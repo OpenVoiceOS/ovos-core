@@ -28,7 +28,8 @@ As always, the OpenVoiceOS team thanks the following entities (in addition to My
 
   - NeonGecko
   - HelloChatterbox
-  - KDE (via Blue Systems)
+  - KDE
+  - Blue Systems
 
 **For now, the rest of this document is part of the README from Mycroft-core.**
 
