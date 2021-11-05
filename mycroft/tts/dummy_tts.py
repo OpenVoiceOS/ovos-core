@@ -21,8 +21,11 @@ from mycroft.tts.tts import TTS, TTSValidator
 
 
 class DummyTTS(TTS):
-    def __init__(self, lang, config):
-        super().__init__(lang, config, DummyValidator(self), 'wav')
+    def __init__(self, lang="en-us", config=None):
+        super().__init__(lang, config or {}, DummyValidator(self), 'wav')
+        LOG.warning("DummyTTS has been deprecated!\n"
+                    "It will be removed after 0.0.3\n"
+                    "use ovos-plugin-manager instead!")
 
     def execute(self, sentence, ident=None, listen=False):
         """Don't do anything, return nothing."""

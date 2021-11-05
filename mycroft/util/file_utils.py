@@ -19,7 +19,7 @@ accessing and curating mycroft's cache.
 """
 
 import os
-import psutil
+
 from stat import S_ISREG, ST_MTIME, ST_MODE, ST_SIZE
 import tempfile
 import xdg.BaseDirectory
@@ -208,6 +208,11 @@ def curate_cache(directory, min_free_percent=5.0, min_free_disk=50):
     # disk available.
     # TODO: Would be easy to add more options, like whitelisted files, etc.
     deleted_files = []
+    try:
+        import psutil
+    except ImportError:
+        LOG.warning("psutil is not installed, cannot curate_cache!")
+        return []
     space = psutil.disk_usage(directory)
 
     min_free_disk = mb_to_bytes(min_free_disk)
