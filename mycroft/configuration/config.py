@@ -199,6 +199,15 @@ def _log_old_location_deprecation(old_user_config=OLD_USER_CONFIG):
                                              BASE_FOLDER))
 
 
+def _get_system_constraints():
+    # constraints must come from SYSTEM config
+    # if not defined then load the DEFAULT constraints
+    # these settings can not be set anywhere else!
+    return LocalConf(SYSTEM_CONFIG).get("system") or \
+           LocalConf(DEFAULT_CONFIG).get("system") or \
+           {}
+
+
 class Configuration:
     """Namespace for operations on the configuration singleton."""
     __config = {}  # Cached config
@@ -239,7 +248,7 @@ class Configuration:
 
         # system administrators can define different constraints in how
         # configurations are loaded
-        system_conf = LocalConf(SYSTEM_CONFIG).get("system") or {}
+        system_conf = _get_system_constraints()
         protected_keys = system_conf.get("protected_keys") or {}
         protected_remote = protected_keys.get("remote") or []
         protected_user = protected_keys.get("user") or []
