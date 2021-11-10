@@ -5,7 +5,6 @@ SpeechRecognition~=3.8.1
 tornado~=6.1
 requests-futures~=0.9.5
 psutil~=5.6.6
-pocketsphinx~=0.1.0
 python-dateutil~=2.6.0
 fasteners~=0.14.1
 PyYAML~=5.4
