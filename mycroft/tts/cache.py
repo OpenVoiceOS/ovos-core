@@ -1,32 +1,9 @@
-"""This module has been deprecated, all TTS logic is part of OPM now
-The 2 methods below remain for backwards compatibility only
-TODO: move these to ovos_utils
 """
-import hashlib
-from pathlib import Path
-
-
-def hash_sentence(sentence: str):
-    """Convert the sentence into a hash value used for the file name
-
-    Args:
-        sentence: The sentence to be cached
-    """
-    encoded_sentence = sentence.encode("utf-8", "ignore")
-    sentence_hash = hashlib.md5(encoded_sentence).hexdigest()
-
-    return sentence_hash
-
-
-def hash_from_path(path: Path) -> str:
-    """Returns hash from a given path.
-
-    Simply removes extension and folder structure leaving the hash.
-
-    Args:
-        path: path to get hash from
-
-    Returns:
-        Hash reference for file.
-    """
-    return path.with_suffix('').name
+NOTE: this is dead code! do not use!
+This file is only present to ensure backwards compatibility
+in case someone is importing from here
+This is only meant for 3rd party code expecting ovos-core
+to be a drop in replacement for mycroft-core
+"""
+from ovos_plugin_manager.utils.tts_cache import hash_sentence, hash_from_path,\
+    AudioFile, PhonemeFile, TextToSpeechCache
