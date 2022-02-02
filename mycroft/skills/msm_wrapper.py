@@ -39,7 +39,11 @@ from ovos_utils.configuration import get_xdg_base
 
 import warnings
 
-warnings.warn("The OpenVoiceOS team regards msm_wrapper.py as dead code. It's available for backwards compatibility with upstream projects, and may be removed in a future update. If you need this functionality use the msm package directly instead")
+warnings.warn(
+    "The OpenVoiceOS team regards msm_wrapper.py as dead code. "
+    "It's available for backwards compatibility with upstream projects, and may be removed in a future update. "
+    "If you need this functionality use the msm package directly instead"
+)
 
 
 try:
