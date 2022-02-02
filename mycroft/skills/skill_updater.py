@@ -42,11 +42,14 @@ def skill_is_blacklisted(skill):
     return False
 
 
-class SeleneDeviceSkills(JsonStorage):
+class _SeleneSkillsManifest(JsonStorage):
     """dict subclass with save/load support
+
     This dictionary contains the metadata expected by selene backend
     This data is used to populate entries in selene skill settings page
     It is only uploaded if enabled in mycroft.conf and device is paired
+
+    Direct usage is strongly discouraged, the purpose of this class is api backwards compatibility
     """
     def __init__(self, api=None):
         path = os.path.join(xdg.BaseDirectory.save_data_path(get_xdg_base()), 'skills.json')
@@ -103,7 +106,7 @@ class SkillUpdater:
     """
 
     def __init__(self, bus=None):
-        self.selene_skills = SeleneDeviceSkills()
+        self.__skill_manifest = _SeleneSkillsManifest()
         self.post_manifest(True)
 
         self.installed_skills = set()
@@ -124,7 +127,7 @@ class SkillUpdater:
     @property
     def installed_skills_file_path(self):
         """Property representing the path of the installed skills file."""
-        return self.selene_skills.path
+        return self.__skill_manifest.path
 
     @property
     def msm(self):
@@ -161,11 +164,11 @@ class SkillUpdater:
         upload_allowed = Configuration.get()['skills'].get('upload_skill_manifest')
         if upload_allowed and is_paired():
             if reload_skills_manifest:
-                self.selene_skills.clear()
-                self.selene_skills.scan_skills()
+                self.__skill_manifest.clear()
+                self.__skill_manifest.scan_skills()
             try:
                 device_api = DeviceApi()
-                device_api.upload_skills_data(self.selene_skills)
+                device_api.upload_skills_data(self.__skill_manifest)
             except Exception:
                 LOG.error('Could not upload skill manifest')
 

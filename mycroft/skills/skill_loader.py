@@ -22,9 +22,8 @@ from time import time
 
 import xdg.BaseDirectory
 
-from mycroft.configuration import BASE_FOLDER
 from mycroft.configuration import Configuration
-from mycroft.configuration.ovos import is_using_xdg
+from ovos_utils.configuration import get_xdg_base, is_using_xdg
 from mycroft.messagebus import Message
 from mycroft.skills.settings import SettingsMetaUploader
 from mycroft.skills.settings import save_settings
@@ -92,7 +91,7 @@ def get_skill_directories(conf=None):
     # they should be considered applets rather than full applications
     skill_locations = list(reversed(
         [os.path.join(p, folder)
-         for p in xdg.BaseDirectory.load_data_paths(BASE_FOLDER)]
+         for p in xdg.BaseDirectory.load_data_paths(get_xdg_base())]
     ))
 
     # load the default skills folder
@@ -144,15 +143,15 @@ def get_default_skills_directory(conf=None):
     # if xdg is disabled, ignore it!
     elif not is_using_xdg():
         # old style mycroft-core skills path definition
-        data_dir = conf.get("data_dir") or "/opt/" + BASE_FOLDER
+        data_dir = conf.get("data_dir") or "/opt/" + get_xdg_base()
         skills_folder = path.join(data_dir, folder)
     else:
-        skills_folder = xdg.BaseDirectory.save_data_path(BASE_FOLDER + '/' + folder)
+        skills_folder = xdg.BaseDirectory.save_data_path(get_xdg_base() + '/' + folder)
     # create folder if needed
     try:
         makedirs(skills_folder, exist_ok=True)
     except PermissionError:  # old style /opt/mycroft/skills not available
-        skills_folder = xdg.BaseDirectory.save_data_path(BASE_FOLDER + '/' + folder)
+        skills_folder = xdg.BaseDirectory.save_data_path(get_xdg_base() + '/' + folder)
         makedirs(skills_folder, exist_ok=True)
 
     return path.expanduser(skills_folder)

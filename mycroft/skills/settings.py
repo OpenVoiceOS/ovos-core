@@ -153,8 +153,10 @@ class SettingsMetaUploader:
     @property
     def msm(self):
         """Instance of the Mycroft Skills Manager"""
-        # TODO - unused but need to keep api backwards compatible
+        # unused but need to keep api backwards compatible
         # log a warning and move on
+        LOG.warning("msm has been deprecated\n"
+                    "DO NOT use self.msm property")
         return None
 
     def get_local_skills(self):

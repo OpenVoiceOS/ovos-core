@@ -37,6 +37,11 @@ from mock_msm import \
 
 from ovos_utils.configuration import get_xdg_base
 
+import warnings
+
+warnings.warn("The OpenVoiceOS team regards this as dead code. It's available for backwards compatibility with upstream projects, and may be removed in a future update.")
+
+
 try:
     from msm.exceptions import MsmException
     from msm import MycroftSkillsManager, SkillRepo
