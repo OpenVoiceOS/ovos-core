@@ -39,7 +39,7 @@ from ovos_utils.configuration import get_xdg_base
 
 import warnings
 
-warnings.warn("The OpenVoiceOS team regards this as dead code. It's available for backwards compatibility with upstream projects, and may be removed in a future update.")
+warnings.warn("The OpenVoiceOS team regards msm_wrapper.py as dead code. It's available for backwards compatibility with upstream projects, and may be removed in a future update. If you need this functionality use the msm package directly instead")
 
 
 try:
@@ -78,7 +78,6 @@ def _init_msm_lock():
 
 def build_msm_config(device_config: dict) -> MsmConfig:
     LOG.warning("build_msm_config has been deprecated\n"
-                "it will be removed in version 0.0.3\n"
                 "use msm package directly instead")
     msm_config = device_config['skills'].get('msm', {})
     msm_repo_config = msm_config.get('repo', {})
@@ -101,7 +100,6 @@ def build_msm_config(device_config: dict) -> MsmConfig:
     )
 
 
-@lru_cache()
 def create_msm(msm_config: MsmConfig) -> MycroftSkillsManager:
     """Returns an instantiated MSM object.
 
