@@ -225,20 +225,22 @@ class SkillManager(Thread):
 
     @property
     def msm(self):
-        # TODO - unused but need to keep api backwards compatible
-        # log a warning and move on
+        """DEPRECATED: do not use, method only for api backwards compatibility
+        Logs a warning and returns None
+        """
         return None
 
     @staticmethod
     def create_msm():
-        # TODO - unused but need to keep api backwards compatible
-        # log a warning and move on
+        """DEPRECATED: do not use, method only for api backwards compatibility
+        Logs a warning and returns None
+        """
         return None
 
     def schedule_now(self, _):
-        # TODO - unused but need to keep api backwards compatible
-        # log a warning and move on
-        pass
+        """DEPRECATED: do not use, method only for api backwards compatibility
+        Logs a warning
+        """
 
     def _start_settings_update(self):
         LOG.info('Start settings update')

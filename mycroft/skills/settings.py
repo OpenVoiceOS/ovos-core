@@ -152,7 +152,9 @@ class SettingsMetaUploader:
 
     @property
     def msm(self):
-        """Instance of the Mycroft Skills Manager"""
+        """DEPRECATED: do not use, method only for api backwards compatibility
+        Logs a warning and returns None
+        """
         # unused but need to keep api backwards compatible
         # log a warning and move on
         LOG.warning("msm has been deprecated\n"
@@ -160,10 +162,13 @@ class SettingsMetaUploader:
         return None
 
     def get_local_skills(self):
-        """Generate a mapping of skill path to skill name for all local skills.
+        """DEPRECATED: do not use, method only for api backwards compatibility
+        Logs a warning and returns empty dictionary
         """
-        # TODO - unused but need to keep api backwards compatible
+        # unused but need to keep api backwards compatible
         # log a warning and move on
+        LOG.warning("msm has been deprecated, do not use this utility method\n"
+                    "get_local_skills always returns an empty dict")
         return {}
 
     @property
@@ -177,7 +182,9 @@ class SettingsMetaUploader:
 
     @property
     def msm_skill_display_name(self):
-        """Display name for use in settings meta."""
+        """DEPRECATED: do not use, method only for api backwards compatibility
+        Logs a warning and returns self.skill_display_name
+        """
         LOG.warning("msm_skill_display_name has been deprecated\n"
                     "use skill_display_name instead")
         return self.skill_display_name

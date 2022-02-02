@@ -34,6 +34,9 @@ FIVE_MINUTES = 300  # number of seconds in a minute
 
 
 def skill_is_blacklisted(skill):
+    """DEPRECATED: do not use, method only for api backwards compatibility
+    Logs a warning and returns False
+    """
     # this is a internal msm helper
     # it should have been private
     # cant remove to keep api compatibility
@@ -131,6 +134,9 @@ class SkillUpdater:
 
     @property
     def msm(self):
+        """DEPRECATED: do not use, method only for api backwards compatibility
+        Logs a warning and returns None
+        """
         # unused but need to keep api backwards compatible
         # log a warning and move on
         LOG.warning("msm has been deprecated\n"
@@ -145,17 +151,17 @@ class SkillUpdater:
         return ()
 
     def update_skills(self, quick=False):
-        """Invoke MSM to install default skills and/or update installed skills
-
-        Args:
-            quick (bool): Expedite the download by running with more threads?
+        """DEPRECATED: do not use, method only for api backwards compatibility
+        Logs a warning and returns True
         """
         LOG.warning("msm has been deprecated\n"
                     "skill install/update is no longer handled by ovos-core")
         return True
 
     def handle_not_connected(self):
-        """Notifications of the device not being connected to the internet"""
+        """"DEPRECATED: do not use, method only for api backwards compatibility
+        Logs a warning
+        """
         LOG.warning("msm has been deprecated\n"
                     "no update will be scheduled")
 
@@ -173,15 +179,15 @@ class SkillUpdater:
                 LOG.error('Could not upload skill manifest')
 
     def install_or_update(self, skill):
-        """Install missing defaults and update existing skills"""
+        """DEPRECATED: do not use, method only for api backwards compatibility
+        Logs a warning
+        """
         LOG.warning("msm has been deprecated\n"
                     f"{skill} will not be changed")
 
     def defaults_installed(self):
-        """Check if all default skills are installed.
-
-        Returns:
-            True if all default skills are installed, else False.
+        """DEPRECATED: do not use, method only for api backwards compatibility
+        Logs a warning and returns True
         """
         LOG.warning("msm has been deprecated\n"
                     "skill install/update is no longer handled by ovos-core")
