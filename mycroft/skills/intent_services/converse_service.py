@@ -19,9 +19,19 @@ class ConverseService:
 
     @property
     def config(self):
+        """
+        Returns:
+            converse_config (dict): config for converse handling options
+        """
         return Configuration.get().get("skills", {}).get("converse") or {}
 
     def get_active_skills(self):
+        """Active skill ids ordered by converse priority
+        this represents the order in which converse will be called
+
+        Returns:
+            active_skills (list): ordered list of skill_ids
+        """
         return [skill[0] for skill in self.active_skills]
 
     def deactivate_skill(self, skill_id, source_skill=None):
@@ -71,6 +81,21 @@ class ConverseService:
             self._consecutive_activations[skill_id] += 1
 
     def _activate_allowed(self, skill_id, source_skill=None):
+        """Checks if a skill_id is allowed to jump to the front of active skills list
+
+        - can a skill activate a different skill
+        - is the skill blacklisted from conversing
+        - is converse configured to only allow specific skills
+        - did the skill activate too many times in a row
+
+        Args:
+            skill_id (str): identifier of skill to be added.
+            source_skill (str): skill requesting the removal
+
+        Returns:
+            permitted (bool): True if skill can be activated
+        """
+
         # cross activation control if skills can activate each other
         if not self.config.get("cross_activation"):
             source_skill = source_skill or skill_id
@@ -114,6 +139,17 @@ class ConverseService:
         return True
 
     def _deactivate_allowed(self, skill_id, source_skill=None):
+        """Checks if a skill_id is allowed to be removed from active skills list
+
+        - can a skill deactivate a different skill
+
+        Args:
+            skill_id (str): identifier of skill to be added.
+            source_skill (str): skill requesting the removal
+
+        Returns:
+            permitted (bool): True if skill can be deactivated
+        """
         # cross activation control if skills can deactivate each other
         if not self.config.get("cross_activation"):
             source_skill = source_skill or skill_id
@@ -123,7 +159,17 @@ class ConverseService:
         return True
 
     def _converse_allowed(self, skill_id):
-        """ check if skill_id is not blacklisted from using converse """
+        """Checks if a skill_id is allowed to converse
+
+        - is the skill blacklisted from conversing
+        - is converse configured to only allow specific skills
+
+        Args:
+            skill_id (str): identifier of skill that wants to converse.
+
+        Returns:
+            permitted (bool): True if skill can converse
+        """
         opmode = self.config.get("converse_mode",
                                  ConverseMode.ACCEPT_ALL)
         if opmode == ConverseMode.BLACKLIST and skill_id in \
@@ -177,6 +223,9 @@ class ConverseService:
             skill_id: skill to query.
             lang (str): current language
             message (Message): message containing interaction info.
+
+        Returns:
+            handled (bool): True if handled otherwise False.
         """
         if self._converse_allowed(skill_id):
             converse_msg = message.reply("skill.converse.request",
