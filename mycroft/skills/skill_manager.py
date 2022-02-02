@@ -325,6 +325,7 @@ class SkillManager(Thread):
 
     def _load_on_startup(self):
         """Handle initial skill load."""
+        self.load_plugin_skills()
         LOG.info('Loading installed skills...')
         self._load_new_skills()
         LOG.info("Skills all loaded!")
@@ -468,15 +469,14 @@ class SkillManager(Thread):
         """Send list of loaded skills."""
         try:
             message_data = {}
-            for skill_loader in self.skill_loaders.values():
-                message_data[skill_loader.skill_id] = {
-                    "active": skill_loader.active and skill_loader.loaded,
-                    "id": skill_loader.skill_id}
-            for skill_loader in self.plugin_skills.values():
-                message_data[skill_loader.skill_id] = {
-                    "active": skill_loader.active and skill_loader.loaded,
-                    "id": skill_loader.skill_id}
             # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
+            skills = {**self.skill_loaders, **self.plugin_skills}
+
+            for skill_loader in skills.values():
+                message_data[skill_loader.skill_id] = {
+                    "active": skill_loader.active and skill_loader.loaded,
+                    "id": skill_loader.skill_id}
+
             self.bus.emit(Message('mycroft.skills.list', data=message_data))
         except Exception:
             LOG.exception('Failed to send skill list')
@@ -484,14 +484,12 @@ class SkillManager(Thread):
     def deactivate_skill(self, message):
         """Deactivate a skill."""
         try:
-            for skill_loader in self.skill_loaders.values():
+            # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
+            skills = {**self.skill_loaders, **self.plugin_skills}
+            for skill_loader in skills.values():
                 if message.data['skill'] == skill_loader.skill_id:
                     LOG.info("Deactivating skill: " + skill_loader.skill_id)
                     skill_loader.deactivate()
-            for skill_loader in self.plugin_skills.values():
-                if message.data['skill'] == skill_loader.skill_id:
-                    skill_loader.deactivate()
-            # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
         except Exception:
             LOG.exception('Failed to deactivate ' + message.data['skill'])
 
@@ -500,15 +498,12 @@ class SkillManager(Thread):
         try:
             skill_to_keep = message.data['skill']
             LOG.info(f'Deactivating all skills except {skill_to_keep}')
-            for skill in self.skill_loaders.values():
-                if skill.skill_id != skill_to_keep:
-                    skill.deactivate()
-                    return
-            for skill in self.plugin_skills.values():
-                if skill.skill_id != skill_to_keep:
-                    skill.deactivate()
-                    return
             # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
+            skills = {**self.skill_loaders, **self.plugin_skills}
+            for skill in skills.values():
+                if skill.skill_id != skill_to_keep:
+                    skill.deactivate()
+                    return
             LOG.info('Couldn\'t find skill ' + message.data['skill'])
         except Exception:
             LOG.exception('An error occurred during skill deactivation!')
@@ -516,17 +511,13 @@ class SkillManager(Thread):
     def activate_skill(self, message):
         """Activate a deactivated skill."""
         try:
-            for skill_loader in self.skill_loaders.values():
-                if (message.data['skill'] in ('all', skill_loader.skill_id)
-                        and not skill_loader.active):
-                    skill_loader.activate()
-                    return
-            for skill_loader in self.plugin_skills.values():
-                if (message.data['skill'] in ('all', skill_loader.skill_id)
-                        and not skill_loader.active):
-                    skill_loader.activate()
-                    return
             # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
+            skills = {**self.skill_loaders, **self.plugin_skills}
+            for skill_loader in skills.values():
+                if (message.data['skill'] in ('all', skill_loader.skill_id)
+                        and not skill_loader.active):
+                    skill_loader.activate()
+                    return
         except Exception:
             LOG.exception('Couldn\'t activate skill')
 

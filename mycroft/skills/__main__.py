@@ -275,7 +275,6 @@ def _initialize_skill_manager(bus, watchdog):
     """
     skill_manager = SkillManager(bus, watchdog)
     skill_manager.load_priority()
-    skill_manager.load_plugin_skills()
     return skill_manager
 
 
