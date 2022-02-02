@@ -270,8 +270,8 @@ class MycroftSkill:
     def settings_path(self):
         is_xdg = is_using_xdg()
         if self.settings_write_path:
-            if is_xdg:
-                LOG.warning("self.settings_write_path has been deprecated!")
+            LOG.warning("self.settings_write_path has been deprecated! "
+                        "Support will be dropped in a future release")
             return join(self.settings_write_path, 'settings.json')
         if not is_xdg:
             return self._old_settings_path
