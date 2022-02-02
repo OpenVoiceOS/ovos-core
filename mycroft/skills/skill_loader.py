@@ -18,7 +18,7 @@ import importlib
 import os
 from os import path, makedirs
 import sys
-from inspect import isclass, signature
+from inspect import isclass
 from time import time
 
 import xdg.BaseDirectory
@@ -26,12 +26,10 @@ import xdg.BaseDirectory
 from mycroft.configuration import Configuration
 from ovos_utils.configuration import get_xdg_base, is_using_xdg
 from mycroft.messagebus import Message
+from mycroft.skills import MycroftSkill
 from mycroft.skills.settings import SettingsMetaUploader
 from mycroft.util.log import LOG
 
-from mycroft.skills import MycroftSkill, CommonIoTSkill, CommonQuerySkill, CommonPlaySkill, FallbackSkill
-from ovos_workshop.skills import OVOSSkill, OVOSFallbackSkill
-from ovos_workshop.skills.common_play import OVOSCommonPlaybackSkill
 
 SKILL_MAIN_MODULE = '__init__.py'
 
@@ -263,21 +261,22 @@ def get_skill_class(skill_module):
     Returns:
         (MycroftSkill): Found subclass of MycroftSkill or None.
     """
-    mycroft_base_classes = [MycroftSkill, CommonIoTSkill, CommonQuerySkill, CommonPlaySkill, FallbackSkill]
-    ovos_base_classes = [OVOSSkill, OVOSFallbackSkill, OVOSCommonPlaybackSkill]
-    skill_base_classes = mycroft_base_classes + ovos_base_classes
-
     candidates = []
     for name, obj in skill_module.__dict__.items():
         if isclass(obj):
-            if issubclass(obj, MycroftSkill) and \
-                    not any(obj is b for b in skill_base_classes):
+            if issubclass(obj, MycroftSkill) and obj is not MycroftSkill:
                 candidates.append(obj)
 
-    if len(candidates) > 1:
-        LOG.warning(f"Multiple skills found in a single file!\n"
-                    f"{candidates}")
+    for candidate in list(candidates):
+        others = [clazz for clazz in candidates if clazz != candidate]
+        # if we found a subclass of this candidate, it is not the final skill
+        if any(issubclass(clazz, candidate) for clazz in others):
+            candidates.remove(candidate)
+
     if candidates:
+        if len(candidates) > 1:
+            LOG.warning(f"Multiple skills found in a single file!\n"
+                        f"{candidates}")
         LOG.debug(f"Loading skill class: {candidates[0]}")
         return candidates[0]
     return None
