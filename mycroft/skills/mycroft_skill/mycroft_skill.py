@@ -171,6 +171,8 @@ class MycroftSkill:
 
     @property
     def is_fully_initialized(self):
+        """Determines if the skill has been fully loaded and setup.
+        When True all data has been loaded and all internal state and events setup"""
         return self._init_event.is_set()
 
     def handle_first_run(self):
@@ -203,7 +205,9 @@ class MycroftSkill:
                 but skill loader can override this
         """
         if self.is_fully_initialized:
-            return  # already initialized
+            LOG.warning(f"Tried to initialize {self.skill_id} multiple times, ignoring")
+            return
+
         # NOTE: this method is called by SkillLoader
         # it is private to make it clear to skill devs they should not touch it
         try:
