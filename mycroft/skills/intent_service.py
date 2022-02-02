@@ -184,7 +184,9 @@ class IntentService:
         self.converse.converse_with_skills(None, lang, message)
 
     def do_converse(self, utterances, skill_id, lang, message):
-        """Call skill and ask if they want to process the utterance.
+        """DEPRECATED: do not use, method only for api backwards compatibility
+
+        Logs a warning and calls ConverseService.converse
 
         Args:
             utterances (list of tuples): utterances paired with normalized
@@ -199,15 +201,16 @@ class IntentService:
         return self.converse.converse(utterances, skill_id, lang, message)
 
     def handle_converse_error(self, message):
-        """Handle error in converse system.
-        Args:
-            message (Message): info about the error.
+        """DEPRECATED: do not use, method only for api backwards compatibility
+        Logs a warning
         """
         # NOTE: can not delete method for backwards compat with upstream
         LOG.warning("handle_converse_error has been deprecated!")
 
     def remove_active_skill(self, skill_id):
-        """Remove a skill from being targetable by converse.
+        """DEPRECATED: do not use, method only for api backwards compatibility
+
+        Logs a warning and calls ConverseService.deactivate_skill
 
         Args:
             skill_id (str): skill to remove
@@ -218,10 +221,9 @@ class IntentService:
         self.converse.deactivate_skill(skill_id)
 
     def add_active_skill(self, skill_id):
-        """Add a skill or update the position of an active skill.
+        """DEPRECATED: do not use, method only for api backwards compatibility
 
-        The skill is added to the front of the list, if it's already in the
-        list it's removed so there is only a single entry of it.
+        Logs a warning and calls ConverseService.activate_skill
 
         Args:
             skill_id (str): identifier of skill to be added.
