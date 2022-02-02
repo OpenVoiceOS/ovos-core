@@ -49,7 +49,9 @@ from mycroft.skills.skill_data import (
     munge_intent_parser,
     read_vocab_file,
     read_value_file,
-    read_translated_file
+    read_translated_file,
+    ResourceFile,
+    SkillResources
 )
 from mycroft.util import (
     resolve_resource_file,
@@ -414,6 +416,18 @@ class MycroftSkill:
                 if isdir(path):
                     return path
         return join(base_path, lang)
+
+    @property
+    def alphanumeric_skill_id(self):
+        return "".join(
+            char if char.isalnum() else "_" for char in str(self.skill_id)
+        )
+
+    @property
+    def resources(self):
+        """Lazily instantiates a ResourceFileLocator instance when needed."""
+        return SkillResources(self.root_dir, self.lang,
+                              self.dialog_renderer)
 
     def bind(self, bus):
         """Register messagebus emitter with skill.
@@ -893,33 +907,23 @@ class MycroftSkill:
         Returns:
             bool: True if the utterance has the given vocabulary it
         """
+        match = False
         lang = lang or self.lang
         cache_key = lang + voc_filename
         if cache_key not in self.voc_match_cache:
-            # Check for both skill resources and mycroft-core resources
-            voc = self.find_resource(voc_filename + '.voc', 'vocab')
-            if not voc:  # Check for vocab in mycroft core resources
-                voc = resolve_resource_file(join('text', lang,
-                                                 voc_filename + '.voc'))
-                if voc:
-                    LOG.info(f"Found global resource: '{voc_filename}.voc' "
-                             f"for lang '{lang}'")
-            if not voc or not exists(voc):
-                raise FileNotFoundError(f'Could not find {voc_filename}.voc file')
-            # load vocab and flatten into a simple list
-            vocab = read_vocab_file(voc)
+            vocab = self.resources.load_vocabulary_file(voc_filename)
             self.voc_match_cache[cache_key] = list(chain(*vocab))
         if utt:
             if exact:
                 # Check for exact match
-                return any(i.strip() == utt
-                           for i in self.voc_match_cache[cache_key])
+                match = any(i.strip() == utt
+                            for i in self.voc_match_cache[cache_key])
             else:
                 # Check for matches against complete words
-                return any([re.match(r'.*\b' + i + r'\b.*', utt)
+                match = any([re.match(r'.*\b' + i + r'\b.*', utt)
                             for i in self.voc_match_cache[cache_key]])
-        else:
-            return False
+
+        return match
 
     def report_metric(self, name, data):
         """Report a skill metric to the Mycroft servers.
@@ -1007,43 +1011,21 @@ class MycroftSkill:
                     self.register_intent_file(intent_file, method)
 
     def translate(self, text, data=None):
-        """Load a translatable single string resource
-
-        The string is loaded from a file in the skill's dialog subdirectory
-        'dialog/<lang>/<text>.dialog'
-
-        The string is randomly chosen from the file and rendered, replacing
-        mustache placeholders with values found in the data dictionary.
-
-        Args:
-            text (str): The base filename  (no extension needed)
-            data (dict, optional): a JSON dictionary
-
-        Returns:
-            str: A randomly chosen string from the file
-        """
-        if not self.dialog_renderer:
-            return ""
-        return self.dialog_renderer.render(text, data or {})
+        """Deprecated method for translating a dialog file."""
+        return self.resources.render_dialog(text, data)
 
     def find_resource(self, res_name, res_dirname=None, lang=None):
         """Find a resource file.
 
         Searches for the given filename using this scheme:
+            1. Search the resource lang directory:
+                <skill>/<res_dirname>/<lang>/<res_name>
+            2. Search the resource directory:
+                <skill>/<res_dirname>/<res_name>
 
-        1. Search the resource lang directory:
-
-           <skill>/<res_dirname>/<lang>/<res_name>
-
-        2. Search the resource directory:
-
-           <skill>/<res_dirname>/<res_name>
-
-        3. Search the locale lang directory or other subdirectory:
-
-           <skill>/locale/<lang>/<res_name> or
-
-           <skill>/locale/<lang>/.../<res_name>
+            3. Search the locale lang directory or other subdirectory:
+                <skill>/locale/<lang>/<res_name> or
+                <skill>/locale/<lang>/.../<res_name>
 
         Args:
             res_name (string): The resource name to be found
@@ -1090,73 +1072,16 @@ class MycroftSkill:
         return None
 
     def translate_namedvalues(self, name, delim=','):
-        """Load translation dict containing names and values.
-
-        This loads a simple CSV from the 'dialog' folders.
-        The name is the first list item, the value is the
-        second.  Lines prefixed with # or // get ignored
-
-        Args:
-            name (str): name of the .value file, no extension needed
-            delim (char): delimiter character used, default is ','
-
-        Returns:
-            dict: name and value dictionary, or empty dict if load fails
-        """
-
-        if not name.endswith('.value'):
-            name += '.value'
-
-        try:
-            filename = self.find_resource(name, 'dialog')
-            return read_value_file(filename, delim)
-
-        except Exception:
-            return {}
-
-    def translate_template(self, template_name, data=None):
-        """Load a translatable template.
-
-        The strings are loaded from a template file in the skill's dialog
-        subdirectory.
-        'dialog/<lang>/<template_name>.template'
-
-        The strings are loaded and rendered, replacing mustache placeholders
-        with values found in the data dictionary.
-
-        Args:
-            template_name (str): The base filename (no extension needed)
-            data (dict, optional): a JSON dictionary
-
-        Returns:
-            list of str: The loaded template file
-        """
-        return self.__translate_file(template_name + '.template', data)
+        """Deprecated method for translating a name/value file."""
+        return self.resources.load_named_value_file(name, delim)
 
     def translate_list(self, list_name, data=None):
-        """Load a list of translatable string resources
+        """Deprecated method for translating a list."""
+        return self.resources.load_list_file(list_name, data)
 
-        The strings are loaded from a list file in the skill's dialog
-        subdirectory.
-        'dialog/<lang>/<list_name>.list'
-
-        The strings are loaded and rendered, replacing mustache placeholders
-        with values found in the data dictionary.
-
-        Args:
-            list_name (str): The base filename (no extension needed)
-            data (dict, optional): a JSON dictionary
-
-        Returns:
-            list of str: The loaded list of strings with items in consistent
-                         positions regardless of the language.
-        """
-        return self.__translate_file(list_name + '.list', data)
-
-    def __translate_file(self, name, data):
-        """Load and render lines from dialog/<lang>/<name>"""
-        filename = self.find_resource(name, 'dialog')
-        return read_translated_file(filename, data)
+    def translate_template(self, template_name, data=None):
+        """Deprecated method for translating a template file"""
+        return self.resources.load_template_file(template_name, data)
 
     def add_event(self, name, handler, handler_info=None, once=False):
         """Create event handler for executing intent or other event.
@@ -1258,22 +1183,20 @@ class MycroftSkill:
         """Register an Intent file with the intent service.
 
         For example:
-
-        === food.order.intent ===
-        Order some {food}.
-        Order some {food} from {place}.
-        I'm hungry.
-        Grab some {food} from {place}.
+            food.order.intent:
+                Order some {food}.
+                Order some {food} from {place}.
+                I'm hungry.
+                Grab some {food} from {place}.
 
         Optionally, you can also use <register_entity_file>
         to specify some examples of {food} and {place}
 
         In addition, instead of writing out multiple variations
         of the same sentence you can write:
-
-        === food.order.intent ===
-        (Order | Grab) some {food} (from {place} | ).
-        I'm hungry.
+            food.order.intent:
+                (Order | Grab) some {food} (from {place} | ).
+                I'm hungry.
 
         Args:
             intent_file: name of file that contains example queries
@@ -1281,45 +1204,39 @@ class MycroftSkill:
                          '.intent'
             handler:     function to register with intent
         """
-        langs = [self._core_lang] + self._secondary_langs
-        for lang in langs:
-            name = f'{self.skill_id}:{intent_file}'
-            filename = self.find_resource(intent_file, 'vocab', lang=lang)
-            if not filename:
-                self.log.error(f'Unable to find "{intent_file}"')
-                continue
-            self.intent_service.register_padatious_intent(name, filename, lang)
-            if handler:
-                self.add_event(name, handler, 'mycroft.skill.handler')
+        name = '{}:{}'.format(self.skill_id, intent_file)
+        resource_file = ResourceFile(self.resources.types.intent, intent_file)
+        if resource_file.file_path is None:
+            raise FileNotFoundError('Unable to find "{}"'.format(intent_file))
+        self.intent_service.register_padatious_intent(
+             name, str(resource_file.file_path)
+        )
+        if handler:
+            self.add_event(name, handler, 'mycroft.skill.handler')
 
     def register_entity_file(self, entity_file):
         """Register an Entity file with the intent service.
 
         An Entity file lists the exact values that an entity can hold.
         For example:
-
-        === ask.day.intent ===
-        Is it {weekend}?
-
-        === weekend.entity ===
-        Saturday
-        Sunday
+            ask.day.intent:
+                Is it {weekend}?
+            weekend.entity:
+                Saturday
+                Sunday
 
         Args:
             entity_file (string): name of file that contains examples of an
-                                  entity.  Must end with '.entity'
+                                  entity.
         """
-        if entity_file.endswith('.entity'):
-            entity_file = entity_file.replace('.entity', '')
-        langs = [self._core_lang] + self._secondary_langs
-        for lang in langs:
-            filename = self.find_resource(entity_file + ".entity", 'vocab',
-                                          lang=lang)
-            if not filename:
-                self.log.error(f'Unable to find "{entity_file}"')
-                continue
-            name = f'{self.skill_id}:{entity_file}'
-            self.intent_service.register_padatious_entity(name, filename, lang)
+        entity = ResourceFile(self.resources.types.entity, entity_file)
+        if entity.file_path is None:
+            raise FileNotFoundError('Unable to find "{}"'.format(entity_file))
+
+        name = '{}:{}'.format(self.skill_id, entity_file)
+        self.intent_service.register_padatious_entity(
+            name, str(entity.file_path)
+        )
 
     def handle_enable_intent(self, message):
         """Listener to enable a registered intent if it belongs to this skill.
@@ -1395,7 +1312,7 @@ class MycroftSkill:
         if not isinstance(word, str):
             raise ValueError('Word should be a string')
 
-        context = to_alnum(self.skill_id) + context
+        context = self.alphanumeric_skill_id + context
         self.intent_service.set_adapt_context(context, word, origin)
 
     def handle_set_cross_context(self, message):
@@ -1439,7 +1356,7 @@ class MycroftSkill:
         """Remove a keyword from the context manager."""
         if not isinstance(context, str):
             raise ValueError('context should be a string')
-        context = to_alnum(self.skill_id) + context
+        context = self.alphanumeric_skill_id + context
         self.intent_service.remove_adapt_context(context)
 
     def register_vocabulary(self, entity, entity_type, lang=None):
@@ -1449,8 +1366,9 @@ class MycroftSkill:
             entity:         word to register
             entity_type:    Intent handler entity to tie the word to
         """
-        keyword_type = to_alnum(self.skill_id) + entity_type
-        self.intent_service.register_adapt_keyword(keyword_type, entity, lang=lang or self.lang)
+        keyword_type = self.alphanumeric_skill_id + entity_type
+        self.intent_service.register_adapt_keyword(keyword_type, entity,
+                                                   lang=lang or self.lang)
 
     def register_regex(self, regex_str, lang=None):
         """Register a new regex.
@@ -1534,96 +1452,51 @@ class MycroftSkill:
         if not process:
             LOG.warning("Unable to play 'acknowledge' audio file!")
 
-    def _load_dialog_files(self, root_directory, lang):
+
+    def load_data_files(self):
+        """Called by the skill loader to load intents, dialogs, etc."""
+        self.init_dialog()
+        self.load_vocab_files()
+        self.load_regex_files()
+
+    def init_dialog(self):
         # If "<skill>/dialog/<lang>" exists, load from there.  Otherwise
         # load dialog from "<skill>/locale/<lang>"
-        dialog_dir = self._get_language_dir(
-            join(root_directory, 'dialog'), lang)
-        locale_dir = self._get_language_dir(
-            join(root_directory, 'locale'), lang)
+        dialog_dir = join(self.root_dir, 'dialog', self.lang)
         if exists(dialog_dir):
-            self.dialog_renderers[lang] = load_dialogs(dialog_dir)
-        elif exists(locale_dir):
-            self.dialog_renderers[lang] = load_dialogs(locale_dir)
+            self.dialog_renderer = load_dialogs(dialog_dir)
+        elif exists(join(self.root_dir, 'locale', self.lang)):
+            locale_path = join(self.root_dir, 'locale', self.lang)
+            self.dialog_renderer = load_dialogs(locale_path)
         else:
-            LOG.debug(f'No dialog loaded for {lang}')
+            LOG.debug('No dialog loaded')
+        self.resources.dialog_renderer = self.dialog_renderer
 
-    def init_dialog(self, root_directory):
-        langs = [self._core_lang] + self._secondary_langs
-        for lang in langs:
-            self._load_dialog_files(root_directory, lang)
-
-    def load_data_files(self, root_directory=None):
-        """Called by the skill loader to load intents, dialogs, etc.
-
-        Args:
-            root_directory (str): root folder to use when loading files.
-        """
-        root_directory = root_directory or self.root_dir
-        self.init_dialog(root_directory)
-        self.load_vocab_files(root_directory)
-        self.load_regex_files(root_directory)
-
-    def _load_vocab_files(self, root_directory, lang):
-        keywords = []
-        vocab_dir = self._get_language_dir(join(root_directory, 'vocab'), lang)
-        locale_dir = self._get_language_dir(join(root_directory, 'locale'),
-                                            lang)
-
-        if exists(vocab_dir):
-            keywords = load_vocabulary(vocab_dir, self.skill_id)
-        elif exists(locale_dir):
-            keywords = load_vocabulary(locale_dir, self.skill_id)
+    def load_vocab_files(self):
+        """ Load vocab files found under skill's root directory."""
+        if self.resources.types.vocabulary.base_directory is None:
+            self.log.info("Skill has no vocabulary")
         else:
-            LOG.debug(f'No vocab loaded for {lang}')
+            skill_vocabulary = self.resources.load_skill_vocabulary(
+                self.alphanumeric_skill_id
+            )
+            # For each found intent register the default along with any aliases
+            for vocab_type in skill_vocabulary:
+                for line in skill_vocabulary[vocab_type]:
+                    entity = line[0]
+                    aliases = line[1:]
+                    self.intent_service.register_adapt_keyword(vocab_type,
+                                                               entity,
+                                                               aliases)
 
-        # For each found intent register the default along with any aliases
-        for vocab_type in keywords:
-            for line in keywords[vocab_type]:
-                entity = line[0]
-                aliases = line[1:]
-                self.intent_service.register_adapt_keyword(vocab_type,
-                                                           entity,
-                                                           aliases,
-                                                           lang)
-
-    def load_vocab_files(self, root_directory):
-        """ Load vocab files found under root_directory.
-
-        Args:
-            root_directory (str): root folder to use when loading files
-        """
-        langs = [self._core_lang] + self._secondary_langs
-        for lang in langs:
-            self._load_vocab_files(root_directory, lang)
-
-    def _load_regex_files(self, root_directory, lang):
-        """ Load regex files found under the skill directory.
-
-        Args:
-            root_directory (str): root folder to use when loading files
-        """
-        regexes = []
-        regex_dir = self._get_language_dir(join(root_directory, 'regex'), lang)
-        locale_dir = self._get_language_dir(join(root_directory, 'locale'), lang)
-
-        if exists(regex_dir):
-            regexes = load_regex(regex_dir, self.skill_id)
-        elif exists(locale_dir):
-            regexes = load_regex(locale_dir, self.skill_id)
-
-        for regex in regexes:
-            self.intent_service.register_adapt_regex(regex, lang)
-
-    def load_regex_files(self, root_directory):
-        """ Load regex files found under the skill directory.
-
-        Args:
-            root_directory (str): root folder to use when loading files
-        """
-        langs = [self._core_lang] + self._secondary_langs
-        for lang in langs:
-            self._load_regex_files(root_directory, lang)
+    def load_regex_files(self):
+        """ Load regex files found under the skill directory."""
+        if self.resources.types.regex.base_directory is not None:
+            regexes = self.resources.load_skill_regex(
+                self.alphanumeric_skill_id
+            )
+            for regex in regexes:
+                self.intent_service.register_adapt_regex(regex)
 
     def __handle_stop(self, message):
         """Handler for the "mycroft.stop" signal. Runs the user defined
