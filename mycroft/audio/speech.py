@@ -132,8 +132,8 @@ def mimic_fallback_tts(utterance, ident, listen):
             LOG.debug("Mimic fallback, utterance : " + str(utterance))
             tts.execute(utterance, ident, listen)
             return
-        except:
-            pass
+        except Exception as e:
+            LOG.exception(e)
 
     LOG.error("TTS FAILURE! utterance : " + str(utterance))
 
