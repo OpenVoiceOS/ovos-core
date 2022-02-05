@@ -82,30 +82,61 @@ def main(ready_hook=on_ready, error_hook=on_error, stopping_hook=on_stopping):
     NOTE: in ovos-core the GUI protocol is handled in it's own service and not part of the enclosure like in mycroft-core!
           You need to also run mycroft.gui process separately, it has been extracted into it's own module
     """
-    LOG.warning("mycroft.client.enclosure is in the process of being deprecated in ovos-core!\n"
-                "see https://github.com/OpenVoiceOS/ovos_PHAL\n"
-                "Be sure to run mycroft.gui process separately, it has been extracted into it's own module!\n"
-                "The only reason to run mycroft.client.enclosure is mark1 support\n"
-                "this module will be removed in version 0.0.3")
     # Read the system configuration
     config = Configuration.get(remote=False)
+
+    if not config.get("backwards_compat", True):
+        LOG.warning("mycroft.client.enclosure is DEPRECATED in ovos-core!\n"
+                    "see https://github.com/OpenVoiceOS/ovos_PHAL")
+        raise DeprecationWarning("Please run PHAL instead of enclosure")
+
     platform = config.get("enclosure", {}).get("platform")
 
-    enclosure = create_enclosure(platform)
-    if enclosure:
-        LOG.debug("Enclosure created")
+    LOG.warning("mycroft.client.enclosure is DEPRECATED in ovos-core!\n"
+                "see https://github.com/OpenVoiceOS/ovos_PHAL\n"
+                "ovos-core now runs the GUI websocket under a different service!")
+
+    if platform == "PHAL":
+        from ovos_PHAL import PHAL
+        LOG.debug("Launching PHAL instead of enclosure")
+        # config read from mycroft.conf
+        # "PHAL": {
+        #     "ovos-PHAL-plugin-display-manager-ipc": {"enabled": true},
+        #     "ovos-PHAL-plugin-mk1": {"enabled": True}
+        # }
+        phal = PHAL()
+        phal.start()
+    else:
+        enclosure = create_enclosure(platform)
+        if enclosure:
+            LOG.debug("Enclosure created")
+            try:
+                reset_sigint_handler()
+                setup_locale()
+                enclosure.run()
+                ready_hook()
+            except Exception as e:
+                error_hook(e)
+        else:
+            LOG.info("No enclosure available for this hardware, running headless")
+
+        LOG.warning("Backwards compatibility is enabled, attempting to launch gui service...\n"
+                    "Please run PHAL + gui service as separate processes instead!")
         try:
-            reset_sigint_handler()
-            setup_locale()
-            enclosure.run()
-            ready_hook()
-            wait_for_exit_signal()
-            enclosure.stop()
-            stopping_hook()
+            service = GUIService()
+            service.run()
         except Exception as e:
             error_hook(e)
-    else:
-        LOG.info("No enclosure available for this hardware, running headless")
+            service = None
+
+        ready_hook()
+        wait_for_exit_signal()
+
+        if enclosure:
+            enclosure.stop()
+        if service:
+            service.stop()
+        stopping_hook()
 
 
 if __name__ == "__main__":
