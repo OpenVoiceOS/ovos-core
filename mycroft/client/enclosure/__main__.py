@@ -25,6 +25,7 @@ to be a drop in replacement for mycroft-core
 
 from mycroft.configuration import setup_locale
 from mycroft.configuration import Configuration
+from mycroft.gui.service import GUIService
 from mycroft.util.log import LOG
 from mycroft.util import wait_for_exit_signal, reset_sigint_handler
 
@@ -85,27 +86,28 @@ def main(ready_hook=on_ready, error_hook=on_error, stopping_hook=on_stopping):
     # Read the system configuration
     config = Configuration.get(remote=False)
 
+    LOG.warning("mycroft.client.enclosure is DEPRECATED in ovos-core!\n"
+                "see https://github.com/OpenVoiceOS/ovos_PHAL")
+
     if not config.get("backwards_compat", True):
-        LOG.warning("mycroft.client.enclosure is DEPRECATED in ovos-core!\n"
-                    "see https://github.com/OpenVoiceOS/ovos_PHAL")
         raise DeprecationWarning("Please run PHAL instead of enclosure")
 
     platform = config.get("enclosure", {}).get("platform")
 
-    LOG.warning("mycroft.client.enclosure is DEPRECATED in ovos-core!\n"
-                "see https://github.com/OpenVoiceOS/ovos_PHAL\n"
-                "ovos-core now runs the GUI websocket under a different service!")
-
     if platform == "PHAL":
-        from ovos_PHAL import PHAL
-        LOG.debug("Launching PHAL instead of enclosure")
+        LOG.debug("Launching PHAL")
         # config read from mycroft.conf
         # "PHAL": {
         #     "ovos-PHAL-plugin-display-manager-ipc": {"enabled": true},
         #     "ovos-PHAL-plugin-mk1": {"enabled": True}
         # }
-        phal = PHAL()
-        phal.start()
+        try:
+            from ovos_PHAL import PHAL
+            phal = PHAL()
+            phal.start()
+        except Exception as e:
+            LOG.exception("PHAL failed to launch!")
+            error_hook(e)
     else:
         enclosure = create_enclosure(platform)
         if enclosure:
