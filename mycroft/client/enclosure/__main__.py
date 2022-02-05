@@ -39,7 +39,7 @@ def on_stopping():
 
 
 def on_error(e='Unknown'):
-    LOG.error('Enclosure failed: {}'.format(repr(e)))
+    LOG.error(f'Enclosure failed: {e}')
 
 
 def create_enclosure(platform):
@@ -86,11 +86,14 @@ def main(ready_hook=on_ready, error_hook=on_error, stopping_hook=on_stopping):
     # Read the system configuration
     config = Configuration.get(remote=False)
 
-    LOG.warning("mycroft.client.enclosure is DEPRECATED in ovos-core!\n"
-                "see https://github.com/OpenVoiceOS/ovos_PHAL")
+    LOG.warning("mycroft.client.enclosure is DEPRECATED in ovos-core!")
+    LOG.warning("see https://github.com/OpenVoiceOS/ovos_PHAL")
 
     if not config.get("backwards_compat", True):
         raise DeprecationWarning("Please run PHAL instead of enclosure")
+
+    reset_sigint_handler()
+    setup_locale()
 
     platform = config.get("enclosure", {}).get("platform")
 
@@ -113,8 +116,6 @@ def main(ready_hook=on_ready, error_hook=on_error, stopping_hook=on_stopping):
         if enclosure:
             LOG.debug("Enclosure created")
             try:
-                reset_sigint_handler()
-                setup_locale()
                 enclosure.run()
                 ready_hook()
             except Exception as e:
@@ -122,13 +123,13 @@ def main(ready_hook=on_ready, error_hook=on_error, stopping_hook=on_stopping):
         else:
             LOG.info("No enclosure available for this hardware, running headless")
 
-        LOG.warning("Backwards compatibility is enabled, attempting to launch gui service...\n"
-                    "Please run PHAL + gui service as separate processes instead!")
+        LOG.warning("Backwards compatibility is enabled, attempting to launch gui service...")
+        LOG.warning("Please run PHAL + gui service as separate processes instead!")
         try:
             service = GUIService()
             service.run()
         except Exception as e:
-            error_hook(e)
+            LOG.error(f"GUI : {e}")
             service = None
 
         ready_hook()
