@@ -137,7 +137,7 @@ class IntentService:
     @property
     def registered_intents(self):
         return [parser.__dict__
-                for parser in self.adapt_service.engine.intent_parsers]
+                for parser in self.adapt_service.engines["en-us"].intent_parsers]
 
     def update_skill_name_dict(self, message):
         """Messagebus handler, updates dict of id to skill name conversions."""
