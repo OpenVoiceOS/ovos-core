@@ -17,7 +17,7 @@ import time
 from threading import Event
 
 from mycroft.configuration import Configuration, setup_locale
-from mycroft.messagebus.message import Message
+from mycroft.messagebus.message import Message, dig_for_message
 from mycroft.metrics import report_timing, Stopwatch
 from mycroft.skills.intent_service_interface import open_intent_envelope
 from mycroft.skills.intent_services import (
@@ -136,8 +136,12 @@ class IntentService:
 
     @property
     def registered_intents(self):
+        message = dig_for_message()
+        lang = "en-us"
+        if message:
+            lang = _get_message_lang(message)
         return [parser.__dict__
-                for parser in self.adapt_service.engine.intent_parsers]
+                for parser in self.adapt_service.engines[lang].intent_parsers]
 
     def update_skill_name_dict(self, message):
         """Messagebus handler, updates dict of id to skill name conversions."""
@@ -181,7 +185,7 @@ class IntentService:
         """Let skills know there was a problem with speech recognition"""
         lang = _get_message_lang(message)
         setup_locale(lang)  # restore default lang
-        self.converse.converse_with_skills(None, lang, message)
+        self.converse.converse_with_skills([], lang, message)
 
     def do_converse(self, utterances, skill_id, lang, message):
         """DEPRECATED: do not use, method only for api backwards compatibility
@@ -246,7 +250,7 @@ class IntentService:
         ident = context['ident'] if 'ident' in context else None
         # Determine what handled the intent
         if intent and intent.intent_service == 'Converse':
-            intent_type = '{}:{}'.format(intent.skill_id, 'converse')
+            intent_type = f'{intent.skill_id}:converse'
         elif intent and intent.intent_service == 'Fallback':
             intent_type = 'fallback'
         elif intent:  # Handled by an other intent parser
@@ -359,7 +363,7 @@ class IntentService:
         entity_type = message.data.get('entity_type')
         regex_str = message.data.get('regex')
         alias_of = message.data.get('alias_of')
-        lang = message.data.get('lang')
+        lang = _get_message_lang(message)
         self.adapt_service.register_vocabulary(entity_value, entity_type,
                                                alias_of, regex_str, lang)
         self.registered_vocab.append(message.data)
@@ -433,7 +437,7 @@ class IntentService:
             message (Message): message containing utterance
         """
         utterance = message.data["utterance"]
-        lang = message.data.get("lang", "en-us")
+        lang = _get_message_lang(message)
         combined = _normalize_all_utterances([utterance])
 
         # Create matchers
@@ -495,7 +499,7 @@ class IntentService:
             message (Message): message containing utterance
         """
         utterance = message.data["utterance"]
-        lang = message.data.get("lang", "en-us")
+        lang = _get_message_lang(message)
         combined = _normalize_all_utterances([utterance])
         intent = self.adapt_service.match_intent(combined, lang)
         intent_data = intent.intent_data if intent else None
