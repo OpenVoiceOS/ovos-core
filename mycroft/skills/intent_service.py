@@ -30,7 +30,7 @@ from mycroft.util.log import LOG
 from mycroft.util.parse import normalize
 
 
-def _get_message_lang(message):
+def _get_message_lang(message=None):
     """Get the language from the message or the default language.
 
     Args:
@@ -39,7 +39,10 @@ def _get_message_lang(message):
     Returns:
         The language code from the message or the default language.
     """
+    message = message or dig_for_message()
     default_lang = Configuration.get().get('lang', 'en-us')
+    if not message:
+        return default_lang
     return message.data.get('lang', default_lang).lower()
 
 
@@ -136,10 +139,7 @@ class IntentService:
 
     @property
     def registered_intents(self):
-        message = dig_for_message()
-        lang = "en-us"
-        if message:
-            lang = _get_message_lang(message)
+        lang = _get_message_lang()
         return [parser.__dict__
                 for parser in self.adapt_service.engines[lang].intent_parsers]
 
