@@ -13,9 +13,6 @@
 # limitations under the License.
 #
 """Mycroft's intent service, providing intent parsing since forever!"""
-import time
-from threading import Event
-
 from mycroft.configuration import Configuration, setup_locale
 from mycroft.messagebus.message import Message, dig_for_message
 from mycroft.metrics import report_timing, Stopwatch
@@ -40,6 +37,7 @@ def _get_message_lang(message=None):
         The language code from the message or the default language.
     """
     message = message or dig_for_message()
+    # TODO read active locale from LF instead
     default_lang = Configuration.get().get('lang', 'en-us')
     if not message:
         return default_lang
