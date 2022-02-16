@@ -1,4 +1,4 @@
-name: Run License Tests
+name: Run UnitTests
 on:
   pull_request:
     branches:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  license_tests:
+  unit_tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
