@@ -18,7 +18,7 @@ from unittest import TestCase, mock
 
 from mycroft.gui.namespace import Namespace, NamespaceManager
 from mycroft.messagebus import Message
-from ...mocks import MessageBusMock
+from ..mocks import MessageBusMock
 
 PATCH_MODULE = "mycroft.gui.namespace"
 
