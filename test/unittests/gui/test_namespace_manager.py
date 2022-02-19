@@ -16,11 +16,11 @@
 
 from unittest import TestCase, mock
 
-from mycroft.enclosure.hardware.display.gui.namespace import Namespace, NamespaceManager
+from mycroft.gui.namespace import Namespace, NamespaceManager
 from mycroft.messagebus import Message
-from ...mocks import MessageBusMock
+from ..mocks import MessageBusMock
 
-PATCH_MODULE = "mycroft.enclosure.hardware.display.gui.namespace"
+PATCH_MODULE = "mycroft.gui.namespace"
 
 
 class TestNamespace(TestCase):
