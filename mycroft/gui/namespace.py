@@ -439,7 +439,7 @@ class NamespaceManager:
         Args:
             persistence: length of time the namespace should be displayed
         """
-        LOG.debug("Setting namespace persistence to {}".format(persistence))
+        LOG.debug(f"Setting namespace persistence to {persistence}")
         for position, namespace in enumerate(self.active_namespaces):
             if position:
                 if not namespace.persistent:
@@ -471,7 +471,7 @@ class NamespaceManager:
             self._remove_namespace_via_timer,
             args=(namespace.name,)
         )
-        LOG.debug("Scheduled removal of namespace {} in duration {}".format(namespace.name, namespace.duration))
+        LOG.debug(f"Scheduled removal of namespace {namespace.name} in duration {namespace.duration}")
         remove_namespace_timer.start()
         self.remove_namespace_timers[namespace.name] = remove_namespace_timer
 
@@ -568,14 +568,14 @@ class NamespaceManager:
         # GUI has interacted with a page
         # Update and increase the namespace duration and reset the remove timer
         namespace_name = message.data.get("skill_id")
-        LOG.debug("GUI interacted with page in namespace {}".format(namespace_name))
+        LOG.debug(f"GUI interacted with page in namespace {namespace_name}")
         if namespace_name == self.idle_display_skill:
             return
         else: 
             namespace = self.loaded_namespaces.get(namespace_name)
             if not namespace.persistent:
                 if self.remove_namespace_timers[namespace.name]:
-                    LOG.debug("Resetting remove timer for namespace {}".format(namespace.name))
+                    LOG.debug(f"Resetting remove timer for namespace {namespace.name}")
                     self.remove_namespace_timers[namespace.name].cancel()
                     self._del_namespace_in_remove_timers(namespace.name)
                     self._schedule_namespace_removal(namespace)

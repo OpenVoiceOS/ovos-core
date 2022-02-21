@@ -28,7 +28,7 @@ class GUIService:
     def add_homescreen(self, homescreen):
         # if homescreen[id] not in self.homescreens then add it
         homescreen_id = homescreen.data["id"]
-        LOG.info("Homescreen Manager: Adding Homescreen {}".format(homescreen_id))
+        LOG.info(f"Homescreen Manager: Adding Homescreen {homescreen_id}")
         # check if the list is empty
         if len(self.homescreens) == 0:
             self.homescreens.append(homescreen.data)
@@ -42,7 +42,7 @@ class GUIService:
 
     def remove_homescreen(self, homescreen):
         homescreen_id = homescreen.data["id"]
-        LOG.info("Homescreen Manager: Removing Homescreen {}".format(homescreen_id))
+        LOG.info(f"Homescreen Manager: Removing Homescreen {homescreen_id}")
         for h in self.homescreens:
             if homescreen_id == h["id"]:
                 self.homescreens.pop(h)
@@ -54,7 +54,7 @@ class GUIService:
         config = Configuration.get()
         enclosure_config = config.get("enclosure")
         active_homescreen = enclosure_config.get("idle_display_skill")
-        LOG.debug("Homescreen Manager: Active Homescreen {}".format(active_homescreen))
+        LOG.debug(f"Homescreen Manager: Active Homescreen {active_homescreen}")
         for h in self.homescreens:
             if h["id"] == active_homescreen:
                 return active_homescreen
@@ -75,7 +75,7 @@ class GUIService:
     def show_homescreen_on_add(self, homescreen_id):
         active_homescreen = self.get_active_homescreen()
         if active_homescreen == homescreen_id:
-            LOG.info("Homescreen Manager: Displaying Homescreen {}".format(active_homescreen))
+            LOG.info(f"Homescreen Manager: Displaying Homescreen {active_homescreen}")
             self.bus.emit(Message("homescreen.manager.activate.display", {"homescreen_id": active_homescreen}))
     
     def disable_active_homescreen(self, message):

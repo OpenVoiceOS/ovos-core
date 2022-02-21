@@ -91,7 +91,7 @@ class GUIWebsocketHandler(WebSocketHandler):
         self.synchronize()
 
     def on_close(self):
-        LOG.info('Closing {}'.format(id(self)))
+        LOG.info(f'Closing {id(self)}')
         GUIWebsocketHandler.clients.remove(self)
 
     def synchronize(self):
@@ -100,7 +100,7 @@ class GUIWebsocketHandler(WebSocketHandler):
         enclosure = self.application.enclosure
 
         for namespace in enclosure.active_namespaces:
-            LOG.info('Sync {}'.format(namespace.name))
+            LOG.info(f'Sync {namespace.name}')
             # Insert namespace
             self.send({"type": "mycroft.session.list.insert",
                        "namespace": "mycroft.system.active_skills",
@@ -122,7 +122,7 @@ class GUIWebsocketHandler(WebSocketHandler):
             namespace_pos += 1
 
     def on_message(self, message):
-        LOG.info("Received: {}".format(message))
+        LOG.info(f"Received: {message}")
         msg = json.loads(message)
         if (msg.get('type') == "mycroft.events.triggered" and
                 (msg.get('event_name') == 'page_gained_focus' or
@@ -134,12 +134,12 @@ class GUIWebsocketHandler(WebSocketHandler):
                         'skill_id': msg['parameters'].get('skillId')}
         elif msg.get('type') == "mycroft.events.triggered":
             # A normal event was triggered
-            msg_type = '{}.{}'.format(msg['namespace'], msg['event_name'])
+            msg_type = f'{msg['namespace']}.{msg['event_name']}'
             msg_data = msg['parameters']
 
         elif msg.get('type') == 'mycroft.session.set':
             # A value was changed send it back to the skill
-            msg_type = '{}.{}'.format(msg['namespace'], 'set')
+            msg_type = f'{msg['namespace']}.set'
             msg_data = msg['data']
 
         message = Message(msg_type, msg_data)
