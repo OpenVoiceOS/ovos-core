@@ -25,7 +25,6 @@ from mycroft.skills.fallback_skill import FallbackSkill
 from mycroft.skills.common_iot_skill import CommonIoTSkill
 from mycroft.skills.common_play_skill import CommonPlaySkill, CPSMatchLevel
 from mycroft.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel
-from mycroft.skills.idle_display_skill import IdleDisplaySkill
 
 try:
     from mycroft.skills.intent_service import AdaptIntent
@@ -41,5 +40,4 @@ __all__ = ['MycroftSkill',
            'CommonPlaySkill',
            'CPSMatchLevel',
            'CommonQuerySkill',
-           'CQSMatchLevel',
-           'IdleDisplaySkill']
+           'CQSMatchLevel']
