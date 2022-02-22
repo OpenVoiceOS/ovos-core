@@ -91,7 +91,7 @@ class GUIWebsocketHandler(WebSocketHandler):
         self.synchronize()
 
     def on_close(self):
-        LOG.info(f'Closing {id(self)}')
+        LOG.info('Closing {}'.format(id(self)))
         GUIWebsocketHandler.clients.remove(self)
 
     def synchronize(self):
@@ -111,7 +111,7 @@ class GUIWebsocketHandler(WebSocketHandler):
             self.send({"type": "mycroft.gui.list.insert",
                        "namespace": namespace.name,
                        "position": 0,
-                       "data": [{"url": p} for p in namespace.pages]
+                       "data": [{"url": p.url} for p in namespace.pages]
                        })
             # Insert data
             for key, value in namespace.data.items():
@@ -122,24 +122,29 @@ class GUIWebsocketHandler(WebSocketHandler):
             namespace_pos += 1
 
     def on_message(self, message):
-        LOG.info(f"Received: {message}")
+        LOG.info("Received: {message}")
         msg = json.loads(message)
         if (msg.get('type') == "mycroft.events.triggered" and
                 (msg.get('event_name') == 'page_gained_focus' or
                     msg.get('event_name') == 'system.gui.user.interaction')):
             # System event, a page was changed
-            msg_type = 'gui.page_interaction'
+            event_name = msg.get('event_name')
+            if event_name == 'page_gained_focus':
+                msg_type = 'gui.page_gained_focus'
+            else:
+                msg_type = 'gui.page_interaction'
+
             msg_data = {'namespace': msg['namespace'],
                         'page_number': msg['parameters'].get('number'),
                         'skill_id': msg['parameters'].get('skillId')}
         elif msg.get('type') == "mycroft.events.triggered":
             # A normal event was triggered
-            msg_type = f'{msg['namespace']}.{msg['event_name']}'
+            msg_type = '{}.{}'.format(msg['namespace'], msg['event_name'])
             msg_data = msg['parameters']
 
         elif msg.get('type') == 'mycroft.session.set':
             # A value was changed send it back to the skill
-            msg_type = f'{msg['namespace']}.set'
+            msg_type = '{}.{}'.format(msg['namespace'], 'set')
             msg_data = msg['data']
 
         message = Message(msg_type, msg_data)
@@ -164,7 +169,7 @@ class GUIWebsocketHandler(WebSocketHandler):
             data (dict): Data to transmit
         """
         s = json.dumps(data)
-        # LOG.info('Sending {}'.format(s))
+        #LOG.info('Sending {}'.format(s))
         self.write_message(s)
 
     def check_origin(self, origin):

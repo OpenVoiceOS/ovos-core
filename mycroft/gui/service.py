@@ -17,6 +17,7 @@ class GUIService:
         self.bus.on("homescreen.manager.get_active", self.get_active_homescreen)
         self.bus.on("homescreen.manager.set_active", self.set_active_homescreen)
         self.bus.on("homescreen.manager.disable_active", self.disable_active_homescreen)
+        self.bus.on("mycroft.mark2.register_idle", self.register_old_style_homescreen)
 
     def run(self):
         """Start the GUI after it has been constructed."""
@@ -28,6 +29,7 @@ class GUIService:
     def add_homescreen(self, homescreen):
         # if homescreen[id] not in self.homescreens then add it
         homescreen_id = homescreen.data["id"]
+        homescreen_class = homescreen.data["class"]
         LOG.info(f"Homescreen Manager: Adding Homescreen {homescreen_id}")
         # check if the list is empty
         if len(self.homescreens) == 0:
@@ -37,8 +39,8 @@ class GUIService:
             for h in self.homescreens:
                 if homescreen_id != h["id"]:
                     self.homescreens.append(homescreen.data)
-    
-        self.show_homescreen_on_add(homescreen_id)
+
+        self.show_homescreen_on_add(homescreen_id, homescreen_class)
 
     def remove_homescreen(self, homescreen):
         homescreen_id = homescreen.data["id"]
@@ -54,7 +56,7 @@ class GUIService:
         config = Configuration.get()
         enclosure_config = config.get("enclosure")
         active_homescreen = enclosure_config.get("idle_display_skill")
-        LOG.debug(f"Homescreen Manager: Active Homescreen {active_homescreen}")
+        LOG.info(f"Homescreen Manager: Active Homescreen {active_homescreen}")
         for h in self.homescreens:
             if h["id"] == active_homescreen:
                 return active_homescreen
@@ -70,14 +72,19 @@ class GUIService:
 
     def reload_homescreens_list(self):
         LOG.info("Homescreen Manager: Reloading Homescreen List")
+        self.collect_old_style_homescreens()
         self.bus.emit(Message("homescreen.manager.reload.list"))
 
-    def show_homescreen_on_add(self, homescreen_id):
+    def show_homescreen_on_add(self, homescreen_id, homescreen_class):
         active_homescreen = self.get_active_homescreen()
         if active_homescreen == homescreen_id:
-            LOG.info(f"Homescreen Manager: Displaying Homescreen {active_homescreen}")
-            self.bus.emit(Message("homescreen.manager.activate.display", {"homescreen_id": active_homescreen}))
-    
+            if homescreen_class == "IdleDisplaySkill":
+                LOG.info(f"Homescreen Manager: Displaying Homescreen {active_homescreen}")
+                self.bus.emit(Message("homescreen.manager.activate.display", {"homescreen_id": active_homescreen}))
+            elif homescreen_class == "MycroftSkill":
+                LOG.info(f"Homescreen Manager: Displaying Homescreen {active_homescreen}")
+                self.bus.emit(Message("{}.idle".format(homescreen_id)))
+
     def disable_active_homescreen(self, message):
         conf = LocalConf(USER_CONFIG)
         conf["enclosure"] = {
@@ -85,6 +92,23 @@ class GUIService:
         }
         conf.store()
         self.bus.emit(Message("configuration.patch", {"config": conf}))
+
+    ### Add compabitility with older versions of the Resting Screen Class
+
+    def collect_old_style_homescreens(self):
+        """Trigger collection of older resting screens."""
+        self.bus.emit(Message("mycroft.mark2.collect_idle"))
+
+    def register_old_style_homescreen(self, message):
+        if "name" in message.data and "id" in message.data:
+            super_class_name = "MycroftSkill"
+            super_class_object = message.data["name"]
+            skill_id = message.data["id"]
+            _homescreen_entry = {"class": super_class_name, "name": super_class_object , "id": skill_id}
+            LOG.debug("Homescreen Manager: Adding OLD Homescreen {skill_id}")
+            self.add_homescreen(Message("homescreen.manager.add", _homescreen_entry))
+        else:
+            LOG.error("Malformed idle screen registration received")
 
     def stop(self):
         """Perform any GUI shutdown processes."""
