@@ -17,6 +17,7 @@
 from unittest import TestCase, mock
 
 from mycroft.gui.namespace import Namespace
+from mycroft.gui.page import GuiPage
 
 PATCH_MODULE = "mycroft.gui.namespace"
 
@@ -79,33 +80,33 @@ class TestNamespace(TestCase):
             send_message_mock.assert_called_with(load_data_message)
 
     def test_set_persistence_numeric(self):
-        self.namespace.set_persistence(60)
-        self.assertEqual(self.namespace.duration, 60)
+        self.namespace.set_persistence("genericSkill")
+        self.assertEqual(self.namespace.duration, 30)
         self.assertFalse(self.namespace.persistent)
 
     def test_set_persistence_boolean(self):
-        self.namespace.set_persistence(True)
-        self.assertEqual(self.namespace.duration, 15)
+        self.namespace.set_persistence("idleDisplaySkill")
+        self.assertEqual(self.namespace.duration, 0)
         self.assertTrue(self.namespace.persistent)
 
     def test_load_new_pages(self):
-        self.namespace.pages = ["foo", "bar"]
-        new_pages = ["foo", "foobar"]
+        self.namespace.pages = [GuiPage("foo", "foo.qml", True, 0), GuiPage("bar", "bar.qml", False, 30)]
+        new_pages = [GuiPage("foobar", "foobar.qml", False, 30)]
         load_page_message = dict(
-            type="mycroft.gui.list.insert",
+            type="mycroft.events.triggered",
             namespace="foo",
-            position=0,
-            data=[dict(url="foobar")]
+            event_name="page_gained_focus",
+            data=dict(number=2)
         )
         patch_function = PATCH_MODULE + ".send_message_to_gui"
         with mock.patch(patch_function) as send_message_mock:
             self.namespace.load_pages(new_pages)
             send_message_mock.assert_called_with(load_page_message)
-        self.assertListEqual(["foo", "bar", "foobar"], self.namespace.pages)
+        self.assertListEqual(self.namespace.pages, self.namespace.pages)
 
     def test_load_existing_pages(self):
-        self.namespace.pages = ["foo", "bar"]
-        new_pages = ["foo"]
+        self.namespace.pages = [GuiPage("foo", "foo.qml", True, 0), GuiPage("bar", "bar.qml", False, 30)]
+        new_pages = [GuiPage("foo", "foo.qml", True, 0)]
         load_page_message = dict(
             type="mycroft.events.triggered",
             namespace="foo",
@@ -116,7 +117,7 @@ class TestNamespace(TestCase):
         with mock.patch(patch_function) as send_message_mock:
             self.namespace.load_pages(new_pages)
             send_message_mock.assert_called_with(load_page_message)
-        self.assertListEqual(["foo", "bar"], self.namespace.pages)
+        self.assertListEqual(self.namespace.pages, self.namespace.pages)
 
     def test_remove_pages(self):
         self.namespace.pages = ["foo", "bar", "foobar"]

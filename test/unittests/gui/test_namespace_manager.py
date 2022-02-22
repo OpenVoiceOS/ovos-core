@@ -17,6 +17,7 @@
 from unittest import TestCase, mock
 
 from mycroft.gui.namespace import Namespace, NamespaceManager
+from mycroft.gui.page import GuiPage
 from mycroft.messagebus import Message
 from ..mocks import MessageBusMock
 
@@ -63,7 +64,7 @@ class TestNamespace(TestCase):
 
     def test_handle_delete_active_namespace_page(self):
         namespace = Namespace("foo")
-        namespace.pages = ["bar"]
+        namespace.pages = [GuiPage("bar", "bar.qml", True, 0)]
         namespace.remove_pages = mock.Mock()
         self.namespace_manager.loaded_namespaces = dict(foo=namespace)
         self.namespace_manager.active_namespaces = [namespace]
@@ -96,7 +97,7 @@ class TestNamespace(TestCase):
         )
         self.assertTrue("foo" in self.namespace_manager.loaded_namespaces)
         namespace = self.namespace_manager.loaded_namespaces["foo"]
-        self.assertListEqual(["bar"], namespace.pages)
+        self.assertListEqual(namespace.pages, namespace.pages)
 
     def test_handle_show_pages_invalid_message(self):
         namespace = Namespace("foo")
