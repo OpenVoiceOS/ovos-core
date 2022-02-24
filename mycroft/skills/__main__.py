@@ -31,7 +31,7 @@ from mycroft.skills.api import SkillApi
 from mycroft.skills.core import FallbackSkill
 from mycroft.skills.event_scheduler import EventScheduler
 from mycroft.skills.intent_service import IntentService
-from mycroft.skills.skill_manager import SkillManager
+from mycroft.skills.skill_manager import SkillManager, on_error, on_stopping, on_ready, on_alive, on_started
 from mycroft.util import (
     connected,
     reset_sigint_handler,
@@ -180,26 +180,6 @@ class DevicePrimer:
         self.bus.emit(Message("speak", data))
         if wait:
             wait_while_speaking()
-
-
-def on_started():
-    LOG.info('Skills service is starting up.')
-
-
-def on_alive():
-    LOG.info('Skills service is alive.')
-
-
-def on_ready():
-    LOG.info('Skills service is ready.')
-
-
-def on_error(e='Unknown'):
-    LOG.info('Skills service failed to launch ({})'.format(repr(e)))
-
-
-def on_stopping():
-    LOG.info('Skills service is shutting down...')
 
 
 def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
