@@ -316,6 +316,8 @@ class SkillManager(Thread):
         """Load skills and update periodically from disk and internet."""
         self._remove_git_locks()
 
+        self.load_priority()
+
         if self.skills_config.get("wait_for_internet", True):
             while not connected() and not self._connected_event.is_set():
                 sleep(1)

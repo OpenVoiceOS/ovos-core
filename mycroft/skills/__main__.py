@@ -40,6 +40,7 @@ from mycroft.util import (
 )
 from mycroft.util.log import LOG
 
+
 RASPBERRY_PI_PLATFORMS = ('mycroft_mark_1', 'picroft', 'mycroft_mark_2pi')
 
 
@@ -184,6 +185,11 @@ class DevicePrimer:
 
 def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
          error_hook=on_error, stopping_hook=on_stopping, watchdog=None):
+    """Create a thread that monitors the loaded skills, looking for updates
+
+    Returns:
+        SkillManager instance or None if it couldn't be initialized
+    """
     reset_sigint_handler()
     # Create PID file, prevent multiple instances of this service
     mycroft.lock.Lock('skills')
@@ -197,12 +203,12 @@ def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
     event_scheduler.setDaemon(True)
     event_scheduler.start()
     SkillApi.connect_bus(bus)
-    skill_manager = _initialize_skill_manager(bus, watchdog,
-                                              alive_hook=alive_hook,
-                                              started_hook=started_hook,
-                                              stopping_hook=stopping_hook,
-                                              ready_hook=ready_hook,
-                                              error_hook=error_hook)
+    skill_manager = SkillManager(bus, watchdog,
+                                 alive_hook=alive_hook,
+                                 started_hook=started_hook,
+                                 stopping_hook=stopping_hook,
+                                 ready_hook=ready_hook,
+                                 error_hook=error_hook)
 
     device_primer = DevicePrimer(bus)
     device_primer.prepare_device()
@@ -226,30 +232,6 @@ def _register_intent_services(bus):
         FallbackSkill.make_intent_failure_handler(bus)
     )
     return service
-
-
-def _initialize_skill_manager(bus, watchdog,
-                              alive_hook=on_alive, started_hook=on_started,
-                              ready_hook=on_ready, error_hook=on_error,
-                              stopping_hook=on_stopping):
-    """Create a thread that monitors the loaded skills, looking for updates
-
-    Returns:
-        SkillManager instance or None if it couldn't be initialized
-    """
-    skill_manager = SkillManager(bus, watchdog,
-                                 alive_hook=alive_hook,
-                                 started_hook=started_hook,
-                                 stopping_hook=stopping_hook,
-                                 ready_hook=ready_hook,
-                                 error_hook=error_hook)
-    skill_manager.load_priority()
-    return skill_manager
-
-
-def _wait_for_internet_connection():
-    while not connected():
-        time.sleep(1)
 
 
 def shutdown(skill_manager, event_scheduler):
