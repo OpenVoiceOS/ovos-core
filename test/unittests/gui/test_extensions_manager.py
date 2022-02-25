@@ -23,8 +23,6 @@ class TestExtensionManager:
                 }
             })
         mock_get.return_value = config
-        config['enclosure']['extension'] = 'Generic'
-        config['enclosure']['extension']['generic']['homescreen_supported'] = False
         extension_manager = ExtensionsManager("ExtensionManager", MessageBusMock(), MessageBusMock())
         extension_manager.activate_extension = mock.Mock()
         extension_manager.activate_extension("Generic")
