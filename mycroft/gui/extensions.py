@@ -219,9 +219,8 @@ class GenericExtension():
         self.bus = bus
         self.gui = gui
         config = Configuration.get()
-        enclosure_config = config.get("enclosure", {})
-        self.homescreen_supported = enclosure_config.get(
-            "extension", {}).get("generic", {}).get("homescreen_supported", False)
+        generic_config = config.get("generic", {})
+        self.homescreen_supported = generic_config.get("homescreen_supported", False)
 
         if self.homescreen_supported:
             self.homescreen_manager = HomescreenManager(self.bus, self.gui)
