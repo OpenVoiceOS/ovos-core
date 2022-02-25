@@ -11,8 +11,7 @@ PATCH_MODULE = "mycroft.gui.extensions"
 
 class TestExtensionManager:
     @patch.object(Configuration, 'get')
-
-    def test_extension_manager_activate(self):
+    def test_extension_manager_activate(self, mock_get):
         config = base_config()
         config.merge(
             {
