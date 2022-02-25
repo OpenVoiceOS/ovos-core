@@ -1,4 +1,5 @@
 from unittest import TestCase, mock
+from unittest.mock import patch
 from mycroft.gui.extensions import ExtensionsManager
 from ..mocks import MessageBusMock
 from mycroft.configuration import Configuration
