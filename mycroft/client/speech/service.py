@@ -26,6 +26,7 @@ from mycroft.util import (
 )
 from mycroft.util.log import LOG
 from mycroft.util.process_utils import ProcessStatus, StatusCallbackMap
+from ovos_utils.file_utils import read_vocab_file, resolve_resource_file
 
 
 def on_ready():
@@ -125,7 +126,8 @@ class SpeechClient(Thread):
                    'source': 'audio'}
         self.bus.emit(Message('speak', event, context))
 
-    def handle_complete_intent_failure(self, event):
+    # messagebus events
+    def handle_complete_intent_failure(self, message):
         """Extreme backup for answering completely unhandled intent requests."""
         LOG.info("Failed to find intent.")
         data = {'utterance': dialog.get('not.loaded')}
@@ -133,58 +135,145 @@ class SpeechClient(Thread):
                    'source': 'audio'}
         self.bus.emit(Message('speak', data, context))
 
-    def handle_sleep(self, event):
+    def handle_sleep(self, message):
         """Put the recognizer loop to sleep."""
         self.loop.sleep()
 
-    def handle_wake_up(self, event):
+    def handle_wake_up(self, message):
         """Wake up the the recognize loop."""
         self.loop.awaken()
 
-    def handle_mic_mute(self, event):
+    def handle_mic_mute(self, message):
         """Mute the listener system."""
         self.loop.mute()
 
-    def handle_mic_unmute(self, event):
+    def handle_mic_unmute(self, message):
         """Unmute the listener system."""
         self.loop.unmute()
 
-    def handle_mic_listen(self, _):
+    def handle_mic_listen(self, message):
         """Handler for mycroft.mic.listen.
 
         Starts listening as if wakeword was spoken.
         """
         self.loop.responsive_recognizer.trigger_listen()
 
-    def handle_mic_get_status(self, event):
+    def handle_mic_get_status(self, message):
         """Query microphone mute status."""
         data = {'muted': self.loop.is_muted()}
-        self.bus.emit(event.response(data))
+        self.bus.emit(message.response(data))
 
-    def handle_paired(self, event):
+    def handle_paired(self, message):
         """Update identity information with pairing data.
 
         This is done here to make sure it's only done in a single place.
         TODO: Is there a reason this isn't done directly in the pairing skill?
         """
-        IdentityManager.update(event.data)
+        IdentityManager.update(message.data)
 
-    def handle_audio_start(self, event):
+    def handle_audio_start(self, message):
         """Mute recognizer loop."""
         if self.config.get("listener").get("mute_during_output"):
             self.loop.mute()
 
-    def handle_audio_end(self, event):
+    def handle_audio_end(self, message):
         """Request unmute, if more sources have requested the mic to be muted
         it will remain muted.
         """
         if self.config.get("listener").get("mute_during_output"):
             self.loop.unmute()  # restore
 
-    def handle_stop(self, event):
+    def handle_stop(self, message):
         """Handler for mycroft.stop, i.e. button press."""
         self.loop.force_unmute()
 
+    # stt control bus events
+    def handle_load_stt_lang(self, message):
+        """ tell STT to pre load a model for this language, it will be needed """
+        lang = message.data.get("lang") or Configuration.get().get("lang", "en-us")
+        LOG.info(f"Loading STT lang: {lang}")
+        if hasattr(self.loop.stt, "load_language"):
+            try:
+                self.loop.stt.load_language(lang)
+            except:
+                LOG.exception(f"Failed to load STT lang: {lang}")
+        if hasattr(self.loop.fallback_stt, "load_language"):
+            try:
+                self.loop.fallback_stt.load_language(lang)
+            except:
+                LOG.exception(f"Failed to load fallback STT lang: {lang}")
+
+    def handle_unload_stt_lang(self, message):
+        """ tell STT to unload model for this language, it won't be needed anymore """
+        lang = message.data.get("lang") or Configuration.get().get("lang", "en-us")
+        LOG.info(f"Unloading STT lang: {lang}")
+        if hasattr(self.loop.stt, "unload_language"):
+            try:
+                self.loop.stt.unload_language(lang)
+            except:
+                LOG.exception(f"Failed to unload STT lang: {lang}")
+        if hasattr(self.loop.fallback_stt, "unload_language"):
+            try:
+                self.loop.fallback_stt.unload_language(lang)
+            except:
+                LOG.exception(f"Failed to unload fallback STT lang: {lang}")
+
+    def handle_enable_limited_vocab(self, message):
+        """ enable limited vocabulary mode if supported
+        will only consider pre defined .voc files
+        """
+        lang = message.data.get("lang") or Configuration.get().get("lang", "en-us")
+        fallback = message.data.get("english_fallback", False)
+        permanent = message.data.get("permanent", False)
+        words = ["[unk]"]
+        for voc_file in message.data.get("vocabs", []):
+            voc = resolve_resource_file(f"text/{lang}/{voc_file}.voc")
+            if lang != "en-us" and not voc and fallback:
+                voc = resolve_resource_file(f"text/en-us/{voc_file}.voc")
+            if voc:
+                for w in read_vocab_file(voc):
+                    words += w
+        LOG.info(f"Enabling limited vocab:  {words}")
+        if hasattr(self.loop.stt, "enable_limited_vocabulary"):
+            try:
+                self.loop.stt.enable_limited_vocabulary(words,
+                                                        lang=lang,
+                                                        permanent=permanent)
+            except:
+                LOG.exception(f"Failed to enable limited STT vocabulary")
+        if hasattr(self.loop.fallback_stt, "enable_limited_vocabulary"):
+            try:
+                self.loop.fallback_stt.enable_limited_vocabulary(words,
+                                                    lang=lang,
+                                                    permanent=permanent)
+            except:
+                LOG.exception(f"Failed to enable limited fallback STT vocabulary")
+
+    def handle_enable_full_vocab(self, message):
+        """ re enable default transcription mode """
+        lang = message.data.get("lang") or Configuration.get().get("lang", "en-us")
+        LOG.info(f"Enabling full vocab: {lang}")
+        if hasattr(self.loop.stt, "enable_full_vocabulary"):
+            try:
+                self.loop.stt.enable_full_vocabulary(lang)
+            except:
+                LOG.exception(f"Failed to disable limited STT vocabulary")
+        if hasattr(self.loop.fallback_stt, "enable_full_vocabulary"):
+            try:
+                self.loop.fallback_stt.enable_full_vocabulary(lang)
+            except:
+                LOG.exception(f"Failed to disable limited fallback STT vocabulary")
+
+    def handle_enable_yesno_vocab(self, message):
+        """ enable limited vocabulary mode if supported
+        will only consider yes / no answer variations
+        """
+        message.data["vocabs"] = ["yes", "no"]
+        message.data["english_fallback"] = True
+        message.data["permanent"] = False
+        self.handle_enable_limited_vocab(message)
+
+    # loop initialization
     def handle_open(self):
         # TODO: Move this into the Enclosure (not speech client)
         # Reset the UI to indicate ready for speech processing
@@ -219,6 +308,11 @@ class SpeechClient(Thread):
         self.bus.on('recognizer_loop:audio_output_start',
                     self.handle_audio_start)
         self.bus.on('recognizer_loop:audio_output_end', self.handle_audio_end)
+        self.bus.on('recognizer_loop:load_language', self.handle_load_stt_lang)
+        self.bus.on('recognizer_loop:unload_language', self.handle_unload_stt_lang)
+        self.bus.on('recognizer_loop:set_yesno_vocab', self.handle_enable_yesno_vocab)
+        self.bus.on('recognizer_loop:set_limited_vocab', self.handle_enable_limited_vocab)
+        self.bus.on('recognizer_loop:set_full_vocab', self.handle_enable_full_vocab)
         self.bus.on('mycroft.stop', self.handle_stop)
 
     def run(self):
