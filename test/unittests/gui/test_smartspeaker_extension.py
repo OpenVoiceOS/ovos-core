@@ -16,7 +16,7 @@ class TestSmartSpeakerExtension:
         config = base_config()
         config.merge(
             {
-                'enclosure': {
+                'gui': {
                     'extension': 'SmartSpeaker'
                 }
             })
@@ -32,7 +32,7 @@ class TestSmartSpeakerExtension:
         config = base_config()
         config.merge(
             {
-                'enclosure': {
+                'gui': {
                     'extension': 'SmartSpeaker'
                 }
             })

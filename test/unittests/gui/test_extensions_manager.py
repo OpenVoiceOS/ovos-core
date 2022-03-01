@@ -15,7 +15,7 @@ class TestExtensionManager:
         config = base_config()
         config.merge(
             {
-                'enclosure': {
+                'gui': {
                     'extension': 'Generic',
                     'generic': {
                         'homescreen_supported': False

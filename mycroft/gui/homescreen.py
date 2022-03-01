@@ -57,7 +57,7 @@ class HomescreenManager:
 
     def get_active_homescreen(self):
         config = Configuration.get()
-        enclosure_config = config.get("enclosure")
+        enclosure_config = config.get("gui")
         active_homescreen = enclosure_config.get("idle_display_skill")
         LOG.debug(f"Homescreen Manager: Active Homescreen {active_homescreen}")
         for h in self.homescreens:
@@ -67,7 +67,7 @@ class HomescreenManager:
     def set_active_homescreen(self, homescreen):
         homescreen_id = homescreen.data["id"]
         conf = LocalConf(USER_CONFIG)
-        conf["enclosure"] = {
+        conf["gui"] = {
             "idle_display_skill": homescreen_id,
         }
         conf.store()
@@ -94,7 +94,7 @@ class HomescreenManager:
 
     def disable_active_homescreen(self, message):
         conf = LocalConf(USER_CONFIG)
-        conf["enclosure"] = {
+        conf["gui"] = {
             "idle_display_skill": None,
         }
         conf.store()

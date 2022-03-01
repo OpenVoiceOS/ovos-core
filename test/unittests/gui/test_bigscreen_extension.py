@@ -16,7 +16,7 @@ class TestBigscreenExtension:
         config = base_config()
         config.merge(
             {
-                'enclosure': {
+                'gui': {
                     'extension': 'Bigscreen'
                 }
             })
@@ -32,7 +32,7 @@ class TestBigscreenExtension:
         config = base_config()
         config.merge(
             {
-                'enclosure': {
+                'gui': {
                     'extension': 'Bigscreen'
                 }
             })

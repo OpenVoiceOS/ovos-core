@@ -3,7 +3,7 @@ from mycroft.configuration import Configuration
 from mycroft.messagebus import Message
 from mycroft.util.log import LOG
 from mycroft.api import is_paired
-from ovos_utils.system import system_reboot, system_shutdown, ssh_enable, ssh_disable
+from ovos_utils.system import ssh_enable, ssh_disable
 
 from json_database import JsonStorageXDG
 from mycroft.gui.homescreen import HomescreenManager
@@ -24,7 +24,7 @@ class ExtensionsManager():
         self.bus = bus
         self.gui = gui
         config = Configuration.get()
-        enclosure_config = config.get("enclosure")
+        enclosure_config = config.get("gui")
         self.active_extension = enclosure_config.get("extension", "Generic")
 
         # ToDo: Add Exclusive Support For "Desktop", "Mobile" Extensions
@@ -75,14 +75,7 @@ class SmartSpeakerExtension():
         self.homescreen_thread.start()
 
         self.device_paired = is_paired()
-        store_conf = ('skill_conf.json')
-
-        self.skill_conf = JsonStorageXDG(store_conf)
-        if not "selected_backend" in self.skill_conf:
-            self.skill_conf["selected_backend"] = "unknown"
-            self.skill_conf.store()
-        else:
-            self.skill_conf = JsonStorageXDG(store_conf)
+        self.backend = "unknown"
 
         try:
             self.bus.on("ovos.pairing.process.completed",
@@ -90,8 +83,6 @@ class SmartSpeakerExtension():
             self.bus.on("ovos.pairing.set.backend", self.set_backend_type)
             self.bus.on("mycroft.gui.screen.close",
                         self.handle_remove_namespace)
-            self.bus.on("system.reboot", self.handle_system_reboot)
-            self.bus.on("system.shutdown", self.handle_system_shutdown)
             self.bus.on("system.display.homescreen",
                         self.handle_system_display_homescreen)
 
@@ -101,13 +92,27 @@ class SmartSpeakerExtension():
     def set_backend_type(self, message):
         backend = message.data.get("backend", "unknown")
         if not backend == "unknown":
-            self.skill_conf["selected_backend"] = backend
-            self.skill_conf.store()
-            self.device_backend = self.skill_conf["selected_backend"]
+            self.backend = backend
+        else:
+            backend = self._detect_backend()
+            self.backend = backend
 
     def start_homescreen_process(self, message):
         self.device_paired = is_paired()
-        self.homescreen_manager.show_homescreen()
+        if not self.backend == "local":
+            self.homescreen_manager.show_homescreen()
+            self.bus.emit(Message("ovos.shell.status.ok"))
+        else:
+            self.bus.emit(Message("ovos.shell.status.ok"))
+
+    def _detect_backend(self):
+        config = Configuration.get()
+        server_config = config.get("server")
+        backend_config = server_config.get("url")
+        if "https://api.mycroft.ai" in backend_config:
+            return "remote"
+        else:
+            return "local"
 
     def handle_remove_namespace(self, message):
         LOG.info("Got Clear Namespace Event In Skill")
@@ -115,12 +120,6 @@ class SmartSpeakerExtension():
         if get_skill_namespace:
             self.bus.emit(Message("gui.clear.namespace",
                                   {"__from": get_skill_namespace}))
-
-    def handle_system_reboot(self, message):
-        system_reboot()
-
-    def handle_system_shutdown(self, message):
-        system_shutdown()
 
     def handle_system_ssh_enable(self, message):
         ssh_enable()
@@ -219,7 +218,8 @@ class GenericExtension():
         self.bus = bus
         self.gui = gui
         config = Configuration.get()
-        generic_config = config.get("generic", {})
+        gui_config = config.get("gui")
+        generic_config = gui_config.get("generic", {})
         self.homescreen_supported = generic_config.get("homescreen_supported", False)
 
         if self.homescreen_supported:
