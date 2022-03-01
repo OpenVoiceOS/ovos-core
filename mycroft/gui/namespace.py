@@ -385,7 +385,7 @@ def _get_active_gui_extension():
     enclosure_config = config.get("gui")
     gui_extension = enclosure_config.get("extension")
 
-    return gui_extension
+    return gui_extension.lower()
 
 
 class NamespaceManager:

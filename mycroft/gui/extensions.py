@@ -25,25 +25,25 @@ class ExtensionsManager():
         self.gui = gui
         config = Configuration.get()
         enclosure_config = config.get("gui")
-        self.active_extension = enclosure_config.get("extension", "Generic")
+        self.active_extension = enclosure_config.get("extension", "generic")
 
         # ToDo: Add Exclusive Support For "Desktop", "Mobile" Extensions
-        self.supported_extensions = ["SmartSpeaker", "Bigscreen", "Generic"]
+        self.supported_extensions = ["smartspeaker", "bigscreen", "generic"]
 
-        if self.active_extension not in self.supported_extensions:
-            self.active_extension = "Generic"
+        if self.active_extension.lower() not in self.supported_extensions:
+            self.active_extension = "generic"
 
         LOG.info(
             f"Extensions Manager: Initializing {self.name} with active extension {self.active_extension}")
-        self.activate_extension(self.active_extension)
+        self.activate_extension(self.active_extension.lower())
 
     def activate_extension(self, extension_id):
         LOG.info(f"Extensions Manager: Activating Extension {extension_id}")
 
         # map extension_id to class
-        if extension_id == "SmartSpeaker":
+        if extension_id == "smartspeaker":
             self.extension = SmartSpeakerExtension(self.bus, self.gui)
-        elif extension_id == "Bigscreen":
+        elif extension_id == "bigscreen":
             self.extension = BigscreenExtension(self.bus, self.gui)
         else:
             self.extension = GenericExtension(self.bus, self.gui)
@@ -120,12 +120,6 @@ class SmartSpeakerExtension():
         if get_skill_namespace:
             self.bus.emit(Message("gui.clear.namespace",
                                   {"__from": get_skill_namespace}))
-
-    def handle_system_ssh_enable(self, message):
-        ssh_enable()
-
-    def handle_system_ssh_disable(self, message):
-        ssh_disable()
 
     def handle_system_display_homescreen(self, message):
         self.homescreen_manager.show_homescreen()

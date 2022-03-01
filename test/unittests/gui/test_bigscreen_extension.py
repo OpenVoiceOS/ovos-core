@@ -17,7 +17,7 @@ class TestBigscreenExtension:
         config.merge(
             {
                 'gui': {
-                    'extension': 'Bigscreen'
+                    'extension': 'bigscreen'
                 }
             })
         mock_get.return_value = config
@@ -33,7 +33,7 @@ class TestBigscreenExtension:
         config.merge(
             {
                 'gui': {
-                    'extension': 'Bigscreen'
+                    'extension': 'bigscreen'
                 }
             })
         mock_get.return_value = config

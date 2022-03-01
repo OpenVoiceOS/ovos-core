@@ -16,7 +16,7 @@ class TestExtensionManager:
         config.merge(
             {
                 'gui': {
-                    'extension': 'Generic',
+                    'extension': 'generic',
                     'generic': {
                         'homescreen_supported': False
                     }
@@ -25,5 +25,5 @@ class TestExtensionManager:
         mock_get.return_value = config
         extension_manager = ExtensionsManager("ExtensionManager", MessageBusMock(), MessageBusMock())
         extension_manager.activate_extension = mock.Mock()
-        extension_manager.activate_extension("Generic")
-        extension_manager.activate_extension.assert_any_call("Generic")
+        extension_manager.activate_extension("generic")
+        extension_manager.activate_extension.assert_any_call("generic")

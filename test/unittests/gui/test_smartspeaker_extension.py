@@ -17,7 +17,7 @@ class TestSmartSpeakerExtension:
         config.merge(
             {
                 'gui': {
-                    'extension': 'SmartSpeaker'
+                    'extension': 'smartspeaker'
                 }
             })
         mock_get.return_value = config
@@ -33,7 +33,7 @@ class TestSmartSpeakerExtension:
         config.merge(
             {
                 'gui': {
-                    'extension': 'SmartSpeaker'
+                    'extension': 'smartspeaker'
                 }
             })
         mock_get.return_value = config
