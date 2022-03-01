@@ -12,25 +12,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build_minimal:
-    strategy:
-      max-parallel: 2
-      matrix:
-        python-version: [ 3.7, 3.8, 3.9, "3.10" ]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Setup Python
-        uses: actions/setup-python@v1
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Build Source Packages
-        run: |
-          python setup.py sdist
-      - name: Install package
-        run: |
-          pip install .
-  build_all:
+  build_tests:
     strategy:
       max-parallel: 2
       matrix:
