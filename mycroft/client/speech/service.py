@@ -225,14 +225,30 @@ class SpeechClient(Thread):
         lang = message.data.get("lang") or Configuration.get().get("lang", "en-us")
         fallback = message.data.get("english_fallback", False)
         permanent = message.data.get("permanent", False)
-        words = ["[unk]"]
-        for voc_file in message.data.get("vocabs", []):
-            voc = resolve_resource_file(f"text/{lang}/{voc_file}.voc")
+
+        # samples defined in message.data
+        words = ["[unk]"] + message.data.get("samples", [])
+
+        def read_file(voc_file, ext):
+            voc = resolve_resource_file(f"text/{lang}/{voc_file}.{ext}") or \
+                  resolve_resource_file(f"locale/{lang}/{voc_file}.{ext}")
             if lang != "en-us" and not voc and fallback:
-                voc = resolve_resource_file(f"text/en-us/{voc_file}.voc")
+                voc = resolve_resource_file(f"text/en-us/{voc_file}.{ext}") or \
+                      resolve_resource_file(f"locale/en-us/{voc_file}.{ext}")
             if voc:
-                for w in read_vocab_file(voc):
-                    words += w
+                return [item for sublist in read_vocab_file(voc) for item in sublist]
+            return []
+
+        # read voc files
+        for voc_file in message.data.get("vocabs", []):
+            words += read_file(voc_file, "voc")
+        for voc_file in message.data.get("dialogs", []):
+            words += read_file(voc_file, "dialog")
+        for voc_file in message.data.get("intents", []):
+            words += read_file(voc_file, "intent")
+        for voc_file in message.data.get("entities", []):
+            words += read_file(voc_file, "entity")
+
         LOG.info(f"Enabling limited vocab:  {words}")
         if hasattr(self.loop.stt, "enable_limited_vocabulary"):
             try:
