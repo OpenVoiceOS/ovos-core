@@ -262,21 +262,26 @@ class SpeechClient(Thread):
             # user defined voc files to load
             words += read_file(voc_file, "voc")
 
-        LOG.info(f"Enabling limited vocab:  {words}")
         if hasattr(self.loop.stt, "enable_limited_vocabulary"):
+            LOG.info(f"Enabling STT limited vocab mode:  {words}")
             try:
                 self.loop.stt.enable_limited_vocabulary(words,
                                                         lang=lang,
                                                         permanent=permanent)
             except:
                 LOG.exception(f"Failed to enable limited STT vocabulary")
+        else:
+            LOG.error(f"STT engine {self.stt.__class__.__name__} does not support limited vocab mode")
         if hasattr(self.loop.fallback_stt, "enable_limited_vocabulary"):
+            LOG.info(f"Enabling Fallback STT limited vocab mode:  {words}")
             try:
                 self.loop.fallback_stt.enable_limited_vocabulary(words,
                                                     lang=lang,
                                                     permanent=permanent)
             except:
                 LOG.exception(f"Failed to enable limited fallback STT vocabulary")
+        else:
+            LOG.error(f"Fallback engine {self.stt.__class__.__name__} does not support limited vocab mode")
 
     def handle_enable_full_vocab(self, message):
         """ re enable default transcription mode """
