@@ -221,13 +221,31 @@ class SpeechClient(Thread):
     def handle_enable_limited_vocab(self, message):
         """ enable limited vocabulary mode if supported
         will only consider pre defined .voc files
+
+        message.data optional parameters:
+
+        lang (str): default to system lang
+        top_words (bool): default True, augment vocab with 10k most common words for lang
+        permanent (bool): default False, tell STT if it should
+            expect to stay in limited voc mode permanently or if it is temporary,
+            engines might unload models from memory based on this
+        english_fallback (bool): default False, use en res files if lang file not found
+        samples (list): list of strings with extra vocabulary to enable
+        vocabs (list): list of strings with name of .voc file resources to enable
+        intents (list): list of strings with name of .intent file resources to enable
+        entities (list): list of strings with name of .entity file resources to enable
+        dialogs (list): list of strings with name of .dialog file resources to enable
+
+        NOTE: resource files are located via resolve_resource_file(f"text/{lang}/{voc_file}.{ext}")
         """
         lang = message.data.get("lang") or Configuration.get().get("lang", "en-us")
         fallback = message.data.get("english_fallback", False)
         permanent = message.data.get("permanent", False)
+        top_words = message.data.get("top_words", True)
 
         # samples defined in message.data
-        words = ["[unk]"] + message.data.get("samples", [])
+        words = ["[unk]"] + \
+                message.data.get("samples", [])
 
         def read_file(voc_file, ext):
             voc = resolve_resource_file(f"text/{lang}/{voc_file}.{ext}") or \
@@ -240,13 +258,20 @@ class SpeechClient(Thread):
             return []
 
         # read voc files
+        if top_words:
+            # most common 10k words for language
+            words += read_file("limited_stt", "voc")
         for voc_file in message.data.get("vocabs", []):
+            # user defined voc files to load
             words += read_file(voc_file, "voc")
         for voc_file in message.data.get("dialogs", []):
+            # user defined dialog files to load
             words += read_file(voc_file, "dialog")
         for voc_file in message.data.get("intents", []):
+            # user defined intent files to load
             words += read_file(voc_file, "intent")
         for voc_file in message.data.get("entities", []):
+            # user defined entity files to load
             words += read_file(voc_file, "entity")
 
         LOG.info(f"Enabling limited vocab:  {words}")
