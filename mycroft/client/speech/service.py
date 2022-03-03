@@ -218,6 +218,53 @@ class SpeechClient(Thread):
             except:
                 LOG.exception(f"Failed to unload fallback STT lang: {lang}")
 
+    @staticmethod
+    def load_limited_vocabs(message=None):
+        """ loads voc files containing limited vocabulary to be used in STT
+
+        message.data optional parameters:
+
+        lang (str): default to system lang
+        top_words (bool): default True, augment vocab with 10k most common words for lang
+        english_fallback (bool): default False, use en res files if lang file not found
+        samples (list): list of strings with extra vocabulary to enable
+        vocabs (list): list of strings with name of .voc file resources to enable
+
+        NOTE: vocab files are located via resolve_resource_file(f"text/{lang}/{voc_file}.voc")
+        """
+        lang = Configuration.get().get("lang", "en-us")
+        top_words = []
+        vocs = []
+        words = ["[unk]"]
+        fallback = False
+        if message:
+            lang = message.data.get("lang") or lang
+            fallback = message.data.get("english_fallback", False)
+            top_words = message.data.get("top_words", True)
+            vocs = message.data.get("vocabs", [])
+
+            # samples defined in message.data
+            words += message.data.get("samples", [])
+
+        def read_file(voc_file, ext):
+            voc = resolve_resource_file(f"text/{lang}/{voc_file}.{ext}") or \
+                  resolve_resource_file(f"locale/{lang}/{voc_file}.{ext}")
+            if lang != "en-us" and not voc and fallback:
+                voc = resolve_resource_file(f"text/en-us/{voc_file}.{ext}") or \
+                      resolve_resource_file(f"locale/en-us/{voc_file}.{ext}")
+            if voc:
+                return [item for sublist in read_vocab_file(voc) for item in sublist]
+            return []
+
+        # read voc files
+        if top_words:
+            # most common 10k words for language
+            words += read_file("limited_stt", "voc")
+        for voc_file in vocs:
+            # user defined voc files to load
+            words += read_file(voc_file, "voc")
+        return words
+
     def handle_enable_limited_vocab(self, message):
         """ enable limited vocabulary mode if supported
         will only consider pre defined .voc files
@@ -236,31 +283,9 @@ class SpeechClient(Thread):
         NOTE: vocab files are located via resolve_resource_file(f"text/{lang}/{voc_file}.voc")
         """
         lang = message.data.get("lang") or Configuration.get().get("lang", "en-us")
-        fallback = message.data.get("english_fallback", False)
         permanent = message.data.get("permanent", False)
-        top_words = message.data.get("top_words", True)
 
-        # samples defined in message.data
-        words = ["[unk]"] + \
-                message.data.get("samples", [])
-
-        def read_file(voc_file, ext):
-            voc = resolve_resource_file(f"text/{lang}/{voc_file}.{ext}") or \
-                  resolve_resource_file(f"locale/{lang}/{voc_file}.{ext}")
-            if lang != "en-us" and not voc and fallback:
-                voc = resolve_resource_file(f"text/en-us/{voc_file}.{ext}") or \
-                      resolve_resource_file(f"locale/en-us/{voc_file}.{ext}")
-            if voc:
-                return [item for sublist in read_vocab_file(voc) for item in sublist]
-            return []
-
-        # read voc files
-        if top_words:
-            # most common 10k words for language
-            words += read_file("limited_stt", "voc")
-        for voc_file in message.data.get("vocabs", []):
-            # user defined voc files to load
-            words += read_file(voc_file, "voc")
+        words = self.load_limited_vocabs(message)
 
         if hasattr(self.loop.stt, "enable_limited_vocabulary"):
             LOG.info(f"Enabling STT limited vocab mode:  {words}")
@@ -271,7 +296,7 @@ class SpeechClient(Thread):
             except:
                 LOG.exception(f"Failed to enable limited STT vocabulary")
         else:
-            LOG.error(f"STT engine {self.stt.__class__.__name__} does not support limited vocab mode")
+            LOG.error(f"STT engine {self.loop.stt.__class__.__name__} does not support limited vocab mode")
         if hasattr(self.loop.fallback_stt, "enable_limited_vocabulary"):
             LOG.info(f"Enabling Fallback STT limited vocab mode:  {words}")
             try:
@@ -281,7 +306,7 @@ class SpeechClient(Thread):
             except:
                 LOG.exception(f"Failed to enable limited fallback STT vocabulary")
         else:
-            LOG.error(f"Fallback engine {self.stt.__class__.__name__} does not support limited vocab mode")
+            LOG.error(f"Fallback engine {self.loop.fallback_stt.__class__.__name__} does not support limited vocab mode")
 
     def handle_enable_full_vocab(self, message):
         """ re enable default transcription mode """

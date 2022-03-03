@@ -12,20 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import sys
 import unittest
-from io import StringIO
 from unittest.mock import MagicMock, patch
 
 import mycroft.configuration
 import mycroft.stt
 from mycroft.client.speech.listener import RecognizerLoop
+from mycroft.client.speech.service import SpeechClient
 from mycroft.util.log import LOG
+from mycroft_bus_client.message import Message
 from ovos_stt_plugin_vosk import VoskKaldiSTT
 from test.util import base_config
+from ovos_utils.file_utils import read_vocab_file, resolve_resource_file
 
 
-class TestSTT(unittest.TestCase):
+
+class TestSTTFactory(unittest.TestCase):
     def test_factory(self):
         config = {'module': 'mycroft',
                   'mycroft': {'uri': 'https://test.com'}}
@@ -115,7 +117,7 @@ class TestSTT(unittest.TestCase):
     @patch.object(mycroft.configuration.Configuration, 'get')
     @patch.object(LOG, 'error')
     @patch.object(LOG, 'warning')
-    def test_fallback_stt_not_set(self,  mock_warn, mock_error, mock_get):
+    def test_fallback_stt_not_set(self, mock_warn, mock_error, mock_get):
         config = base_config()
         config.merge(
             {
@@ -133,3 +135,17 @@ class TestSTT(unittest.TestCase):
         mock_warn.assert_called_with("No fallback STT configured")
         mock_error.assert_called_with("Failed to create fallback STT")
 
+
+class TestSTTControl(unittest.TestCase):
+    def test_limited_voc(self):
+        msg = Message("", {"lang": "en-us", "top_words": False})
+        words = SpeechClient.load_limited_vocabs(msg)
+        self.assertEqual(words , ["[unk]"])
+
+        msg = Message("", {"lang": "invalid"})
+        words = SpeechClient.load_limited_vocabs(msg)
+        self.assertEqual(words , ["[unk]"])
+
+        msg = Message("", {"lang": "en-us", "top_words": True})
+        words_en = SpeechClient.load_limited_vocabs(msg)
+        self.assertEqual(len(words_en), 10001)
