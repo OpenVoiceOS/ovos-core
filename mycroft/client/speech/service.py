@@ -312,6 +312,7 @@ class SpeechClient(Thread):
         message.data["vocabs"] = ["yes", "no"]
         message.data["english_fallback"] = True
         message.data["permanent"] = False
+        message.data["top_words"] = False
         self.handle_enable_limited_vocab(message)
 
     # loop initialization
