@@ -18,6 +18,8 @@ from unittest.mock import MagicMock, patch
 import mycroft.stt
 from mycroft.configuration import Configuration
 from test.util import base_config
+from mycroft.client.speech.listener import RecognizerLoop
+from ovos_stt_plugin_vosk import VoskKaldiSTT
 
 
 class TestSTT(unittest.TestCase):
@@ -67,3 +69,22 @@ class TestSTT(unittest.TestCase):
         audio = MagicMock()
         stt.execute(audio, 'en-us')
         self.assertTrue(mycroft.stt.STTApi.called)
+
+    @patch.object(Configuration, 'get')
+    def test_falback_stt(self, mock_get):
+        config = base_config()
+        config.merge(
+            {
+                'stt': {
+                    'module': 'mycroft',
+                    "fallback_module": "ovos-stt-plugin-vosk",
+                    'mycroft': {'uri': 'https://test.com'}
+                },
+                'lang': 'en-US'
+            })
+        mock_get.return_value = config
+
+        # check class matches
+        fallback_stt = RecognizerLoop.get_fallback_stt()
+        self.assertEqual(fallback_stt, VoskKaldiSTT)
+

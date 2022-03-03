@@ -331,25 +331,32 @@ class RecognizerLoop(EventEmitter):
             except Exception as e:
                 LOG.error("Failed to load hotword: " + word)
 
+    @staticmethod
+    def get_fallback_stt():
+        config_core = Configuration.get()
+        stt_config = config_core.get('stt', {})
+        engine = stt_config.get("fallback_module")
+        if not engine:
+            LOG.warning("No fallback STT configured")
+        else:
+            plugin_config = stt_config.get(engine) or {}
+            plugin_config["lang"] = plugin_config.get("lang") or \
+                                    config_core.get("lang", "en-us")
+            try:
+                return STTFactory.get_class({"module": engine,
+                                             engine: plugin_config})
+            except Exception as e:
+                LOG.error(f"Failed to create fallback STT")
+
     def start_async(self):
         """Start consumer and producer threads."""
         self.state.running = True
         if not self.stt:
             self.stt = STTFactory.create()
         if not self.fallback_stt:
-            stt_config = Configuration.get().get('stt', {})
-            engine = stt_config.get("fallback_module")
-            if not engine:
-                LOG.warning("No fallback STT configured")
-            else:
-                plugin_config = stt_config.get(engine) or {}
-                plugin_config["lang"] = plugin_config.get("lang") or \
-                                        self.config_core.get("lang", "en-us")
-                try:
-                    self.fallback_stt = STTFactory.create({"module": engine,
-                                                           engine: plugin_config})
-                except Exception as e:
-                    LOG.error(f"Failed to create fallback STT")
+            clazz = self.get_fallback_stt()
+            self.fallback_stt = clazz()
+
         self.queue = Queue()
         self.audio_consumer = AudioConsumer(self)
         self.audio_consumer.start()
