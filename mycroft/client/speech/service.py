@@ -232,11 +232,8 @@ class SpeechClient(Thread):
         english_fallback (bool): default False, use en res files if lang file not found
         samples (list): list of strings with extra vocabulary to enable
         vocabs (list): list of strings with name of .voc file resources to enable
-        intents (list): list of strings with name of .intent file resources to enable
-        entities (list): list of strings with name of .entity file resources to enable
-        dialogs (list): list of strings with name of .dialog file resources to enable
 
-        NOTE: resource files are located via resolve_resource_file(f"text/{lang}/{voc_file}.{ext}")
+        NOTE: vocab files are located via resolve_resource_file(f"text/{lang}/{voc_file}.voc")
         """
         lang = message.data.get("lang") or Configuration.get().get("lang", "en-us")
         fallback = message.data.get("english_fallback", False)
@@ -264,15 +261,6 @@ class SpeechClient(Thread):
         for voc_file in message.data.get("vocabs", []):
             # user defined voc files to load
             words += read_file(voc_file, "voc")
-        for voc_file in message.data.get("dialogs", []):
-            # user defined dialog files to load
-            words += read_file(voc_file, "dialog")
-        for voc_file in message.data.get("intents", []):
-            # user defined intent files to load
-            words += read_file(voc_file, "intent")
-        for voc_file in message.data.get("entities", []):
-            # user defined entity files to load
-            words += read_file(voc_file, "entity")
 
         LOG.info(f"Enabling limited vocab:  {words}")
         if hasattr(self.loop.stt, "enable_limited_vocabulary"):
