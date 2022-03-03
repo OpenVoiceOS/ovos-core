@@ -342,11 +342,13 @@ class RecognizerLoop(EventEmitter):
             plugin_config = stt_config.get(engine) or {}
             plugin_config["lang"] = plugin_config.get("lang") or \
                                     config_core.get("lang", "en-us")
-            try:
-                return STTFactory.get_class({"module": engine,
+            clazz = STTFactory.get_class({"module": engine,
                                              engine: plugin_config})
-            except Exception as e:
-                LOG.error(f"Failed to create fallback STT")
+            if clazz:
+                return clazz
+            else:
+                LOG.warning(f"Could not find plugin: {engine}")
+        LOG.error(f"Failed to create fallback STT")
 
     def start_async(self):
         """Start consumer and producer threads."""
