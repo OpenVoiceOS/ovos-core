@@ -21,8 +21,18 @@ from test.util import base_config
 
 
 class TestSTT(unittest.TestCase):
+    def test_factory(self):
+        config = {'module': 'mycroft',
+                  'mycroft': {'uri': 'https://test.com'}}
+        stt = mycroft.stt.STTFactory.create(config)
+        self.assertEqual(type(stt), mycroft.stt.MycroftSTT)
+
+        config = {'stt': config}
+        stt = mycroft.stt.STTFactory.create(config)
+        self.assertEqual(type(stt), mycroft.stt.MycroftSTT)
+
     @patch.object(Configuration, 'get')
-    def test_factory(self, mock_get):
+    def test_factory_from_config(self, mock_get):
         mycroft.stt.STTApi = MagicMock()
         config = base_config()
         config.merge(
