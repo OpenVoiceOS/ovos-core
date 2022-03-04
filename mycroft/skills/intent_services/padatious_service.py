@@ -156,6 +156,8 @@ class PadatiousService:
 
         self.registered_intents = []
         self.registered_entities = []
+        self.intent_samples = {}
+        self.entity_samples = {}
 
     def train(self, message=None):
         """Perform padatious training.
@@ -258,6 +260,12 @@ class PadatiousService:
             message (Message): message triggering action
         """
         lang = message.data.get('lang', self.lang)
+        name = message.data['name']
+        file_name = message.data['file_name']
+        if lang not in self.intent_samples:
+            self.intent_samples[lang] = {name: []}
+        with open(file_name) as f:
+            self.intent_samples[lang][name] = [l.strip() for l in f.readlines()]
         if lang in self.containers:
             self.registered_intents.append(message.data['name'])
             if self._padaos:
@@ -274,6 +282,13 @@ class PadatiousService:
             message (Message): message triggering action
         """
         lang = message.data.get('lang', self.lang)
+        name = message.data['name']
+        file_name = message.data['file_name']
+        if lang not in self.entity_samples:
+            self.entity_samples[lang] = {name: []}
+        with open(file_name) as f:
+            self.entity_samples[lang][name] = [l.strip() for l in f.readlines()]
+
         if lang in self.containers:
             self.registered_entities.append(message.data)
             if self._padaos:

@@ -216,7 +216,7 @@ class IntentQueryApi:
         self.bus = bus
         self.timeout = timeout
 
-    def get_adapt_intent(self, utterance, lang="en-us"):
+    def get_adapt_intent(self, utterance, lang=None):
         """ get best adapt intent for utterance """
         msg = Message("intent.service.adapt.get",
                       {"utterance": utterance, "lang": lang},
@@ -232,7 +232,7 @@ class IntentQueryApi:
             return None
         return data["intent"]
 
-    def get_padatious_intent(self, utterance, lang="en-us"):
+    def get_padatious_intent(self, utterance, lang=None):
         """ get best padatious intent for utterance """
         msg = Message("intent.service.padatious.get",
                       {"utterance": utterance, "lang": lang},
@@ -247,7 +247,7 @@ class IntentQueryApi:
             return None
         return data["intent"]
 
-    def get_intent(self, utterance, lang="en-us"):
+    def get_intent(self, utterance, lang=None):
         """ get best intent for utterance """
         msg = Message("intent.service.intent.get",
                       {"utterance": utterance, "lang": lang},
@@ -262,7 +262,7 @@ class IntentQueryApi:
             return None
         return data["intent"]
 
-    def get_skill(self, utterance, lang="en-us"):
+    def get_skill(self, utterance, lang=None):
         """ get skill that utterance will trigger """
         intent = self.get_intent(utterance, lang)
         if not intent:
@@ -305,8 +305,9 @@ class IntentQueryApi:
             return data["skills"]
         return [s[0] for s in data["skills"]]
 
-    def get_adapt_manifest(self):
+    def get_adapt_manifest(self, lang=None):
         msg = Message("intent.service.adapt.manifest.get",
+                      data={"lang": lang},
                       context={"destination": "intent_service",
                                "source": "intent_api"})
         resp = self.bus.wait_for_response(msg,
@@ -318,27 +319,39 @@ class IntentQueryApi:
             return None
         return data["intents"]
 
-    def get_padatious_manifest(self):
+    def _get_padatious(self, lang=None):
         msg = Message("intent.service.padatious.manifest.get",
+                      data={"lang": lang},
                       context={"destination": "intent_service",
                                "source": "intent_api"})
         resp = self.bus.wait_for_response(msg,
                                           'intent.service.padatious.manifest',
                                           timeout=self.timeout)
-        data = resp.data if resp is not None else {}
+        return resp.data if resp is not None else {}
+
+    def get_padatious_manifest(self, lang=None):
+        data = self._get_padatious(lang)
         if not data:
             LOG.error("Intent Service timed out!")
             return None
         return data["intents"]
 
-    def get_intent_manifest(self):
-        padatious = self.get_padatious_manifest()
-        adapt = self.get_adapt_manifest()
+    def get_padatious_samples(self, lang=None):
+        data = self._get_padatious(lang)
+        if not data:
+            LOG.error("Intent Service timed out!")
+            return None
+        return data["samples"]
+
+    def get_intent_manifest(self, lang=None):
+        padatious = self.get_padatious_manifest(lang)
+        adapt = self.get_adapt_manifest(lang)
         return {"adapt": adapt,
                 "padatious": padatious}
 
-    def get_vocab_manifest(self):
+    def get_vocab_manifest(self, lang=None):
         msg = Message("intent.service.adapt.vocab.manifest.get",
+                      data={"lang": lang},
                       context={"destination": "intent_service",
                                "source": "intent_api"})
         reply_msg_type = 'intent.service.adapt.vocab.manifest'
@@ -360,8 +373,9 @@ class IntentQueryApi:
         return [{"name": voc, "samples": vocab[voc]["samples"]}
                 for voc in vocab]
 
-    def get_regex_manifest(self):
+    def get_regex_manifest(self, lang=None):
         msg = Message("intent.service.adapt.vocab.manifest.get",
+                      data={"lang": lang},
                       context={"destination": "intent_service",
                                "source": "intent_api"})
         reply_msg_type = 'intent.service.adapt.vocab.manifest'
@@ -384,8 +398,9 @@ class IntentQueryApi:
         return [{"name": voc, "regexes": vocab[voc]["samples"]}
                 for voc in vocab]
 
-    def get_entities_manifest(self):
+    def get_entities_manifest(self, lang=None):
         msg = Message("intent.service.padatious.entities.manifest.get",
+                      data={"lang": lang},
                       context={"destination": "intent_service",
                                "source": "intent_api"})
         reply_msg_type = 'intent.service.padatious.entities.manifest'
@@ -410,10 +425,10 @@ class IntentQueryApi:
                 entities.append({"name": ent["name"], "samples": samples})
         return entities
 
-    def get_keywords_manifest(self):
-        padatious = self.get_entities_manifest()
-        adapt = self.get_vocab_manifest()
-        regex = self.get_regex_manifest()
+    def get_keywords_manifest(self, lang=None):
+        padatious = self.get_entities_manifest(lang)
+        adapt = self.get_vocab_manifest(lang)
+        regex = self.get_regex_manifest(lang)
         return {"adapt": adapt,
                 "padatious": padatious,
                 "regex": regex}
@@ -426,3 +441,20 @@ def open_intent_envelope(message):
                   intent_dict.get('requires'),
                   intent_dict.get('at_least_one'),
                   intent_dict.get('optional'))
+
+
+def get_intent_samples(bus=None):
+    words = []
+    intentapi = IntentQueryApi(bus)
+
+    intents = intentapi.get_padatious_samples() or {}
+    for intent, samples in intents.items():
+        words += samples
+
+    for entity in intentapi.get_vocab_manifest() or []:
+        words += entity["samples"]
+
+    for entity in intentapi.get_entities_manifest() or []:
+        words += entity["samples"]
+
+    return list(set(words))

@@ -41,7 +41,8 @@ def _get_message_lang(message=None):
     default_lang = Configuration.get().get('lang', 'en-us')
     if not message:
         return default_lang
-    return message.data.get('lang', default_lang).lower()
+    lang = message.data.get('lang') or default_lang
+    return lang.lower()
 
 
 def _normalize_all_utterances(utterances):
@@ -544,9 +545,11 @@ class IntentService:
         Args:
             message (Message): message triggering the method
         """
+        lang = _get_message_lang(message) or self.lang
         self.bus.emit(message.reply(
             "intent.service.padatious.manifest",
-            {"intents": self.padatious_service.registered_intents}))
+            {"intents": self.padatious_service.registered_intents,
+             "samples": self.padatious_service.intent_samples[lang]}))
 
     def handle_entity_manifest(self, message):
         """Messagebus handler returning the registered padatious entities.
@@ -554,9 +557,11 @@ class IntentService:
         Args:
             message (Message): message triggering the method
         """
+        lang = _get_message_lang(message) or self.lang
         self.bus.emit(message.reply(
             "intent.service.padatious.entities.manifest",
-            {"entities": self.padatious_service.registered_entities}))
+            {"entities": self.padatious_service.registered_entities,
+             "samples": self.padatious_service.entity_samples[lang]}))
 
 
 def _is_old_style_keyword_message(message):

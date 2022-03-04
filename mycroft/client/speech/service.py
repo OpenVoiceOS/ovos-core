@@ -27,6 +27,7 @@ from mycroft.util import (
 from mycroft.util.log import LOG
 from mycroft.util.process_utils import ProcessStatus, StatusCallbackMap
 from ovos_utils.file_utils import read_vocab_file, resolve_resource_file
+from mycroft.skills.intent_service_interface import get_intent_samples
 
 
 def on_ready():
@@ -273,6 +274,7 @@ class SpeechClient(Thread):
 
         lang (str): default to system lang
         top_words (bool): default True, augment vocab with 10k most common words for lang
+        intents (bool): default True, augment vocab with loaded intents for lang
         permanent (bool): default False, tell STT if it should
             expect to stay in limited voc mode permanently or if it is temporary,
             engines might unload models from memory based on this
@@ -284,8 +286,11 @@ class SpeechClient(Thread):
         """
         lang = message.data.get("lang") or Configuration.get().get("lang", "en-us")
         permanent = message.data.get("permanent", False)
+        load_intents = message.data.get("intents", True)
 
         words = self.load_limited_vocabs(message)
+        if load_intents:
+            words += get_intent_samples(self.bus)
 
         if hasattr(self.loop.stt, "enable_limited_vocabulary"):
             LOG.info(f"Enabling STT limited vocab mode:  {words}")
