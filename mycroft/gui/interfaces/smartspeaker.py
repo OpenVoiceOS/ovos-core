@@ -1,10 +1,10 @@
 import os
 import subprocess
 import time
-import socket
 import secrets
 import string
 from ovos_utils.gui import GUIInterface
+from ovos_utils.network_utils import get_ip
 
 
 class SmartSpeakerExtensionGuiInterface(GUIInterface):
@@ -44,7 +44,7 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
     def handle_device_settings(self, message):
         """ Display device settings page. """
         self["state"] = "settings/settingspage"
-        self.show_page("SYSTEM_AdditionalSettings.qml")
+        self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
 
     def handle_device_homescreen_settings(self, message):
         """
@@ -54,14 +54,14 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
         self["idleScreenList"] = {"screenBlob": screens}
         self["selectedScreen"] = self.homescreen_manager.get_active_homescreen()
         self["state"] = "settings/homescreen_settings"
-        self.show_page("SYSTEM_AdditionalSettings.qml")
+        self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
 
     def handle_device_ssh_settings(self, message):
         """
         display ssh settings page
         """
         self["state"] = "settings/ssh_settings"
-        self.show_page("SYSTEM_AdditionalSettings.qml")
+        self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
 
     def handle_set_homescreen(self, message):
         """
@@ -101,7 +101,7 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
         if self.dash_running:
             self["dashboard_enabled"] = self.dash_running
             self["dashboard_url"] = "https://{0}:5000".format(
-                self._get_local_ip())
+                get_ip())
             self["dashboard_user"] = "OVOS"
             self["dashboard_password"] = self.dash_secret
 
@@ -137,14 +137,6 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
 
         if self.dash_running:
             self["dashboard_enabled"] = self.dash_running
-            self["dashboard_url"] = "https://{0}:5000".format(
-                self._get_local_ip())
+            self["dashboard_url"] = "https://{0}:5000".format(get_ip())
             self["dashboard_user"] = "OVOS"
             self["dashboard_password"] = self.dash_secret
-
-    def _get_local_ip(self):
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8', 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
