@@ -1,10 +1,5 @@
-import os
-import subprocess
-import time
-import secrets
-import string
+from mycroft.messagebus import Message
 from ovos_utils.gui import GUIInterface
-from ovos_utils.network_utils import get_ip
 
 
 class SmartSpeakerExtensionGuiInterface(GUIInterface):
@@ -14,11 +9,6 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
         self.bus = bus
         self.homescreen_manager = homescreen_manager
 
-        # Dashboard Specific
-        self.dash_running = None
-        alphabet = string.ascii_letters + string.digits
-        self.dash_secret = ''.join(secrets.choice(alphabet) for i in range(5))
-
         # Initiate Bind
         self.bind()
 
@@ -26,6 +16,8 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
         super().set_bus(self.bus)
 
         self.bus.on("mycroft.device.settings", self.handle_device_settings)
+        self.bus.on("ovos.PHAL.dashboard.status.response",
+                    self.update_device_dashboard_status)
         self.register_handler("mycroft.device.settings",
                               self.handle_device_settings)
         self.register_handler(
@@ -76,67 +68,29 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
 
     def handle_device_developer_settings(self, message):
         self['state'] = 'settings/developer_settings'
-
-    def handle_device_dashboard_status_check(self):
-        build_status_check_call = "systemctl --user is-active --quiet ovos-dashboard@'{0}'.service".format(
-            self.dash_secret)
-        status = os.system(build_status_check_call)
+        self.handle_get_dash_status()
 
     def handle_device_developer_enable_dash(self, message):
-        os.environ["SIMPLELOGIN_USERNAME"] = "OVOS"
-        os.environ["SIMPLELOGIN_PASSWORD"] = self.dash_secret
-        build_call = "systemctl --user start ovos-dashboard@'{0}'.service".format(
-            self.dash_secret)
-        call_dash = subprocess.Popen([build_call], shell=True)
-        time.sleep(3)
-        build_status_check_call = "systemctl --user is-active --quiet ovos-dashboard@'{0}'.service".format(
-            self.dash_secret)
-        status = os.system(build_status_check_call)
-
-        if status == 0:
-            self.dash_running = True
-        else:
-            self.dash_running = False
-
-        if self.dash_running:
-            self["dashboard_enabled"] = self.dash_running
-            self["dashboard_url"] = "https://{0}:5000".format(
-                get_ip())
-            self["dashboard_user"] = "OVOS"
-            self["dashboard_password"] = self.dash_secret
+        self.bus.emit(Message("ovos.PHAL.dashboard.enable"))
 
     def handle_device_developer_disable_dash(self, message):
-        build_call = "systemctl --user stop ovos-dashboard@'{0}'.service".format(
-            self.dash_secret)
-        subprocess.Popen([build_call], shell=True)
-        time.sleep(3)
-        build_status_check_call = "systemctl --user is-active --quiet ovos-dashboard@'{0}'.service".format(
-            self.dash_secret)
-        status = os.system(build_status_check_call)
+        self.bus.emit(Message("ovos.PHAL.dashboard.disable"))
 
-        if status == 0:
-            self.dash_running = True
+    def update_device_dashboard_status(self, message):
+        call_check = message.data.get("status", False)
+        dash_security_pass = message.data.get("password", "")
+        dash_security_user = message.data.get("username", "")
+        dash_url = message.data.get("url", "")
+        if call_check:
+            self["dashboard_enabled"] = call_check
+            self["dashboard_url"] = dash_url
+            self["dashboard_user"] = dash_security_user
+            self["dashboard_password"] = dash_security_pass
         else:
-            self.dash_running = False
-
-        if not self.dash_running:
-            self["dashboard_enabled"] = self.dash_running
+            self["dashboard_enabled"] = call_check
             self["dashboard_url"] = ""
             self["dashboard_user"] = ""
             self["dashboard_password"] = ""
 
-    def handle_device_dashboard_status_check(self):
-        build_status_check_call = "systemctl --user is-active --quiet ovos-dashboard@'{0}'.service".format(
-            self.dash_secret)
-        status = os.system(build_status_check_call)
-
-        if status == 0:
-            self.dash_running = True
-        else:
-            self.dash_running = False
-
-        if self.dash_running:
-            self["dashboard_enabled"] = self.dash_running
-            self["dashboard_url"] = "https://{0}:5000".format(get_ip())
-            self["dashboard_user"] = "OVOS"
-            self["dashboard_password"] = self.dash_secret
+    def handle_get_dash_status(self):
+        self.bus.emit(Message("ovos.PHAL.dashboard.get.status"))
