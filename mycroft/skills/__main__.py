@@ -56,93 +56,32 @@ class DevicePrimer:
         config = config or Configuration.get()
         self.bus = message_bus_client
         self.platform = config['enclosure'].get("platform", "unknown")
-
-        # force flag is for backwards compat with regular mycroft-core
-        # assumptions
-        force = config['enclosure'].get("force_mycroft_ntp") and \
-                self.platform in RASPBERRY_PI_PLATFORMS
-
-        self.do_ntp_sync = config['enclosure'].get("ntp_sync_on_boot") or force
-
         self.enclosure = EnclosureAPI(self.bus)
-        self.is_paired = False
         self.backend_down = False
-        # Remember "now" at startup.  Used to detect clock changes.
+
+    @property
+    def is_paired(self):
+        return is_paired()
 
     def prepare_device(self):
         """Internet dependent updates of various aspects of the device."""
         if connected():
-            self._get_pairing_status()
-            self._update_system_clock()
             self._update_system()
             # Above will block during update process and kill this instance if
             # new software is installed
-
-            if self.backend_down:
-                self._notify_backend_down()
-            else:
-                self._display_skill_loading_notification()
-                self.bus.emit(Message('mycroft.internet.connected'))
-                self._ensure_device_is_paired()
-                self._update_device_attributes_on_backend()
+            self._display_skill_loading_notification()
+            self.bus.emit(Message('mycroft.internet.connected'))
+            self._update_device_attributes_on_backend()
         else:
             LOG.warning('Cannot prime device because there is no '
                         'internet connection, this is OK 99% of the time, '
                         'but it might affect integration with mycroft '
                         'backend')
 
-    def _get_pairing_status(self):
-        """Set an instance attribute indicating the device's pairing status"""
-        try:
-            self.is_paired = is_paired(ignore_errors=False)
-        except BackendDown:
-            LOG.error('Cannot complete device updates due to backend issues.')
-            self.backend_down = True
-
-        if self.is_paired:
-            LOG.info('Device is paired')
-
-    def _update_system_clock(self):
-        """Force a sync of the local clock with the Network Time Protocol.
-
-        The NTP sync is only forced on Raspberry Pi based devices.  The
-        assumption being that these devices are only running Mycroft services.
-        We don't want to sync the time on a Linux desktop device, for example,
-        because it could have a negative impact on other software running on
-        that device.
-        """
-        if self.do_ntp_sync:
-            LOG.info('Updating the system clock via NTP...')
-            if self.is_paired:
-                # Only display time sync message when paired because the prompt
-                # to go to home.mycroft.ai will be displayed by the pairing
-                # skill when pairing
-                self.enclosure.mouth_text(dialog.get("message_synching.clock"))
-            self.bus.wait_for_response(
-                Message('system.ntp.sync'),
-                'system.ntp.sync.complete',
-                15
-            )
-
-    def _notify_backend_down(self):
-        """Notify user of inability to communicate with the backend."""
-        self._speak_dialog(dialog_id="backend.down")
-        self.bus.emit(Message("backend.down"))
-
     def _display_skill_loading_notification(self):
         """Indicate to the user that skills are being loaded."""
         self.enclosure.eyes_color(189, 183, 107)  # dark khaki
         self.enclosure.mouth_text(dialog.get("message_loading.skills"))
-
-    def _ensure_device_is_paired(self):
-        """Determine if device is paired, if not automatically start pairing.
-
-        Pairing cannot be performed if there is no connection to the back end.
-        So skip pairing if the backend is down.
-        """
-        if not self.is_paired and not self.backend_down:
-            LOG.info('Device not paired, invoking the pairing skill')
-            self.bus.emit(Message("mycroft.not.paired"))
 
     def _update_device_attributes_on_backend(self):
         """Communicate version information to the backend.
@@ -156,10 +95,12 @@ class DevicePrimer:
                 api = DeviceApi()
                 api.update_version()
             except Exception:
-                self._notify_backend_down()
+                pass
 
     def _update_system(self):
-        """Emit an update event that will be handled by the admin service."""
+        """Emit an update event that will be handled by the admin service.
+        TODO: deprecate this, only used in mark1, admin service doesnt exist anywhere else
+        """
         if not self.is_paired:
             LOG.info('Attempting system update...')
             self.bus.emit(Message('system.update'))
@@ -175,12 +116,6 @@ class DevicePrimer:
                     'system.update.complete',
                     1000
                 )
-
-    def _speak_dialog(self, dialog_id, wait=False):
-        data = {'utterance': dialog.get(dialog_id)}
-        self.bus.emit(Message("speak", data))
-        if wait:
-            wait_while_speaking()
 
 
 def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
