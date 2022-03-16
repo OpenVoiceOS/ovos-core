@@ -18,44 +18,34 @@ In this repo, you will not find an entry called mycroft-skills in the bin
 directory.  The executable gets added to the bin directory when installed
 (see setup.py)
 """
-import time
 
 import mycroft.lock
-from mycroft import dialog
-from mycroft.api import is_paired, BackendDown, DeviceApi
-from mycroft.audio import wait_while_speaking
-from mycroft.configuration import Configuration, setup_locale
+from mycroft.api import is_paired
+from mycroft.configuration import setup_locale
 from mycroft.enclosure.api import EnclosureAPI
-from mycroft.messagebus.message import Message
 from mycroft.skills.api import SkillApi
 from mycroft.skills.core import FallbackSkill
 from mycroft.skills.event_scheduler import EventScheduler
 from mycroft.skills.intent_service import IntentService
 from mycroft.skills.skill_manager import SkillManager, on_error, on_stopping, on_ready, on_alive, on_started
 from mycroft.util import (
-    connected,
     reset_sigint_handler,
     start_message_bus_client,
     wait_for_exit_signal
 )
 from mycroft.util.log import LOG
 
-
 RASPBERRY_PI_PLATFORMS = ('mycroft_mark_1', 'picroft', 'mycroft_mark_2pi')
 
 
 class DevicePrimer:
-    """Container handling the device preparation.
-
-    Args:
-        message_bus_client: Bus client used to interact with the system
-        config (dict): Mycroft configuration
+    """DEPRECATED: this class has been fully deprecated, stop using it!
+    Only here to provide public api compatibility but it does absolutely nothing!
     """
 
     def __init__(self, message_bus_client, config=None):
-        config = config or Configuration.get()
         self.bus = message_bus_client
-        self.platform = config['enclosure'].get("platform", "unknown")
+        self.platform = "unknown"
         self.enclosure = EnclosureAPI(self.bus)
         self.backend_down = False
 
@@ -65,57 +55,7 @@ class DevicePrimer:
 
     def prepare_device(self):
         """Internet dependent updates of various aspects of the device."""
-        if connected():
-            self._update_system()
-            # Above will block during update process and kill this instance if
-            # new software is installed
-            self._display_skill_loading_notification()
-            self.bus.emit(Message('mycroft.internet.connected'))
-            self._update_device_attributes_on_backend()
-        else:
-            LOG.warning('Cannot prime device because there is no '
-                        'internet connection, this is OK 99% of the time, '
-                        'but it might affect integration with mycroft '
-                        'backend')
-
-    def _display_skill_loading_notification(self):
-        """Indicate to the user that skills are being loaded."""
-        self.enclosure.eyes_color(189, 183, 107)  # dark khaki
-        self.enclosure.mouth_text(dialog.get("message_loading.skills"))
-
-    def _update_device_attributes_on_backend(self):
-        """Communicate version information to the backend.
-
-        The backend tracks core version, enclosure version, platform build
-        and platform name for each device, if it is known.
-        """
-        if self.is_paired:
-            LOG.info('Sending updated device attributes to the backend...')
-            try:
-                api = DeviceApi()
-                api.update_version()
-            except Exception:
-                pass
-
-    def _update_system(self):
-        """Emit an update event that will be handled by the admin service.
-        TODO: deprecate this, only used in mark1, admin service doesnt exist anywhere else
-        """
-        if not self.is_paired:
-            LOG.info('Attempting system update...')
-            self.bus.emit(Message('system.update'))
-            msg = Message(
-                'system.update',
-                dict(paired=self.is_paired, platform=self.platform)
-            )
-            resp = self.bus.wait_for_response(msg, 'system.update.processing')
-
-            if resp and (resp.data or {}).get('processing', True):
-                self.bus.wait_for_response(
-                    Message('system.update.waiting'),
-                    'system.update.complete',
-                    1000
-                )
+        LOG.warning("DevicePrimer has been deprecated!")
 
 
 def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
@@ -145,9 +85,7 @@ def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
                                  ready_hook=ready_hook,
                                  error_hook=error_hook)
 
-    device_primer = DevicePrimer(bus)
     skill_manager.start()
-    device_primer.prepare_device()
 
     wait_for_exit_signal()
 
