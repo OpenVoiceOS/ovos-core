@@ -319,8 +319,6 @@ class SkillManager(Thread):
             else:
                 LOG.error(f'Priority skill {skill_id} can\'t be found')
 
-        self.status.set_alive()
-
     def handle_initial_training(self, message):
         self.initial_load_complete = True
 
@@ -329,6 +327,8 @@ class SkillManager(Thread):
         self._remove_git_locks()
 
         self.load_priority()
+
+        self.status.set_alive()
 
         if self.skills_config.get("wait_for_internet", True):
             while not connected() and not self._connected_event.is_set():
