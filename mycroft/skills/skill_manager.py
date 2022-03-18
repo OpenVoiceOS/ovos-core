@@ -192,6 +192,7 @@ class SkillManager(Thread):
         )
         self.bus.once('mycroft.skills.initialized',
                       self.handle_check_device_readiness)
+        self.bus.once('mycroft.skills.trained', self.handle_initial_training)
 
     def is_device_ready(self):
         is_ready = False
@@ -320,6 +321,9 @@ class SkillManager(Thread):
 
         self.status.set_alive()
 
+    def handle_initial_training(self, message):
+        self.initial_load_complete = True
+
     def run(self):
         """Load skills and update periodically from disk and internet."""
         self._remove_git_locks()
@@ -338,7 +342,11 @@ class SkillManager(Thread):
             self.skill_updater.post_manifest()
             self._start_settings_update()
 
+        # wait for initial intents training
+        while not self.initial_load_complete:
+            sleep(0.5)
         self.status.set_ready()
+
         # Scan the file folder that contains Skills.  If a Skill is updated,
         # unload the existing version from memory and reload from the disk.
         while not self._stop_event.is_set():
