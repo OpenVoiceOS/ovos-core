@@ -249,6 +249,9 @@ class Configuration:
         xdg_locations = get_xdg_config_locations()
 
         if not configs:
+            LOG.debug("Loading configs")
+            LOG.debug(f"DEFAULT_CONFIG={DEFAULT_CONFIG}")
+            LOG.debug(f"SYSTEM_CONFIG={SYSTEM_CONFIG}")
             configs = [LocalConf(DEFAULT_CONFIG),
                        LocalConf(SYSTEM_CONFIG)]
             if not skip_remote and remote:
