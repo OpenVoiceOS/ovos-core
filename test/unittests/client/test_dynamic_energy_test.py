@@ -17,7 +17,7 @@ from unittest import TestCase, mock
 
 from speech_recognition import AudioSource
 
-from mycroft.client.speech.mic import ResponsiveRecognizer
+from mycroft.listener.mic import ResponsiveRecognizer
 
 
 class MockStream:

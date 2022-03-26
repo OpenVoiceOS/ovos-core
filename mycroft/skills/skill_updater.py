@@ -25,22 +25,10 @@ from combo_lock import ComboLock
 from mycroft.util.log import LOG
 from mycroft.util.file_utils import get_temp_path
 from mycroft.skills.skill_loader import get_skill_directories
-
+from mycroft.deprecated.skills import skill_is_blacklisted
 
 ONE_HOUR = 3600
 FIVE_MINUTES = 300  # number of seconds in a minute
-
-
-def skill_is_blacklisted(skill):
-    """DEPRECATED: do not use, method only for api backwards compatibility
-    Logs a warning and returns False
-    """
-    # this is a internal msm helper
-    # it should have been private
-    # cant remove to keep api compatibility
-    # nothing in the wild should be using this
-    LOG.warning("skill_is_blacklisted is an internal method and has been deprecated. Stop using it!")
-    return False
 
 
 class _SeleneSkillsManifest(JsonStorage):

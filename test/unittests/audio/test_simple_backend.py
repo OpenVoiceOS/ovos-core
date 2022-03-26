@@ -4,7 +4,7 @@ import time
 import unittest
 import unittest.mock as mock
 
-import mycroft.audio.services.simple as simple
+import mycroft.deprecated.audio.services.simple as simple
 from mycroft.messagebus import Message
 
 """Tests for the simple audio service backend."""
@@ -37,7 +37,7 @@ class CallWaiter:
 
 
 class TestSimpleBackend(unittest.TestCase):
-    @mock.patch('mycroft.audio.services.simple.Session')
+    @mock.patch('mycroft.deprecated.audio.services.simple.Session')
     def test_find_mime(self, mock_session):
         mock_response = mock.MagicMock()
         mock_session_instance = mock.Mock()
@@ -88,9 +88,9 @@ class TestSimpleBackend(unittest.TestCase):
         service.play()
         self.assertTrue(bus.emit.called)
 
-    @mock.patch('mycroft.audio.services.simple.play_mp3')
-    @mock.patch('mycroft.audio.services.simple.play_ogg')
-    @mock.patch('mycroft.audio.services.simple.play_wav')
+    @mock.patch('mycroft.deprecated.audio.services.simple.play_mp3')
+    @mock.patch('mycroft.deprecated.audio.services.simple.play_ogg')
+    @mock.patch('mycroft.deprecated.audio.services.simple.play_wav')
     def test_play_internals(self, play_wav_mock, play_ogg_mock, play_mp3_mock):
         bus = mock.Mock()
         process_mock = mock.Mock(name='process')

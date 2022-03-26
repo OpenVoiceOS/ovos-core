@@ -1,0 +1,6 @@
+msm
+ovos_cli_client
+python-vlc>=1.1.2
+pyalsaaudio~=0.8.2
+pyserial~=3.0
+pillow~=8.3.2

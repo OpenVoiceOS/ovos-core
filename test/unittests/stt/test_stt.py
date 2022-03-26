@@ -18,8 +18,8 @@ from io import StringIO
 from unittest.mock import MagicMock, patch
 
 import mycroft.configuration
-import mycroft.stt
-from mycroft.client.speech.listener import RecognizerLoop
+import mycroft.listener.stt
+from mycroft.listener import RecognizerLoop
 from mycroft.util.log import LOG
 from ovos_stt_plugin_vosk import VoskKaldiSTT
 from test.util import base_config
@@ -29,16 +29,16 @@ class TestSTT(unittest.TestCase):
     def test_factory(self):
         config = {'module': 'mycroft',
                   'mycroft': {'uri': 'https://test.com'}}
-        stt = mycroft.stt.STTFactory.create(config)
-        self.assertEqual(type(stt), mycroft.stt.MycroftSTT)
+        stt = mycroft.listener.stt.STTFactory.create(config)
+        self.assertEqual(type(stt), mycroft.listener.stt.MycroftSTT)
 
         config = {'stt': config}
-        stt = mycroft.stt.STTFactory.create(config)
-        self.assertEqual(type(stt), mycroft.stt.MycroftSTT)
+        stt = mycroft.listener.stt.STTFactory.create(config)
+        self.assertEqual(type(stt), mycroft.listener.stt.MycroftSTT)
 
     @patch.object(mycroft.configuration.Configuration, 'get')
     def test_factory_from_config(self, mock_get):
-        mycroft.stt.STTApi = MagicMock()
+        mycroft.listener.stt.STTApi = MagicMock()
         config = base_config()
         config.merge(
             {
@@ -51,12 +51,12 @@ class TestSTT(unittest.TestCase):
             })
         mock_get.return_value = config
 
-        stt = mycroft.stt.STTFactory.create()
-        self.assertEqual(type(stt), mycroft.stt.MycroftSTT)
+        stt = mycroft.listener.stt.STTFactory.create()
+        self.assertEqual(type(stt), mycroft.listener.stt.MycroftSTT)
 
     @patch.object(mycroft.configuration.Configuration, 'get')
     def test_mycroft_stt(self, mock_get):
-        mycroft.stt.STTApi = MagicMock()
+        mycroft.listener.stt.STTApi = MagicMock()
         config = base_config()
         config.merge(
             {
@@ -68,10 +68,10 @@ class TestSTT(unittest.TestCase):
             })
         mock_get.return_value = config
 
-        stt = mycroft.stt.MycroftSTT()
+        stt = mycroft.listener.stt.MycroftSTT()
         audio = MagicMock()
         stt.execute(audio, 'en-us')
-        self.assertTrue(mycroft.stt.STTApi.called)
+        self.assertTrue(mycroft.listener.stt.STTApi.called)
 
     @patch.object(mycroft.configuration.Configuration, 'get')
     def test_fallback_stt(self, mock_get):

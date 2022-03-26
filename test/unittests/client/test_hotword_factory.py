@@ -14,7 +14,7 @@
 #
 import unittest
 
-from mycroft.client.speech.hotword_factory import HotWordFactory
+from mycroft.listener.hotword_factory import HotWordFactory
 
 
 class PocketSphinxTest(unittest.TestCase):

@@ -20,9 +20,7 @@ directory.  The executable gets added to the bin directory when installed
 """
 
 import mycroft.lock
-from mycroft.api import is_paired
 from mycroft.configuration import setup_locale
-from mycroft.enclosure.api import EnclosureAPI
 from mycroft.skills.api import SkillApi
 from mycroft.skills.core import FallbackSkill
 from mycroft.skills.event_scheduler import EventScheduler
@@ -35,27 +33,8 @@ from mycroft.util import (
 )
 from mycroft.util.log import LOG
 
-RASPBERRY_PI_PLATFORMS = ('mycroft_mark_1', 'picroft', 'mycroft_mark_2pi')
-
-
-class DevicePrimer:
-    """DEPRECATED: this class has been fully deprecated, stop using it!
-    Only here to provide public api compatibility but it does absolutely nothing!
-    """
-
-    def __init__(self, message_bus_client, config=None):
-        self.bus = message_bus_client
-        self.platform = "unknown"
-        self.enclosure = EnclosureAPI(self.bus)
-        self.backend_down = False
-
-    @property
-    def is_paired(self):
-        return is_paired()
-
-    def prepare_device(self):
-        """Internet dependent updates of various aspects of the device."""
-        LOG.warning("DevicePrimer has been deprecated!")
+# keep these imports for backwards compat!
+from mycroft.deprecated.skills import DevicePrimer, RASPBERRY_PI_PLATFORMS
 
 
 def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,

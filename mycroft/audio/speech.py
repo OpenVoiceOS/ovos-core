@@ -18,11 +18,10 @@ from threading import Lock
 
 from mycroft.configuration import Configuration
 from mycroft.metrics import report_timing, Stopwatch
-from mycroft.tts import TTSFactory, TTS
+from mycroft.audio.tts import TTSFactory, TTS, RemoteTTSException
 from mycroft.util import check_for_signal
 from mycroft.util.log import LOG
 from mycroft.messagebus.message import Message
-from mycroft.tts.remote_tts import RemoteTTSException
 
 bus = None  # Mycroft messagebus connection
 tts = None

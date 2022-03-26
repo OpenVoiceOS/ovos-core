@@ -19,7 +19,7 @@ from contextlib import contextmanager
 
 from speech_recognition import Recognizer
 
-from mycroft.client.speech.mic import MutableMicrophone
+from mycroft.listener.mic import MutableMicrophone
 from mycroft.configuration import Configuration
 from mycroft.util.audio_utils import play_wav
 from mycroft.util.log import LOG

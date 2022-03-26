@@ -71,6 +71,7 @@ setup(
         'skills': required('requirements/extra-skills.txt'),
         'gui': required('requirements/extra-gui.txt'),
         'bus': required('requirements/extra-bus.txt'),
+        'deprecated': required('requirements/extra-deprecated.txt'),
         'all': required('requirements/requirements.txt')
     },
     packages=find_packages(include=['mycroft*']),
