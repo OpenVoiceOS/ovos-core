@@ -120,7 +120,6 @@ class SkillManager(Thread):
         self.skill_loaders = {}
         self.plugin_skills = {}
         self.enclosure = EnclosureAPI(bus)
-        self.initial_load_complete = False
         self.num_install_retries = 0
         self.empty_skill_dirs = set()  # Save a record of empty skill dirs.
 
@@ -161,7 +160,6 @@ class SkillManager(Thread):
         self.bus.on('skillmanager.activate', self.activate_skill)
         self.bus.once('mycroft.skills.initialized',
                       self.handle_check_device_readiness)
-        self.bus.once('mycroft.skills.trained', self.handle_initial_training)
 
         # load skills waiting for connectivity
         self.bus.on("mycroft.network.connected", self.handle_network_connected)
@@ -425,9 +423,6 @@ class SkillManager(Thread):
             else:
                 LOG.error(f'Priority skill {skill_id} can\'t be found')
 
-    def handle_initial_training(self, message):
-        self.initial_load_complete = True
-
     def run(self):
         """Load skills and update periodically from disk and internet."""
         self._remove_git_locks()
@@ -473,10 +468,9 @@ class SkillManager(Thread):
                  'network_loaded': self._network_loaded.is_set()}))
         self.bus.emit(Message('mycroft.skills.initialized'))
 
-        # wait for initial intents training
-        LOG.debug("Waiting for initial training")
-        while not self.initial_load_complete:
-            sleep(0.5)
+        # load user skill folders
+        self._load_new_skills()
+
         self.status.set_ready()
 
         if self._gui_event.is_set() and self._connected_event.is_set():

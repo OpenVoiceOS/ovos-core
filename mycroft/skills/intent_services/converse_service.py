@@ -1,29 +1,42 @@
 import time
-
 from ovos_config.config import Configuration
+from ovos_config.locale import setup_locale
 from ovos_bus_client.message import Message
-from mycroft.skills.intent_services import (
-    IntentMatch
-)
-from mycroft.skills.permissions import ConverseMode, ConverseActivationMode
+from ovos_bus_client.util import get_message_lang
+from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
+from ovos_plugin_manager.intents import IntentMatch, IntentPriority, IntentEngine
 from ovos_utils.log import LOG
 
 
-class ConverseService:
+class ConverseService(IntentEngine):
     """Intent Service handling conversational skills."""
 
     def __init__(self, bus):
-        self.bus = bus
+        config = Configuration.get().get("skills", {}).get("converse") or {}
+        super().__init__("ovos.intentbox.converse", bus=bus, config=config)
         self._consecutive_activations = {}
         self.active_skills = []  # [skill_id , timestamp]
 
+    def bind(self, bus, engine=None):
+        self.bus = bus
+        self.register_bus_handlers()
+        self.register_compat_bus_handlers()
+
+    def register_bus_handlers(self):
+        self.bus.on('ovos.intentbox.converse.reset', self.reset_converse)
+        self.bus.on('ovos.intentbox.converse.get_active', self.reset_converse)
+
+        self.bus.on('mycroft.speech.recognition.unknown', self.reset_converse)
+        self.bus.on('intent.service.skills.activate', self.handle_activate_skill_request)
+        self.bus.on('intent.service.skills.deactivate', self.handle_deactivate_skill_request)
+
+    def register_compat_bus_handlers(self):
+        self.bus.on('active_skill_request', self.handle_activate_skill_request)
+        self.bus.on("intent.service.active_skills.get", self.handle_get_active_skills)
+
     @property
-    def config(self):
-        """
-        Returns:
-            converse_config (dict): config for converse handling options
-        """
-        return Configuration().get("skills", {}).get("converse") or {}
+    def priority(self):
+        return IntentPriority.CONVERSE
 
     def get_active_skills(self):
         """Active skill ids ordered by converse priority
@@ -261,4 +274,45 @@ class ConverseService:
             if self.converse(utterances, skill_id, lang, message):
                 return IntentMatch('Converse', None, None, skill_id)
         return None
+
+    # event handlers
+    def handle_utterance_message(self, message):
+        utterances = message.data["utterances"]
+        lang = get_message_lang(message)
+        match = self.converse_with_skills(utterances, lang, message)
+        return [match] if match else []
+
+    def handle_activate_skill_request(self, message):
+        # TODO imperfect solution - only a skill can activate itself
+        # someone can forge this message and emit it raw, but in OpenVoiceOS all
+        # skill messages should have skill_id in context, so let's make sure
+        # this doesnt happen accidentally at very least
+        skill_id = message.data['skill_id']
+        source_skill = message.context.get("skill_id")
+        self.activate_skill(skill_id, source_skill)
+
+    def handle_deactivate_skill_request(self, message):
+        # TODO imperfect solution - only a skill can deactivate itself
+        # someone can forge this message and emit it raw, but in ovos-core all
+        # skill message should have skill_id in context, so let's make sure
+        # this doesnt happen accidentally
+        skill_id = message.data['skill_id']
+        source_skill = message.context.get("skill_id") or skill_id
+        self.deactivate_skill(skill_id, source_skill)
+
+    def handle_get_active_skills(self, message):
+        """Send active skills to caller.
+
+        Argument:
+            message: query message to reply to.
+        """
+        self.bus.emit(message.reply("intent.service.active_skills.reply",
+                                    {"skills": self.active_skills}))
+
+    def reset_converse(self, message):
+        """Let skills know there was a problem with speech recognition"""
+        lang = get_message_lang(message)
+        setup_locale(lang)  # restore default lang
+        self.converse_with_skills([], lang, message)
+
 

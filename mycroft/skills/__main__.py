@@ -52,7 +52,7 @@ def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
 
     # Connect this process to the Mycroft message bus
     bus = start_message_bus_client("SKILLS")
-    _register_intent_services(bus)
+    intentservice = _register_intent_services(bus)
     event_scheduler = EventScheduler(bus, autostart=False)
     event_scheduler.daemon = True
     event_scheduler.start()
@@ -68,6 +68,7 @@ def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
 
     wait_for_exit_signal()
 
+    intentservice.shutdown()
     shutdown(skill_manager, event_scheduler)
 
 
