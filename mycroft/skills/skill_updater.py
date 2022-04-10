@@ -21,7 +21,6 @@ from json_database import JsonStorage
 from mycroft.api import DeviceApi, is_paired
 from mycroft.configuration import Configuration
 from ovos_utils.configuration import get_xdg_data_save_path
-from mycroft.util import connected
 from combo_lock import ComboLock
 from mycroft.util.log import LOG
 from mycroft.util.file_utils import get_temp_path
@@ -55,7 +54,7 @@ class _SeleneSkillsManifest(JsonStorage):
     """
     def __init__(self, api=None):
         path = os.path.join(get_xdg_data_save_path(), 'skills.json')
-        super().__init__(path)
+        super().__init__(path, disable_lock=True)
         if "skills" not in self:
             self["skills"] = []
             self.store()
