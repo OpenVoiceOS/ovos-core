@@ -31,7 +31,7 @@ from mycroft.util import start_message_bus_client
 class Enclosure:
     def __init__(self):
         # Load full config
-        config = Configuration.get()
+        config = Configuration()
         self.lang = config['lang']
         self.config = config.get("enclosure")
         self.global_config = config

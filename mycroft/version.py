@@ -12,13 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import json
-
-from genericpath import exists, isfile
-from os.path import join, expanduser
-
-from mycroft.configuration import Configuration
-from mycroft.util.log import LOG
 
 # The following lines are replaced during the release process.
 # START_VERSION_BLOCK

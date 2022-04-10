@@ -65,7 +65,7 @@ class EventScheduler(Thread):
         self.bus = bus
         self.is_running = True
 
-        core_conf = Configuration.get(remote=False)
+        core_conf = Configuration()
         data_dir = core_conf.get('data_dir') or get_xdg_data_save_path()
         old_schedule_path = join(expanduser(data_dir), schedule_file)
 

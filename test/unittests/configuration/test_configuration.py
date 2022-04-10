@@ -4,13 +4,6 @@ import mycroft.configuration
 
 
 class TestConfiguration(TestCase):
-    def setUp(self):
-        """
-            Clear cached configuration
-        """
-        super(TestConfiguration, self).setUp()
-        mycroft.configuration.Configuration.load_config_stack([{}], True)
-
     def test_get(self):
         d1 = {'a': 1, 'b': {'c': 1, 'd': 2}}
         d2 = {'b': {'d': 'changed'}}

@@ -52,7 +52,7 @@ class SkillGUI:
         self.current_page_idx = -1
         self.skill = skill
         self.on_gui_changed_callback = None
-        self.config = Configuration.get()
+        self.config = Configuration()
 
     @property
     def bus(self):

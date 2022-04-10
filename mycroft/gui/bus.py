@@ -42,7 +42,7 @@ write_lock = Lock()
 
 def get_gui_websocket_config():
     """Retrieves the configuration values for establishing a GUI message bus"""
-    config = Configuration.get()
+    config = Configuration()
     websocket_config = config["gui_websocket"]
 
     return websocket_config

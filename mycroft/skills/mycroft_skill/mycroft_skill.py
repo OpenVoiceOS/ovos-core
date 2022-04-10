@@ -114,7 +114,7 @@ class MycroftSkill:
         self._enclosure = EnclosureAPI()
 
         #: Mycroft global configuration. (dict)
-        self.config_core = Configuration.get()
+        self.config_core = Configuration()
 
         self._settings = None
         self._initial_settings = {}
@@ -367,7 +367,7 @@ class MycroftSkill:
         NOTE: this should be public, but since if a skill uses this it wont
         work in regular mycroft-core it was made private! Equivalent PRs in
         mycroft-core have been rejected/abandoned"""
-        return Configuration.get().get("lang", "en-us").lower()
+        return self.config_core.get("lang", "en-us").lower()
 
     @property
     def _secondary_langs(self):
@@ -1643,7 +1643,7 @@ class MycroftSkill:
         pass
 
     def shutdown(self):
-        """Optional shutdown proceedure implemented by subclass.
+        """Optional shutdown procedure implemented by subclass.
 
         This method is intended to be called during the skill process
         termination. The skill implementation must shutdown all processes and

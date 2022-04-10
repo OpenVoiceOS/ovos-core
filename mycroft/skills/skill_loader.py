@@ -35,7 +35,7 @@ SKILL_MAIN_MODULE = '__init__.py'
 
 def _get_skill_folder_name(conf=None):
     # TODO deprecate on version 0.0.3 when the warning is no longer needed
-    conf = conf or Configuration.get(remote=False)
+    conf = conf or Configuration()
     folder = conf["skills"].get("directory")
 
     if not folder:
@@ -84,7 +84,7 @@ def get_skill_directories(conf=None):
     # the contents of each skills directory must be individual skill folders
     # we are still dependent on the mycroft-core structure of skill_id/__init__.py
 
-    conf = conf or Configuration.get(remote=False)
+    conf = conf or Configuration()
     folder = _get_skill_folder_name(conf)
 
     # load all valid XDG paths
@@ -130,7 +130,7 @@ def get_default_skills_directory(conf=None):
     Args:
         conf (dict): mycroft.conf dict, will be loaded automatically if None
     """
-    conf = conf or Configuration.get(remote=False)
+    conf = conf or Configuration()
     path_override = conf["skills"].get("directory_override")
     folder = _get_skill_folder_name()
 
@@ -306,7 +306,7 @@ class SkillLoader:
         self.last_loaded = 0
         self.instance = None
         self.active = True
-        self.config = Configuration.get()
+        self.config = Configuration()
 
         self.modtime_error_log_written = False
 

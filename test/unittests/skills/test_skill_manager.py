@@ -96,10 +96,6 @@ class TestSkillManager(MycroftUnitTestBase):
         }
 
     def test_instantiate(self):
-        self.assertEqual(
-            self.skill_manager.config['data_dir'],
-            str(self.temp_dir)
-        )
         expected_result = [
             'mycroft.internet.connected',
             'skillmanager.list',

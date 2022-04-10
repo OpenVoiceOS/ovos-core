@@ -18,10 +18,9 @@ from copy import copy, deepcopy
 
 import requests
 from requests import HTTPError, RequestException
-
-from mycroft.configuration import Configuration
+import mycroft.configuration
 from mycroft.identity import IdentityManager, identity_lock
-from mycroft.version import VersionManager
+from mycroft.version import VersionManager, OVOS_VERSION_STR
 from mycroft.util import get_arch, connected, LOG
 
 _paired_cache = False
@@ -48,8 +47,8 @@ class Api:
 
         # Load the config, skipping the remote config since we are
         # getting the info needed to get to it!
-        config = Configuration.get(cache=False, remote=False)
-        config_server = config.get("server")
+        config = mycroft.configuration.Configuration()
+        config_server = config.get("server") or {}
         self.url = config_server.get("url")
         self.version = config_server.get("version")
         self.identity = IdentityManager.get()
@@ -235,14 +234,8 @@ class DeviceApi(Api):
 
     def activate(self, state, token):
         version = VersionManager.get()
-        platform = "unknown"
-        platform_build = ""
-
-        # load just the local configs to get platform info
-        config = Configuration.get(cache=False, remote=False)
-        if "enclosure" in config:
-            platform = config.get("enclosure").get("platform", "unknown")
-            platform_build = config.get("enclosure").get("platform_build", "")
+        platform = "ovos-core"
+        platform_build = OVOS_VERSION_STR
 
         return self.request({
             "method": "POST",
@@ -257,15 +250,8 @@ class DeviceApi(Api):
 
     def update_version(self):
         version = VersionManager.get()
-        platform = "unknown"
-        platform_build = ""
-
-        # load just the local configs to get platform info
-        config = Configuration.get(cache=False, remote=False)
-        if "enclosure" in config:
-            platform = config.get("enclosure").get("platform", "unknown")
-            platform_build = config.get("enclosure").get("platform_build", "")
-
+        platform = "ovos-core"
+        platform_build = OVOS_VERSION_STR
         return self.request({
             "method": "PATCH",
             "path": "/" + UUID,
@@ -543,7 +529,7 @@ def check_remote_pairing(ignore_errors):
 
 
 def is_backend_disabled():
-    config = Configuration.get(cache=False, remote=False)
+    config = mycroft.configuration.Configuration()
     if not config.get("server"):
         # missing server block implies disabling backend
         return True

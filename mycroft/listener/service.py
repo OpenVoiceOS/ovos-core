@@ -51,7 +51,7 @@ class SpeechClient(Thread):
         self.status = ProcessStatus('speech', callback_map=callbacks)
         self.status.set_started()
 
-        self.config = Configuration.get()
+        self.config = Configuration()
         self.bus = start_message_bus_client("VOICE")
 
         self.status.bind(self.bus)

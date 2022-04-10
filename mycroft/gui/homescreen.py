@@ -56,8 +56,8 @@ class HomescreenManager:
         return self.homescreens
 
     def get_active_homescreen(self):
-        config = Configuration.get()
-        enclosure_config = config.get("gui")
+        config = Configuration()
+        enclosure_config = config.get("gui") or {}
         active_homescreen = enclosure_config.get("idle_display_skill")
         LOG.debug(f"Homescreen Manager: Active Homescreen {active_homescreen}")
         for h in self.homescreens:

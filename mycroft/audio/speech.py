@@ -75,7 +75,7 @@ def mute_and_speak(utterance, ident, listen=False):
         ident:      Ident tying the utterance to the source query
     """
     global tts_hash
-    config = Configuration.get()
+    config = Configuration()
 
     # update TTS object if configuration has changed
     if tts_hash != hash(str(config.get('tts', ''))):
@@ -100,7 +100,7 @@ def _get_tts_fallback():
     """Lazily initializes the fallback TTS if needed."""
     global fallback_tts, bus
     if not fallback_tts:
-        config = Configuration.get()
+        config = Configuration()
         engine = config.get('tts', {}).get("fallback_module", "mimic")
         cfg = {"tts": {"module": engine,
                        engine: config.get('tts', {}).get(engine, {})}}
@@ -170,7 +170,7 @@ def init(messagebus):
 
     tts = TTSFactory.create()
     tts.init(bus)
-    tts_hash = hash(str(Configuration.get().get('tts', '')))
+    tts_hash = hash(str(Configuration().get('tts', '')))
 
 
 def shutdown():

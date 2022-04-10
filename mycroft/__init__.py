@@ -29,8 +29,7 @@ __all__ = ['MYCROFT_ROOT_PATH',
            'Api',
            'Message']
 
-from mycroft.configuration import Configuration
-_cfg = Configuration.get()
+_cfg = mycroft.configuration.Configuration()
 _log_level = _cfg.get("log_level", "INFO")
 _logs_conf = _cfg.get("logs") or {}
 _logs_conf["level"] = _log_level

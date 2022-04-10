@@ -430,7 +430,7 @@ class TestMycroftSkill(unittest.TestCase):
         expected = [{'context': 'ADonatello'}]
         check_remove_context(expected)
 
-    @patch.dict(Configuration._Configuration__config, BASE_CONF)
+    @patch.dict(Configuration._Configuration__patch, BASE_CONF)
     def test_skill_location(self):
         s = SimpleSkill1()
         self.assertEqual(s.location, BASE_CONF.get('location'))
@@ -439,7 +439,7 @@ class TestMycroftSkill(unittest.TestCase):
         self.assertEqual(s.location_timezone,
                          BASE_CONF['location']['timezone']['code'])
 
-    @patch.dict(Configuration._Configuration__config, BASE_CONF)
+    @patch.dict(Configuration._Configuration__patch, BASE_CONF)
     def test_add_event(self):
         emitter = MagicMock()
         s = SimpleSkill1()
@@ -450,7 +450,7 @@ class TestMycroftSkill(unittest.TestCase):
         # Check that the handler was stored in the skill
         self.assertTrue('handler1' in [e[0] for e in s.events])
 
-    @patch.dict(Configuration._Configuration__config, BASE_CONF)
+    @patch.dict(Configuration._Configuration__patch, BASE_CONF)
     def test_remove_event(self):
         emitter = MagicMock()
         s = SimpleSkill1()
@@ -465,7 +465,7 @@ class TestMycroftSkill(unittest.TestCase):
         self.assertEqual(emitter.remove_all_listeners.call_args[0][0],
                          'handler1')
 
-    @patch.dict(Configuration._Configuration__config, BASE_CONF)
+    @patch.dict(Configuration._Configuration__patch, BASE_CONF)
     def test_add_scheduled_event(self):
         emitter = MagicMock()
         s = SimpleSkill1()
@@ -489,7 +489,7 @@ class TestMycroftSkill(unittest.TestCase):
         sched_events = [e[0] for e in s.event_scheduler.events]
         self.assertTrue('A:float_handler' in sched_events)
 
-    @patch.dict(Configuration._Configuration__config, BASE_CONF)
+    @patch.dict(Configuration._Configuration__patch, BASE_CONF)
     def test_remove_scheduled_event(self):
         emitter = MagicMock()
         s = SimpleSkill1()
@@ -506,7 +506,7 @@ class TestMycroftSkill(unittest.TestCase):
         events = [e[0] for e in s.event_scheduler.events]
         self.assertTrue('A:sched_handler1' not in events)
 
-    @patch.dict(Configuration._Configuration__config, BASE_CONF)
+    @patch.dict(Configuration._Configuration__patch, BASE_CONF)
     def test_run_scheduled_event(self):
         emitter = MagicMock()
         s = SimpleSkill1()

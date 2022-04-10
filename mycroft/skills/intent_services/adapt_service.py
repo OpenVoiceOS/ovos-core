@@ -162,9 +162,9 @@ class AdaptService:
 
     def __init__(self, config):
         self.config = config
-
-        self.lang = Configuration.get().get("lang", "en-us")
-        langs = Configuration.get().get('secondary_langs') or []
+        core_config = Configuration()
+        self.lang = core_config.get("lang", "en-us")
+        langs = core_config.get('secondary_langs') or []
         if self.lang not in langs:
             langs.append(self.lang)
 

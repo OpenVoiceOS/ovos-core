@@ -18,9 +18,21 @@ from shutil import rmtree
 from unittest import TestCase
 from unittest.mock import patch
 
-from .mocks import mock_config, MessageBusMock
+from .mocks import base_config, MessageBusMock
+from mycroft.configuration import Configuration
 
 
+def mock_config():
+    """Supply a reliable return value for the Configuration.get() method."""
+    config = base_config()
+    config['skills']['priority_skills'] = ['foobar']
+    config['data_dir'] = str(tempfile.mkdtemp())
+    config['server']['metrics'] = False
+    config['enclosure'] = {}
+    return config
+
+
+@patch.dict(Configuration._Configuration__patch, mock_config())
 class MycroftUnitTestBase(TestCase):
     mock_package = None
 
@@ -28,14 +40,7 @@ class MycroftUnitTestBase(TestCase):
         temp_dir = tempfile.mkdtemp()
         self.temp_dir = Path(temp_dir)
         self.message_bus_mock = MessageBusMock()
-        self._mock_config()
         self._mock_log()
-
-    def _mock_config(self):
-        config_mgr_patch = patch(self.mock_package + 'Configuration')
-        self.addCleanup(config_mgr_patch.stop)
-        self.config_mgr_mock = config_mgr_patch.start()
-        self.config_mgr_mock.get = mock_config(self.temp_dir)
 
     def _mock_log(self):
         log_patch = patch(self.mock_package + 'LOG')

@@ -9,5 +9,5 @@ class HotWordFactory(OVOSWakeWordFactory):
     def create_hotword(cls, hotword="hey mycroft", config=None,
                        lang="en-us", loop=None):
         if not config:
-            config = Configuration.get()['hotwords']
+            config = Configuration()['hotwords']
         return OVOSWakeWordFactory.create_hotword(hotword, config, lang, loop)

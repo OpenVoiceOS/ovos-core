@@ -26,7 +26,7 @@ class TestTimeFuncs(TestCase):
         # self.assertEqual(default_timezone(), tzlocal())
 
         # Test tz from config
-        mock_conf.get.return_value = test_config
+        mock_conf.return_value = test_config
         setup_locale()  # will load (test) tz from config
         self.assertEqual(default_timezone(),
                          tzfile('/usr/share/zoneinfo/America/Chicago'))
@@ -37,7 +37,7 @@ class TestTimeFuncs(TestCase):
 
     @mock.patch('mycroft.util.time.datetime')
     def test_now_local(self, mock_dt, mock_conf):
-        mock_conf.get.return_value = test_config
+        mock_conf.return_value = test_config
         setup_locale()
 
         dt_test = datetime(year=1985, month=10, day=25, hour=8, minute=18,
@@ -54,7 +54,7 @@ class TestTimeFuncs(TestCase):
 
     @mock.patch('mycroft.util.time.datetime')
     def test_now_utc(self, mock_dt, mock_conf):
-        mock_conf.get.return_value = test_config
+        mock_conf.return_value = test_config
         setup_locale()
 
         dt_test = datetime(year=1985, month=10, day=25, hour=8, minute=18)
@@ -66,7 +66,7 @@ class TestTimeFuncs(TestCase):
         mock_dt.utcnow.assert_called_with()
 
     def test_to_utc(self, mock_conf):
-        mock_conf.get.return_value = test_config
+        mock_conf.return_value = test_config
         dt = datetime(year=2000, month=1, day=1,
                       hour=0, minute=0, second=0,
                       tzinfo=gettz('Europe/Stockholm'))
@@ -74,7 +74,7 @@ class TestTimeFuncs(TestCase):
         self.assertEqual(to_utc(dt).tzinfo, gettz('UTC'))
 
     def test_to_local(self, mock_conf):
-        mock_conf.get.return_value = test_config
+        mock_conf.return_value = test_config
         dt = datetime(year=2000, month=1, day=1,
                       hour=0, minute=0, second=0,
                       tzinfo=gettz('Europe/Stockholm'))
@@ -83,7 +83,7 @@ class TestTimeFuncs(TestCase):
         self.assertEqual(to_local(dt).tzinfo, default_timezone())
 
     def test_to_system(self, mock_conf):
-        mock_conf.get.return_value = test_config
+        mock_conf.return_value = test_config
         dt = datetime(year=2000, month=1, day=1,
                       hour=0, minute=0, second=0,
                       tzinfo=gettz('Europe/Stockholm'))

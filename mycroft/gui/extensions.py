@@ -5,12 +5,11 @@ from mycroft.util.log import LOG
 from mycroft.api import is_paired
 from ovos_utils.system import ssh_enable, ssh_disable
 
-from json_database import JsonStorageXDG
 from mycroft.gui.homescreen import HomescreenManager
 from mycroft.gui.interfaces.smartspeaker import SmartSpeakerExtensionGuiInterface
 
 
-class ExtensionsManager():
+class ExtensionsManager:
     def __init__(self, name, bus, gui):
         """ Constructor for the Extension Manager. The Extension Manager is responsible for
         managing the extensions that define additional GUI behaviours for specific platforms.
@@ -24,8 +23,8 @@ class ExtensionsManager():
         self.name = name
         self.bus = bus
         self.gui = gui
-        config = Configuration.get()
-        enclosure_config = config.get("gui")
+        core_config = Configuration()
+        enclosure_config = core_config.get("gui") or {}
         self.active_extension = enclosure_config.get("extension", "generic")
 
         # ToDo: Add Exclusive Support For "Desktop", "Mobile" Extensions
@@ -54,7 +53,7 @@ class ExtensionsManager():
             Message("extension.manager.activated", {"id": extension_id}))
 
 
-class SmartSpeakerExtension():
+class SmartSpeakerExtension:
     """ Smart Speaker Extension: This extension is responsible for managing the Smart Speaker
     specific GUI behaviours. This extension adds support for Homescreens and Homescreen Mangement.
 
@@ -109,9 +108,9 @@ class SmartSpeakerExtension():
             self.bus.emit(Message("ovos.shell.status.ok"))
 
     def _detect_backend(self):
-        config = Configuration.get()
-        server_config = config.get("server")
-        backend_config = server_config.get("url")
+        config = Configuration()
+        server_config = config.get("server") or {}
+        backend_config = server_config.get("url", "")
         if "https://api.mycroft.ai" in backend_config:
             return "remote"
         else:
@@ -128,7 +127,7 @@ class SmartSpeakerExtension():
         self.homescreen_manager.show_homescreen()
 
 
-class BigscreenExtension():
+class BigscreenExtension:
     """ Bigscreen Platform Extension: This extension is responsible for managing the Bigscreen
     specific GUI behaviours. The bigscreen extension does not support Homescreens. It includes
     support for Window managment and Window behaviour.
@@ -198,7 +197,7 @@ class BigscreenExtension():
         self.handle_remove_namespace(message)
 
 
-class GenericExtension():
+class GenericExtension:
     """ Generic Platform Extension: This extension is responsible for managing the generic GUI behaviours
     for non specific platforms. The generic extension does optionally support Homescreen and Homescreen
     Management but it needs to be exclusively enabled in the configuration file.
@@ -214,8 +213,8 @@ class GenericExtension():
 
         self.bus = bus
         self.gui = gui
-        config = Configuration.get()
-        gui_config = config.get("gui")
+        core_config = Configuration()
+        gui_config = core_config.get("gui") or {}
         generic_config = gui_config.get("generic", {})
         self.homescreen_supported = generic_config.get("homescreen_supported", False)
 

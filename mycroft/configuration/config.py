@@ -15,13 +15,15 @@
 import json
 import re
 from os.path import isfile
-
+from mycroft_bus_client.message import Message
 from mycroft.configuration.locations import *
 from ovos_utils.configuration import get_xdg_config_locations, get_xdg_config_save_path
+from ovos_utils.network_utils import is_connected
 from mycroft.util import camel_case_split
 from mycroft.util.json_helper import load_commented_json, merge_dict
 from mycroft.util.log import LOG
 from ovos_utils.json_helper import flattened_delete
+import mycroft.api
 
 
 def is_remote_list(values):
@@ -65,7 +67,7 @@ def translate_remote(config, setting):
 
 
 def translate_list(config, values):
-    """Translate list formated by mycroft server.
+    """Translate list formatted by mycroft server.
 
     Args:
         config (dict): target config
@@ -84,28 +86,33 @@ class LocalConf(dict):
 
     def __init__(self, path):
         super(LocalConf, self).__init__()
+        self.path = path
         if path:
-            self.path = path
             self.load_local(path)
 
-    def load_local(self, path):
+    def load_local(self, path=None):
         """Load local json file into self.
 
         Args:
             path (str): file to load
         """
+        path = path or self.path
+        if not path:
+            LOG.error(f"in memory configuration, nothing to load")
+            return
         if exists(path) and isfile(path):
             try:
                 config = load_commented_json(path)
                 for key in config:
                     self.__setitem__(key, config[key])
-
-                LOG.debug("Configuration {} loaded".format(path))
+                LOG.debug(f"Configuration {path} loaded")
             except Exception as e:
-                LOG.error("Error loading configuration '{}'".format(path))
-                LOG.error(repr(e))
+                LOG.exception(f"Error loading configuration '{path}'")
         else:
-            LOG.debug("Configuration '{}' not defined, skipping".format(path))
+            LOG.debug(f"Configuration '{path}' not defined, skipping")
+
+    def reload(self):
+        self.load_local(self.path)
 
     def store(self, path=None):
         """Cache the received settings locally.
@@ -114,6 +121,9 @@ class LocalConf(dict):
         that are as close to the user's as possible.
         """
         path = path or self.path
+        if not path:
+            LOG.error(f"in memory configuration, no save location")
+            return
         with open(path, 'w') as f:
             json.dump(self, f, indent=2)
 
@@ -124,23 +134,16 @@ class LocalConf(dict):
 class RemoteConf(LocalConf):
     """Config dictionary fetched from mycroft.ai."""
 
-    def __init__(self, cache=None):
-        super(RemoteConf, self).__init__(None)
+    def __init__(self, cache=WEB_CONFIG_CACHE):
+        super(RemoteConf, self).__init__(cache)
 
-        cache = cache or WEB_CONFIG_CACHE
-        self.path = cache  # after super to avoid loading
-
+    def reload(self):
         try:
-            # Here to avoid cyclic import
-            from mycroft.api import is_paired
-            from mycroft.api import DeviceApi
-            from mycroft.api import is_backend_disabled
-
-            if not is_paired():
-                self.load_local(cache)
+            if not mycroft.api.is_paired():
+                self.load_local(self.path)
                 return
 
-            if is_backend_disabled():
+            if mycroft.api.is_backend_disabled():
                 # disable options that require backend
                 config = {
                     "server": {
@@ -153,15 +156,15 @@ class RemoteConf(LocalConf):
                 for key in config:
                     self.__setitem__(key, config[key])
             else:
-                api = DeviceApi()
+                api = mycroft.api.DeviceApi()
                 setting = api.get_settings()
                 location = None
                 try:
                     location = api.get_location()
                 except Exception as e:
                     LOG.error(f"Exception fetching remote location: {e}")
-                    if exists(cache) and isfile(cache):
-                        location = load_commented_json(cache).get('location')
+                    if exists(self.path) and isfile(self.path):
+                        location = load_commented_json(self.path).get('location')
 
                 if location:
                     setting["location"] = location
@@ -171,11 +174,11 @@ class RemoteConf(LocalConf):
 
                 for key in config:
                     self.__setitem__(key, config[key])
-                self.store(cache)
+                self.store(self.path)
 
         except Exception as e:
             LOG.error(f"Exception fetching remote configuration: {e}")
-            self.load_local(cache)
+            self.load_local(self.path)
 
 
 def _log_old_location_deprecation(old_user_config=OLD_USER_CONFIG):
@@ -188,40 +191,74 @@ def _log_old_location_deprecation(old_user_config=OLD_USER_CONFIG):
     LOG.warning(" Please move it to " + get_xdg_config_save_path())
 
 
-def _get_system_constraints():
-    # constraints must come from SYSTEM config
-    # if not defined then load the DEFAULT constraints
-    # these settings can not be set anywhere else!
-    return LocalConf(SYSTEM_CONFIG).get("system") or \
-           LocalConf(DEFAULT_CONFIG).get("system") or \
-           {}
-
-
-class Configuration:
+class Configuration(dict):
     """Namespace for operations on the configuration singleton."""
-    __config = {}  # Cached config
-    __patch = {}  # Patch config that skills can update to override config
+    __patch = LocalConf(None)  # Patch config that skills can update to override config
+    bus = None
+    default = LocalConf(DEFAULT_CONFIG)
+    system = LocalConf(SYSTEM_CONFIG)
+    remote = RemoteConf()
+    # This includes both the user config and
+    # /etc/xdg/mycroft/mycroft.conf
+    xdg_configs = [LocalConf(p) for p in get_xdg_config_locations()]
+    _old_user = LocalConf(OLD_USER_CONFIG)
 
-    @staticmethod
-    def get(configs=None, cache=True, remote=True):
-        """Get configuration
+    def __init__(self, *args, **kwargs):
+        # python does not support proper overloading
+        # when instantiation a Configuration object (new style)
+        # the get method is replaced for proper dict behaviour
+        self.get = self._real_get
+        super().__init__(*args, **kwargs)
 
-        Returns cached instance if available otherwise builds a new
-        configuration dict.
+    # dict methods
+    def __setitem__(self, key, value):
+        Configuration.__patch[key] = value
+        # sync with other processes connected to bus
+        if Configuration.bus:
+            Configuration.bus.emit(Message("configuration.patch",
+                                           {"config": {key: value}}))
 
-        Args:
-            configs (list): List of configuration dicts
-            cache (boolean): True if the result should be cached
-            remote (boolean): False if the Remote settings shouldn't be loaded
+    def __getitem__(self, item):
+        cfg = Configuration.load_all_configs()
+        return cfg.get(item)
 
-        Returns:
-            (dict) configuration dictionary.
-        """
-        if Configuration.__config:
-            return Configuration.__config
-        else:
-            return Configuration.load_config_stack(configs, cache, remote)
+    def __str__(self):
+        cfg = Configuration.load_all_configs()
+        try:
+            return json.dumps(cfg, sort_keys=True)
+        except:
+            return str(cfg)
 
+    def __dict__(self):
+        return Configuration.load_all_configs()
+
+    def __repr__(self):
+        return str(Configuration.load_all_configs())
+
+    def __iter__(self):
+        for k in Configuration.load_all_configs():
+            yield k
+
+    def update(self, *args, **kwargs):
+        Configuration.__patch.update(*args, **kwargs)
+
+    def pop(self, key):
+        # we can not pop the key because configs are read only
+        # we could do it for __patch but that does not make sense
+        # for the object as a whole which is
+        # supposed to behave like a python dict
+        Configuration.__patch[key] = None
+
+    def items(self):
+        return Configuration.load_all_configs().items()
+
+    def keys(self):
+        return Configuration.load_all_configs().keys()
+
+    def values(self):
+        return Configuration.load_all_configs().values()
+
+    # config methods
     @staticmethod
     def load_config_stack(configs=None, cache=False, remote=True):
         """Load a stack of config dicts into a single dict
@@ -234,65 +271,101 @@ class Configuration:
         Returns:
             (dict) merged dict of all configuration files
         """
+        LOG.warning("load_config_stack has been deprecated, use load_all_configs instead")
+        if configs:
+            return Configuration.filter_and_merge(configs)
+        system_constraints = Configuration.get_system_constraints()
+        if not remote:
+            system_constraints["disable_remote_config"] = True
+        return Configuration.load_all_configs(system_constraints)
+
+    @staticmethod
+    def reset():
+        Configuration.__patch = {}
+        Configuration.reload()
+
+    @staticmethod
+    def reload():
+        Configuration.default.reload()
+        Configuration.system.reload()
+        Configuration.remote.reload()
+        for cfg in Configuration.xdg_configs:
+            cfg.reload()
+
+    @staticmethod
+    def get_system_constraints():
+        # constraints must come from SYSTEM config
+        # if not defined then load the DEFAULT constraints
+        # these settings can not be set anywhere else!
+        return Configuration.system.get("system") or \
+               Configuration.default.get("system") or \
+               {}
+
+    @staticmethod
+    def load_all_configs(system_constraints=None):
+        """Load the stack of config files into a single dict
+
+        Returns:
+            (dict) merged dict of all configuration files
+        """
+        # system administrators can define different constraints in how
+        # configurations are loaded
+        system_constraints = system_constraints or Configuration.get_system_constraints()
+        skip_user = system_constraints.get("disable_user_config", False)
+        skip_remote = system_constraints.get("disable_remote_config", False)
+
+        configs = [Configuration.default, Configuration.system]
+        if not skip_remote:
+            configs.append(Configuration.remote)
+        if not skip_user:
+            # deprecation warning
+            if isfile(OLD_USER_CONFIG):
+                _log_old_location_deprecation(OLD_USER_CONFIG)
+                configs.append(Configuration._old_user)
+            configs += Configuration.xdg_configs
+
+        # runtime patches by skills / bus events
+        configs.append(Configuration.__patch)
+
+        # Merge all configs into one
+        return Configuration.filter_and_merge(configs)
+
+    @staticmethod
+    def filter_and_merge(configs):
+        # ensure type
+        for index, item in enumerate(configs):
+            if isinstance(item, str):
+                configs[index] = LocalConf(item)
+            elif isinstance(item, dict):
+                configs[index] = LocalConf(None)
+                configs[index].merge(item)
 
         # system administrators can define different constraints in how
         # configurations are loaded
-        system_conf = _get_system_constraints()
+        system_conf = Configuration.get_system_constraints()
         protected_keys = system_conf.get("protected_keys") or {}
         protected_remote = protected_keys.get("remote") or []
         protected_user = protected_keys.get("user") or []
         skip_user = system_conf.get("disable_user_config", False)
         skip_remote = system_conf.get("disable_remote_config", False)
 
-        # This includes both the user config and
-        # /etc/xdg/mycroft/mycroft.conf
-        xdg_locations = get_xdg_config_locations()
-
-        if not configs:
-            configs = [LocalConf(DEFAULT_CONFIG),
-                       LocalConf(SYSTEM_CONFIG)]
-            if not skip_remote and remote:
-                configs.append(RemoteConf())
-            if not skip_user:
-                # deprecation warning
-                if isfile(OLD_USER_CONFIG):
-                    _log_old_location_deprecation(OLD_USER_CONFIG)
-                    configs.append(LocalConf(OLD_USER_CONFIG))
-                configs += [LocalConf(p) for p in xdg_locations]
-            configs.append(Configuration.__patch)
-        else:
-            # Handle strings in stack
-            for index, item in enumerate(configs):
-                if isinstance(item, str):
-                    configs[index] = LocalConf(item)
-
         # Merge all configs into one
         base = {}
         for cfg in configs:
-            # check for protected keys in remote config (changes blocked by system)
-            if isinstance(cfg, RemoteConf):
-                if skip_remote:  # remote config disabled at system level
-                    continue
+            is_user = cfg.path is None or cfg.path not in [Configuration.default, Configuration.system]
+            is_remote = cfg.path == Configuration.remote.path
+            if (is_remote and skip_remote) or (is_user and skip_user):
+                continue
+            elif is_remote:
                 # delete protected keys from remote config
                 for protection in protected_remote:
                     flattened_delete(cfg, protection)
-            # check for protected keys in user config (changes blocked by system)
-            elif isinstance(cfg, LocalConf) and cfg.path in xdg_locations + [OLD_USER_CONFIG]:
-                if skip_user:  # user config disabled at system level
-                    continue
+            elif is_user:
                 # delete protected keys from user config
                 for protection in protected_user:
                     flattened_delete(cfg, protection)
             merge_dict(base, cfg)
-
-        # copy into cache
-        if cache:
-            Configuration.__config.clear()
-            for key in base:
-                Configuration.__config[key] = base[key]
-            return Configuration.__config
-        else:
-            return base
+        return base
 
     @staticmethod
     def set_config_update_handlers(bus):
@@ -301,10 +374,45 @@ class Configuration:
         Args:
             bus: Message bus client instance
         """
+        # remove any old event listeners
+        Configuration.deregister_bus()
+
+        # sync any modified values from before the bind
+        if Configuration.__patch and not Configuration.bus:
+            Configuration.bus.emit(Message("configuration.patch",
+                                           {"config": Configuration.__patch}))
+
+        # attach new bus and listeners
+        Configuration.bus = bus
         bus.on("configuration.updated", Configuration.updated)
         bus.on("configuration.patch", Configuration.patch)
         bus.on("configuration.patch.clear", Configuration.patch_clear)
         bus.on("configuration.cache.clear", Configuration.clear_cache)
+        # TODO unify these namespaces, they seem to differ between dev/mk2/PHAL
+        bus.on("mycroft.paired", Configuration.handle_remote_update)
+        bus.on("mycroft.internet.connected", Configuration.handle_remote_update)
+
+        # do the initial remote fetch
+        if is_connected():
+            Configuration.remote.reload()
+
+    @staticmethod
+    def deregister_bus():
+        if Configuration.bus:
+            Configuration.bus.remove("configuration.updated", Configuration.updated)
+            Configuration.bus.remove("configuration.patch", Configuration.patch)
+            Configuration.bus.remove("configuration.patch.clear", Configuration.patch_clear)
+            Configuration.bus.remove("configuration.cache.clear", Configuration.clear_cache)
+            Configuration.bus.remove("mycroft.paired", Configuration.handle_remote_update)
+            Configuration.bus.remove("mycroft.internet.connected", Configuration.handle_remote_update)
+
+    @staticmethod
+    def handle_remote_update(message):
+        """Handler for paired/internet connect
+
+        Triggers an update of remote config.
+        """
+        Configuration.remote.reload()
 
     @staticmethod
     def updated(message):
@@ -312,7 +420,7 @@ class Configuration:
 
         Triggers an update of cached config.
         """
-        Configuration.load_config_stack(cache=True)
+        Configuration.reload()
 
     @staticmethod
     def patch(message):
@@ -323,8 +431,8 @@ class Configuration:
                      in the data payload.
         """
         config = message.data.get("config", {})
-        merge_dict(Configuration.__patch, config)
-        Configuration.load_config_stack(cache=True)
+        for k, v in config.items():
+            Configuration.__patch[k] = v
 
     @staticmethod
     def patch_clear(message):
@@ -335,12 +443,21 @@ class Configuration:
                      in the data payload.
         """
         Configuration.__patch = {}
-        Configuration.load_config_stack(cache=True)
+
+    # Backwards compat methods
+    @staticmethod
+    def get(configs=None, cache=True, remote=True):
+        """DEPRECATED - use Configuration class instead"""
+        LOG.warning("Configuration.get() has been deprecated, use Configuration() instead")
+        # NOTE: this is only called if using the class directly
+        # if using an instance (dict object) self._real_get is called instead
+        return Configuration.load_config_stack(configs, cache, remote)
+
+    def _real_get(self, key, default=None):
+        return self.__getitem__(key) or default
 
     @staticmethod
     def clear_cache(message=None):
-        """ Clear the cached configuration
+        """DEPRECATED - there is no cache anymore """
+        Configuration.updated(message)
 
-        force a reload on Configuration.get()
-        """
-        Configuration.__config = {}

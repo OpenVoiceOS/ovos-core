@@ -103,7 +103,7 @@ class SettingsMetaUploader:
         self.skill_id = skill_id or skill_name or basename(self.skill_directory)
         self.json_path = self.skill_directory.joinpath('settingsmeta.json')
         self.yaml_path = self.skill_directory.joinpath('settingsmeta.yaml')
-        self.config = Configuration.get()
+        self.config = Configuration()
         self.settings_meta = {}
         self.api = None
         self.upload_timer = None
@@ -328,11 +328,10 @@ class SkillSettingsDownloader:
         if is_backend_disabled():
             self.sync_enabled = False
         else:
-            self.sync_enabled = Configuration.get()["server"] \
-                .get("sync_skill_settings", False)
+            self.sync_enabled = Configuration().get("server", {}).get("sync_skill_settings", False)
 
         if not self.sync_enabled:
-            LOG.info("Skill settings sync is disabled, backend settings will "
+            LOG.debug("Skill settings sync is disabled, backend settings will "
                      "not be downloaded")
 
     def stop_downloading(self):

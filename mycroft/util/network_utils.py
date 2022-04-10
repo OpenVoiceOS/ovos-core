@@ -4,13 +4,12 @@ from urllib.request import urlopen
 
 import requests
 from mycroft.util.log import LOG
+import mycroft.configuration
 
 
 def _get_network_tests_config():
     """Get network_tests object from mycroft.configuration."""
-    # Wrapped to avoid circular import errors.
-    from mycroft.configuration import Configuration
-    config = Configuration.get()
+    config = mycroft.configuration.Configuration()
     return config.get('network_tests', {
         "dns_primary": "8.8.8.8",
         "dns_secondary": "8.8.4.4",

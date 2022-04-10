@@ -371,8 +371,8 @@ def _validate_page_message(message: Message):
 def _get_idle_display_config():
     """Retrieves the current value of the idle display skill configuration."""
     LOG.info("Getting Idle Skill From Config")
-    config = Configuration.get()
-    enclosure_config = config.get("gui")
+    config = Configuration()
+    enclosure_config = config.get("gui") or {}
     idle_display_skill = enclosure_config.get("idle_display_skill")
 
     return idle_display_skill
@@ -381,9 +381,9 @@ def _get_idle_display_config():
 def _get_active_gui_extension():
     """Retrieves the current value of the gui extension configuration. """
     LOG.info("Getting GUI Extension From Config")
-    config = Configuration.get()
-    enclosure_config = config.get("gui")
-    gui_extension = enclosure_config.get("extension")
+    config = Configuration()
+    enclosure_config = config.get("gui") or {}
+    gui_extension = enclosure_config.get("extension", "generic")
 
     return gui_extension.lower()
 

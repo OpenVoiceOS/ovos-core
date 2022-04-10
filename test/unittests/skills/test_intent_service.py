@@ -201,15 +201,16 @@ class ConversationTest(TestCase):
 
 
 class TestLanguageExtraction(TestCase):
-    @mock.patch.dict(Configuration._Configuration__config, BASE_CONF)
+    @mock.patch.dict(Configuration._Configuration__patch, BASE_CONF)
     def test_no_lang_in_message(self):
         """No lang in message should result in lang from active locale."""
         setup_locale("it-it")
         msg = Message('test msg', data={})
         self.assertEqual(get_message_lang(msg), 'it-it')
         setup_locale("en-us")
+        self.assertEqual(get_message_lang(msg), 'en-us')
 
-    @mock.patch.dict(Configuration._Configuration__config, BASE_CONF)
+    @mock.patch.dict(Configuration._Configuration__patch, BASE_CONF)
     def test_lang_exists(self):
         """Message has a lang code in data, it should be used."""
         msg = Message('test msg', data={'lang': 'de-de'})

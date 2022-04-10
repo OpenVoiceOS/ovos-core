@@ -29,6 +29,7 @@ use in Mycroft Skills.
 from warnings import warn
 from mycroft.util.time import now_local
 from mycroft.util.log import LOG
+import mycroft.configuration
 
 # backwards compat import for mycroft-core
 # this code is maintained as part of ovos_utils
@@ -121,8 +122,7 @@ def extract_datetime(text, anchorDate="DEFAULT", lang=None,
     if anchorDate is None or anchorDate == "DEFAULT":
         anchorDate = now_local()
     if not lang:
-        from mycroft.configuration.locale import get_default_lang
-        lang = get_default_lang()
+        lang = mycroft.configuration.get_default_lang()
     return lf_extract_datetime(text,
                                anchorDate,
                                lang,

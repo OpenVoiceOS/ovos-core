@@ -3,7 +3,9 @@ import logging
 import signal as sig
 from threading import Event
 from mycroft.util.log import LOG
+import mycroft.configuration
 from ovos_utils import create_daemon, wait_for_exit_signal
+import mycroft.messagebus.client
 
 # backwards compat imports, DO NOT DELETE, careful with autopep8
 from ovos_utils.process_utils import ProcessState, ProcessStatus, StatusCallbackMap
@@ -70,9 +72,7 @@ def create_echo_function(name, whitelist=None):
     Returns:
         func: The echo function
     """
-
-    from mycroft.configuration import Configuration
-    blacklist = Configuration.get().get("ignore_logs")
+    blacklist = mycroft.configuration.Configuration().get("ignore_logs")
 
     # Make sure whitelisting doesn't remove the log level setting command
     if whitelist:
@@ -120,13 +120,10 @@ def start_message_bus_client(service, bus=None, whitelist=None):
     Returns:
         A connected instance of the MessageBusClient
     """
-    # Local imports to avoid circular importing
-    from mycroft.messagebus.client import MessageBusClient
-    from mycroft.configuration import Configuration
     # Create a client if one was not provided
     if bus is None:
-        bus = MessageBusClient()
-    Configuration.set_config_update_handlers(bus)
+        bus = mycroft.messagebus.client.MessageBusClient()
+    mycroft.configuration.Configuration.set_config_update_handlers(bus)
     bus_connected = Event()
     bus.on('message', create_echo_function(service, whitelist))
     # Set the bus connected event when connection is established

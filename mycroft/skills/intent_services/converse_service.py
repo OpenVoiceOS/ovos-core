@@ -23,7 +23,7 @@ class ConverseService:
         Returns:
             converse_config (dict): config for converse handling options
         """
-        return Configuration.get().get("skills", {}).get("converse") or {}
+        return Configuration().get("skills", {}).get("converse") or {}
 
     def get_active_skills(self):
         """Active skill ids ordered by converse priority

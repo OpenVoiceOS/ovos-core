@@ -19,7 +19,7 @@ The mycroft.util.lang module provides the main interface for setting up the
 lingua-franca (https://github.com/mycroftai/lingua-franca) selected language
 """
 from dateutil.tz import gettz, tzlocal
-from mycroft.configuration.config import Configuration
+import mycroft.configuration
 
 # lingua_franca is optional and might not be installed
 # exceptions should only be raised in the parse and format utils
@@ -54,8 +54,7 @@ def set_default_lang(lang):
 
 
 def get_config_tz():
-    config = Configuration.get()
-    code = config["location"]["timezone"]["code"]
+    code = mycroft.configuration.Configuration()["location"]["timezone"]["code"]
     return gettz(code)
 
 
@@ -88,7 +87,7 @@ def load_language(lang):
 
 
 def setup_locale(lang=None, tz=None):
-    lang_code = lang or Configuration.get().get("lang", "en-us")
+    lang_code = lang or mycroft.configuration.Configuration().get("lang", "en-us")
     # Load language resources, currently en-us must also be loaded at all times
     load_languages([lang_code, "en-us"])
     # Set the active lang to match the configured one

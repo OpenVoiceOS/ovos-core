@@ -40,7 +40,7 @@ class AudioService:
                 bus: Mycroft messagebus
         """
         self.bus = bus
-        self.config = Configuration.get().get("Audio")
+        self.config = Configuration().get("Audio") or {}
         self.service_lock = Lock()
 
         self.default = None

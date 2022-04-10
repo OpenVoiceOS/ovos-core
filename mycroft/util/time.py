@@ -19,7 +19,7 @@ may not match the system locale.
 """
 from datetime import datetime
 from dateutil.tz import gettz, tzlocal
-
+import mycroft.configuration
 # LF ais optional and should not be needed because of time utils
 # only parse and format utils require LF
 
@@ -42,8 +42,7 @@ def default_timezone():
     Returns:
         (datetime.tzinfo): Definition of the default timezone
     """
-    from mycroft.configuration.locale import get_default_tz
-    return get_default_tz()
+    return mycroft.configuration.get_default_tz()
 
 
 def now_utc():

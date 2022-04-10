@@ -102,7 +102,7 @@ def main():
                 print('   {}:       {}'.format(device_index, dev['name']))
         print()
 
-    config = Configuration.get()
+    config = Configuration()
     if "device_name" in config["listener"]:
         dev = config["listener"]["device_name"]
     elif "device_index" in config["listener"]:

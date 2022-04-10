@@ -154,7 +154,7 @@ class SkillManager(Thread):
 
         self._stop_event = Event()
         self._connected_event = Event()
-        self.config = Configuration.get()
+        self.config = Configuration()
         self.upload_queue = UploadQueue()
 
         self.skill_loaders = {}

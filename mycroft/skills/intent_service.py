@@ -69,7 +69,7 @@ class IntentService:
 
     def __init__(self, bus):
         self.bus = bus
-        config = Configuration.get()
+        config = Configuration()
 
         # Dictionary for translating a skill id to a name
         self.skill_names = {}

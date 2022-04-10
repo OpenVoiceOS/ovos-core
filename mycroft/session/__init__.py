@@ -62,7 +62,7 @@ class SessionManager:
 
         :return: An active session
         """
-        config = Configuration.get().get('session')
+        config = Configuration().get('session')
 
         with SessionManager.__lock:
             if (not SessionManager.__current_session or

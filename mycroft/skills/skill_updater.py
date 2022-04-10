@@ -99,20 +99,18 @@ class SkillUpdater:
 
     def __init__(self, bus=None):
         self.__skill_manifest = _SeleneSkillsManifest()
-        self.post_manifest(True)
-
         self.installed_skills = set()
-
         # below are unused, only for api backwards compat
         self.msm_lock = ComboLock(get_temp_path('mycroft-msm.lck'))
         self.install_retries = 0
-        self.config = Configuration.get()
+        self.config = Configuration()
         update_interval = self.config['skills'].get('update_interval', 1.0)
         self.update_interval = int(update_interval) * ONE_HOUR
         self.dot_msm_path = "/tmp/.msm"
         self.next_download = 0
         self.default_skill_install_error = False
 
+        self.post_manifest(True)
         if bus:
             LOG.warning("bus argument has been deprecated")
 
@@ -156,7 +154,7 @@ class SkillUpdater:
 
     def post_manifest(self, reload_skills_manifest=False):
         """Post the manifest of the device's skills to the backend."""
-        upload_allowed = Configuration.get()['skills'].get('upload_skill_manifest')
+        upload_allowed = self.config['skills'].get('upload_skill_manifest')
         if upload_allowed and is_paired():
             if reload_skills_manifest:
                 self.__skill_manifest.clear()

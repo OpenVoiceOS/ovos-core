@@ -116,8 +116,9 @@ class PadatiousService:
         intent_cache = expanduser(self.padatious_config['intent_cache'])
         self._padaos = self.padatious_config.get("padaos_only", False)
 
-        self.lang = Configuration.get().get("lang", "en-us")
-        langs = Configuration.get().get('secondary_langs') or []
+        core_config = Configuration()
+        self.lang = core_config.get("lang", "en-us")
+        langs = core_config.get('secondary_langs') or []
         if self.lang not in langs:
             langs.append(self.lang)
 
@@ -165,8 +166,7 @@ class PadatiousService:
         """
         self.finished_training_event.clear()
         if not self._padaos:
-            padatious_single_thread = Configuration.get()[
-                'padatious']['single_thread']
+            padatious_single_thread = self.padatious_config['single_thread']
             if message is None:
                 single_thread = padatious_single_thread
             else:

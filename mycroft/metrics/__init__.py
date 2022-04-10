@@ -62,7 +62,7 @@ def report_metric(name, data):
         data (dict): JSON dictionary to report. Must be valid JSON
     """
     try:
-        if is_paired() and Configuration().get()['opt_in']:
+        if is_paired() and Configuration().get('opt_in', False):
             DeviceApi().report_metric(name, data)
     except requests.RequestException as e:
         LOG.error('Metric couldn\'t be uploaded, due to a network error ({})'
@@ -197,9 +197,9 @@ class MetricsAggregator:
 
 class MetricsPublisher:
     def __init__(self, url=None, enabled=False):
-        conf = Configuration().get()['server']
-        self.url = url or conf['url']
-        self.enabled = enabled or conf['metrics']
+        conf = Configuration().get('server') or {}
+        self.url = url or conf.get('url')
+        self.enabled = enabled or conf.get('metrics', False)
 
     def publish(self, events):
         if 'session_id' not in events:

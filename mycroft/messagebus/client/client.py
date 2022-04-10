@@ -17,7 +17,7 @@ from mycroft_bus_client import MessageBusClient as _MessageBusClient
 from mycroft_bus_client.client import MessageWaiter
 
 from mycroft.messagebus.load_config import load_message_bus_config
-from mycroft.util.process_utils import create_echo_function
+import mycroft.util.process_utils
 
 
 class MessageBusClient(_MessageBusClient):
@@ -42,7 +42,7 @@ def echo():
         message.msg_type = 'speak'
         message_bus_client.emit(message)
 
-    message_bus_client.on('message', create_echo_function(None))
+    message_bus_client.on('message', mycroft.util.process_utils.create_echo_function(None))
     message_bus_client.on('recognizer_loop:utterance', repeat_utterance)
     message_bus_client.run_forever()
 

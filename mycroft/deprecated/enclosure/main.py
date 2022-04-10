@@ -84,7 +84,7 @@ def main(ready_hook=on_ready, error_hook=on_error, stopping_hook=on_stopping):
           You need to also run mycroft.gui process separately, it has been extracted into it's own module
     """
     # Read the system configuration
-    config = Configuration.get(remote=False)
+    config = Configuration()
 
     LOG.warning("mycroft.client.enclosure is DEPRECATED in ovos-core!")
     LOG.warning("see https://github.com/OpenVoiceOS/ovos_PHAL")

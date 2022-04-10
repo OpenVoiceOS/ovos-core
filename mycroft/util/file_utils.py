@@ -56,7 +56,7 @@ def resolve_resource_file(res_name):
     Returns:
         (str) path to resource or None if no resource found
     """
-    config = mycroft.configuration.Configuration.get()
+    config = mycroft.configuration.Configuration()
 
     # First look for fully qualified file (e.g. a user setting)
     if os.path.isfile(res_name):
@@ -150,7 +150,7 @@ def get_cache_directory(domain=None):
     Returns:
         (str) a path to the directory where you can cache data
     """
-    config = mycroft.configuration.Configuration.get(remote=False)
+    config = mycroft.configuration.Configuration()
     directory = config.get("cache_path")
     if not directory:
         directory = os.path.join(get_xdg_data_save_path(), "cache")

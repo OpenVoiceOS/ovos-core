@@ -26,7 +26,7 @@ use in Mycroft Skills.
 """
 import datetime
 import warnings
-
+import mycroft.configuration
 from calendar import leapdays
 from enum import Enum
 
@@ -114,8 +114,7 @@ def _duration_handler(time1, lang=None, speech=True, *, time2=None,
         str: timespan as a string
     """
     if not lang:
-        from mycroft.configuration.locale import get_default_lang
-        lang = get_default_lang()
+        lang = mycroft.configuration.get_default_lang()
     _leapdays = 0
     _input_resolution = resolution
     milliseconds = 0
