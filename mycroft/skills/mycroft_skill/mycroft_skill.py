@@ -59,7 +59,7 @@ from mycroft.util import (
 from mycroft.util.format import pronounce_number, join_list
 from mycroft.util.log import LOG
 from mycroft.util.parse import match_one, extract_number
-from ovos_utils.configuration import is_using_xdg, get_xdg_base, get_xdg_data_save_path
+from ovos_utils.configuration import is_using_xdg, get_xdg_base, get_xdg_data_save_path, get_xdg_config_save_path
 from ovos_utils.enclosure.api import EnclosureAPI
 from ovos_utils.file_utils import get_temp_path
 import shutil
@@ -248,7 +248,14 @@ class MycroftSkill:
 
         # migrate settings if needed
         if not exists(self._settings_path) and exists(self._old_settings_path):
+            LOG.warning("Found skill settings at pre-xdg location, migrating!")
             shutil.copy(self._old_settings_path, self._settings_path)
+            LOG.info(f"{self._old_settings_path} moved to {self._settings_path}")
+        if not exists(self._settings_path) and exists(self._old_xdg_settings_path):
+            LOG.warning("Found skill settings at xdg data dir, this was a bug! "
+                        "migrating to xdg config path")
+            shutil.copy(self._old_xdg_settings_path, self._settings_path)
+            LOG.info(f"{self._old_xdg_settings_path} moved to {self._settings_path}")
 
         # NOTE: lock is disabled due to usage of deepcopy and to allow json serialization
         self._settings = JsonStorage(self._settings_path, disable_lock=True)
@@ -268,6 +275,12 @@ class MycroftSkill:
         return join(old_dir, old_folder, self.skill_id, 'settings.json')
 
     @property
+    def _old_xdg_settings_path(self):
+        """ previous versions were using xdg data instead of xdg config!
+        This means settings path conflicts with user skills path and can cause all sorts of issues"""
+        return join(get_xdg_data_save_path(), 'skills', self.skill_id, 'settings.json')
+
+    @property
     def _settings_path(self):
         is_xdg = is_using_xdg()
         if self.settings_write_path:
@@ -276,7 +289,7 @@ class MycroftSkill:
             return join(self.settings_write_path, 'settings.json')
         if not is_xdg:
             return self._old_settings_path
-        return join(get_xdg_data_save_path(), 'skills', self.skill_id, 'settings.json')
+        return join(get_xdg_config_save_path(), 'skills', self.skill_id, 'settings.json')
 
     @property
     def settings(self):
