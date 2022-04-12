@@ -251,11 +251,6 @@ class MycroftSkill:
             LOG.warning("Found skill settings at pre-xdg location, migrating!")
             shutil.copy(self._old_settings_path, self._settings_path)
             LOG.info(f"{self._old_settings_path} moved to {self._settings_path}")
-        if not exists(self._settings_path) and exists(self._old_xdg_settings_path):
-            LOG.warning("Found skill settings at xdg data dir, this was a bug! "
-                        "migrating to xdg config path")
-            shutil.copy(self._old_xdg_settings_path, self._settings_path)
-            LOG.info(f"{self._old_xdg_settings_path} moved to {self._settings_path}")
 
         # NOTE: lock is disabled due to usage of deepcopy and to allow json serialization
         self._settings = JsonStorage(self._settings_path, disable_lock=True)
@@ -273,12 +268,6 @@ class MycroftSkill:
         old_dir = self.config_core.get("data_dir", "/opt/mycroft")
         old_folder = self.config_core.get("skills", {}).get("msm", {}).get("directory", "skills")
         return join(old_dir, old_folder, self.skill_id, 'settings.json')
-
-    @property
-    def _old_xdg_settings_path(self):
-        """ previous versions were using xdg data instead of xdg config!
-        This means settings path conflicts with user skills path and can cause all sorts of issues"""
-        return join(get_xdg_data_save_path(), 'skills', self.skill_id, 'settings.json')
 
     @property
     def _settings_path(self):
