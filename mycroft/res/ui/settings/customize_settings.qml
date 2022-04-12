@@ -242,7 +242,7 @@ Item {
 
             Kirigami.Icon {
                 id: backIcon
-                source: Qt.resolvedUrl("images/back.png")
+                source: Qt.resolvedUrl("images/back.svg")
                 Layout.preferredHeight: Kirigami.Units.iconSizes.medium
                 Layout.preferredWidth: Kirigami.Units.iconSizes.medium
 
