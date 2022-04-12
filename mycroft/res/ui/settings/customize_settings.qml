@@ -211,7 +211,7 @@ Item {
                     }
                 }
 
-                onDoubleClicked: {
+                onClicked: {
                     OVOSPlugin.Configuration.setScheme(modelData.name, modelData.path)
                 }
             }
@@ -240,16 +240,15 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
 
-            Image {
+            Kirigami.Icon {
                 id: backIcon
-                source: "images/back.png"
+                source: Qt.resolvedUrl("images/back.png")
                 Layout.preferredHeight: Kirigami.Units.iconSizes.medium
                 Layout.preferredWidth: Kirigami.Units.iconSizes.medium
 
                 ColorOverlay {
                     anchors.fill: parent
                     source: backIcon
-                    cached: true
                     color: Kirigami.Theme.textColor
                 }
             }

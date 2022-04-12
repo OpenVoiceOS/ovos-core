@@ -178,16 +178,15 @@ Item {
         RowLayout {
             anchors.fill: parent
             
-            Image {
+            Kirigami.Icon {
                 id: backIcon
-                source: "images/back.png"
+                source: Qt.resolvedUrl("images/back.svg")
                 Layout.preferredHeight: Kirigami.Units.iconSizes.medium
                 Layout.preferredWidth: Kirigami.Units.iconSizes.medium
 
                 ColorOverlay {
                     anchors.fill: parent
                     source: backIcon
-                    cached: true
                     color: Kirigami.Theme.textColor
                 }
             }
