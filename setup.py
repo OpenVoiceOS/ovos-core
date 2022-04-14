@@ -78,7 +78,7 @@ setup(
     include_package_data=True,
     entry_points={
         'console_scripts': [
-            'mycroft-speech-client=mycroft.client.speech.__main__:main',
+            'mycroft-speech-client=mycroft.listener.__main__:main',
             'mycroft-messagebus=mycroft.messagebus.service.__main__:main',
             'mycroft-skills=mycroft.skills.__main__:main',
             'mycroft-audio=mycroft.audio.__main__:main',

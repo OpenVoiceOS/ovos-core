@@ -6,5 +6,5 @@ cov-core==1.15.0
 sphinx==2.2.1
 sphinx-rtd-theme==0.4.3
 
-
+ovos-stt-plugin-vosk>=0.1.3a2
 python-vlc==1.1.2
