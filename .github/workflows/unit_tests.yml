@@ -52,7 +52,7 @@ jobs:
           pip install .[audio-backend,mark1,stt,tts,skills,gui,bus,PHAL,all,deprecated]
       - name: Install test dependencies
         run: |
-          pip install pytest pytest-timeout pytest-cov
+          pip install -r requirements/tests.txt
       - name: Run unittests
         run: |
           pytest --cov=mycroft --cov-report xml test/unittests
