@@ -21,7 +21,7 @@ def main(ready_hook=on_ready, error_hook=on_error, stopping_hook=on_stopping,
                            on_error=error_hook,
                            on_stopping=stopping_hook,
                            watchdog=watchdog)
-    service.setDaemon(True)
+    service.daemon = True
     service.start()
     wait_for_exit_signal()
 

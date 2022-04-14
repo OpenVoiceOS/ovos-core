@@ -360,7 +360,8 @@ class RecognizerLoop(EventEmitter):
             self.stt = STTFactory.create()
         if not self.fallback_stt:
             clazz = self.get_fallback_stt()
-            self.fallback_stt = clazz()
+            if clazz:
+                self.fallback_stt = clazz()
 
         self.queue = Queue()
         self.audio_consumer = AudioConsumer(self)
