@@ -107,7 +107,7 @@ function launch-all() {
     launch-background skills
     launch-background audio
     launch-background voice
-    launch-background gui
+    launch-background enclosure
 }
 
 _opt=$1
