@@ -576,5 +576,5 @@ class SkillManager(Thread):
                 _shutdown_skill(skill_loader.instance)
 
         # Do a clean shutdown of all plugin skills
-        for skill_id in self.plugin_skills:
+        for skill_id in list(self.plugin_skills.keys()):
             self._unload_plugin_skill(skill_id)
