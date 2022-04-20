@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import importlib
-import sys
 import time
-from os import listdir
-from os.path import abspath, dirname, basename, isdir, join
 from threading import Lock
 
 from mycroft.audio.services import RemoteAudioBackend
@@ -25,168 +21,11 @@ from mycroft.messagebus.message import Message
 from mycroft.util.log import LOG
 from mycroft.util.monotonic_event import MonotonicEvent
 from mycroft.util.plugins import find_plugins
+from ovos_plugin_manager.audio import setup_audio_service as setup_service, load_audio_service_plugins as load_plugins
+# deprecated, but can not be deleted for backwards compat imports
+from mycroft.deprecated.audio import load_internal_services, load_services, create_service_spec, get_services
 
 MINUTES = 60  # Seconds in a minute
-
-MAINMODULE = '__init__'
-sys.path.append(abspath(dirname(__file__)))
-
-
-def create_service_spec(service_folder):
-    """Prepares a descriptor that can be used together with imp.
-
-        Args:
-            service_folder: folder that shall be imported.
-
-        Returns:
-            Dict with import information
-    """
-    module_name = 'audioservice_' + basename(service_folder)
-    path = join(service_folder, MAINMODULE + '.py')
-    spec = importlib.util.spec_from_file_location(module_name, path)
-    mod = importlib.util.module_from_spec(spec)
-    info = {'spec': spec, 'mod': mod, 'module_name': module_name}
-    return {"name": basename(service_folder), "info": info}
-
-
-def get_services(services_folder):
-    """
-        Load and initialize services from all subfolders.
-
-        Args:
-            services_folder: base folder to look for services in.
-
-        Returns:
-            Sorted list of audio services.
-    """
-    LOG.info("Loading services from " + services_folder)
-    services = []
-    possible_services = listdir(services_folder)
-    for i in possible_services:
-        location = join(services_folder, i)
-        if (isdir(location) and
-                not MAINMODULE + ".py" in listdir(location)):
-            for j in listdir(location):
-                name = join(location, j)
-                if (not isdir(name) or
-                        not MAINMODULE + ".py" in listdir(name)):
-                    continue
-                try:
-                    services.append(create_service_spec(name))
-                except Exception:
-                    LOG.error('Failed to create service from ' + name,
-                              exc_info=True)
-        if (not isdir(location) or
-                not MAINMODULE + ".py" in listdir(location)):
-            continue
-        try:
-            services.append(create_service_spec(location))
-        except Exception:
-            LOG.error('Failed to create service from ' + location,
-                      exc_info=True)
-    return sorted(services, key=lambda p: p.get('name'))
-
-
-def setup_service(service_module, config, bus):
-    """Run the appropriate setup function and return created service objects.
-
-    Args:
-        service_module: Python module to run
-        config (dict): Mycroft configuration dict
-        bus (MessageBusClient): Messagebus interface
-
-    Returns:
-        (list) List of created services.
-    """
-    if (hasattr(service_module, 'autodetect') and
-            callable(service_module.autodetect)):
-        try:
-            return service_module.autodetect(config, bus)
-        except Exception as e:
-            LOG.error('Failed to autodetect. ' + repr(e))
-    elif hasattr(service_module, 'load_service'):
-        try:
-            return service_module.load_service(config, bus)
-        except Exception as e:
-            LOG.error('Failed to load service. ' + repr(e))
-    else:
-        LOG.error('Failed to load service. loading function not found')
-        return None
-
-
-def load_internal_services(config, bus, path=None):
-    """Load audio services included in Mycroft-core.
-
-    Args:
-        config: configuration dict for the audio backends.
-        bus: Mycroft messagebus
-        path: (default None) optional path for builtin audio service
-              implementations
-
-    Returns:
-        List of started services
-    """
-    if path is None:
-        path = dirname(abspath(__file__)) + '/services/'
-    service_directories = get_services(path)
-    service = []
-    for descriptor in service_directories:
-        try:
-            service_module = descriptor['info']['mod']
-            spec = descriptor['info']['spec']
-            module_name = descriptor['info']['module_name']
-            sys.modules[module_name] = service_module
-            spec.loader.exec_module(service_module)
-        except Exception as e:
-            LOG.error('Failed to import module ' + descriptor['name'] + '\n' +
-                      repr(e))
-        else:
-            s = setup_service(service_module, config, bus)
-            if s:
-                LOG.info('Loaded ' + descriptor['name'])
-                service += s
-
-    return service
-
-
-def load_plugins(config, bus):
-    """Load installed audioservice plugins.
-
-    Args:
-        config: configuration dict for the audio backends.
-        bus: Mycroft messagebus
-
-    Returns:
-        List of started services
-    """
-    plugin_services = []
-    found_plugins = find_plugins('mycroft.plugin.audioservice')
-    for plugin_name, plugin_module in found_plugins.items():
-        LOG.info(f'Loading audio service plugin: {plugin_name}')
-        service = setup_service(plugin_module, config, bus)
-        if service:
-            plugin_services += service
-    return plugin_services
-
-
-def load_services(config, bus, path=None):
-    """Load builtin services as well as service plugins
-
-    The builtin service folder is scanned (or a folder indicated by the path
-    parameter) for services and plugins registered with the
-    "mycroft.plugin.audioservice" entrypoint group.
-
-    Args:
-        config: configuration dict for the audio backends.
-        bus: Mycroft messagebus
-        path: (default None) optional path for builtin audio service
-              implementations
-
-    Returns:
-        List of started services.
-    """
-    return (load_internal_services(config, bus, path) +
-            load_plugins(config, bus))
 
 
 class AudioService:
@@ -219,7 +58,7 @@ class AudioService:
         Sets up the global service, default and registers the event handlers
         for the subsystem.
         """
-        services = load_services(self.config, self.bus)
+        services = load_plugins(self.config, self.bus)
         # Sort services so local services are checked first
         local = [s for s in services if not isinstance(s, RemoteAudioBackend)]
         remote = [s for s in services if isinstance(s, RemoteAudioBackend)]
