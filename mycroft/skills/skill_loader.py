@@ -21,7 +21,7 @@ from inspect import isclass, signature
 from os import path, makedirs
 from time import time
 
-from ovos_utils.configuration import get_xdg_base, is_using_xdg, get_xdg_data_dirs, get_xdg_data_save_path
+from ovos_utils.configuration import get_xdg_base, get_xdg_data_dirs, get_xdg_data_save_path
 from ovos_plugin_manager.skills import find_skill_plugins
 
 from mycroft.configuration import Configuration
@@ -140,11 +140,6 @@ def get_default_skills_directory(conf=None):
                     "It will no longer be supported after version 0.0.3\n"
                     "add the new path to 'extra_directories' instead")
         skills_folder = path_override
-    # if xdg is disabled, ignore it!
-    elif not is_using_xdg():
-        # old style mycroft-core skills path definition
-        data_dir = conf.get("data_dir") or "/opt/" + get_xdg_base()
-        skills_folder = path.join(data_dir, folder)
     else:
         skills_folder = os.path.join(get_xdg_data_save_path(), folder)
     # create folder if needed

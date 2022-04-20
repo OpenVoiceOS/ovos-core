@@ -17,7 +17,7 @@ import re
 from os.path import isfile
 
 from mycroft.configuration.locations import *
-from ovos_utils.configuration import is_using_xdg, get_xdg_config_locations, get_xdg_config_save_path
+from ovos_utils.configuration import get_xdg_config_locations, get_xdg_config_save_path
 from mycroft.util import camel_case_split
 from mycroft.util.json_helper import load_commented_json, merge_dict
 from mycroft.util.log import LOG
@@ -254,15 +254,11 @@ class Configuration:
             if not skip_remote and remote:
                 configs.append(RemoteConf())
             if not skip_user:
-                if is_using_xdg():
-                    # deprecation warning
-                    if isfile(OLD_USER_CONFIG):
-                        _log_old_location_deprecation(OLD_USER_CONFIG)
-                        configs.append(LocalConf(OLD_USER_CONFIG))
-                    configs += [LocalConf(p) for p in xdg_locations]
-                else:
-                    # just load the pre defined old locations
+                # deprecation warning
+                if isfile(OLD_USER_CONFIG):
+                    _log_old_location_deprecation(OLD_USER_CONFIG)
                     configs.append(LocalConf(OLD_USER_CONFIG))
+                configs += [LocalConf(p) for p in xdg_locations]
             configs.append(Configuration.__patch)
         else:
             # Handle strings in stack

@@ -62,4 +62,4 @@ Examples config:
    }
 }
 """
-from ovos_utils.configuration import get_ovos_config, is_using_xdg
+from ovos_utils.configuration import get_ovos_config

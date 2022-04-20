@@ -21,7 +21,7 @@ accessing and curating mycroft's cache.
 import os
 
 from ovos_utils.file_utils import get_temp_path
-from ovos_utils.configuration import is_using_xdg, get_xdg_base, get_xdg_data_dirs, get_xdg_data_save_path
+from ovos_utils.configuration import get_xdg_base, get_xdg_data_dirs, get_xdg_data_save_path
 import mycroft.configuration
 from mycroft.util.log import LOG
 # do not delete these imports, here for backwards compat!
@@ -153,11 +153,7 @@ def get_cache_directory(domain=None):
     config = mycroft.configuration.Configuration.get(remote=False)
     directory = config.get("cache_path")
     if not directory:
-        if not is_using_xdg():
-            # If not defined, use /tmp/mycroft/cache
-            directory = get_temp_path(get_xdg_base(), 'cache')
-        else:
-            directory = os.path.join(get_xdg_data_save_path(), "cache")
+        directory = os.path.join(get_xdg_data_save_path(), "cache")
     return ensure_directory_exists(directory, domain)
 
 

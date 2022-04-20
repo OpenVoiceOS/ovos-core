@@ -15,7 +15,7 @@
 import os
 import shutil
 from os.path import join, expanduser, isdir
-from ovos_utils.configuration import is_using_xdg, get_xdg_base, get_xdg_config_save_path
+from ovos_utils.configuration import get_xdg_base, get_xdg_config_save_path
 
 
 class FileSystemAccess:
@@ -35,12 +35,10 @@ class FileSystemAccess:
             raise ValueError("path must be initialized as a non empty string")
 
         path = expanduser(f'~/.{get_xdg_base()}/{path}')
-
-        if is_using_xdg():
-            xdg_path = expanduser(f'{get_xdg_config_save_path()}/{path}')
-            # Migrate from the old location if it still exists
-            if isdir(path) and not isdir(xdg_path):
-                shutil.move(path, xdg_path)
+        xdg_path = expanduser(f'{get_xdg_config_save_path()}/{path}')
+        # Migrate from the old location if it still exists
+        if isdir(path) and not isdir(xdg_path):
+            shutil.move(path, xdg_path)
 
         if not isdir(path):
             os.makedirs(path)

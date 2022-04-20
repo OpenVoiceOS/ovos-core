@@ -23,7 +23,7 @@ from threading import Thread, Lock
 from os.path import isfile, join, expanduser
 
 from mycroft.configuration import Configuration
-from ovos_utils.configuration import is_using_xdg, get_xdg_base, get_xdg_data_save_path, get_xdg_config_save_path
+from ovos_utils.configuration import get_xdg_base, get_xdg_data_save_path, get_xdg_config_save_path
 from mycroft.messagebus.message import Message
 from mycroft.util.log import LOG
 from mycroft.skills.mycroft_skill.event_container import EventContainer, \
@@ -69,12 +69,9 @@ class EventScheduler(Thread):
         data_dir = core_conf.get('data_dir') or get_xdg_data_save_path()
         old_schedule_path = join(expanduser(data_dir), schedule_file)
 
-        self.schedule_file = old_schedule_path
-        if is_using_xdg():
-            new_schedule_path = join(get_xdg_config_save_path(), schedule_file)
-            if isfile(old_schedule_path):
-                shutil.move(old_schedule_path, new_schedule_path)
-            self.schedule_file = new_schedule_path
+        self.schedule_file = join(get_xdg_config_save_path(), schedule_file)
+        if isfile(old_schedule_path):
+            shutil.move(old_schedule_path, self.schedule_file)
 
         if self.schedule_file:
             self.load()

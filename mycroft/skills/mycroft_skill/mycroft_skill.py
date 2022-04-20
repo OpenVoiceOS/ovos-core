@@ -59,7 +59,7 @@ from mycroft.util import (
 from mycroft.util.format import pronounce_number, join_list
 from mycroft.util.log import LOG
 from mycroft.util.parse import match_one, extract_number
-from ovos_utils.configuration import is_using_xdg, get_xdg_base, get_xdg_data_save_path, get_xdg_config_save_path
+from ovos_utils.configuration import get_xdg_base, get_xdg_data_save_path, get_xdg_config_save_path
 from ovos_utils.enclosure.api import EnclosureAPI
 from ovos_utils.file_utils import get_temp_path
 import shutil
@@ -271,13 +271,10 @@ class MycroftSkill:
 
     @property
     def _settings_path(self):
-        is_xdg = is_using_xdg()
         if self.settings_write_path:
             LOG.warning("self.settings_write_path has been deprecated! "
                         "Support will be dropped in a future release")
             return join(self.settings_write_path, 'settings.json')
-        if not is_xdg:
-            return self._old_settings_path
         return join(get_xdg_config_save_path(), 'skills', self.skill_id, 'settings.json')
 
     @property
