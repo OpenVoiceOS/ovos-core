@@ -30,25 +30,21 @@ As always, the OpenVoiceOS team thanks the following entities (in addition to My
   - HelloChatterbox
   - KDE
   - Blue Systems
-
-**For now, the rest of this document is part of the README from Mycroft-core.**
-
+  
 ## Table of Contents
 
 - [Running Mycroft](#running-mycroft)
 - [Using Mycroft](#using-mycroft)
-  * [*Home* Device and Account Manager](#home-device-and-account-manager)
-  * [Skills](#skills)
+  - [Skills](#skills)
 - [Behind the scenes](#behind-the-scenes)
-  * [Pairing Information](#pairing-information)
-  * [Configuration](#configuration)
-  * [Using Mycroft Without Home](#using-mycroft-without-home)
-  * [API Key Services](#api-key-services)
-  * [Using Mycroft behind a proxy](#using-mycroft-behind-a-proxy)
-    + [Using Mycroft behind a proxy without authentication](#using-mycroft-behind-a-proxy-without-authentication)
-    + [Using Mycroft behind an authenticated proxy](#using-mycroft-behind-an-authenticated-proxy)
+  - [Identity Information](#identity-information)
+  - [Configuration](#configuration)
+  - [*Home* Device and Account Manager](#home-device-and-account-manager)
+  - [Using Mycroft with a backend](#using-mycroft-with-a-backend)
+  - [Using Mycroft behind a proxy](#using-mycroft-behind-a-proxy)
 - [Getting Involved](#getting-involved)
 - [Links](#links)
+
 
 ## Running Mycroft
 
@@ -84,11 +80,13 @@ This file uniquely identifies your device and should be kept safe
 ### Configuration
 Mycroft's configuration consists of 4 possible locations:
 - `mycroft-core/mycroft/configuration/mycroft.conf`(Defaults)
-- [Mycroft Home](https://home.mycroft.ai) (Remote)
+- [Mycroft Home](https://home.mycroft.ai) (Remote) 
 - `/etc/mycroft/mycroft.conf` (Machine)
 - `$XDG_CONFIG_DIR/mycroft/mycroft.conf` (which is by default `$HOME/.config/mycroft/mycroft.conf`) (USER)
 
 When the configuration loader starts, it looks in these locations in this order, and loads ALL configurations. Keys that exist in multiple configuration files will be overridden by the last file to contain the value. This process results in a minimal amount being written for a specific device and user, without modifying default distribution files.
+
+Remote configuration only exists if you explicitly enabled a backend
 
 ### *Home* Device and Account Manager
 Mycroft AI, Inc. maintains a device and account management system known as Mycroft Home. Developers may sign up at: https://home.mycroft.ai
@@ -98,12 +96,11 @@ By default, mycroft-core is configured to not use Home.
 When enabled by saying "Hey Mycroft, pair my device" (or any other request verbal request) you will be informed that your device needs to be paired. 
 Mycroft will speak a 6-digit code which you can enter into the pairing page within the [Mycroft Home site](https://home.mycroft.ai).
 
-Once paired, your unit will use Mycroft API keys for services such as Speech-to-Text (STT), weather and various other skills.
-
 The Mycroft backend provides access to a range of API keys for specific services. 
-Without pairing with the Mycroft backend, you will need to add your own API keys, install a different Skill or Plugin to perform that function, or not have access to that functionality.
+Once paired, your unit can use Mycroft API keys for services such as Speech-to-Text (STT), weather and various other skills.
+Without pairing with the Mycroft backend, you may need to add your own API keys, install a different Skill or Plugin to perform that function, or not have access to that functionality.
 
-For default skills OpenVoiceOS provides free proxies/services that do not require pairing
+For default OpenVoiceOS skills free proxies/services are used that do not require pairing
 
 ### Using Mycroft with a backend
 
