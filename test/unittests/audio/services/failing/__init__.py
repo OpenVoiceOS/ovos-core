@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from mycroft.audio.services import AudioBackend
+from ovos_plugin_manager.templates.audio import AudioBackend
 
 
 class FailingBackend(AudioBackend):

@@ -14,7 +14,7 @@
 #
 
 from unittest.mock import Mock
-from mycroft.audio.services import AudioBackend
+from ovos_plugin_manager.templates.audio import AudioBackend
 
 
 class WorkingBackend(AudioBackend):

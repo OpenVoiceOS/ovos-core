@@ -69,7 +69,7 @@ class TestService(unittest.TestCase):
                                               TestService.service_path)
         self.assertEqual(len(service), 1)
 
-    @mock.patch('mycroft.audio.audioservice.load_services')
+    @mock.patch('mycroft.audio.audioservice.load_plugins')
     def test_audio_backend_shutdown(self, mock_load_services):
         """Test shutdown of audio backend."""
         backend, second_backend = setup_mock_backends(mock_load_services,
@@ -137,7 +137,7 @@ class TestService(unittest.TestCase):
 
         service.shutdown()
 
-    @mock.patch('mycroft.audio.audioservice.load_services')
+    @mock.patch('mycroft.audio.audioservice.load_plugins')
     def test_audio_service_methods_playing(self, mock_load_services):
         """Check that backend methods are called during playback."""
         backend, second_backend = setup_mock_backends(mock_load_services,
@@ -199,7 +199,7 @@ class TestService(unittest.TestCase):
 
         service.shutdown()
 
-    @mock.patch('mycroft.audio.audioservice.load_services')
+    @mock.patch('mycroft.audio.audioservice.load_plugins')
     def test_audio_service_queue_methods(self, mock_load_services):
         """Check that backend methods are called during playback."""
         backend, second_backend = setup_mock_backends(mock_load_services,
