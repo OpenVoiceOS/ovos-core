@@ -10,6 +10,7 @@ PyYAML~=5.4
 
 ovos-utils~=0.0.20a2
 ovos-plugin-manager~=0.0.17a1
+ovos-stt-plugin-server
 ovos-tts-plugin-mimic>=0.2.6
 ovos-tts-plugin-mimic2>=0.1.4
 ovos-tts-plugin-google-tx>=0.0.3
