@@ -88,9 +88,9 @@ class TestApi(unittest.TestCase):
         self.assertEqual(a.send(req), mock_response_ok.json())
 
         # check that a 300+ status code generates Exception
-        #mock_request.return_value = mock_response_301
-        #with self.assertRaises(mycroft.api.HTTPError):
-        #    a.send(req)
+        mock_request.return_value = mock_response_301
+        with self.assertRaises(mycroft.api.HTTPError):
+            a.send(req)
 
         # Check 401
         mock_request.return_value = mock_response_401
