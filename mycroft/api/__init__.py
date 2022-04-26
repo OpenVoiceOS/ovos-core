@@ -116,7 +116,7 @@ class Api:
             Requests response object.
         """
         if self.disabled:
-            return None
+            return {}
         query_data = frozenset(params.get('query', {}).items())
         params_key = (params.get('path'), query_data)
         etag = self.params_to_etag.get(params_key)
