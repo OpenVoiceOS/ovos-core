@@ -96,7 +96,7 @@ By default, mycroft-core is configured to not use Home.
 When enabled by saying "Hey Mycroft, pair my device" (or any other request verbal request) you will be informed that your device needs to be paired. 
 Mycroft will speak a 6-digit code which you can enter into the pairing page within the [Mycroft Home site](https://home.mycroft.ai).
 
-The Mycroft backend provides access to a range of API keys for specific services. 
+The Mycroft backend provides access to a range of third-party APIs for specific services.
 Once paired, your unit can use Mycroft API keys for services such as Speech-to-Text (STT), weather and various other skills.
 Without pairing with the Mycroft backend, you may need to add your own API keys, install a different Skill or Plugin to perform that function, or not have access to that functionality.
 
