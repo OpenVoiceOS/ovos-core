@@ -1,0 +1,23 @@
+name: Close Pull Request
+
+# only trigger on pull request closed events
+on:
+  pull_request:
+    types: [ closed ]
+
+jobs:
+  merge_job:
+    # this job will only run if the PR has been merged
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Send message to Matrix bots channel
+        id: matrix-chat-message
+        uses: fadenb/matrix-chat-message@v0.0.6
+        with:
+          homeserver: 'matrix.org'
+          token: ${{ secrets.MATRIX_TOKEN }}
+          channel: '!WjxEKjjINpyBRPFgxl:krbel.duckdns.org'
+          message: |
+            new ovos-core PR merged! https://github.com/OpenVoiceOS/ovos-core/pull/${{ github.event.number }}
