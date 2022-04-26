@@ -80,7 +80,7 @@ This file uniquely identifies your device and should be kept safe
 ### Configuration
 Mycroft's configuration consists of 4 possible locations:
 - `mycroft-core/mycroft/configuration/mycroft.conf`(Defaults)
-- [Mycroft Home](https://home.mycroft.ai) (Remote) 
+- [Mycroft Home](https://home.mycroft.ai) (Remote)
 - `/etc/mycroft/mycroft.conf` (Machine)
 - `$XDG_CONFIG_DIR/mycroft/mycroft.conf` (which is by default `$HOME/.config/mycroft/mycroft.conf`) (USER)
 
