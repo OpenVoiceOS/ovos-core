@@ -1,27 +1,27 @@
 requests~=2.26
-PyAudio~=0.2.11
+PyAudio~=0.2
 pyee~=8.1
-SpeechRecognition~=3.8.1
+SpeechRecognition~=3.8
 tornado~=6.0, >=6.0.3
 psutil~=5.6.6
-python-dateutil~=2.6.0
+python-dateutil~=2.6
 combo-lock~=0.2
 PyYAML~=5.4
 
-ovos-utils~=0.0.20a2
-ovos-plugin-manager~=0.0.17a1
-ovos-stt-plugin-server
-ovos-tts-plugin-mimic>=0.2.6
-ovos-tts-plugin-mimic2>=0.1.4
-ovos-tts-plugin-google-tx>=0.0.3
-ovos-ww-plugin-pocketsphinx>=0.1.2
-ovos-ww-plugin-precise>=0.1.1
-ovos_workshop>=0.0.5
-ovos_PHAL>=0.0.1
+ovos-utils~=0.0
+ovos-plugin-manager~=0.0
+ovos-stt-plugin-server~=0.0
+ovos-tts-plugin-mimic~=0.2
+ovos-tts-plugin-mimic2~=0.1
+ovos-tts-plugin-google-tx~=0.0
+ovos-ww-plugin-pocketsphinx~=0.1
+ovos-ww-plugin-precise~=0.1
+ovos_workshop~=0.0
+ovos_PHAL~=0.0
 
-ovos-lingua-franca~=0.4.3
-mycroft-messagebus-client~=0.9.1,!=0.9.2,!=0.9.3
+ovos-lingua-franca~=0.4
+mycroft-messagebus-client~=0.9,!=0.9.2,!=0.9.3
 adapt-parser~=0.5
-padatious~=0.4.8
-fann2==1.0.7
+padatious~=0.4
+fann2~=1.0
 padaos~=0.1
