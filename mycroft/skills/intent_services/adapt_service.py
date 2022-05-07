@@ -18,8 +18,7 @@ import time
 
 from adapt.context import ContextManagerFrame
 from adapt.engine import IntentDeterminationEngine
-from adapt.intent import IntentBuilder
-
+from ovos_workshop.helpers import AdaptIntent, IntentBuilder, Intent
 from mycroft.configuration import Configuration
 from mycroft.util.log import LOG
 from mycroft.skills.intent_services.base import IntentMatch
@@ -38,17 +37,6 @@ def _entity_skill_id(skill_id):
     skill_id = skill_id.replace('.', '_')
     skill_id = skill_id.replace('-', '_')
     return skill_id
-
-
-class AdaptIntent(IntentBuilder):
-    """Wrapper for IntentBuilder setting a blank name.
-
-    Args:
-        name (str): Optional name of intent
-    """
-
-    def __init__(self, name=''):
-        super().__init__(name)
 
 
 def _strip_result(context_features):

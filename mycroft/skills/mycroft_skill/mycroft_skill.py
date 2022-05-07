@@ -22,10 +22,9 @@ from inspect import signature
 from itertools import chain
 from os import walk, listdir
 from os.path import join, abspath, dirname, basename, exists, isdir
-import shutil
 from threading import Event
 
-from adapt.intent import Intent, IntentBuilder
+from ovos_workshop.helpers import Intent, IntentBuilder
 from json_database import JsonStorage
 
 from mycroft import dialog
