@@ -21,7 +21,9 @@ license_overrides = {
     "vosk": "Apache-2.0"
 }
 # explicitly allow these packages that would fail otherwise
-whitelist = ['ovos-skill-installer']
+whitelist = ['ovos-skill-installer',
+             'python-dateutil' # Apache Software License, BSD License (Dual License)
+             ]
 
 # validation flags
 allow_nonfree = False
