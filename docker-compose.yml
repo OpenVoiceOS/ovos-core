@@ -1,0 +1,113 @@
+version: "3"
+
+volumes:
+  ovos_data:
+    driver: local
+  ovos_cache:
+    driver: local
+  ovos_config:
+    driver: local
+
+services:
+  speech:
+    image: ghcr.io/openvoiceos/speech:latest
+    build: ./ovos-speech
+    container_name: ovos_speech
+    hostname: ovos_speech
+    restart: unless-stopped
+    volumes:
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+      - ovos_config:/home/mycroft/.config/mycroft
+      - ovos_data:/home/mycroft/.local/mycroft
+      - ovos_cache:/home/mycroft/.cache/mycroft
+    network_mode: host
+    depends_on:
+      - ovos_bus
+
+  gui:
+    image: ghcr.io/openvoiceos/gui_messagebus:latest
+    build: ./ovos-gui
+    container_name: ovos_gui
+    hostname: ovos_gui
+    restart: unless-stopped
+    volumes:
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+      - ovos_config:/home/mycroft/.config/mycroft
+      - ovos_data:/home/mycroft/.local/mycroft
+      - ovos_cache:/home/mycroft/.cache/mycroft
+    network_mode: host
+    depends_on:
+      - ovos_bus
+
+  phal:
+    image: ghcr.io/openvoiceos/phal:latest
+    build: ./ovos_PHAL
+    container_name: ovos_phal
+    hostname: ovos_phal
+    restart: unless-stopped
+    volumes:
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+      - ovos_config:/home/mycroft/.config/mycroft
+      - ovos_data:/home/mycroft/.local/mycroft
+      - ovos_cache:/home/mycroft/.cache/mycroft
+    network_mode: host
+    depends_on:
+      - ovos_bus
+
+  audio:
+    image: ghcr.io/openvoiceos/audio:latest
+    build: ./ovos-audio
+    container_name: ovos_audio
+    hostname: ovos_audio
+    restart: unless-stopped
+    network_mode: host
+    devices:
+      - /dev/snd
+    environment:
+      PULSE_SERVER: unix:${XDG_RUNTIME_DIR}/pulse/native
+      PULSE_COOKIE: /home/mycroft/.config/pulse/cookie
+    volumes:
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+      - ovos_config:/home/mycroft/.config/mycroft
+      - ovos_data:/home/mycroft/.local/mycroft
+      - ovos_cache:/home/mycroft/.cache/mycroft
+      - ~/.config/pulse/cookie:/home/mycroft/.config/pulse/cookie:ro
+      - ${XDG_RUNTIME_DIR}/pulse:${XDG_RUNTIME_DIR}/pulse:ro
+    depends_on:
+      - ovos_bus
+
+  skills:
+    image: ghcr.io/openvoiceos/skills:latest
+    build: ./ovos-skills
+    container_name: ovos_skills
+    hostname: ovos_skills
+    restart: unless-stopped
+    volumes:
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+      - ovos_config:/home/mycroft/.config/mycroft
+      - ovos_data:/home/mycroft/.local/mycroft
+      - ovos_cache:/home/mycroft/.cache/mycroft
+    network_mode: host
+    depends_on:
+        - ovos_bus
+
+  ovos_bus:
+    image: ghcr.io/openvoiceos/messagebus:latest
+    build: ./ovos-bus
+    container_name: ovos_bus
+    hostname: ovos_bus
+    restart: unless-stopped
+    volumes:
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+      - ovos_config:/home/mycroft/.config/mycroft
+      - ovos_data:/home/mycroft/.local/mycroft
+      - ovos_cache:/home/mycroft/.cache/mycroft
+    network_mode: host
+
+
