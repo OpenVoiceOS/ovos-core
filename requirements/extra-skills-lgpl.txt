@@ -1,6 +1,6 @@
 adapt-parser~=0.5
 padaos~=0.1
-ovos-lingua-franca~=0.4.3
+ovos-lingua-franca~=0.4
 
 padatious~=0.4
-fann2==1.0.7
+fann2==1.0
