@@ -13,7 +13,7 @@ RUN apt-get update && \
 RUN mkdir -p /home/mycroft/.config/mycroft /home/mycroft/.cache/mycroft /home/mycroft/.local/mycroft
 RUN chown mycroft:mycroft -R /home/mycroft/.config/mycroft /home/mycroft/.cache/mycroft /home/mycroft/.local/mycroft
 
-RUN pip3 install ovos-core~=0.0.2a44
-
+COPY . /tmp/ovos-core
+RUN pip3 install /tmp/ovos-core
 
 # this is meant as a base image for other containers with a minimal ovos-core install
