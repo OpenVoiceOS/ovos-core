@@ -326,11 +326,17 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         LOG.info(f"VAD method: {method}")
 
         module = vad_config.get('module')
+        no_vad = True
         if "vad" in method and module:
             # dont load plugin if not being used
             LOG.info(f"Creating VAD engine: {vad_config.get('module')}")
-            vad_plugin = OVOSVADFactory.create(vad_config)
-        else:
+            try:
+                vad_plugin = OVOSVADFactory.create(vad_config)
+                no_vad = False
+            except:
+                LOG.error("Failed to load VAD plugin!")
+
+        if no_vad:
             if "vad" in method:
                 LOG.warning(f"{method} selected, but VAD plugin not available!")
                 method = SilenceMethod.RATIO_ONLY
