@@ -16,7 +16,7 @@
 Intent Service. Including both adapt and padatious.
 """
 from os.path import exists, isfile
-from ovos_workshop.helpers import Intent
+from ovos_utils.intents import Intent
 
 from mycroft.messagebus.message import Message, dig_for_message
 from mycroft.messagebus.client import MessageBusClient

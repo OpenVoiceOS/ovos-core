@@ -17,7 +17,7 @@ import mycroft.configuration
 from mycroft.api import Api
 from mycroft.messagebus.message import Message
 
-from ovos_workshop.helpers import AdaptIntent, IntentBuilder, Intent
+from ovos_utils.intents import AdaptIntent, IntentBuilder, Intent
 from mycroft.skills.context import adds_context, removes_context
 from mycroft.skills import (MycroftSkill, FallbackSkill,
                             intent_handler, intent_file_handler)

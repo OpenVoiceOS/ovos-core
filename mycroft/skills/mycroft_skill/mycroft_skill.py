@@ -24,7 +24,8 @@ from os import walk, listdir
 from os.path import join, abspath, dirname, basename, exists, isdir
 from threading import Event
 
-from ovos_workshop.helpers import Intent, IntentBuilder
+from ovos_utils.intents import Intent, IntentBuilder
+from ovos_utils.skills import get_non_properties
 from json_database import JsonStorage
 
 from mycroft import dialog
@@ -78,31 +79,6 @@ def simple_trace(stack_trace):
         if line.strip():
             tb += line
     return tb
-
-
-def get_non_properties(obj):
-    """Get attibutes that are not properties from object.
-
-    Will return members of object class along with bases down to MycroftSkill.
-
-    Args:
-        obj: object to scan
-
-    Returns:
-        Set of attributes that are not a property.
-    """
-
-    def check_class(cls):
-        """Find all non-properties in a class."""
-        # Current class
-        d = cls.__dict__
-        np = [k for k in d if not isinstance(d[k], property)]
-        # Recurse through base classes excluding MycroftSkill and object
-        for b in [b for b in cls.__bases__ if b not in (object, MycroftSkill)]:
-            np += check_class(b)
-        return np
-
-    return set(check_class(obj.__class__))
 
 
 class MycroftSkill:
