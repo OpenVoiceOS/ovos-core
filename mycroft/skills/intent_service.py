@@ -182,7 +182,10 @@ class IntentService:
     def reset_converse(self, message):
         """Let skills know there was a problem with speech recognition"""
         lang = _get_message_lang(message)
-        setup_locale(lang)  # restore default lang
+        try:
+            setup_locale(lang)  # restore default lang
+        except Exception as e:
+            LOG.exception(f"Failed to set lingua_franca default lang to {lang}")
         self.converse.converse_with_skills([], lang, message)
 
     def do_converse(self, utterances, skill_id, lang, message):
@@ -288,7 +291,10 @@ class IntentService:
         """
         try:
             lang = _get_message_lang(message)
-            setup_locale(lang)  # set default lang
+            try:
+                setup_locale(lang)
+            except Exception as e:
+                LOG.exception(f"Failed to set lingua_franca default lang to {lang}")
 
             utterances = message.data.get('utterances', [])
             combined = _normalize_all_utterances(utterances)
