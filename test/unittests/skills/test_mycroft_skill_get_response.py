@@ -7,7 +7,7 @@ from unittest import TestCase, mock
 
 from lingua_franca import load_language
 
-from mycroft import MycroftSkill
+from mycroft.skills import MycroftSkill
 from mycroft.messagebus import Message
 
 from test.unittests.mocks import base_config, AnyCallable
@@ -154,6 +154,21 @@ class TestMycroftSkillGetResponse(TestCase):
                                       validator=validator)
         skill._wait_response.assert_called_with(AnyCallable(), validator,
                                                 AnyCallable(), -1)
+
+    def test_converse_detection(self):
+        """Ensure validator is passed on."""
+        skill = create_skill()
+        skill._wait_response = mock.Mock()
+        skill.speak_dialog = mock.Mock()
+
+        def validator(*args, **kwargs):
+            self.assertTrue(skill.converse_is_implemented)
+
+        self.assertFalse(skill.converse_is_implemented)
+        skill.get_response('what do you want', validator=validator)
+        skill._wait_response.assert_called_with(AnyCallable(), validator,
+                                                AnyCallable(), -1)
+        self.assertFalse(skill.converse_is_implemented)
 
 
 class TestMycroftSkillAskYesNo(TestCase):

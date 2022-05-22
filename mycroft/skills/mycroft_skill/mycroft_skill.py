@@ -146,6 +146,8 @@ class MycroftSkill:
         # Skill Public API
         self.public_api = {}
 
+        self.__original_converse = self.converse
+
     @property
     def is_fully_initialized(self):
         """Determines if the skill has been fully loaded and setup.
@@ -484,7 +486,8 @@ class MycroftSkill:
 
     @property
     def converse_is_implemented(self):
-        return self.__class__.converse is not MycroftSkill.converse
+        return self.__class__.converse is not MycroftSkill.converse or \
+               self.__original_converse != self.converse
 
     def _register_system_event_handlers(self):
         """Add all events allowing the standard interaction with the Mycroft
@@ -674,10 +677,10 @@ class MycroftSkill:
         # install a temporary conversation handler
         self.activate()
         converse.response = None
-        default_converse = self.converse
+        self.__original_converse = self.converse
         self.converse = converse
         event.wait(15)  # 10 for listener, 5 for SST, then timeout
-        self.converse = default_converse
+        self.converse = self.__original_converse
         return converse.response
 
     def get_response(self, dialog='', data=None, validator=None,
