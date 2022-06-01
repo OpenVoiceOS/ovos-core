@@ -900,7 +900,9 @@ class MycroftSkill:
             if not voc:  # Check for vocab in mycroft core resources
                 voc = resolve_resource_file(join('text', lang,
                                                  voc_filename + '.voc'))
-
+                if voc:
+                    LOG.info(f"Found global resource: '{voc_filename}'"
+                             f"for lang '{lang}'")
             if not voc or not exists(voc):
                 raise FileNotFoundError(f'Could not find {voc_filename}.voc file')
             # load vocab and flatten into a simple list
@@ -1057,10 +1059,8 @@ class MycroftSkill:
         result = self._find_resource(res_name, lang, res_dirname)
         if not result:
             # when resource not found try fallback to en-us
-            LOG.warning(
-                f"Skill {self.skill_id} resource '{res_name}' for lang '{lang}' not "
-                f"found"
-            )
+            LOG.info(f"Skill {self.skill_id} resource '{res_name}' for lang "
+                     f"'{lang}' not found in skill")
         return result
 
     def _find_resource(self, res_name, lang, res_dirname=None):
