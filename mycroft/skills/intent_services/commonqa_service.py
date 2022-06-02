@@ -2,7 +2,7 @@ from mycroft.skills.intent_services.base import IntentMatch
 from ovos_utils.log import LOG
 from ovos_utils.enclosure.api import EnclosureAPI
 from mycroft_bus_client.message import Message, dig_for_message
-from mycroft.configuration.locale import get_default_lang
+from ovos_utils.messagebus import get_message_lang
 from threading import Lock, Event
 import time
 
@@ -161,12 +161,9 @@ class CommonQAService:
         """
         # registers the skill as being active
         self.enclosure.register(self.skill_id)
+
         message = message or dig_for_message()
-
-        lang = message.data.get("lang") or \
-               message.context.get("lang") or \
-               get_default_lang()
-
+        lang = get_message_lang(message)
         data = {'utterance': utterance,
                 'expect_response': False,
                 'meta': {"skill": self.skill_id},
