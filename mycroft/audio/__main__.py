@@ -34,7 +34,7 @@ def on_ready():
 
 
 def on_error(e='Unknown'):
-    LOG.error('Audio service failed to launch ({}).'.format(repr(e)))
+    LOG.error(f'Audio service failed to launch ({e}).')
 
 
 def on_stopping():
@@ -64,13 +64,17 @@ def main(ready_hook=on_ready, error_hook=on_error, stopping_hook=on_stopping):
     except Exception as e:
         status.set_error(e)
     else:
-        if audio.wait_for_load() and len(audio.service) > 0:
-            # If at least one service exists, report ready
+        if audio.wait_for_load():
+            if len(audio.service) == 0:
+                LOG.warning('No audio backends loaded! Audio playback is not available')
+                LOG.info("Running audio service in TTS only mode")
+        # If at least TTS exists, report ready
+        if speech.tts:
             status.set_ready()
             wait_for_exit_signal()
             status.set_stopping()
         else:
-            status.set_error('No audio services loaded')
+            status.set_error('No TTS loaded')
 
         speech.shutdown()
         audio.shutdown()
