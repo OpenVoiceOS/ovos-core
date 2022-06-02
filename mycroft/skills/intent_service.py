@@ -26,6 +26,7 @@ from mycroft.skills.intent_services import (
 from mycroft.skills.permissions import ConverseMode, ConverseActivationMode
 from mycroft.util.log import LOG
 from mycroft.util.parse import normalize
+from mycroft.configuration.locale import get_default_lang
 
 
 def _get_message_lang(message=None):
@@ -38,8 +39,7 @@ def _get_message_lang(message=None):
         The language code from the message or the default language.
     """
     message = message or dig_for_message()
-    # TODO read active locale from LF instead
-    default_lang = Configuration.get().get('lang', 'en-us')
+    default_lang = get_default_lang()
     if not message:
         return default_lang
     return message.data.get('lang', default_lang).lower()
@@ -72,7 +72,7 @@ def _normalize_all_utterances(utterances):
         else:
             combined.append((utt, norm))
 
-    LOG.debug("Utterances: {}".format(combined))
+    LOG.debug(f"Utterances: {combined}")
     return combined
 
 
@@ -281,11 +281,12 @@ class IntentService:
         1) Active skills attempt to handle using converse()
         2) Padatious high match intents (conf > 0.95)
         3) Adapt intent handlers
-        5) High Priority Fallbacks
-        6) Padatious near match intents (conf > 0.8)
-        7) General Fallbacks
-        8) Padatious loose match intents (conf > 0.5)
-        9) Catch all fallbacks including Unknown intent handler
+        5) CommonQuery Skills
+        6) High Priority Fallbacks
+        7) Padatious near match intents (conf > 0.8)
+        8) General Fallbacks
+        9) Padatious loose match intents (conf > 0.5)
+        10) Catch all fallbacks including Unknown intent handler
 
         If all these fail the complete_intent_failure message will be sent
         and a generic info of the failure will be spoken.
