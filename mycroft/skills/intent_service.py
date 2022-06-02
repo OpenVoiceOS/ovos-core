@@ -256,6 +256,8 @@ class IntentService:
             intent_type = f'{intent.skill_id}:converse'
         elif intent and intent.intent_service == 'Fallback':
             intent_type = 'fallback'
+        elif intent and intent.intent_service == 'CommonQuery':
+            intent_type = 'common_qa'
         elif intent:  # Handled by an other intent parser
             # Recreate skill name from skill id
             parts = intent.intent_type.split(':')
