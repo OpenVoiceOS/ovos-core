@@ -62,6 +62,7 @@ from mycroft.util.parse import match_one, extract_number
 from ovos_utils.configuration import get_xdg_base, get_xdg_data_save_path, get_xdg_config_save_path
 from ovos_utils.enclosure.api import EnclosureAPI
 from ovos_utils.file_utils import get_temp_path
+from ovos_utils.messagebus import get_message_lang
 import shutil
 
 
@@ -357,7 +358,7 @@ class MycroftSkill:
         lang = self._core_lang
         message = dig_for_message()
         if message:
-            lang = message.data.get("lang") or message.context.get("lang") or lang
+            lang = get_message_lang(message)
         return lang.lower()
 
     @property

@@ -26,23 +26,7 @@ from mycroft.skills.intent_services import (
 from mycroft.skills.permissions import ConverseMode, ConverseActivationMode
 from mycroft.util.log import LOG
 from mycroft.util.parse import normalize
-from mycroft.configuration.locale import get_default_lang
-
-
-def _get_message_lang(message=None):
-    """Get the language from the message or the default language.
-
-    Args:
-        message: message to check for language code.
-
-    Returns:
-        The language code from the message or the default language.
-    """
-    message = message or dig_for_message()
-    default_lang = get_default_lang()
-    if not message:
-        return default_lang
-    return message.data.get('lang', default_lang).lower()
+from ovos_utils.messagebus import get_message_lang
 
 
 def _normalize_all_utterances(utterances):
@@ -139,7 +123,7 @@ class IntentService:
 
     @property
     def registered_intents(self):
-        lang = _get_message_lang()
+        lang = get_message_lang()
         return [parser.__dict__
                 for parser in self.adapt_service.engines[lang].intent_parsers]
 
@@ -183,7 +167,7 @@ class IntentService:
 
     def reset_converse(self, message):
         """Let skills know there was a problem with speech recognition"""
-        lang = _get_message_lang(message)
+        lang = get_message_lang(message)
         try:
             setup_locale(lang)  # restore default lang
         except Exception as e:
@@ -295,7 +279,7 @@ class IntentService:
             message (Message): The messagebus data
         """
         try:
-            lang = _get_message_lang(message)
+            lang = get_message_lang(message)
             try:
                 setup_locale(lang)
             except Exception as e:
@@ -373,7 +357,7 @@ class IntentService:
         entity_type = message.data.get('entity_type')
         regex_str = message.data.get('regex')
         alias_of = message.data.get('alias_of')
-        lang = _get_message_lang(message)
+        lang = get_message_lang(message)
         self.adapt_service.register_vocabulary(entity_value, entity_type,
                                                alias_of, regex_str, lang)
         self.registered_vocab.append(message.data)
@@ -447,7 +431,7 @@ class IntentService:
             message (Message): message containing utterance
         """
         utterance = message.data["utterance"]
-        lang = _get_message_lang(message)
+        lang = get_message_lang(message)
         combined = _normalize_all_utterances([utterance])
 
         # Create matchers
@@ -509,7 +493,7 @@ class IntentService:
             message (Message): message containing utterance
         """
         utterance = message.data["utterance"]
-        lang = _get_message_lang(message)
+        lang = get_message_lang(message)
         combined = _normalize_all_utterances([utterance])
         intent = self.adapt_service.match_intent(combined, lang)
         intent_data = intent.intent_data if intent else None
