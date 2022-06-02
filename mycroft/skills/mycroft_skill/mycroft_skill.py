@@ -357,7 +357,7 @@ class MycroftSkill:
         lang = self._core_lang
         message = dig_for_message()
         if message:
-            lang = message.data.get("lang") or lang
+            lang = message.data.get("lang") or message.context.get("lang") or lang
         return lang.lower()
 
     @property

@@ -70,15 +70,13 @@ class CommonQuerySkill(MycroftSkill, ABC):
 
     def __init__(self, name=None, bus=None):
         super().__init__(name, bus)
-        noise_words_filepath = "text/%s/noise_words.list" % (self.lang,)
+        noise_words_filepath = f"text/{self.lang}/noise_words.list"
         noise_words_filename = resolve_resource_file(noise_words_filepath)
         self.translated_noise_words = []
-        try:
+        if noise_words_filename:
             with open(noise_words_filename) as f:
                 self.translated_noise_words = f.read().strip()
             self.translated_noise_words = self.translated_noise_words.split()
-        except FileNotFoundError:
-            self.log.warning("Missing noise_words.list file in res/text/lang")
 
         # these should probably be configurable
         self.level_confidence = {
@@ -148,12 +146,6 @@ class CommonQuerySkill(MycroftSkill, ABC):
         # bonus for more sentences
         num_sentences = float(float(len(answer.split("."))) / float(10))
 
-        # Add bonus if match has visuals and the device supports them.
-        platform = self.config_core.get("enclosure", {}).get("platform")
-        bonus = 0.0
-        if is_CQSVisualMatchLevel(level) and handles_visuals(platform):
-            bonus = 0.1
-
         # extract topic
         topic = self.remove_noise(match)
 
@@ -177,7 +169,7 @@ class CommonQuerySkill(MycroftSkill, ABC):
         wc_mod = float(float(answer_size) / float(WORD_COUNT_DIVISOR)) * 2
 
         confidence = self.level_confidence[level] + \
-                     consumed_pct + bonus + num_sentences + relevance + wc_mod
+                     consumed_pct + num_sentences + relevance + wc_mod
 
         return confidence
 

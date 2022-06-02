@@ -5,3 +5,4 @@ from mycroft.skills.intent_services.fallback_service import FallbackService
 from mycroft.skills.intent_services.padatious_service \
     import PadatiousService, PadatiousMatcher
 from mycroft.skills.intent_services.converse_service import ConverseService
+from mycroft.skills.intent_services.commonqa_service import CommonQAService

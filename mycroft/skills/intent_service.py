@@ -20,7 +20,8 @@ from mycroft.skills.intent_service_interface import open_intent_envelope
 from mycroft.skills.intent_services import (
     AdaptService, FallbackService,
     PadatiousService, PadatiousMatcher,
-    ConverseService, IntentMatch
+    ConverseService, CommonQAService,
+    IntentMatch
 )
 from mycroft.skills.permissions import ConverseMode, ConverseActivationMode
 from mycroft.util.log import LOG
@@ -95,6 +96,7 @@ class IntentService:
             LOG.exception(f'Failed to create padatious handlers ({err})')
         self.fallback = FallbackService(bus)
         self.converse = ConverseService(bus)
+        self.common_qa = CommonQAService(bus)
 
         self.bus.on('register_vocab', self.handle_register_vocab)
         self.bus.on('register_intent', self.handle_register_intent)
@@ -298,6 +300,8 @@ class IntentService:
 
             utterances = message.data.get('utterances', [])
             combined = _normalize_all_utterances(utterances)
+            # update message object to be passed to services
+            message.data["utterances"] = combined
 
             stopwatch = Stopwatch()
 
@@ -308,9 +312,10 @@ class IntentService:
             # These are listed in priority order.
             match_funcs = [
                 self.converse.converse_with_skills, padatious_matcher.match_high,
-                self.adapt_service.match_intent, self.fallback.high_prio,
-                padatious_matcher.match_medium, self.fallback.medium_prio,
-                padatious_matcher.match_low, self.fallback.low_prio
+                self.adapt_service.match_intent, self.common_qa.match,
+                self.fallback.high_prio, padatious_matcher.match_medium,
+                self.fallback.medium_prio, padatious_matcher.match_low,
+                self.fallback.low_prio
             ]
 
             match = None
