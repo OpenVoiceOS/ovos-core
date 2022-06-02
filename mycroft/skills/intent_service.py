@@ -300,8 +300,6 @@ class IntentService:
 
             utterances = message.data.get('utterances', [])
             combined = _normalize_all_utterances(utterances)
-            # update message object to be passed to services
-            message.data["utterances"] = combined
 
             stopwatch = Stopwatch()
 

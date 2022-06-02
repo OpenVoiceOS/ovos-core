@@ -2,6 +2,7 @@ from mycroft.skills.intent_services.base import IntentMatch
 from ovos_utils.log import LOG
 from ovos_utils.enclosure.api import EnclosureAPI
 from mycroft_bus_client.message import Message, dig_for_message
+from mycroft.configuration.locale import get_default_lang
 from threading import Lock, Event
 import time
 
@@ -23,8 +24,7 @@ class CommonQAService:
         self.searching = Event()
         self.waiting = True
         self.answered = False
-        self._lang = "en-us"
-        self.enclosure = EnclosureAPI()
+        self.enclosure = EnclosureAPI(self.bus, self.skill_id)
         self.bus.on('question:query.response', self.handle_query_response)
 
     def match(self, utterances, lang, message):
@@ -38,7 +38,8 @@ class CommonQAService:
         Returns:
             IntentMatch or None
         """
-        self._lang = message.data["lang"] = lang  # only used for speak
+        message.data["lang"] = lang  # only used for speak
+        message.data["utterance"] = utterances[0][0]
         answered = self.handle_question(message)
         if answered:
             ret = IntentMatch('CommonQuery', None, {}, None)
@@ -113,7 +114,7 @@ class CommonQAService:
         # Prevent any late-comers from retriggering this query handler
         with self.lock:
             LOG.info('Timeout occured check responses')
-            search_phrase = message.data['phrase']
+            search_phrase = message.data.get('phrase', "")
             if search_phrase in self.query_extensions:
                 self.query_extensions[search_phrase] = []
             self.enclosure.mouth_reset()
@@ -162,11 +163,9 @@ class CommonQAService:
         self.enclosure.register(self.skill_id)
         message = message or dig_for_message()
 
-        lang = self._lang
-        if message:
-            lang = message.data.get("lang") or \
-                   message.context.get("lang") or \
-                   lang
+        lang = message.data.get("lang") or \
+               message.context.get("lang") or \
+               get_default_lang()
 
         data = {'utterance': utterance,
                 'expect_response': False,
