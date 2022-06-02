@@ -96,31 +96,7 @@ class TestCommonQueryMatching(TestCase):
                          'What\'s the meaning of life')
         self.assertEqual(response.data['skill_id'], self.skill.skill_id)
         self.assertEqual(response.data['answer'], '42')
-        self.assertEqual(response.data['conf'], 1.12)
-
-    def test_successful_visual_match_query_phrase(self):
-        self.skill.config_core['enclosure']['platform'] = 'mycroft_mark_2'
-        query_phrase = self.bus.on.call_args_list[-2][0][1]
-        self.skill.CQS_match_query_phrase.return_value = (
-            'What\'s the meaning of life', CQSVisualMatchLevel.EXACT, '42')
-
-        query_phrase(Message('question:query',
-                             data={'phrase': 'What\'s the meaning of life'}))
-
-        # Check that the skill replied that it was searching
-        extension = self.bus.emit.call_args_list[-2][0][0]
-        self.assertEqual(extension.data['phrase'],
-                         'What\'s the meaning of life')
-        self.assertEqual(extension.data['skill_id'], self.skill.skill_id)
-        self.assertEqual(extension.data['searching'], True)
-
-        # Assert that the skill responds with answer and confidence level
-        response = self.bus.emit.call_args_list[-1][0][0]
-        self.assertEqual(response.data['phrase'],
-                         'What\'s the meaning of life')
-        self.assertEqual(response.data['skill_id'], self.skill.skill_id)
-        self.assertEqual(response.data['answer'], '42')
-        self.assertEqual(response.data['conf'], 1.2200000000000002)
+        self.assertTrue(response.data['conf'] >= 1.0)
 
 
 class CQSTest(CommonQuerySkill):

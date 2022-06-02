@@ -18,7 +18,8 @@ from adapt.intent import IntentBuilder
 from mycroft.configuration.locale import setup_locale
 from mycroft.configuration import Configuration
 from mycroft.messagebus import Message
-from mycroft.skills.intent_service import IntentService, _get_message_lang
+from mycroft.skills.intent_service import IntentService
+from ovos_utils.messagebus import get_message_lang
 from mycroft.skills.intent_services.adapt_service import (ContextManager,
                                                           AdaptIntent)
 
@@ -204,21 +205,21 @@ class TestLanguageExtraction(TestCase):
     def test_no_lang_in_message(self):
         """No lang in message should result in lang from config."""
         msg = Message('test msg', data={})
-        self.assertEqual(_get_message_lang(msg), 'it-it')
+        self.assertEqual(get_message_lang(msg), 'it-it')
 
     @mock.patch.dict(Configuration._Configuration__config, NO_LANG_CONF)
     def test_no_lang_at_all(self):
         """Not in message and not in config, should result in en-us."""
         msg = Message('test msg', data={})
-        self.assertEqual(_get_message_lang(msg), 'en-us')
+        self.assertEqual(get_message_lang(msg), 'en-us')
 
     @mock.patch.dict(Configuration._Configuration__config, BASE_CONF)
     def test_lang_exists(self):
         """Message has a lang code in data, it should be used."""
         msg = Message('test msg', data={'lang': 'de-de'})
-        self.assertEqual(_get_message_lang(msg), 'de-de')
+        self.assertEqual(get_message_lang(msg), 'de-de')
         msg = Message('test msg', data={'lang': 'sv-se'})
-        self.assertEqual(_get_message_lang(msg), 'sv-se')
+        self.assertEqual(get_message_lang(msg), 'sv-se')
 
 
 def create_old_style_vocab_msg(keyword, value):
