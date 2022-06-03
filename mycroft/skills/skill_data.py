@@ -17,12 +17,20 @@ import re
 from collections import namedtuple
 
 from os import walk
+from os.path import dirname
 from pathlib import Path
 from typing import List, Optional, Tuple
 
 from mycroft.util.file_utils import resolve_resource_file
 from mycroft.util.format import expand_options
 from mycroft.util.log import LOG
+from mycroft.dialog import load_dialogs
+# backwards compat imports, do not delete
+from mycroft.deprecated.skills import (
+    read_value_file, read_translated_file, read_vocab_file,
+    load_vocabulary, load_regex, load_regex_from_file,
+    to_alnum
+)
 
 SkillResourceTypes = namedtuple(
     "SkillResourceTypes",
@@ -38,6 +46,21 @@ SkillResourceTypes = namedtuple(
         "word"
     ]
 )
+
+
+def locate_lang_directories(lang, skill_directory, resource_subdirectory=None):
+    base_lang = lang.split("-")[0]
+    base_dirs = [Path(skill_directory, "locale"),
+                 Path(skill_directory, "text")]
+    if resource_subdirectory:
+        base_dirs.append(Path(skill_directory, resource_subdirectory))
+    candidates = []
+    for directory in base_dirs:
+        if directory.exists():
+            for folder in directory.iterdir():
+                if folder.name.startswith(base_lang):
+                    candidates.append(folder)
+    return candidates
 
 
 class ResourceType:
@@ -62,6 +85,12 @@ class ResourceType:
         self.language = language
         self.base_directory = None
 
+    def locate_lang_directories(self, skill_directory):
+        resource_subdirectory = self._get_resource_subdirectory()
+        return locate_lang_directories(self.language,
+                                       skill_directory,
+                                       resource_subdirectory)
+
     def locate_base_directory(self, skill_directory):
         """Find the skill's base directory for the specified resource type.
 
@@ -83,17 +112,22 @@ class ResourceType:
         resource_subdirectory = self._get_resource_subdirectory()
         possible_directories = (
             Path(skill_directory, "locale", self.language),
-            Path(skill_directory, "locale", "en-us"),
             Path(skill_directory, resource_subdirectory, self.language),
-            Path(skill_directory, resource_subdirectory, "en-us"),
             Path(skill_directory, resource_subdirectory),
+            Path(skill_directory, "text", self.language),
         )
         for directory in possible_directories:
             if directory.exists():
                 self.base_directory = directory
-                if "en-us" in str(directory) and self.language != "en-us":
-                    self.language = "en-us"
-                break
+                return
+
+        # check for subdialects of same language as a fallback
+        # eg, language is set to en-au but only en-us resources are available
+        similar_dialect_directories = self.locate_lang_directories(skill_directory)
+        for directory in similar_dialect_directories:
+            if directory.exists():
+                self.base_directory = directory
+                return
 
     def _get_resource_subdirectory(self) -> str:
         """Returns the subdirectory for this resource type.
@@ -225,7 +259,6 @@ class VocabularyFile(ResourceFile):
         if self.file_path is not None:
             for line in self._read():
                 vocabulary.append(expand_options(line.lower()))
-
         return vocabulary
 
 
@@ -247,7 +280,6 @@ class NamedValueFile(ResourceFile):
                 name, value = self._load_line(line)
                 if name is not None and value is not None:
                     named_values[name] = value
-
         return named_values
 
     def _load_line(self, line: str) -> Tuple[str, str]:
@@ -307,12 +339,33 @@ class WordFile(ResourceFile):
 
 
 class SkillResources:
-    def __init__(self, skill_directory, language, dialog_renderer):
+    def __init__(self, skill_directory, language, dialog_renderer=None):
         self.skill_directory = skill_directory
         self.language = language
         self.types = self._define_resource_types()
-        self.dialog_renderer = dialog_renderer
+        self._dialog_renderer = dialog_renderer
         self.static = dict()
+
+    @property
+    def dialog_renderer(self):
+        if not self._dialog_renderer:
+            self._load_dialog_renderer()
+        return self._dialog_renderer
+
+    @dialog_renderer.setter
+    def dialog_renderer(self, val):
+        self._dialog_renderer = val
+
+    def _load_dialog_renderer(self):
+        base_dirs = locate_lang_directories(self.language,
+                                            self.skill_directory,
+                                            "dialog")
+        for directory in base_dirs:
+            if directory.exists():
+                dialog_dir = str(directory)
+                self._dialog_renderer = load_dialogs(dialog_dir)
+                return
+        LOG.debug(f'No dialog loaded for {self.language}')
 
     def _define_resource_types(self) -> SkillResourceTypes:
         """Defines all known types of skill resource files.
@@ -334,7 +387,6 @@ class SkillResources:
         )
         for resource_type in resource_types.values():
             resource_type.locate_base_directory(self.skill_directory)
-
         return SkillResourceTypes(**resource_types)
 
     def load_dialog_file(self, name, data=None) -> List[str]:
@@ -351,7 +403,6 @@ class SkillResources:
         """
         dialog_file = DialogFile(self.types.dialog, name)
         dialog_file.data = data
-
         return dialog_file.load()
 
     def load_list_file(self, name, data=None) -> List[str]:
@@ -368,7 +419,6 @@ class SkillResources:
         """
         list_file = ListFile(self.types.list, name)
         list_file.data = data
-
         return list_file.load()
 
     def load_named_value_file(self, name, delimiter=None) -> dict:
@@ -407,7 +457,6 @@ class SkillResources:
             List representation of the regular expression file.
         """
         regex_file = RegexFile(self.types.regex, name)
-
         return regex_file.load()
 
     def load_template_file(self, name, data=None) -> List[str]:
@@ -424,7 +473,6 @@ class SkillResources:
         """
         template_file = TemplateFile(self.types.template, name)
         template_file.data = data
-
         return template_file.load()
 
     def load_vocabulary_file(self, name) -> List[List[str]]:
@@ -440,7 +488,6 @@ class SkillResources:
             List representation of the regular expression file.
         """
         vocabulary_file = VocabularyFile(self.types.vocabulary, name)
-
         return vocabulary_file.load()
 
     def load_word_file(self, name) -> Optional[str]:
@@ -452,7 +499,6 @@ class SkillResources:
             List representation of the regular expression file.
         """
         word_file = WordFile(self.types.word, name)
-
         return word_file.load()
 
     def render_dialog(self, name, data=None) -> str:
@@ -466,7 +512,6 @@ class SkillResources:
         """
         resource_file = DialogFile(self.types.dialog, name)
         resource_file.data = data
-
         return resource_file.render(self.dialog_renderer)
 
     def load_skill_vocabulary(self, alphanumeric_skill_id: str) -> dict:
@@ -524,6 +569,14 @@ class SkillResources:
         return modified_regexes
 
 
+class CoreResources(SkillResources):
+    def __init__(self, language):
+        directory = f"{dirname(dirname(__file__))}/res"
+        super(CoreResources, self).__init__(directory, language)
+
+
+# TODO move this class to ovos_utils/workshop to
+#  allow it to be used by skills with mycroft-core dev branch
 class RegexExtractor:
     """Extracts data from an utterance using regular expressions.
 
@@ -599,17 +652,44 @@ class RegexExtractor:
             LOG.info(f"{self.group_name} extracted from utterance: " + extract)
 
 
-def to_alnum(skill_id):
-    """Convert a skill id to only alphanumeric characters
+def find_resource(res_name, res_dirname, lang):
+    """Find a resource file.
 
-     Non alpha-numeric characters are converted to "_"
+    Searches for the given filename using this scheme:
+        1. Search the resource lang directory:
+            <skill>/<res_dirname>/<lang>/<res_name>
+        2. Search the resource directory:
+            <skill>/<res_dirname>/<res_name>
+
+        3. Search the locale lang directory or other subdirectory:
+            <skill>/locale/<lang>/<res_name> or
+            <skill>/locale/<lang>/.../<res_name>
 
     Args:
-        skill_id (str): identifier to be converted
+        res_name (string): The resource name to be found
+        res_dirname (string): A skill root directory
+        lang (string): language folder to be used
+
     Returns:
-        (str) String of letters
+        string: The full path to the resource file or None if not found
     """
-    return "".join(c if c.isalnum() else "_" for c in str(skill_id))
+    for directory in locate_lang_directories(lang, res_dirname):
+        for x in directory.iterdir():
+            if x.is_file() and res_name == x.name:
+                return x
+
+
+def munge_regex(regex, skill_id):
+    """Insert skill id as letters into match groups.
+
+    Args:
+        regex (str): regex string
+        skill_id (str): skill identifier
+    Returns:
+        (str) munged regex
+    """
+    base = '(?P<' + to_alnum(skill_id)
+    return base.join(regex.split('(?P<'))
 
 
 def munge_intent_parser(intent_parser, name, skill_id):
@@ -627,8 +707,8 @@ def munge_intent_parser(intent_parser, name, skill_id):
         skill_id: (int) skill identifier
     """
     # Munge parser name
-    if not name.startswith(str(skill_id) + ":"):
-        intent_parser.name = str(skill_id) + ":" + name
+    if not name.startswith(str(skill_id) + ':'):
+        intent_parser.name = str(skill_id) + ':' + name
     else:
         intent_parser.name = name
 
@@ -657,16 +737,21 @@ def munge_intent_parser(intent_parser, name, skill_id):
     # Munge at_least_one keywords
     at_least_one = []
     for i in intent_parser.at_least_one:
-        element = [skill_id + e.replace(skill_id, "") for e in i]
+        element = [skill_id + e.replace(skill_id, '') for e in i]
         at_least_one.append(tuple(element))
     intent_parser.at_least_one = at_least_one
 
-    # Munge excluded keywords
-    excludes = []
-    for i in intent_parser.excludes:
-        if not i.startswith(skill_id):
-            kw = skill_id + i
-            excludes.append(kw)
-        else:
-            excludes.append(i)
-    intent_parser.excludes = excludes
+    # NOTE: this functionality is a open PR in adapt not yet merged
+    # partially supported in ovos and already deployed in the mk2
+    if hasattr(intent_parser, "excludes"):
+        # Munge excluded keywords
+        excludes = []
+        for i in intent_parser.excludes:
+            if not i.startswith(skill_id):
+                kw = skill_id + i
+                excludes.append(kw)
+            else:
+                excludes.append(i)
+        intent_parser.excludes = excludes
+
+
