@@ -902,7 +902,7 @@ class MycroftSkill:
                 voc = resolve_resource_file(join('text', lang,
                                                  voc_filename + '.voc'))
                 if voc:
-                    LOG.info(f"Found global resource: '{voc_filename}'"
+                    LOG.info(f"Found global resource: '{voc_filename}.voc' "
                              f"for lang '{lang}'")
             if not voc or not exists(voc):
                 raise FileNotFoundError(f'Could not find {voc_filename}.voc file')
