@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import re
 import time
 from threading import Lock
 
@@ -28,6 +27,7 @@ tts = None
 tts_hash = None
 lock = Lock()
 fallback_tts = None
+fallback_tts_hash = None
 
 _last_stop_signal = 0
 
@@ -67,6 +67,34 @@ def handle_speak(event):
                   {'utterance': utterance, 'tts': tts.__class__.__name__})
 
 
+def _maybe_reload_tts():
+    global tts, tts_hash, fallback_tts, fallback_tts_hash
+    config = Configuration().get("tts", {})
+
+    # update TTS object if configuration has changed
+    if not tts_hash or tts_hash != config.get("module", ""):
+        if tts:
+            tts.shutdown()
+        # Create new tts instance
+        LOG.info("(re)loading TTS engine")
+        tts = TTSFactory.create(config)
+        tts.init(bus)
+        tts_hash = config.get("module", "")
+
+    # if fallback TTS is the same as main TTS dont load it
+    if config.get("module", "") == config.get("fallback_module", ""):
+        return
+
+    if not fallback_tts_hash or \
+            fallback_tts_hash != config.get("fallback_module", ""):
+        if fallback_tts:
+            fallback_tts.shutdown()
+        # Create new tts instance
+        LOG.info("(re)loading fallback TTS engine")
+        _get_tts_fallback()
+        fallback_tts_hash = config.get("fallback_module", "")
+
+
 def mute_and_speak(utterance, ident, listen=False):
     """Mute mic and start speaking the utterance using selected tts backend.
 
@@ -74,26 +102,13 @@ def mute_and_speak(utterance, ident, listen=False):
         utterance:  The sentence to be spoken
         ident:      Ident tying the utterance to the source query
     """
-    global tts_hash
-    config = Configuration()
-
-    # update TTS object if configuration has changed
-    if tts_hash != hash(str(config.get('tts', ''))):
-        global tts
-        # Stop tts playback thread
-        tts.playback.stop()
-        tts.playback.join()
-        # Create new tts instance
-        tts = TTSFactory.create(config)
-        tts.init(bus)
-        tts_hash = hash(str(config.get('tts', '')))
-
     LOG.info("Speak: " + utterance)
     try:
         tts.execute(utterance, ident, listen)
     except Exception as e:
         LOG.exception("TTS synth failed!")
-        execute_fallback_tts(utterance, ident, listen)
+        if tts_hash != fallback_tts_hash:
+            execute_fallback_tts(utterance, ident, listen)
 
 
 def _get_tts_fallback():
@@ -137,7 +152,6 @@ def mimic_fallback_tts(utterance, ident, listen):
     execute_fallback_tts(utterance, ident=ident, listen=listen)
 
 
-
 def handle_stop(event):
     """Handle stop message.
 
@@ -156,10 +170,7 @@ def init(messagebus):
     Args:
         messagebus: Connection to the Mycroft messagebus
     """
-
     global bus
-    global tts
-    global tts_hash
 
     bus = messagebus
     Configuration.set_config_update_handlers(bus)
@@ -168,9 +179,8 @@ def init(messagebus):
     bus.on('mycroft.audio.speech.stop', handle_stop)
     bus.on('speak', handle_speak)
 
-    tts = TTSFactory.create()
-    tts.init(bus)
-    tts_hash = hash(str(Configuration().get('tts', '')))
+    _maybe_reload_tts()
+    Configuration.set_config_watcher(_maybe_reload_tts)
 
 
 def shutdown():

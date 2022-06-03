@@ -6,6 +6,7 @@ psutil~=5.6.6
 python-dateutil~=2.6
 combo-lock~=0.2
 PyYAML~=5.4
+watchdog
 
 ovos-utils~=0.0, >=0.0.22
 ovos-plugin-manager~=0.0, >=0.0.17

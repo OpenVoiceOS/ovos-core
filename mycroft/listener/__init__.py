@@ -263,7 +263,9 @@ class RecognizerLoop(EventEmitter):
         self.audio_producer = None
         self.responsive_recognizer = None
 
+        self.needs_reload = False
         self._load_config()
+        Configuration.set_config_watcher(self._on_config_update)
 
     def bind(self, stt, fallback_stt=None):
         self.stt = stt
@@ -371,13 +373,19 @@ class RecognizerLoop(EventEmitter):
 
     def stop(self):
         self.state.running = False
-        self.audio_producer.stop()
+        if self.audio_producer:
+            self.audio_producer.stop()
         # stop wake word detectors
         for ww, hotword in self.engines.items():
-            hotword["engine"].stop()
+            try:
+                hotword["engine"].stop()
+            except:
+                LOG.exception(f"Failed to stop hotword engine: {ww}")
         # wait for threads to shutdown
-        self.audio_producer.join()
-        self.audio_consumer.join()
+        if self.audio_producer:
+            self.audio_producer.join(1)
+        if self.audio_consumer:
+            self.audio_consumer.join(1)
 
     def mute(self):
         """Mute microphone and increase number of requests to mute."""
@@ -412,6 +420,12 @@ class RecognizerLoop(EventEmitter):
     def awaken(self):
         self.state.sleeping = False
 
+    def _on_config_update(self):
+        current_hash = recognizer_conf_hash(Configuration())
+        if current_hash != self._config_hash:
+            self._config_hash = current_hash
+            self.needs_reload = True
+
     def run(self):
         """Start and reload mic and STT handling threads as needed.
 
@@ -427,10 +441,8 @@ class RecognizerLoop(EventEmitter):
         # Handle reload of consumer / producer if config changes
         while self.state.running:
             try:
-                time.sleep(1)
-                current_hash = recognizer_conf_hash(Configuration())
-                if current_hash != self._config_hash:
-                    self._config_hash = current_hash
+                time.sleep(0.5)
+                if self.needs_reload:
                     LOG.debug('Config has changed, reloading...')
                     self.reload()
             except KeyboardInterrupt as e:
@@ -447,4 +459,5 @@ class RecognizerLoop(EventEmitter):
         # load config
         self._load_config()
         # restart
+        self.needs_reload = False
         self.start_async()

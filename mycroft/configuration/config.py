@@ -22,6 +22,7 @@ from ovos_utils.network_utils import is_connected
 from mycroft.util import camel_case_split
 from mycroft.util.json_helper import load_commented_json, merge_dict
 from mycroft.util.log import LOG
+from mycroft.util.file_utils import FileWatcher
 from ovos_utils.json_helper import flattened_delete
 import mycroft.api
 
@@ -202,13 +203,15 @@ class Configuration(dict):
     # /etc/xdg/mycroft/mycroft.conf
     xdg_configs = [LocalConf(p) for p in get_xdg_config_locations()]
     _old_user = LocalConf(OLD_USER_CONFIG)
+    _watchdog = None
+    _callbacks = []
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self):
         # python does not support proper overloading
         # when instantiation a Configuration object (new style)
         # the get method is replaced for proper dict behaviour
         self.get = self._real_get
-        super().__init__(*args, **kwargs)
+        super().__init__(**self.load_all_configs())
 
     # dict methods
     def __setitem__(self, key, value):
@@ -392,9 +395,42 @@ class Configuration(dict):
         bus.on("mycroft.paired", Configuration.handle_remote_update)
         bus.on("mycroft.internet.connected", Configuration.handle_remote_update)
 
+        Configuration.set_config_watcher()
+
         # do the initial remote fetch
         if is_connected():
             Configuration.remote.reload()
+
+    @staticmethod
+    def set_config_watcher(callback=None):
+        """Setup filewatcher to monitor for config file changes"""
+        paths = [Configuration.system.path] + \
+                [c.path for c in Configuration.xdg_configs]
+        if callback:
+            Configuration._callbacks.append(callback)
+        if not Configuration._watchdog:
+            Configuration._watchdog = FileWatcher(
+                [p for p in paths if isfile(p)],
+                Configuration._on_file_change
+            )
+
+    @staticmethod
+    def _on_file_change(path):
+        LOG.info(f'{path} changed on disk, reloading!')
+        # reload updated config
+        for cfg in Configuration.xdg_configs + [Configuration.system]:
+            if cfg.path == path:
+                cfg.reload()
+                break
+        else:
+            # reload all configs
+            Configuration.reload()
+
+        for handler in Configuration._callbacks:
+            try:
+                handler()
+            except:
+                LOG.exception("Error in config update callback handler")
 
     @staticmethod
     def deregister_bus():
