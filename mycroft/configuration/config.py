@@ -216,50 +216,57 @@ class Configuration(dict):
     # dict methods
     def __setitem__(self, key, value):
         Configuration.__patch[key] = value
+        super().__setitem__(key, value)
         # sync with other processes connected to bus
         if Configuration.bus:
             Configuration.bus.emit(Message("configuration.patch",
                                            {"config": {key: value}}))
 
     def __getitem__(self, item):
-        cfg = Configuration.load_all_configs()
-        return cfg.get(item)
+        super().update(Configuration.load_all_configs())
+        return super().get(item)
 
     def __str__(self):
-        cfg = Configuration.load_all_configs()
+        super().update(Configuration.load_all_configs())
         try:
-            return json.dumps(cfg, sort_keys=True)
+            return json.dumps(self, sort_keys=True)
         except:
-            return str(cfg)
+            return super().__str__()
 
     def __dict__(self):
-        return Configuration.load_all_configs()
+        super().update(Configuration.load_all_configs())
+        return self
 
     def __repr__(self):
-        return str(Configuration.load_all_configs())
+        return self.__str__()
 
     def __iter__(self):
-        for k in Configuration.load_all_configs():
+        super().update(Configuration.load_all_configs())
+        for k in super().__iter__():
             yield k
 
     def update(self, *args, **kwargs):
         Configuration.__patch.update(*args, **kwargs)
+        super().update(*args, **kwargs)
 
     def pop(self, key):
         # we can not pop the key because configs are read only
         # we could do it for __patch but that does not make sense
         # for the object as a whole which is
         # supposed to behave like a python dict
-        Configuration.__patch[key] = None
+        self.__setitem__(key, None)
 
     def items(self):
-        return Configuration.load_all_configs().items()
+        super().update(Configuration.load_all_configs())
+        return super().items()
 
     def keys(self):
-        return Configuration.load_all_configs().keys()
+        super().update(Configuration.load_all_configs())
+        return super().keys()
 
     def values(self):
-        return Configuration.load_all_configs().values()
+        super().update(Configuration.load_all_configs())
+        return super().values()
 
     # config methods
     @staticmethod
@@ -425,7 +432,7 @@ class Configuration(dict):
         else:
             # reload all configs
             Configuration.reload()
-
+        
         for handler in Configuration._callbacks:
             try:
                 handler()
