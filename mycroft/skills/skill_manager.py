@@ -152,6 +152,7 @@ class SkillManager(Thread):
         self.status = ProcessStatus('skills', callback_map=callbacks)
         self.status.set_started()
 
+        self._backend_selection_event = Event()
         self._stop_event = Event()
         self._connected_event = Event()
         self.config = Configuration()
@@ -175,7 +176,7 @@ class SkillManager(Thread):
     def _define_message_bus_events(self):
         """Define message bus events with handlers defined in this class."""
         # Update on initial connection
-        self.bus.on(
+        self.bus.once(
             'mycroft.internet.connected',
             lambda x: self._connected_event.set()
         )
@@ -186,13 +187,16 @@ class SkillManager(Thread):
         self.bus.on('skillmanager.keep', self.deactivate_except)
         self.bus.on('skillmanager.activate', self.activate_skill)
         self.bus.on('mycroft.paired', self.handle_paired)
-        self.bus.on(
-            'mycroft.skills.settings.update',
-            self.settings_downloader.download
-        )
+        self.bus.on('mycroft.setup.complete',
+                    self.handle_backend_setup_complete)
+        self.bus.on('mycroft.skills.settings.update',
+                    self.settings_downloader.download)
         self.bus.once('mycroft.skills.initialized',
                       self.handle_check_device_readiness)
         self.bus.once('mycroft.skills.trained', self.handle_initial_training)
+
+    def handle_backend_setup_complete(self, message):
+        self._backend_selection_event.set()
 
     def is_device_ready(self):
         is_ready = False
@@ -240,7 +244,12 @@ class SkillManager(Thread):
         for ser in services:
             services[ser] = False
             if ser == "pairing":
-                services[ser] = is_paired()
+                # pairing service (skill) needs to be available
+                # in offline mode (default) is_paired always returns True
+                # but setup skill may enable backend
+                # wait for backend selection event
+                if self._backend_selection_event.is_set():
+                    services[ser] = is_paired()
                 continue
             elif ser in ["gui", "enclosure"]:
                 # not implemented
