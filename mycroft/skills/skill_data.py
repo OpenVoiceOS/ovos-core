@@ -21,6 +21,7 @@ from os.path import dirname
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from ovos_utils.configuration import get_xdg_data_save_path
 from mycroft.util.file_utils import resolve_resource_file
 from mycroft.util.format import expand_options
 from mycroft.util.log import LOG
@@ -84,12 +85,18 @@ class ResourceType:
         self.file_extension = file_extension
         self.language = language
         self.base_directory = None
+        self.user_directory = None
 
     def locate_lang_directories(self, skill_directory):
         resource_subdirectory = self._get_resource_subdirectory()
         return locate_lang_directories(self.language,
                                        skill_directory,
                                        resource_subdirectory)
+
+    def locate_user_directory(self, skill_id):
+        skill_directory = Path(get_xdg_data_save_path(), "resources", skill_id)
+        if skill_directory.exists():
+            self.user_directory = skill_directory
 
     def locate_base_directory(self, skill_directory):
         """Find the skill's base directory for the specified resource type.
@@ -109,6 +116,7 @@ class ResourceType:
         Returns:
             the skill's directory for the resource type or None if not found
         """
+        # check for lang resources shipped by the skill
         resource_subdirectory = self._get_resource_subdirectory()
         possible_directories = (
             Path(skill_directory, "locale", self.language),
@@ -128,6 +136,12 @@ class ResourceType:
             if directory.exists():
                 self.base_directory = directory
                 return
+
+        # check for lang resources defined by the user
+        # user data is usually meant as an override for skill data
+        # but it may be the only data source in some rare instances
+        if self.user_directory:
+            self.base_directory = self.user_directory
 
     def _get_resource_subdirectory(self) -> str:
         """Returns the subdirectory for this resource type.
@@ -177,11 +191,23 @@ class ResourceFile:
         else:
             file_name = self.resource_name + self.resource_type.file_extension
 
-        walk_directory = str(self.resource_type.base_directory)
-        for directory, _, file_names in walk(walk_directory):
-            if file_name in file_names:
-                file_path = Path(directory, file_name)
+        # first check for user defined resource files
+        # usually these resources are overrides to
+        # customize dialogs or provide additional languages
+        if self.resource_type.user_directory:
+            walk_directory = str(self.resource_type.user_directory)
+            for directory, _, file_names in walk(walk_directory):
+                if file_name in file_names:
+                    file_path = Path(directory, file_name)
 
+        # check the skill resources
+        if file_path is None:
+            walk_directory = str(self.resource_type.base_directory)
+            for directory, _, file_names in walk(walk_directory):
+                if file_name in file_names:
+                    file_path = Path(directory, file_name)
+
+        # check the core resources
         if file_path is None:
             sub_path = Path("text", self.resource_type.language, file_name)
             file_path = resolve_resource_file(str(sub_path))
@@ -339,9 +365,10 @@ class WordFile(ResourceFile):
 
 
 class SkillResources:
-    def __init__(self, skill_directory, language, dialog_renderer=None):
+    def __init__(self, skill_directory, language, dialog_renderer=None, skill_id=None):
         self.skill_directory = skill_directory
         self.language = language
+        self.skill_id = skill_id
         self.types = self._define_resource_types()
         self._dialog_renderer = dialog_renderer
         self.static = dict()
@@ -386,6 +413,7 @@ class SkillResources:
             word=ResourceType("word", ".word", self.language)
         )
         for resource_type in resource_types.values():
+            resource_type.locate_user_directory(self.skill_id)
             resource_type.locate_base_directory(self.skill_directory)
         return SkillResourceTypes(**resource_types)
 
@@ -572,7 +600,13 @@ class SkillResources:
 class CoreResources(SkillResources):
     def __init__(self, language):
         directory = f"{dirname(dirname(__file__))}/res"
-        super(CoreResources, self).__init__(directory, language)
+        super().__init__(directory, language)
+
+
+class UserResources(SkillResources):
+    def __init__(self, language, skill_id):
+        directory = f"{get_xdg_data_save_path()}/resources/{skill_id}"
+        super().__init__(directory, language)
 
 
 # TODO move this class to ovos_utils/workshop to

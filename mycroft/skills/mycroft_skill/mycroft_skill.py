@@ -418,7 +418,7 @@ class MycroftSkill:
         lang = lang or self.lang
         root_directory = root_directory or self.root_dir
         if lang not in self._lang_resources:
-            self._lang_resources[lang] = SkillResources(root_directory, lang)
+            self._lang_resources[lang] = SkillResources(root_directory, lang, skill_id=self.skill_id)
         return self._lang_resources[lang]
 
     def bind(self, bus):
