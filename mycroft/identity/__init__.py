@@ -48,6 +48,7 @@ class IdentityManager:
     def _load():
         if isfile(IdentityManager.OLD_IDENTITY_FILE) and \
                 not isfile(IdentityManager.IDENTITY_FILE):
+            os.makedirs(dirname(IdentityManager.IDENTITY_FILE), exist_ok=True)
             shutil.move(IdentityManager.OLD_IDENTITY_FILE, IdentityManager.IDENTITY_FILE)
         if isfile(IdentityManager.IDENTITY_FILE):
             LOG.debug('Loading identity')
