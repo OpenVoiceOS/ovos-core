@@ -152,7 +152,7 @@ class SkillManager(Thread):
         self.status = ProcessStatus('skills', callback_map=callbacks)
         self.status.set_started()
 
-        self._backend_selection_event = Event()
+        self._setup_event = Event()
         self._stop_event = Event()
         self._connected_event = Event()
         self.config = Configuration()
@@ -187,16 +187,11 @@ class SkillManager(Thread):
         self.bus.on('skillmanager.keep', self.deactivate_except)
         self.bus.on('skillmanager.activate', self.activate_skill)
         self.bus.on('mycroft.paired', self.handle_paired)
-        self.bus.on('mycroft.setup.complete',
-                    self.handle_backend_setup_complete)
         self.bus.on('mycroft.skills.settings.update',
                     self.settings_downloader.download)
         self.bus.once('mycroft.skills.initialized',
                       self.handle_check_device_readiness)
         self.bus.once('mycroft.skills.trained', self.handle_initial_training)
-
-    def handle_backend_setup_complete(self, message):
-        self._backend_selection_event.set()
 
     def is_device_ready(self):
         is_ready = False
@@ -243,14 +238,20 @@ class SkillManager(Thread):
         """
         for ser in services:
             services[ser] = False
-            if ser == "pairing":
-                # pairing service (skill) needs to be available
+            if ser in ["pairing", "setup"]:
+                # pairing service (setup skill) needs to be available
                 # in offline mode (default) is_paired always returns True
                 # but setup skill may enable backend
                 # wait for backend selection event
-                if self._backend_selection_event.is_set():
-                    services[ser] = is_paired()
-                continue
+                response = self.bus.wait_for_response(Message('ovos.setup.state'))
+                if response:
+                    state = response.data['state']
+                    LOG.debug(f"Setup state: {state}")
+                    if state == "inactive":
+                        services[ser] = True
+                else:
+                    # older verson / alternate setup skill installed
+                    services[ser] = is_paired(ignore_errors=True)
             elif ser in ["gui", "enclosure"]:
                 # not implemented
                 services[ser] = True
