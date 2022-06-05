@@ -24,4 +24,4 @@ class TestXdg(TestCase):
         self.assertTrue(FileSystemAccess("test").path.startswith(get_xdg_data_save_path()))
 
     def test_remote_config(self):
-        self.assertTrue(REMOTE_CACHE.startswith(get_xdg_cache_save_path()))
+        self.assertTrue(str(REMOTE_CACHE).startswith(get_xdg_cache_save_path()))
