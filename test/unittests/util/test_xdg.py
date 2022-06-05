@@ -17,6 +17,8 @@ class TestXdg(TestCase):
 
     def test_identity(self):
         self.assertTrue(IdentityManager.IDENTITY_FILE.startswith(get_xdg_config_save_path()))
+        self.assertTrue(IdentityManager.IDENTITY_FILE.endswith("/identity/identity2.json"))
+        self.assertTrue(IdentityManager.OLD_IDENTITY_FILE not in IdentityManager.IDENTITY_FILE)
 
     def test_filesystem(self):
         self.assertTrue(FileSystemAccess("test").path.startswith(get_xdg_data_save_path()))

@@ -15,9 +15,10 @@
 import json
 import time
 import os
-from os.path import isfile, dirname
+from os.path import isfile, dirname, expanduser
+import shutil
 
-from ovos_utils.configuration import get_xdg_config_save_path
+from ovos_utils.configuration import get_xdg_config_save_path, get_xdg_base
 from mycroft.util.log import LOG
 from combo_lock import ComboLock
 
@@ -40,10 +41,14 @@ class DeviceIdentity:
 
 class IdentityManager:
     IDENTITY_FILE = f"{get_xdg_config_save_path()}/identity/identity2.json"
+    OLD_IDENTITY_FILE = expanduser(f"~/.{get_xdg_base()}/identity/identity2.json")
     __identity = None
 
     @staticmethod
     def _load():
+        if isfile(IdentityManager.OLD_IDENTITY_FILE) and \
+                not isfile(IdentityManager.IDENTITY_FILE):
+            shutil.move(IdentityManager.OLD_IDENTITY_FILE, IdentityManager.IDENTITY_FILE)
         if isfile(IdentityManager.IDENTITY_FILE):
             LOG.debug('Loading identity')
             try:
