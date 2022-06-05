@@ -1032,8 +1032,7 @@ class MycroftSkill:
             string: The full path to the resource file or None if not found
         """
         lang = lang or self.lang
-        root_dir = f"{self.root_dir}/{res_dirname}" if res_dirname else self.root_dir
-        x = find_resource(res_name, root_dir, lang)
+        x = find_resource(res_name, self.root_dir, res_dirname, lang)
         if x:
             return str(x)
         self.log.error(f"Skill {self.skill_id} resource '{res_name}' for lang "

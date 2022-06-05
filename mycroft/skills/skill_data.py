@@ -44,9 +44,20 @@ SkillResourceTypes = namedtuple(
         "regex",
         "template",
         "vocabulary",
-        "word"
+        "word",
+        "qml"
     ]
 )
+
+
+def locate_base_directories(skill_directory, resource_subdirectory=None):
+    base_dirs = [Path(skill_directory, resource_subdirectory)] if resource_subdirectory else []
+    base_dirs += [Path(skill_directory, "locale"), Path(skill_directory, "text")]
+    candidates = []
+    for directory in base_dirs:
+        if directory.exists():
+            candidates.append(directory)
+    return candidates
 
 
 def locate_lang_directories(lang, skill_directory, resource_subdirectory=None):
@@ -80,7 +91,7 @@ class ResourceType:
         base_directory: directory containing all files for the resource type
     """
 
-    def __init__(self, resource_type: str, file_extension: str, language: str):
+    def __init__(self, resource_type: str, file_extension: str, language=None):
         self.resource_type = resource_type
         self.file_extension = file_extension
         self.language = language
@@ -88,6 +99,8 @@ class ResourceType:
         self.user_directory = None
 
     def locate_lang_directories(self, skill_directory):
+        if not self.language:
+            return []
         resource_subdirectory = self._get_resource_subdirectory()
         return locate_lang_directories(self.language,
                                        skill_directory,
@@ -97,6 +110,22 @@ class ResourceType:
         skill_directory = Path(get_xdg_data_save_path(), "resources", skill_id)
         if skill_directory.exists():
             self.user_directory = skill_directory
+
+    def _locate_base_no_lang(self, skill_directory, resource_subdirectory):
+        possible_directories = (
+            Path(skill_directory, resource_subdirectory),
+            Path(skill_directory),
+        )
+        for directory in possible_directories:
+            if directory.exists():
+                self.base_directory = directory
+                return
+
+        # check for lang resources defined by the user
+        # user data is usually meant as an override for skill data
+        # but it may be the only data source in some rare instances
+        if self.user_directory:
+            self.base_directory = self.user_directory
 
     def locate_base_directory(self, skill_directory):
         """Find the skill's base directory for the specified resource type.
@@ -116,8 +145,13 @@ class ResourceType:
         Returns:
             the skill's directory for the resource type or None if not found
         """
-        # check for lang resources shipped by the skill
         resource_subdirectory = self._get_resource_subdirectory()
+
+        if not self.language:
+            self._locate_base_no_lang(skill_directory, resource_subdirectory)
+            return
+
+        # check for lang resources shipped by the skill
         possible_directories = (
             Path(skill_directory, "locale", self.language),
             Path(skill_directory, resource_subdirectory, self.language),
@@ -158,7 +192,8 @@ class ResourceType:
             regex="regex",
             template="dialog",
             vocab="vocab",
-            word="dialog"
+            word="dialog",
+            qml="ui"
         )
 
         return subdirectories[self.resource_type]
@@ -208,9 +243,13 @@ class ResourceFile:
                     file_path = Path(directory, file_name)
 
         # check the core resources
-        if file_path is None:
+        if file_path is None and self.resource_type.language:
             sub_path = Path("text", self.resource_type.language, file_name)
             file_path = resolve_resource_file(str(sub_path))
+
+        # check non-lang specific core resources
+        if file_path is None:
+            file_path = resolve_resource_file(file_path)
 
         if file_path is None:
             LOG.error(f"Could not find resource file {file_name}")
@@ -228,6 +267,11 @@ class ResourceFile:
                 if not line or line.startswith("#"):
                     continue
                 yield line
+
+
+class QmlFile(ResourceFile):
+    def load(self):
+        return str(self.file_path)
 
 
 class DialogFile(ResourceFile):
@@ -410,7 +454,8 @@ class SkillResources:
             regex=ResourceType("regex", ".rx", self.language),
             template=ResourceType("template", ".template", self.language),
             vocabulary=ResourceType("vocab", ".voc", self.language),
-            word=ResourceType("word", ".word", self.language)
+            word=ResourceType("word", ".word", self.language),
+            qml=ResourceType("qml", ".qml")
         )
         for resource_type in resource_types.values():
             resource_type.locate_user_directory(self.skill_id)
@@ -432,6 +477,10 @@ class SkillResources:
         dialog_file = DialogFile(self.types.dialog, name)
         dialog_file.data = data
         return dialog_file.load()
+
+    def locate_qml_file(self, name):
+        qml_file = QmlFile(self.types.qml, name)
+        return qml_file.load()
 
     def load_list_file(self, name, data=None) -> List[str]:
         """Load a file containing a list of words or phrases
@@ -686,7 +735,7 @@ class RegexExtractor:
             LOG.info(f"{self.group_name} extracted from utterance: " + extract)
 
 
-def find_resource(res_name, res_dirname, lang):
+def find_resource(res_name, root_dir, res_dirname, lang=None):
     """Find a resource file.
 
     Searches for the given filename using this scheme:
@@ -694,20 +743,26 @@ def find_resource(res_name, res_dirname, lang):
             <skill>/<res_dirname>/<lang>/<res_name>
         2. Search the resource directory:
             <skill>/<res_dirname>/<res_name>
-
         3. Search the locale lang directory or other subdirectory:
             <skill>/locale/<lang>/<res_name> or
             <skill>/locale/<lang>/.../<res_name>
 
     Args:
         res_name (string): The resource name to be found
-        res_dirname (string): A skill root directory
+        root_dir (string): A skill root directory
+        res_dirname (string): A skill sub directory
         lang (string): language folder to be used
 
     Returns:
         string: The full path to the resource file or None if not found
     """
-    for directory in locate_lang_directories(lang, res_dirname):
+    if lang:
+        for directory in locate_lang_directories(lang, root_dir, res_dirname):
+            for x in directory.iterdir():
+                if x.is_file() and res_name == x.name:
+                    return x
+
+    for directory in locate_base_directories(root_dir, res_dirname):
         for x in directory.iterdir():
             if x.is_file() and res_name == x.name:
                 return x

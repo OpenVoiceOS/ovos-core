@@ -185,10 +185,7 @@ class SkillGUI:
         # Convert pages to full reference
         page_urls = []
         for name in page_names:
-            if name.startswith("SYSTEM"):
-                page = resolve_resource_file(join('ui', name))
-            else:
-                page = self.skill.find_resource(name, 'ui')
+            page = self.skill._resources.locate_qml_file(name)
             if page:
                 if self.remote_url:
                     page_urls.append(self.remote_url + "/" + page)
