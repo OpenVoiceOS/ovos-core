@@ -26,9 +26,11 @@ class TestSkillGUI(TestCase):
         self.mock_skill = mock.Mock(name='Skill')
         self.mock_skill.skill_id = 'fortytwo-skill'
 
-        def find_resource(page, folder):
-            return '/test/{}/{}'.format(folder, page)
-        self.mock_skill.find_resource = find_resource
+        def find_resource(page):
+            return resolve_resource_file(f'ui/{page}') or f'/test/ui/{page}'
+
+        self.mock_skill._resources.locate_qml_file = find_resource
+
         self.gui = SkillGUI(self.mock_skill)
 
     def test_show_page(self):
