@@ -35,7 +35,7 @@ class FileSystemAccess:
             raise ValueError("path must be initialized as a non empty string")
 
         old_path = expanduser(f'~/.{get_xdg_base()}/{path}')
-        xdg_path = expanduser(f'{get_xdg_data_save_path()}/{path}')
+        xdg_path = expanduser(f'{get_xdg_data_save_path()}/filesystem/{path}')
         # Migrate from the old location if it still exists
         if isdir(old_path) and not isdir(xdg_path):
             shutil.move(old_path, xdg_path)
