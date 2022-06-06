@@ -247,10 +247,8 @@ class MycroftSkill:
                     self._settings[k] = v
         self._initial_settings = copy(self.settings)
 
-        self._settings_watchdog = FileWatcher(
-            [self._handle_settings_file_change],
-            self.settings_change_callback
-        )
+        self._settings_watchdog = FileWatcher([self._settings_path],
+                                              callback=self.settings_change_callback)
 
     def _handle_settings_file_change(self):
         if self._settings:
