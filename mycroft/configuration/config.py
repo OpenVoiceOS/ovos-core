@@ -203,6 +203,9 @@ class Configuration(dict):
     # /etc/xdg/mycroft/mycroft.conf
     xdg_configs = [LocalConf(p) for p in get_xdg_config_locations()]
     _old_user = LocalConf(OLD_USER_CONFIG)
+    # deprecation warning
+    if isfile(OLD_USER_CONFIG):
+        _log_old_location_deprecation(OLD_USER_CONFIG)
     _watchdog = None
     _callbacks = []
 
@@ -330,7 +333,6 @@ class Configuration(dict):
         if not skip_user:
             # deprecation warning
             if isfile(OLD_USER_CONFIG):
-                _log_old_location_deprecation(OLD_USER_CONFIG)
                 configs.append(Configuration._old_user)
             configs += Configuration.xdg_configs
 
@@ -386,11 +388,6 @@ class Configuration(dict):
         """
         # remove any old event listeners
         Configuration.deregister_bus()
-
-        # sync any modified values from before the bind
-        if Configuration.__patch and not Configuration.bus:
-            Configuration.bus.emit(Message("configuration.patch",
-                                           {"config": Configuration.__patch}))
 
         # attach new bus and listeners
         Configuration.bus = bus

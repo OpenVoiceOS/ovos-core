@@ -62,6 +62,7 @@ from mycroft.util import (
 from mycroft.util.format import pronounce_number, join_list
 from mycroft.util.log import LOG
 from mycroft.util.parse import match_one, extract_number
+from mycroft.util.file_utils import FileWatcher
 from ovos_utils.configuration import get_xdg_base, get_xdg_data_save_path, get_xdg_config_save_path
 from ovos_utils.enclosure.api import EnclosureAPI
 from ovos_utils.file_utils import get_temp_path
@@ -122,6 +123,7 @@ class MycroftSkill:
         self._settings = None
         self._initial_settings = {}
         self.settings_write_path = None
+        self._settings_watchdog = None
 
         # old kludge from fallback skills, unused according to grep
         if use_settings is False:
@@ -244,6 +246,21 @@ class MycroftSkill:
                 if k not in self._settings:
                     self._settings[k] = v
         self._initial_settings = copy(self.settings)
+
+        self._settings_watchdog = FileWatcher(
+            [self._handle_settings_file_change],
+            self.settings_change_callback
+        )
+
+    def _handle_settings_file_change(self):
+        if self._settings:
+            self._settings.reload()
+        if self.settings_change_callback:
+            try:
+                self.settings_change_callback()
+            except:
+                self.log.exception("settings change callback failed, "
+                                   "file changes not handled!")
 
     @property
     def _old_settings_path(self):
@@ -525,8 +542,7 @@ class MycroftSkill:
         if its remote settings were among those changed
         """
         if self.settings_meta is None or self.settings_meta.skill_gid is None:
-            LOG.error('The skill_gid was not set when '
-                      '{} was loaded!'.format(self.name))
+            LOG.error(f'The skill_gid was not set when {self.name} was loaded!')
         else:
             remote_settings = message.data.get(self.settings_meta.skill_gid)
             if remote_settings is not None:
@@ -534,7 +550,11 @@ class MycroftSkill:
                 self.settings.update(**remote_settings)
                 self.settings.store()
                 if self.settings_change_callback is not None:
-                    self.settings_change_callback()
+                    try:
+                        self.settings_change_callback()
+                    except:
+                        self.log.exception("settings change callback failed, "
+                                           "remote changes not handled!")
 
     def detach(self):
         for (name, _) in self.intent_service:
@@ -1509,6 +1529,8 @@ class MycroftSkill:
             self.settings.store()
         if self.settings_meta:
             self.settings_meta.stop()
+        if self._settings_watchdog:
+            self._settings_watchdog.shutdown()
 
         # Clear skill from gui
         self.gui.shutdown()
