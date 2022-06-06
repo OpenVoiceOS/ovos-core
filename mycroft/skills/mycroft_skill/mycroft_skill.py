@@ -20,8 +20,7 @@ import traceback
 from copy import copy
 from inspect import signature
 from itertools import chain
-from os import walk, listdir
-from os.path import join, abspath, dirname, basename, exists, isdir
+from os.path import join, abspath, dirname, basename, exists, isfile
 from threading import Event
 
 from ovos_utils.intents import Intent, IntentBuilder
@@ -247,8 +246,12 @@ class MycroftSkill:
                     self._settings[k] = v
         self._initial_settings = copy(self.settings)
 
-        self._settings_watchdog = FileWatcher([self._settings_path],
-                                              callback=self.settings_change_callback)
+        self._start_filewatcher()
+
+    def _start_filewatcher(self):
+        if self._settings_watchdog is None and isfile(self._settings.path):
+            self._settings_watchdog = FileWatcher([self._settings.path],
+                                                  callback=self.settings_change_callback)
 
     def _handle_settings_file_change(self):
         if self._settings:
@@ -553,6 +556,7 @@ class MycroftSkill:
                     except:
                         self.log.exception("settings change callback failed, "
                                            "remote changes not handled!")
+                self._start_filewatcher()
 
     def detach(self):
         for (name, _) in self.intent_service:
