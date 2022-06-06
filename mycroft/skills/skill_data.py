@@ -270,6 +270,38 @@ class ResourceFile:
 
 
 class QmlFile(ResourceFile):
+    def _locate(self):
+        """ QML files are special because we do not want to walk the directory """
+        file_path = None
+        if self.resource_name.endswith(self.resource_type.file_extension):
+            file_name = self.resource_name
+        else:
+            file_name = self.resource_name + self.resource_type.file_extension
+
+        # first check for user defined resource files
+        # usually these resources are overrides
+        # eg, to change hardcoded color or text
+        if self.resource_type.user_directory:
+            for x in self.resource_type.user_directory.iterdir():
+                if x.is_file() and file_name == x.name:
+                    file_path = Path(self.resource_type.user_directory, file_name)
+
+        # check the skill resources
+        if file_path is None:
+            for x in self.resource_type.base_directory.iterdir():
+                if x.is_file() and file_name == x.name:
+                    file_path = Path(self.resource_type.base_directory, file_name)
+
+        # check the core resources
+        if file_path is None:
+            file_path = resolve_resource_file(file_name) or \
+                        resolve_resource_file(f"ui/{file_name}")
+
+        if file_path is None:
+            LOG.error(f"Could not find resource file {file_name}")
+
+        return file_path
+
     def load(self):
         return str(self.file_path)
 
