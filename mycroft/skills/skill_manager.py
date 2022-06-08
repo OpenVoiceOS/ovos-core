@@ -236,8 +236,10 @@ class SkillManager(Thread):
 
         services (iterable): service names to check.
         """
-        for ser in services:
-            services[ser] = False
+        for ser, rdy in services.items():
+            if rdy:
+                # already reported ready
+                continue
             if ser in ["pairing", "setup"]:
                 # pairing service (setup skill) needs to be available
                 # in offline mode (default) is_paired always returns True
