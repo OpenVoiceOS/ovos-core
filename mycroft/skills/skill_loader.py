@@ -29,6 +29,7 @@ from mycroft.messagebus import Message
 from mycroft.skills.mycroft_skill.mycroft_skill import MycroftSkill
 from mycroft.skills.settings import SettingsMetaUploader
 from mycroft.util.log import LOG
+from mycroft.util.file_utils import FileWatcher
 
 SKILL_MAIN_MODULE = '__init__.py'
 
@@ -306,6 +307,7 @@ class SkillLoader:
         self.last_loaded = 0
         self.instance = None
         self.active = True
+        self._watchdog = None
         self.config = Configuration()
 
         self.modtime_error_log_written = False
@@ -319,30 +321,16 @@ class SkillLoader:
         else:
             return False
 
+    @property
+    def reload_allowed(self):
+        return self.active and (self.instance is None or self.instance.reload_skill)
+
     def reload_needed(self):
-        """Load an unloaded skill or reload unloaded/changed skill.
+        """DEPRECATED: backwards compatibility only
 
-        Returns:
-             bool: if the skill was loaded/reloaded
+        this is now event based and always returns False after initial load
         """
-        # TODO on ntp sync last_modified needs to be updated
-        try:
-            self.last_modified = _get_last_modified_time(self.skill_directory)
-        except OSError as err:
-            self.last_modified = self.last_loaded
-            if not self.modtime_error_log_written:
-                self.modtime_error_log_written = True
-                LOG.error(f'Failed to get last_modification time ({err})')
-        else:
-            self.modtime_error_log_written = False
-
-        modified = self.last_modified > self.last_loaded
-
-        reload_allowed = (
-                self.active and
-                (self.instance is None or self.instance.reload_skill)
-        )
-        return modified and reload_allowed
+        return self.instance is None
 
     def reload(self):
         LOG.info('ATTEMPTING TO RELOAD SKILL: ' + self.skill_id)
@@ -359,6 +347,10 @@ class SkillLoader:
 
     def _unload(self):
         """Remove listeners and stop threads before loading"""
+        if self._watchdog:
+            self._watchdog.shutdown()
+            self._watchdog = None
+
         self._execute_instance_shutdown()
         if self.config.get("debug", False):
             self._garbage_collect()
@@ -414,6 +406,7 @@ class SkillLoader:
 
         self.last_loaded = time()
         self._communicate_load_status()
+        self._start_filewatcher()
         if self.loaded:
             self._prepare_settings_meta()
         return self.loaded
@@ -422,6 +415,35 @@ class SkillLoader:
         settings_meta = SettingsMetaUploader(self.skill_directory,
                                              self.instance.skill_id)
         self.instance.settings_meta = settings_meta
+
+    def _start_filewatcher(self):
+        if not self._watchdog:
+            self._watchdog = FileWatcher([self.skill_directory],
+                                         callback=self._handle_filechange,
+                                         recursive=True)
+
+    def _handle_filechange(self):
+        LOG.info("Skill change detected!")
+
+        try:
+            if self.reload_allowed:
+                self.reload()
+        except Exception:
+            LOG.exception(f'Unhandled exception occurred while reloading {self.skill_directory}')
+
+        # NOTE: below could be removed, but is kept for api backwards compatibility
+        # users of SkillLoader will still have all properties properly updated
+
+        # TODO on ntp sync last_modified needs to be updated
+        try:
+            self.last_modified = _get_last_modified_time(self.skill_directory)
+        except OSError as err:
+            self.last_modified = self.last_loaded
+            if not self.modtime_error_log_written:
+                self.modtime_error_log_written = True
+                LOG.error(f'Failed to get last_modification time ({err})')
+        else:
+            self.modtime_error_log_written = False
 
     def _prepare_for_load(self):
         self.load_attempted = True

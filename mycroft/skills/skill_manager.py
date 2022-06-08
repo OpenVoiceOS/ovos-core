@@ -367,7 +367,6 @@ class SkillManager(Thread):
         while not self._stop_event.is_set():
             try:
                 self._unload_removed_skills()
-                self._reload_modified_skills()
                 self._load_new_skills()
                 self._watchdog()
                 sleep(2)  # Pause briefly before beginning next scan
@@ -392,17 +391,6 @@ class SkillManager(Thread):
         self._load_new_skills()
         LOG.info("Skills all loaded!")
         self.bus.emit(Message('mycroft.skills.initialized'))
-
-    def _reload_modified_skills(self):
-        """Handle reload of recently changed skill(s)"""
-        for skill_dir, skill_loader in self.skill_loaders.items():
-            try:
-                if skill_loader is not None and skill_loader.reload_needed():
-                    # If reload succeed add settingsmeta to upload queue
-                    if skill_loader.reload():
-                        self.upload_queue.put(skill_loader)
-            except Exception:
-                LOG.exception(f'Unhandled exception occured while reloading {skill_dir}')
 
     def _load_new_skills(self):
         """Handle load of skills installed since startup."""

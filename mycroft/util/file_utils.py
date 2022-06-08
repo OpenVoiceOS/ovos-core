@@ -206,13 +206,13 @@ def create_file(filename):
 
 
 class FileWatcher:
-    def __init__(self, files, callback):
+    def __init__(self, files, callback, recursive=False):
         self.observer = Observer()
         self.handlers = []
         for file_path in files:
             watch_dir = dirname(file_path)
             self.observer.schedule(FileEventHandler(file_path, callback),
-                                   watch_dir, recursive=False)
+                                   watch_dir, recursive=recursive)
         self.observer.start()
 
     def shutdown(self):
