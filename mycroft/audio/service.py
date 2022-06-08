@@ -58,11 +58,19 @@ class SpeechService(Thread):
         self.bus = bus or start_message_bus_client("AUDIO",
                                                    whitelist=whitelist)
         self.status.bind(self.bus)
+        self.init_messagebus()
 
         try:
-            self.init_messagebus()
+            self._maybe_reload_tts()
+            Configuration.set_config_watcher(self._maybe_reload_tts)
+        except Exception as e:
+            LOG.exception(e)
+            self.status.set_error(e)
+
+        try:
             self.audio = AudioService(self.bus)
         except Exception as e:
+            LOG.exception(e)
             self.status.set_error(e)
 
     def run(self):
@@ -77,7 +85,7 @@ class SpeechService(Thread):
         else:
             self.status.set_error('No TTS loaded')
 
-    def handle_speak(self, event):
+    def handle_speak(self, message):
         """Handle "speak" message
 
         Parse sentences and invoke text to speech service.
@@ -85,15 +93,15 @@ class SpeechService(Thread):
 
         # if the message is targeted and audio is not the target don't
         # don't synthesise speech
-        event.context = event.context or {}
-        if event.context.get('destination') and not \
-                ('debug_cli' in event.context['destination'] or
-                 'audio' in event.context['destination']):
+        message.context = message.context or {}
+        if message.context.get('destination') and not \
+                ('debug_cli' in message.context['destination'] or
+                 'audio' in message.context['destination']):
             return
 
         # Get conversation ID
-        if event.context and 'ident' in event.context:
-            ident = event.context['ident']
+        if message.context and 'ident' in message.context:
+            ident = message.context['ident']
         else:
             ident = 'unknown'
 
@@ -101,9 +109,9 @@ class SpeechService(Thread):
             stopwatch = Stopwatch()
             stopwatch.start()
 
-            utterance = event.data['utterance']
-            listen = event.data.get('expect_response', False)
-            self.mute_and_speak(utterance, ident, listen)
+            utterance = message.data['utterance']
+            listen = message.data.get('expect_response', False)
+            self.execute_tts(utterance, ident, listen)
 
             stopwatch.stop()
 
@@ -112,7 +120,7 @@ class SpeechService(Thread):
                        'tts': self.tts.__class__.__name__})
 
     def _maybe_reload_tts(self):
-        config = Configuration().get("tts", {})
+        config = self.config.get("tts", {})
 
         # update TTS object if configuration has changed
         if not self._tts_hash or self._tts_hash != config.get("module", ""):
@@ -137,12 +145,13 @@ class SpeechService(Thread):
             self._get_tts_fallback()
             self._fallback_tts_hash = config.get("fallback_module", "")
 
-    def mute_and_speak(self, utterance, ident, listen=False):
+    def execute_tts(self, utterance, ident, listen=False):
         """Mute mic and start speaking the utterance using selected tts backend.
 
         Args:
             utterance:  The sentence to be spoken
             ident:      Ident tying the utterance to the source query
+            listen:     True if a user response is expected
         """
         LOG.info("Speak: " + utterance)
         try:
@@ -182,15 +191,7 @@ class SpeechService(Thread):
             LOG.error(e)
             LOG.exception(f"TTS FAILURE! utterance : {utterance}")
 
-    def mimic_fallback_tts(self, utterance, ident, listen):
-        """
-        DEPRECATED: use execute_fallback_tts instead
-        This method is only kept around for backwards api compat
-        """
-        LOG.warning("mimic_fallback_tts is deprecated! use execute_fallback_tts instead")
-        self.execute_fallback_tts(utterance, ident=ident, listen=listen)
-
-    def handle_stop(self, _):
+    def handle_stop(self, message):
         """Handle stop message.
 
         Shutdown any speech.
@@ -219,6 +220,3 @@ class SpeechService(Thread):
         self.bus.on('mycroft.stop', self.handle_stop)
         self.bus.on('mycroft.audio.speech.stop', self.handle_stop)
         self.bus.on('speak', self.handle_speak)
-
-        self._maybe_reload_tts()
-        Configuration.set_config_watcher(self._maybe_reload_tts)
