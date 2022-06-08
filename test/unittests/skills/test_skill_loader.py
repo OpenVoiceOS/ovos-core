@@ -133,6 +133,14 @@ class TestSkillLoader(MycroftUnitTestBase):
         ]
         self.assertListEqual(log_messages, self.log_mock.method_calls)
 
+    def test_reload_modified(self):
+        self.loader.last_modified = 0
+        self.loader.reload = Mock()
+
+        self.loader._handle_filechange()
+        self.loader.reload.assert_called_once_with()
+        self.assertNotEqual(self.loader.last_modified, 0)
+
     def test_skill_load_blacklisted(self):
         """Skill should not be loaded if it is blacklisted"""
         self.loader.config['skills']['blacklisted_skills'] = ['test_skill']
