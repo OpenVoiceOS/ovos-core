@@ -29,8 +29,8 @@ bus: MessageBusClient = None
 tts = None
 tts_hash = None
 lock = Lock()
-fallback_tts = None
-fallback_tts_hash = None
+config = None
+mimic_fallback_obj = None
 
 
 def _get_messagebus():

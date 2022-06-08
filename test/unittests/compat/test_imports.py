@@ -1,4 +1,3 @@
-import sys
 import unittest
 
 
@@ -20,7 +19,9 @@ class TestDeprecatedImports(unittest.TestCase):
         from mycroft.audio.services import AudioBackend, RemoteAudioBackend
         from mycroft.audio.services.simple import SimpleAudioService
         from mycroft.audio.services.vlc import VlcService
-
+        from mycroft.audio.speech import bus, config, tts, tts_hash, lock, \
+            mimic_fallback_obj, handle_speak, mute_and_speak, \
+            mimic_fallback_tts, handle_stop, init, shutdown
 
     def test_enclosure(self):
         from mycroft.client.enclosure.mark1 import EnclosureMark1, EnclosureMouth, EnclosureEyes, \
@@ -28,7 +29,6 @@ class TestDeprecatedImports(unittest.TestCase):
         from mycroft.client.enclosure.mark2 import EnclosureMark2
         from mycroft.client.enclosure.generic import EnclosureGeneric
         from mycroft.client.enclosure.base import Enclosure
-
 
     def test_speech(self):
         from mycroft.client.speech.data_structures import RollingMean, CyclicAudioBuffer
