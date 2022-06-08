@@ -490,7 +490,8 @@ class SkillResources:
             qml=ResourceType("qml", ".qml")
         )
         for resource_type in resource_types.values():
-            resource_type.locate_user_directory(self.skill_id)
+            if self.skill_id:
+                resource_type.locate_user_directory(self.skill_id)
             resource_type.locate_base_directory(self.skill_directory)
         return SkillResourceTypes(**resource_types)
 
