@@ -245,7 +245,9 @@ class SkillManager(Thread):
                 # in offline mode (default) is_paired always returns True
                 # but setup skill may enable backend
                 # wait for backend selection event
-                response = self.bus.wait_for_response(Message('ovos.setup.state'))
+                response = self.bus.wait_for_response(Message('ovos.setup.state',
+                                                              context={"source": "skills",
+                                                                       "destination": "ovos-setup"}))
                 if response:
                     state = response.data['state']
                     LOG.debug(f"Setup state: {state}")
@@ -259,7 +261,8 @@ class SkillManager(Thread):
                 services[ser] = True
                 continue
             response = self.bus.wait_for_response(
-                Message(f'mycroft.{ser}.is_ready'))
+                Message(f'mycroft.{ser}.is_ready',
+                        context={"source": "skills", "destination": ser}))
             if response and response.data['status']:
                 services[ser] = True
         return all([services[ser] for ser in services])
