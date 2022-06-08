@@ -1,10 +1,15 @@
-from mycroft.skills.intent_services.base import IntentMatch
-from ovos_utils.log import LOG
-from ovos_utils.enclosure.api import EnclosureAPI
-from mycroft_bus_client.message import Message, dig_for_message
-from ovos_utils.messagebus import get_message_lang
-from threading import Lock, Event
+import re
 import time
+from itertools import chain
+from threading import Lock, Event
+
+from mycroft_bus_client.message import Message, dig_for_message
+
+from mycroft.skills.intent_services.base import IntentMatch
+from mycroft.skills.skill_data import CoreResources
+from ovos_utils.enclosure.api import EnclosureAPI
+from ovos_utils.log import LOG
+from ovos_utils.messagebus import get_message_lang
 
 EXTENSION_TIME = 10
 
@@ -25,7 +30,57 @@ class CommonQAService:
         self.waiting = True
         self.answered = False
         self.enclosure = EnclosureAPI(self.bus, self.skill_id)
+        self._vocabs = {}
         self.bus.on('question:query.response', self.handle_query_response)
+
+    def voc_match(self, utterance, voc_filename, lang, exact=False):
+        """Determine if the given utterance contains the vocabulary provided.
+
+        By default the method checks if the utterance contains the given vocab
+        thereby allowing the user to say things like "yes, please" and still
+        match against "Yes.voc" containing only "yes". An exact match can be
+        requested.
+
+        The method checks the "res/text/{lang}" folder of mycroft-core.
+        The result is cached to avoid hitting the disk each time the method is called.
+
+        Args:
+            utterance (str): Utterance to be tested
+            voc_filename (str): Name of vocabulary file (e.g. 'yes' for
+                                'res/text/en-us/yes.voc')
+            lang (str): Language code, defaults to self.lang
+            exact (bool): Whether the vocab must exactly match the utterance
+
+        Returns:
+            bool: True if the utterance has the given vocabulary it
+        """
+        match = False
+
+        if lang not in self._vocabs:
+            resources = CoreResources(language=lang)
+            vocab = resources.load_vocabulary_file(voc_filename)
+            self._vocabs[lang] = list(chain(*vocab))
+
+        if utterance:
+            if exact:
+                # Check for exact match
+                match = any(i.strip() == utterance
+                            for i in self._vocabs[lang])
+            else:
+                # Check for matches against complete words
+                match = any([re.match(r'.*\b' + i + r'\b.*', utterance)
+                             for i in self._vocabs[lang]])
+
+        return match
+
+    def is_question_like(self, utterance, lang):
+        # skip utterances with less than 3 words
+        if len(utterance.split(" ")) < 3:
+            return False
+        # skip utterances meant for common play
+        if self.voc_match(utterance, "common_play", lang):
+            return False
+        return True
 
     def match(self, utterances, lang, message):
         """Send common query request and select best response
@@ -38,14 +93,15 @@ class CommonQAService:
         Returns:
             IntentMatch or None
         """
-        message.data["lang"] = lang  # only used for speak
-        message.data["utterance"] = utterances[0][0]
-        answered = self.handle_question(message)
-        if answered:
-            ret = IntentMatch('CommonQuery', None, {}, None)
-        else:
-            ret = None
-        return ret
+        match = None
+        utterance = utterances[0][0]
+        if self.is_question_like(utterance, lang):
+            message.data["lang"] = lang  # only used for speak
+            message.data["utterance"] = utterance
+            answered = self.handle_question(message)
+            if answered:
+                match = IntentMatch('CommonQuery', None, {}, None)
+        return match
 
     def handle_question(self, message):
         """ Send the phrase to the CommonQuerySkills and prepare for handling
