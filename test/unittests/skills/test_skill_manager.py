@@ -186,14 +186,3 @@ class TestSkillManager(MycroftUnitTestBase):
 
         self.skill_manager.activate_skill(message)
         test_skill_loader.activate.assert_called_once_with()
-
-    def test_reload_modified(self):
-        self.skill_dir.mkdir(parents=True)
-        self.skill_dir.joinpath('__init__.py').touch()
-        self.skill_loader_mock.reload_needed.return_value = True
-        self.skill_manager._reload_modified_skills()
-        self.skill_loader_mock.reload.assert_called_once_with()
-        self.assertEqual(
-            self.skill_loader_mock,
-            self.skill_manager.skill_loaders[str(self.skill_dir)]
-        )
