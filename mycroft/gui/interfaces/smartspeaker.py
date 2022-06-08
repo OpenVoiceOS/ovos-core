@@ -34,6 +34,8 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
                               self.handle_show_homescreen)
         self.register_handler("mycroft.device.settings.customize",
                               self.handle_device_customize_settings)
+        self.register_handler("mycroft.device.settings.create.theme",
+                              self.handle_device_create_theme)
 
     def handle_device_settings(self, message):
         """ Display device settings page. """
@@ -96,6 +98,10 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
 
     def handle_device_customize_settings(self, message):
         self['state'] = 'settings/customize_settings'
+        self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
+
+    def handle_device_create_theme(self, message):
+        self['state'] = 'settings/customize_theme'
         self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
 
     def handle_get_dash_status(self):

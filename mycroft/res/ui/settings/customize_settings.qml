@@ -19,7 +19,6 @@ import QtQuick.Layouts 1.4
 import QtQuick 2.4
 import QtQuick.Controls 2.11
 import org.kde.kirigami 2.11 as Kirigami
-import org.kde.plasma.core 2.0 as PlasmaCore
 import Mycroft 1.0 as Mycroft
 import OVOSPlugin 1.0 as OVOSPlugin
 import QtGraphicalEffects 1.12
@@ -171,7 +170,7 @@ Item {
 
                             Kirigami.Icon {
                                 anchors.fill: parent
-                                anchors.margins: Mycroft.Units.gridUnit * 2
+                                anchors.margins: 4
                                 source: Qt.resolvedUrl("images/tick.svg")
                                 color: Kirigami.Theme.textColor
                             }
@@ -212,7 +211,8 @@ Item {
                 }
 
                 onClicked: {
-                    OVOSPlugin.Configuration.setScheme(modelData.name, modelData.path)
+                    Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
+                    styleViewPopUp.showView(modelData.name, modelData.path, modelData.primaryColor, modelData.secondaryColor, modelData.textColor)
                 }
             }
         }
@@ -234,41 +234,251 @@ Item {
             height: 2
         }
 
-        RowLayout {
+        Item {
             anchors.top: areaSep.bottom
             anchors.bottom: parent.bottom
+            width: parent.width / 2
             anchors.left: parent.left
-            anchors.right: parent.right
 
-            Kirigami.Icon {
-                id: backIcon
-                source: Qt.resolvedUrl("images/back.svg")
-                Layout.preferredHeight: Kirigami.Units.iconSizes.medium
-                Layout.preferredWidth: Kirigami.Units.iconSizes.medium
+            RowLayout {
+                anchors.fill: parent
 
-                ColorOverlay {
-                    anchors.fill: parent
-                    source: backIcon
+                Kirigami.Icon {
+                    id: backIcon
+                    source: Qt.resolvedUrl("images/back.svg")
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.medium
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.medium
+
+                    ColorOverlay {
+                        anchors.fill: parent
+                        source: backIcon
+                        color: Kirigami.Theme.textColor
+                    }
+                }
+
+                Kirigami.Heading {
+                    level: 2
+                    wrapMode: Text.WordWrap
+                    font.bold: true
                     color: Kirigami.Theme.textColor
+                    text: "Device Settings"
+                    verticalAlignment: Text.AlignVCenter
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Kirigami.Units.gridUnit * 2
                 }
             }
 
-            Kirigami.Heading {
-                level: 2
-                wrapMode: Text.WordWrap
-                font.bold: true
-                color: Kirigami.Theme.textColor
-                text: "Device Settings"
-                verticalAlignment: Text.AlignVCenter
-                Layout.fillWidth: true
-                Layout.preferredHeight: Kirigami.Units.gridUnit * 2
+            MouseArea {
+                anchors.fill: parent
+                onClicked: {
+                    Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
+                    triggerGuiEvent("mycroft.device.settings", {})
+                }
             }
         }
 
-        MouseArea {
-            anchors.fill: parent
-            onClicked: {
-                triggerGuiEvent("mycroft.device.settings", {})
+        Item {
+            anchors.top: areaSep.bottom
+            anchors.bottom: parent.bottom
+            width: parent.width / 2
+            anchors.right: parent.right
+
+            RowLayout {
+                anchors.fill: parent
+
+                Kirigami.Heading {
+                    level: 2
+                    wrapMode: Text.WordWrap
+                    font.bold: true
+                    color: Kirigami.Theme.textColor
+                    text: "Create Scheme"
+                    horizontalAlignment: Text.AlignRight
+                    verticalAlignment: Text.AlignVCenter
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Kirigami.Units.gridUnit * 2
+                }
+
+                Kirigami.Icon {
+                    id: nextIcon
+                    source: Qt.resolvedUrl("images/next.svg")
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.medium
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.medium
+                    Layout.alignment: Qt.AlignRight
+
+                    ColorOverlay {
+                        anchors.fill: parent
+                        source: nextIcon
+                        color: Kirigami.Theme.textColor
+                    }
+                }
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: {
+                    Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
+                    triggerGuiEvent("mycroft.device.settings.create.theme", {})
+                }
+            }
+        }
+    }
+
+    Popup  {
+        id: styleViewPopUp
+        width: parent.width * 0.9
+        height: parent.height * 0.9
+        x: (parent.width - width) / 2
+        y: (parent.height - height) / 2
+        property var modelDataPath
+        property var modelDataName
+        property color primaryColor
+        property color secondaryColor
+        property color textColor
+        dim: true
+
+        Overlay.modeless: Rectangle {
+            color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.5)
+        }
+
+        function showView(modelDataName, modelDataPath, primaryColor, secondaryColor, textColor) {
+            styleViewPopUp.primaryColor = primaryColor
+            styleViewPopUp.secondaryColor = secondaryColor
+            styleViewPopUp.textColor = textColor
+            styleViewPopUp.modelDataName = modelDataName
+            styleViewPopUp.modelDataPath = modelDataPath
+            styleViewPopUp.open()
+        }
+
+        function setTheme(themeStyle) {
+            OVOSPlugin.Configuration.setScheme(styleViewPopUp.modelDataName, styleViewPopUp.modelDataPath, themeStyle)
+            styleViewPopUp.close()
+        }
+
+        background: Rectangle {
+            color: Kirigami.Theme.backgroundColor
+            layer.enabled: true
+            layer.effect: DropShadow {
+                color: Kirigami.Theme.backgroundColor
+                transparentBorder: false
+                horizontalOffset: 0
+                verticalOffset: 0
+                spread: 0.2
+                radius: 8
+                samples: 16
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.1)
+            }
+        }
+
+        contentItem: Item {
+
+            Rectangle {
+                id: popupHeaderArea
+                color: Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.6)
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: Mycroft.Units.gridUnit * 5
+                radius: 4
+
+                Label {
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.margins: Mycroft.Units.gridUnit / 2
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    font.pixelSize: 32
+                    font.bold: true
+                    minimumPixelSize: 5
+                    fontSizeMode: Text.Fit
+                    maximumLineCount: 1
+                    text: "Select Style"
+                    color: Kirigami.Theme.textColor
+                    elide: Text.ElideRight
+                }
+            }
+
+            RowLayout {
+                anchors.top: popupHeaderArea.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: popupBottomArea.top
+                anchors.margins: Mycroft.Units.gridUnit / 2
+
+                ThemeView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    darkMode: true
+                    viewPrimaryColor: styleViewPopUp.primaryColor
+                    viewSecondaryColor: styleViewPopUp.secondaryColor
+                    viewTextColor: styleViewPopUp.textColor
+                    themeName: styleViewPopUp.modelDataName
+                }
+
+                ThemeView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    darkMode: false
+                    viewPrimaryColor: styleViewPopUp.primaryColor
+                    viewSecondaryColor: styleViewPopUp.secondaryColor
+                    viewTextColor: styleViewPopUp.textColor
+                    themeName: styleViewPopUp.modelDataName
+                }
+            }
+
+            Rectangle {
+                id: popupBottomArea
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: Mycroft.Units.gridUnit * 5
+                color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.1)
+                border.color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.5)
+                border.width: 1
+                radius: 4
+
+                RowLayout {
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.margins: Mycroft.Units.gridUnit / 2
+
+                    Kirigami.Icon {
+                        id: backIconPopUp
+                        source: "window-close-symbolic"
+                        Layout.preferredHeight: Kirigami.Units.iconSizes.medium
+                        Layout.preferredWidth: Kirigami.Units.iconSizes.medium
+
+                        ColorOverlay {
+                            anchors.fill: parent
+                            source: backIconPopUp
+                            color: Kirigami.Theme.textColor
+                        }
+                    }
+
+                    Kirigami.Heading {
+                        level: 2
+                        wrapMode: Text.WordWrap
+                        font.bold: true
+                        color: Kirigami.Theme.textColor
+                        text: "Cancel"
+                        verticalAlignment: Text.AlignVCenter
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Kirigami.Units.gridUnit * 2
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: {
+                        Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
+                        styleViewPopUp.close()
+                    }
+                }
             }
         }
     }
