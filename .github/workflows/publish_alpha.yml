@@ -41,7 +41,8 @@ jobs:
         uses: heinrichreimer/github-changelog-generator-action@v2.3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          max-issues: 50
+          maxIssues: 50
+          sinceTag: "release/v20.8.1"
         id: changelog
       - name: Commit to dev
         uses: stefanzweifel/git-auto-commit-action@v4
