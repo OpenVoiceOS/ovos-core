@@ -424,11 +424,27 @@ class Configuration(dict):
         # reload updated config
         for cfg in Configuration.xdg_configs + [Configuration.system]:
             if cfg.path == path:
-                cfg.reload()
+                try:
+                    cfg.reload()
+                except:
+                    # got the file changed signal before write finished
+                    sleep(0.5)
+                    try:
+                        cfg.reload()
+                    except:
+                        LOG.exception("Failed to load configuration, syntax seems invalid!")
                 break
         else:
             # reload all configs
-            Configuration.reload()
+            try:
+                Configuration.reload()
+            except:
+                # got the file changed signal before write finished
+                sleep(0.5)
+                try:
+                    Configuration.reload()
+                except:
+                    LOG.exception("Failed to load configuration, syntax seems invalid!")
         
         for handler in Configuration._callbacks:
             try:
