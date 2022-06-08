@@ -43,7 +43,7 @@ def _get_messagebus():
 
 def handle_speak(event):
     LOG.warning("speech.handle_speak has been deprecated!")
-    _get_messagebus().emit(event)
+    LOG.error("speak message not handled")
 
 
 def mute_and_speak(utterance, ident, listen=False):
