@@ -21,7 +21,7 @@ from time import sleep
 
 from os.path import exists
 
-import mycroft.audio.speech as speech
+from mycroft.audio.service import SpeechService
 from mycroft.messagebus import Message
 from mycroft.tts.remote_tts import RemoteTTSTimeoutException
 
@@ -41,14 +41,16 @@ def setup_mocks(config_mock, tts_factory_mock):
     tts_mock.reset_mock()
 
 
-@mock.patch('mycroft.audio.speech.Configuration')
-@mock.patch('mycroft.audio.speech.TTSFactory')
+@mock.patch('mycroft.audio.service.Configuration')
+@mock.patch('mycroft.audio.service.TTSFactory')
 class TestSpeech(unittest.TestCase):
     def test_life_cycle(self, tts_factory_mock, config_mock):
         """Ensure the init and shutdown behaves as expected."""
         setup_mocks(config_mock, tts_factory_mock)
         bus = mock.Mock()
-        speech.init(bus)
+        speech = SpeechService(bus=bus)
+        speech.daemon = True
+        speech.run()
 
         self.assertTrue(tts_factory_mock.create.called)
         bus.on.assert_any_call('mycroft.stop', speech.handle_stop)
@@ -57,17 +59,18 @@ class TestSpeech(unittest.TestCase):
         bus.on.assert_any_call('speak', speech.handle_speak)
 
         speech.shutdown()
+        self.assertFalse(speech.is_alive())
         # TODO TTS.playback is now a singleton, this test does not reach it anymore when using mock
         #self.assertTrue(tts_mock.playback.stop.called)
         #self.assertTrue(tts_mock.playback.join.called)
 
-    @mock.patch('mycroft.audio.speech.check_for_signal')
+    @mock.patch('mycroft.audio.service.check_for_signal')
     def test_stop(self, check_for_signal_mock, tts_factory_mock, config_mock):
         """Ensure the stop handler signals stop correctly."""
         setup_mocks(config_mock, tts_factory_mock)
         bus = mock.Mock()
         config_mock.get.return_value = {'tts': {'module': 'test'}}
-        speech.init(bus)
+        speech = SpeechService(bus=bus)
 
         speech._last_stop_signal = 0
         check_for_signal_mock.return_value = False
@@ -77,6 +80,7 @@ class TestSpeech(unittest.TestCase):
         check_for_signal_mock.return_value = True
         speech.handle_stop(Message('mycroft.stop'))
         self.assertNotEqual(speech._last_stop_signal, 0)
+        speech.shutdown()
 
 
 if __name__ == "__main__":

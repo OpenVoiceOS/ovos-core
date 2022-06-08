@@ -12,72 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""Mycroft audio service.
-
-    This handles playback of audio and speech
-"""
-from mycroft.util import (
-    check_for_signal,
-    reset_sigint_handler,
-    start_message_bus_client,
-    wait_for_exit_signal
-)
-from mycroft.util.log import LOG
-from mycroft.util.process_utils import ProcessStatus, StatusCallbackMap
+from mycroft.audio.service import SpeechService, on_ready, on_error, on_stopping
 from mycroft.configuration import setup_locale
-import mycroft.audio.speech as speech
-from mycroft.audio.audioservice import AudioService
+from mycroft.lock import Lock as PIDLock  # Create/Support PID locking file
+from mycroft.util import reset_sigint_handler, wait_for_exit_signal, \
+    check_for_signal
 
 
-def on_ready():
-    LOG.info('Audio service is ready.')
-
-
-def on_error(e='Unknown'):
-    LOG.error(f'Audio service failed to launch ({e}).')
-
-
-def on_stopping():
-    LOG.info('Audio service is shutting down...')
-
-
-def main(ready_hook=on_ready, error_hook=on_error, stopping_hook=on_stopping):
+def main(ready_hook=on_ready, error_hook=on_error, stopping_hook=on_stopping,
+         watchdog=lambda: None):
     """Start the Audio Service and connect to the Message Bus"""
-    LOG.info("Starting Audio Service")
-    callbacks = StatusCallbackMap(on_ready=ready_hook, on_error=error_hook,
-                                  on_stopping=stopping_hook)
-    status = ProcessStatus('audio', callback_map=callbacks)
-    status.set_started()
-    try:
-        reset_sigint_handler()
-        check_for_signal("isSpeaking")
-        whitelist = ['mycroft.audio.service']
-        bus = start_message_bus_client("AUDIO", whitelist=whitelist)
-        status.bind(bus)
-
-        setup_locale()
-        speech.init(bus)
-
-        # Connect audio service instance to message bus
-        audio = AudioService(bus)
-
-    except Exception as e:
-        status.set_error(e)
-    else:
-        if audio.wait_for_load():
-            if len(audio.service) == 0:
-                LOG.warning('No audio backends loaded! Audio playback is not available')
-                LOG.info("Running audio service in TTS only mode")
-        # If at least TTS exists, report ready
-        if speech.tts:
-            status.set_ready()
-            wait_for_exit_signal()
-            status.set_stopping()
-        else:
-            status.set_error('No TTS loaded')
-
-        speech.shutdown()
-        audio.shutdown()
+    reset_sigint_handler()
+    check_for_signal("isSpeaking")
+    PIDLock("audio")
+    setup_locale()
+    service = SpeechService(ready_hook=ready_hook, error_hook=error_hook,
+                            stopping_hook=stopping_hook, watchdog=watchdog)
+    service.daemon = True
+    service.start()
+    wait_for_exit_signal()
+    service.shutdown()
 
 
 if __name__ == '__main__':
