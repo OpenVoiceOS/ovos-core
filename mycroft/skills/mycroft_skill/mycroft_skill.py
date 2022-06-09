@@ -251,9 +251,10 @@ class MycroftSkill:
     def _start_filewatcher(self):
         if self._settings_watchdog is None and isfile(self._settings.path):
             self._settings_watchdog = FileWatcher([self._settings.path],
-                                                  callback=self._handle_settings_file_change)
+                                                  callback=self._handle_settings_file_change,
+                                                  ignore_creation=True)
 
-    def _handle_settings_file_change(self):
+    def _handle_settings_file_change(self, path):
         if self._settings:
             self._settings.reload()
         if self.settings_change_callback:
