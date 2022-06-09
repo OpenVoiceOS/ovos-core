@@ -66,6 +66,7 @@ from ovos_utils.configuration import get_xdg_base, get_xdg_data_save_path, get_x
 from ovos_utils.enclosure.api import EnclosureAPI
 from ovos_utils.file_utils import get_temp_path
 from ovos_utils.messagebus import get_message_lang
+from ovos_workshop.decorators.killable import AbortEvent
 import shutil
 
 
@@ -499,13 +500,11 @@ class MycroftSkill:
                 # reused and can't be sent over the messagebus
                 func = self.public_api[key].pop('func')
                 self.add_event(self.public_api[key]['type'],
-                               wrap_method(func),
-                               speak_errors=False)
+                               wrap_method(func), speak_errors=False)
 
         if self.public_api:
             self.add_event(f'{self.skill_id}.public_api',
-                           self._send_public_api,
-                               speak_errors=False)
+                           self._send_public_api, speak_errors=False)
 
     @property
     def stop_is_implemented(self):
@@ -522,30 +521,18 @@ class MycroftSkill:
         """
         # Only register stop if it's been implemented
         if self.stop_is_implemented:
-            self.add_event('mycroft.stop', self.__handle_stop,
-                               speak_errors=False)
-        self.add_event('skill.converse.ping', self._handle_converse_ack,
-                               speak_errors=False)
-        self.add_event('skill.converse.request', self._handle_converse_request,
-                               speak_errors=False)
-        self.add_event(f"{self.skill_id}.activate", self.handle_activate,
-                               speak_errors=False)
-        self.add_event(f"{self.skill_id}.deactivate", self.handle_deactivate,
-                               speak_errors=False)
-        self.add_event("intent.service.skills.deactivated", self._handle_skill_deactivated,
-                               speak_errors=False)
-        self.add_event("intent.service.skills.activated", self._handle_skill_activated,
-                               speak_errors=False)
-        self.add_event('mycroft.skill.enable_intent', self.handle_enable_intent,
-                               speak_errors=False)
-        self.add_event('mycroft.skill.disable_intent', self.handle_disable_intent,
-                               speak_errors=False)
-        self.add_event('mycroft.skill.set_cross_context', self.handle_set_cross_context,
-                               speak_errors=False)
-        self.add_event('mycroft.skill.remove_cross_context', self.handle_remove_cross_context,
-                               speak_errors=False)
-        self.add_event('mycroft.skills.settings.changed', self.handle_settings_change,
-                               speak_errors=False)
+            self.add_event('mycroft.stop', self.__handle_stop, speak_errors=False)
+        self.add_event('skill.converse.ping', self._handle_converse_ack, speak_errors=False)
+        self.add_event('skill.converse.request', self._handle_converse_request, speak_errors=False)
+        self.add_event(f"{self.skill_id}.activate", self.handle_activate, speak_errors=False)
+        self.add_event(f"{self.skill_id}.deactivate", self.handle_deactivate, speak_errors=False)
+        self.add_event("intent.service.skills.deactivated", self._handle_skill_deactivated, speak_errors=False)
+        self.add_event("intent.service.skills.activated", self._handle_skill_activated, speak_errors=False)
+        self.add_event('mycroft.skill.enable_intent', self.handle_enable_intent, speak_errors=False)
+        self.add_event('mycroft.skill.disable_intent', self.handle_disable_intent, speak_errors=False)
+        self.add_event('mycroft.skill.set_cross_context', self.handle_set_cross_context, speak_errors=False)
+        self.add_event('mycroft.skill.remove_cross_context', self.handle_remove_cross_context, speak_errors=False)
+        self.add_event('mycroft.skills.settings.changed', self.handle_settings_change, speak_errors=False)
 
     def handle_settings_change(self, message):
         """Update settings if the remote settings changes apply to this skill.
@@ -1011,12 +998,10 @@ class MycroftSkill:
                 self.log.info(f'Registering resting screen {method} for {self.resting_name}.')
 
                 # Register for handling resting screen
-                self.add_event(f'{self.skill_id}.idle', method,
-                               speak_errors=False)
+                self.add_event(f'{self.skill_id}.idle', method, speak_errors=False)
                 # Register handler for resting screen collect message
                 self.add_event('mycroft.mark2.collect_idle',
-                               self._handle_collect_resting,
-                               speak_errors=False)
+                               self._handle_collect_resting, speak_errors=False)
 
                 # Do a send at load to make sure the skill is registered
                 # if reloaded
@@ -1088,8 +1073,44 @@ class MycroftSkill:
         """Deprecated method for translating a template file"""
         return self._resources.load_template_file(template_name, data)
 
-    def add_event(self, name, handler, handler_info=None, once=False,
-                  speak_errors=True):
+    def _on_event_start(self, message, handler_info, skill_data):
+        """Indicate that the skill handler is starting."""
+        if handler_info:
+            # Indicate that the skill handler is starting if requested
+            msg_type = handler_info + '.start'
+            message.context["skill_id"] = self.skill_id
+            self.bus.emit(message.forward(msg_type, skill_data))
+
+    def _on_event_end(self, message, handler_info, skill_data):
+        """Store settings and indicate that the skill handler has completed
+        """
+        if self.settings != self._initial_settings:
+            self.settings.store()
+            self._initial_settings = copy(self.settings)
+        if handler_info:
+            msg_type = handler_info + '.complete'
+            message.context["skill_id"] = self.skill_id
+            self.bus.emit(message.forward(msg_type, skill_data))
+
+    def _on_event_error(self, error, message, handler_info, skill_data, speak_errors):
+        """Speak and log the error."""
+        # Convert "MyFancySkill" to "My Fancy Skill" for speaking
+        handler_name = camel_case_split(self.name)
+        msg_data = {'skill': handler_name}
+        speech = dialog.get('skill.error', self.lang, msg_data)
+        if speak_errors:
+            self.speak(speech)
+        LOG.exception(error)
+        # append exception information in message
+        skill_data['exception'] = repr(error)
+        if handler_info:
+            # Indicate that the skill handler errored
+            msg_type = handler_info + '.error'
+            message = message or Message("")
+            message.context["skill_id"] = self.skill_id
+            self.bus.emit(message.forward(msg_type, skill_data))
+
+    def add_event(self, name, handler, handler_info=None, once=False, speak_errors=True):
         """Create event handler for executing intent or other event.
 
         Args:
@@ -1106,41 +1127,17 @@ class MycroftSkill:
         skill_data = {'name': get_handler_name(handler)}
 
         def on_error(error, message):
-            """Speak and log the error."""
-            # Convert "MyFancySkill" to "My Fancy Skill" for speaking
-            handler_name = camel_case_split(self.name)
-            msg_data = {'skill': handler_name}
-            speech = dialog.get('skill.error', self.lang, msg_data)
-            if speak_errors:
-                self.speak(speech)
-            LOG.exception(error)
-            # append exception information in message
-            skill_data['exception'] = repr(error)
-            if handler_info:
-                # Indicate that the skill handler errored
-                msg_type = handler_info + '.error'
-                message = message or Message("")
-                message.context["skill_id"] = self.skill_id
-                self.bus.emit(message.forward(msg_type, skill_data))
+            if isinstance(error, AbortEvent):
+                LOG.info("Skill execution aborted")
+                self._on_event_end(message, handler_info, skill_data)
+                return
+            self._on_event_error(error, message, handler_info, skill_data, speak_errors)
 
         def on_start(message):
-            """Indicate that the skill handler is starting."""
-            if handler_info:
-                # Indicate that the skill handler is starting if requested
-                msg_type = handler_info + '.start'
-                message.context["skill_id"] = self.skill_id
-                self.bus.emit(message.forward(msg_type, skill_data))
+            self._on_event_start(message, handler_info, skill_data)
 
         def on_end(message):
-            """Store settings and indicate that the skill handler has completed
-            """
-            if self.settings != self._initial_settings:
-                self.settings.store()
-                self._initial_settings = copy(self.settings)
-            if handler_info:
-                msg_type = handler_info + '.complete'
-                message.context["skill_id"] = self.skill_id
-                self.bus.emit(message.forward(msg_type, skill_data))
+            self._on_event_end(message, handler_info, skill_data)
 
         wrapper = create_wrapper(handler, self.skill_id, on_start, on_end,
                                  on_error)
