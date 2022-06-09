@@ -21,7 +21,7 @@ import pyaudio
 from pyee import EventEmitter
 
 from mycroft.listener.hotword_factory import HotWordFactory
-from mycroft.listener.mic import MutableMicrophone, ResponsiveRecognizer
+from mycroft.listener.mic import MutableMicrophone, ResponsiveRecognizer, ListeningMode
 from ovos_config.config import Configuration
 from mycroft.metrics import Stopwatch, report_timing
 from mycroft.session import SessionManager
@@ -127,10 +127,26 @@ class AudioConsumer(Thread):
         self.loop = loop
 
     @property
+    def listening_mode(self):
+        return self.loop.responsive_recognizer.listening_mode
+
+    @property
     def wakeup_engines(self):
         """ wake from sleep mode """
         return [(ww, w["engine"]) for ww, w in self.loop.engines.items()
                 if w["wakeup"]]
+
+    @property
+    def wakeword_strings(self):
+        """ wakewords can define a string to be cleaned from STT transcript
+         this is removed only if the transcript starts with this text"""
+        valid_strings = []
+        for ww, w in self.loop.engines.items():
+            if w.get("wakeup"):
+                continue
+            valid_strings += w.get("stt_strings", [])
+            valid_strings.append(ww)
+        return [w for w in valid_strings if w]
 
     def run(self):
         while self.loop.state.running:
@@ -176,9 +192,18 @@ class AudioConsumer(Thread):
                 transcription = self.transcribe(audio, lang)
             if transcription:
                 ident = str(stopwatch.timestamp) + str(hash(transcription))
+
+                # clean wake words caught at start of transcript
+                clean = transcription
+                if self.listening_mode == ListeningMode.CONTINUOUS:
+                    for ww in self.wakeword_strings:
+                        if clean.startswith(ww):
+                            clean = clean[len(ww):]
+
                 # STT succeeded, send the transcribed speech on for processing
+                utts = [clean, transcription] if clean != transcription else [transcription]
                 payload = {
-                    'utterances': [transcription],
+                    'utterances': utts,
                     'lang': self.loop.stt.lang,
                     'session': SessionManager.get().session_id,
                     'ident': ident
@@ -195,7 +220,8 @@ class AudioConsumer(Thread):
     def transcribe(self, audio, lang):
         def send_unknown_intent():
             """ Send message that nothing was transcribed. """
-            self.loop.emit('recognizer_loop:speech.recognition.unknown')
+            if self.listening_mode == ListeningMode.WAKEWORD:
+                self.loop.emit('recognizer_loop:speech.recognition.unknown')
 
         try:
             # Invoke the STT engine on the audio clip
@@ -310,6 +336,7 @@ class RecognizerLoop(EventEmitter):
                 lang = data.get("stt_lang", self.lang)
                 enabled = data.get("active", True)
                 event = data.get("bus_event")
+                stt_strings = data.get("stt_strings", [])
                 # global listening sound
                 if not sound and listen and global_listen:
                     sound = global_sounds.get("start_listening")
@@ -329,6 +356,7 @@ class RecognizerLoop(EventEmitter):
                                           "trigger": trigger,
                                           "utterance": utterance,
                                           "stt_lang": lang,
+                                          "stt_strings": stt_strings,
                                           "listen": listen,
                                           "wakeup": wakeup}
             except Exception as e:

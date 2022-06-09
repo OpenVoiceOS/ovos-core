@@ -252,11 +252,18 @@ class SilenceDetector:
 
         self.current_chunk: bytes = bytes()
 
-    def stop(self) -> bytes:
+    def stop(self, phrase_only=False) -> bytes:
         """Free any resources and return recorded audio."""
         before_buffer = bytes()
         for before_chunk in self.before_phrase_chunks:
             before_buffer += before_chunk
+
+        if phrase_only:
+            # TODO is 5 a good magic number ?
+            # the aim is to include just a tiny bit of silence
+            # and avoid super long recordings to account
+            # for non streaming STT
+            before_buffer = before_chunk[-5:]
 
         audio_data = before_buffer + self.phrase_buffer
 

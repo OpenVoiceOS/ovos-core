@@ -13,27 +13,32 @@
 # limitations under the License.
 #
 import audioop
-import time
-from time import sleep, time as get_time
-import itertools
-
-from collections import deque, namedtuple
 import datetime
+import itertools
 import os
+import time
+from collections import deque, namedtuple
+from enum import Enum
+from hashlib import md5
 from os.path import join
+from tempfile import gettempdir
+from threading import Lock, Event
+from time import sleep, time as get_time
+
 import pyaudio
 import requests
 import speech_recognition
-from hashlib import md5
 from speech_recognition import (
     Microphone,
     AudioSource,
     AudioData
 )
-from tempfile import gettempdir
-from threading import Lock, Event
+
 from mycroft.api import DeviceApi
 from ovos_config.config import Configuration
+from mycroft.deprecated.speech_client import NoiseTracker
+from mycroft.listener.data_structures import RollingMean, CyclicAudioBuffer
+from mycroft.listener.silence import SilenceDetector, SilenceResultType, SilenceMethod
 from mycroft.session import SessionManager
 from mycroft.util import (
     check_for_signal,
@@ -42,15 +47,17 @@ from mycroft.util import (
     play_wav, play_ogg, play_mp3
 )
 from mycroft.util.log import LOG
-from mycroft.deprecated.speech_client import NoiseTracker
-from mycroft.listener.data_structures import RollingMean, CyclicAudioBuffer
-from mycroft.listener.silence import SilenceDetector, SilenceResultType, SilenceMethod
-
 from ovos_plugin_manager.vad import OVOSVADFactory
-
+from ovos_utils.messagebus import get_message_lang
 
 WakeWordData = namedtuple('WakeWordData',
                           ['audio', 'found', 'stopped', 'end_audio'])
+
+
+class ListeningMode(str, Enum):
+    WAKEWORD = "wakeword"
+    CONTINUOUS = "continuous"
+    RECORDING = "recording"
 
 
 class MutableStream:
@@ -258,6 +265,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
 
     def __init__(self, loop, watchdog=None):
         self.loop = loop
+        self.listening_mode = ListeningMode.CONTINUOUS
         self._watchdog = watchdog or (lambda: None)  # Default to dummy func
         self.config = Configuration()
         listener_config = self.config.get('listener') or {}
@@ -321,7 +329,6 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
             LOG.error(f"{method} is invalid!")
             method = SilenceMethod.VAD_AND_RATIO
             LOG.warning(f"Casting silence method to {method}")
-
 
         LOG.info(f"VAD method: {method}")
 
@@ -453,7 +460,11 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
             if stream:
                 stream.stream_chunk(chunk)
             result = self.silence_detector.process(chunk)
-            if result.type in { SilenceResultType.PHRASE_END, SilenceResultType.TIMEOUT }:
+
+            if self.listening_mode == ListeningMode.CONTINUOUS:
+                if result.type == SilenceResultType.PHRASE_END:
+                    break
+            elif result.type in {SilenceResultType.PHRASE_END, SilenceResultType.TIMEOUT}:
                 break
 
             # Periodically write the energy level to the mic level file.
@@ -462,7 +473,36 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
                 self.write_mic_level(result.energy, source)
             num_chunks += 1
 
-        return self.silence_detector.stop()
+        # if in continuous mode do not include silence before phrase
+        # if in wake word mode include full audio after wake word
+        return self.silence_detector.stop(phrase_only=self.listening_mode == ListeningMode.CONTINUOUS)
+
+    def _record_audio(self, source):
+        """Record audio until signaled to stop
+
+         recording can be interrupted by:
+         - button press
+         - bus event
+         - timeout defined in trigger message
+         - configured wake words (stop recording, end recording, the end)
+
+        Args:
+            source (AudioSource):  Source producing the audio chunks
+
+        Returns:
+            bytearray: complete audio buffer recorded, including any
+                       silence at the end of the user's utterance
+        """
+        self.loop.emit("recognizer_loop:record_begin")
+        frame_data = bytes()
+        for chunk in source.stream.iter_chunks():
+            # TODO all the other stop conditions
+            if check_for_signal('buttonPress'):
+                break
+            frame_data += chunk
+        audio_data = self._create_audio_data(frame_data, source)
+        self.loop.emit("recognizer_loop:record_end")
+        return audio_data
 
     def write_mic_level(self, energy, source):
         if self.mic_meter_ipc_enabled:
@@ -756,36 +796,49 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         # TODO consider (re)moving this and making configurable
         self.adjust_for_ambient_noise(source, 0.3)
 
-        LOG.debug("Waiting for wake word...")
-        ww_data, lang = self._wait_until_wake_word(source, sec_per_buffer)
+        audio_data = None
+        lang = get_message_lang()
 
-        if ww_data.stopped or self.loop.state.sleeping:
-            # If the waiting returned from a stop signal or sleep mode is active
-            return None, lang
-        ww_frames = ww_data.end_audio
+        if self.listening_mode == ListeningMode.WAKEWORD:
+            LOG.debug("Waiting for wake word...")
+            ww_data, lang = self._wait_until_wake_word(source, sec_per_buffer)
 
+            if ww_data.stopped or self.loop.state.sleeping:
+                # If the waiting returned from a stop signal or sleep mode is active
+                return None, lang
+
+            audio_data = self._listen_phrase(source, sec_per_buffer, stream)
+
+        elif self.listening_mode == ListeningMode.CONTINUOUS:
+            LOG.debug("Listening...")
+            audio_data = self._listen_phrase(source, sec_per_buffer, stream)
+        elif self.listening_mode == ListeningMode.RECORDING:
+            LOG.debug("Recording...")
+            audio_data = self._record_audio(source)
+            LOG.info("Saving Recording")
+            # TODO name from trigger bus message
+            stamp = str(datetime.datetime.now())
+            # TODO dedicated folder
+            filename = f"/{self.saved_utterances_dir}/{stamp}.wav"
+            with open(filename, 'wb') as filea:
+                filea.write(audio_data.get_wav_data())
+        LOG.debug("Thinking...")
+        return audio_data, lang
+
+    def _listen_phrase(self, source, sec_per_buffer, stream):
+        """ record user utterance and save recording if needed"""
         LOG.debug("Recording...")
         self.loop.emit("recognizer_loop:record_begin")
-        frame_data = self._record_phrase(
-            source,
-            sec_per_buffer,
-            stream,
-            ww_frames
-        )
+        frame_data = self._record_phrase(source, sec_per_buffer, stream)
         audio_data = self._create_audio_data(frame_data, source)
         self.loop.emit("recognizer_loop:record_end")
         if self.save_utterances:
             LOG.info("Saving Utterance Recording")
             stamp = str(datetime.datetime.now())
-            filename = "/{}/{}.wav".format(
-                self.saved_utterances_dir,
-                stamp
-            )
+            filename = f"/{self.saved_utterances_dir}/{stamp}.wav"
             with open(filename, 'wb') as filea:
                 filea.write(audio_data.get_wav_data())
-            LOG.debug("Thinking...")
-
-        return audio_data, lang
+        return audio_data
 
     def adjust_for_ambient_noise(self, source, seconds=1.0):
         chunks_per_second = source.CHUNK / source.SAMPLE_RATE
