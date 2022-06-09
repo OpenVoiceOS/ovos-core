@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from mycroft.audio.service import SpeechService, on_ready, on_error, on_stopping
+from mycroft.audio.service import PlaybackService, on_ready, on_error, on_stopping
 from mycroft.configuration import setup_locale
 from mycroft.lock import Lock as PIDLock  # Create/Support PID locking file
 from mycroft.util import reset_sigint_handler, wait_for_exit_signal, \
@@ -29,8 +29,8 @@ def main(ready_hook=on_ready, error_hook=on_error, stopping_hook=on_stopping,
     check_for_signal("isSpeaking")
     PIDLock("audio")
     setup_locale()
-    service = SpeechService(ready_hook=ready_hook, error_hook=error_hook,
-                            stopping_hook=stopping_hook, watchdog=watchdog)
+    service = PlaybackService(ready_hook=ready_hook, error_hook=error_hook,
+                              stopping_hook=stopping_hook, watchdog=watchdog)
     service.daemon = True
     service.start()
     wait_for_exit_signal()

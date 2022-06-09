@@ -21,7 +21,7 @@ from time import sleep
 
 from os.path import exists
 
-from mycroft.audio.service import SpeechService
+from mycroft.audio.service import PlaybackService
 from mycroft.messagebus import Message
 from mycroft.tts.remote_tts import RemoteTTSTimeoutException
 
@@ -48,7 +48,7 @@ class TestSpeech(unittest.TestCase):
         """Ensure the init and shutdown behaves as expected."""
         setup_mocks(config_mock, tts_factory_mock)
         bus = mock.Mock()
-        speech = SpeechService(bus=bus)
+        speech = PlaybackService(bus=bus)
         speech.daemon = True
         speech.run()
 
@@ -70,7 +70,7 @@ class TestSpeech(unittest.TestCase):
         setup_mocks(config_mock, tts_factory_mock)
         bus = mock.Mock()
         config_mock.get.return_value = {'tts': {'module': 'test'}}
-        speech = SpeechService(bus=bus)
+        speech = PlaybackService(bus=bus)
 
         speech._last_stop_signal = 0
         check_for_signal_mock.return_value = False

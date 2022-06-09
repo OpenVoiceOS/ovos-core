@@ -32,11 +32,11 @@ def on_stopping():
     LOG.info('Audio service is shutting down...')
 
 
-class SpeechService(Thread):
+class PlaybackService(Thread):
     def __init__(self, ready_hook=on_ready, error_hook=on_error,
                  stopping_hook=on_stopping, alive_hook=on_alive,
                  started_hook=on_started, watchdog=lambda: None, bus=None):
-        super(SpeechService, self).__init__()
+        super(PlaybackService, self).__init__()
 
         LOG.info("Starting Audio Service")
         callbacks = StatusCallbackMap(on_ready=ready_hook, on_error=error_hook,
