@@ -60,14 +60,10 @@ class AudioService:
         default_backend = self.config.get("default-backend")
         config_type = self.config.get("backends", {}).get(default_backend,
                                                           {}).get("type")
-        if config_type == "simple" and default_backend == "simple":
+        if config_type == "simple":
             LOG.info("Overriding Audio backend to 'ovos_audio_simple'")
             self.config["backends"][default_backend]["type"] = \
                 "ovos_audio_simple"
-        elif config_type == "simple" and default_backend == "local":
-            LOG.info("Overriding Audio backend to 'ovos_common_play'")
-            self.config["backends"][default_backend]["type"] = \
-                "ovos_common_play"
         elif config_type == "vlc":
             LOG.info("Overriding Audio backend to 'ovos_vlc'")
             self.config["backends"][default_backend]["type"] = "ovos_vlc"

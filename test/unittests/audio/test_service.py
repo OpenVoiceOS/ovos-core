@@ -251,7 +251,7 @@ class TestService(unittest.TestCase):
         self.assertEqual(service.config['backends'].keys(),
                          config['backends'].keys())
         self.assertEqual(service.config['backends']['local'],
-                         {"type": "ovos_common_play",
+                         {"type": "ovos_audio_simple",
                           "active": True})
         service.shutdown()
         # simple backend
