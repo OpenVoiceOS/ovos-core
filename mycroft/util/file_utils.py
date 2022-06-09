@@ -228,9 +228,9 @@ class FileEventHandler(FileSystemEventHandler):
         self._debounce = 1
         self._last_update = 0
         if ignore_creation:
-            self._events = ('created', 'modified')
-        else:
             self._events = ('modified')
+        else:
+            self._events = ('created', 'modified')
 
     def on_any_event(self, event):
         if event.is_directory:
