@@ -47,6 +47,7 @@ from mycroft.util import (
     play_wav, play_ogg, play_mp3
 )
 from mycroft.util.log import LOG
+from ovos_utils.configuration import get_xdg_data_save_path
 from ovos_plugin_manager.vad import OVOSVADFactory
 from ovos_utils.messagebus import get_message_lang
 
@@ -269,8 +270,9 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         self.config = Configuration()
         listener_config = self.config.get('listener') or {}
         self.instant_listen = listener_config.get("instant_listen", False)
+        self.continuous_mode = listener_config.get("continuous_listen", False)
         # experimental setting, no wake word needed
-        if listener_config.get("continuous_listen"):
+        if self.continuous_mode:
             self.listening_mode = ListeningMode.CONTINUOUS
         else:
             self.listening_mode = ListeningMode.WAKEWORD
@@ -289,13 +291,16 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         # and for a path under which to save them
         self.save_utterances = listener_config.get('save_utterances', False)
         self.save_wake_words = listener_config.get('record_wake_words', False)
-        self.save_path = listener_config.get('save_path', gettempdir())
-        self.saved_wake_words_dir = join(self.save_path, 'mycroft_wake_words')
+        self.save_path = listener_config.get('save_path', f"{get_xdg_data_save_path()}/listener")
+        self.saved_wake_words_dir = join(self.save_path, 'wake_words')
         if self.save_wake_words:
             os.makedirs(self.saved_wake_words_dir, exist_ok=True)
-        self.saved_utterances_dir = join(self.save_path, 'mycroft_utterances')
+        self.saved_utterances_dir = join(self.save_path, 'utterances')
         if self.save_utterances:
             os.makedirs(self.saved_utterances_dir, exist_ok=True)
+
+        self.saved_recordings_dir = join(self.save_path, 'recordings')
+        os.makedirs(self.saved_recordings_dir, exist_ok=True)
 
         # Signal statuses
         self._stop_recording = False
@@ -827,12 +832,24 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
             LOG.debug("Recording...")
             audio_data = self._record_audio(source)
             LOG.info("Saving Recording")
-            # TODO name from trigger bus message
+            # TODO allow name from trigger bus message ?
             stamp = str(datetime.datetime.now())
-            # TODO dedicated folder
-            filename = f"/{self.saved_utterances_dir}/{stamp}.wav"
+            filename = f"/{self.saved_recordings_dir}/{stamp}.wav"
             with open(filename, 'wb') as filea:
                 filea.write(audio_data.get_wav_data())
+
+            # TODO add a bus flag to reset mode or not back
+            single_recording = True
+            if single_recording:
+                # experimental setting, no wake word needed
+                if self.continuous_mode:
+                    self.listening_mode = ListeningMode.CONTINUOUS
+                else:
+                    self.listening_mode = ListeningMode.WAKEWORD
+
+            # recording mode should not trigger STT
+            return None, lang
+
         LOG.debug("Thinking...")
         return audio_data, lang
 
