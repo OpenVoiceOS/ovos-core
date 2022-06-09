@@ -31,4 +31,10 @@ ListModel {
         settingEvent: "mycroft.device.settings.developer"
         settingCall: "" 
     }
+    ListElement {
+        settingIcon: "images/info.svg"
+        settingName: "About"
+        settingEvent: "mycroft.device.settings.about.page"
+        settingCall: ""
+    }
 }

@@ -1,4 +1,7 @@
+import platform
+from ovos_utils import network_utils
 from mycroft.messagebus import Message
+from mycroft.version import OVOS_VERSION_STR
 from ovos_utils.gui import GUIInterface
 
 
@@ -36,6 +39,8 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
                               self.handle_device_customize_settings)
         self.register_handler("mycroft.device.settings.create.theme",
                               self.handle_device_create_theme)
+        self.register_handler("mycroft.device.settings.about.page",
+                              self.handle_device_about_page)
 
     def handle_device_settings(self, message):
         """ Display device settings page. """
@@ -102,6 +107,20 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
 
     def handle_device_create_theme(self, message):
         self['state'] = 'settings/customize_theme'
+        self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
+
+    def handle_device_about_page(self, message):
+        uname_info = platform.uname()
+        system_information = {
+            "uname_os": uname_info[0],
+            "uname_systemversion": uname_info[1],
+            "uname_kernelversion": uname_info[2],
+            "ovos_core_version": OVOS_VERSION_STR,
+            "python_version": platform.python_version(),
+            "local_address": network_utils.get_ip()
+        }
+        self['state'] = 'settings/about_page'
+        self['system_info'] = system_information
         self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
 
     def handle_get_dash_status(self):
