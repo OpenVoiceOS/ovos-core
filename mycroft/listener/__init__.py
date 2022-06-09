@@ -298,6 +298,14 @@ class RecognizerLoop(EventEmitter):
         if fallback_stt:
             self.fallback_stt = fallback_stt
 
+    @property
+    def listening_mode(self):
+        return self.responsive_recognizer.listening_mode
+
+    @listening_mode.setter
+    def listening_mode(self, val):
+        self.responsive_recognizer.listening_mode = val
+
     def _load_config(self):
         """Load configuration parameters from configuration."""
         config = Configuration()

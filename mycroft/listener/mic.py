@@ -265,11 +265,16 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
 
     def __init__(self, loop, watchdog=None):
         self.loop = loop
-        self.listening_mode = ListeningMode.CONTINUOUS
         self._watchdog = watchdog or (lambda: None)  # Default to dummy func
         self.config = Configuration()
         listener_config = self.config.get('listener') or {}
         self.instant_listen = listener_config.get("instant_listen", False)
+        # experimental setting, no wake word needed
+        if listener_config.get("continuous_listen"):
+            self.listening_mode = ListeningMode.CONTINUOUS
+        else:
+            self.listening_mode = ListeningMode.WAKEWORD
+
         self.upload_url = listener_config['wake_word_upload']['url']
         self.upload_disabled = listener_config['wake_word_upload']['disable']
 
@@ -293,6 +298,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
             os.makedirs(self.saved_utterances_dir, exist_ok=True)
 
         # Signal statuses
+        self._stop_recording = False
         self._stop_signaled = False
         self._listen_triggered = False
         self._waiting_for_wakeup = False
@@ -421,6 +427,9 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
             # seems like config changed and we hit this mid reload!
             return
 
+    def stop_recording(self):
+        self._stop_recording = True
+
     def _record_phrase(
             self,
             source,
@@ -454,7 +463,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         if stream:
             stream.stream_start()
         for chunk in source.stream.iter_chunks():
-            if check_for_signal('buttonPress'):
+            if self._stop_recording or check_for_signal('buttonPress'):
                 break
 
             if stream:
@@ -483,8 +492,8 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
          recording can be interrupted by:
          - button press
          - bus event
-         - timeout defined in trigger message
-         - configured wake words (stop recording, end recording, the end)
+         - timeout defined in trigger message (TODO)
+         - configured wake words (stop recording, end recording, the end) TODO
 
         Args:
             source (AudioSource):  Source producing the audio chunks
@@ -496,8 +505,8 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         self.loop.emit("recognizer_loop:record_begin")
         frame_data = bytes()
         for chunk in source.stream.iter_chunks():
-            # TODO all the other stop conditions
-            if check_for_signal('buttonPress'):
+            if self._stop_recording or \
+               check_for_signal('buttonPress'):
                 break
             frame_data += chunk
         audio_data = self._create_audio_data(frame_data, source)
@@ -538,6 +547,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
 
     def stop(self):
         """Signal stop and exit waiting state."""
+        self._stop_recording = True
         self._stop_signaled = True
 
     def _compile_metadata(self, engine):
@@ -798,6 +808,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
 
         audio_data = None
         lang = get_message_lang()
+        self._stop_recording = False
 
         if self.listening_mode == ListeningMode.WAKEWORD:
             LOG.debug("Waiting for wake word...")

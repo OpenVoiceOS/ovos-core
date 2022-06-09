@@ -17,6 +17,7 @@ from threading import Thread
 
 from mycroft import dialog
 from mycroft.listener import RecognizerLoop
+from mycroft.listener.mic import ListeningMode
 from ovos_config.config import Configuration
 from mycroft.enclosure.api import EnclosureAPI
 from mycroft.identity import IdentityManager
@@ -134,6 +135,28 @@ class SpeechService(Thread):
                    'source': 'audio'}
         self.bus.emit(Message('speak', data, context))
 
+    def handle_change_mode(self, event):
+        """Set listening mode."""
+        mode = event.data.get("mode")
+        if mode == ListeningMode.WAKEWORD:
+            self.loop.listening_mode = ListeningMode.WAKEWORD
+        elif mode == ListeningMode.CONTINUOUS:
+            self.loop.listening_mode = ListeningMode.CONTINUOUS
+        elif mode == ListeningMode.RECORDING:
+            self.loop.listening_mode = ListeningMode.RECORDING
+        else:
+            LOG.error(f"Invalid listening mode: {mode}")
+        self.handle_get_mode(event)
+
+    def handle_get_mode(self, event):
+        """Query listening mode"""
+        data = {'mode': self.loop.listening_mode}
+        self.bus.emit(event.reply("recognizer_loop:listening_mode", data))
+
+    def handle_stop_recording(self, event):
+        """Stop current recording session """
+        self.loop.responsive_recognizer.stop_recording()
+
     def handle_sleep(self, event):
         """Put the recognizer loop to sleep."""
         self.loop.sleep()
@@ -222,6 +245,9 @@ class SpeechService(Thread):
                     self.handle_complete_intent_failure)
         self.bus.on('recognizer_loop:sleep', self.handle_sleep)
         self.bus.on('recognizer_loop:wake_up', self.handle_wake_up)
+        self.bus.on('recognizer_loop:record_stop', self.handle_stop_recording)
+        self.bus.on('recognizer_loop:listening_mode.set', self.handle_change_mode)
+        self.bus.on('recognizer_loop:listening_mode.get', self.handle_get_mode)
         self.bus.on('mycroft.mic.mute', self.handle_mic_mute)
         self.bus.on('mycroft.mic.unmute', self.handle_mic_unmute)
         self.bus.on('mycroft.mic.get_status', self.handle_mic_get_status)
