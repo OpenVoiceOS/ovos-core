@@ -50,7 +50,27 @@ class AudioService:
         self.volume_is_low = False
 
         self._loaded = MonotonicEvent()
+        self._patch_audio_config()
         self.load_services()
+
+    def _patch_audio_config(self):
+        """
+        Patch legacy config with updated values
+        """
+        default_backend = self.config.get("default-backend")
+        config_type = self.config.get("backends", {}).get(default_backend,
+                                                          {}).get("type")
+        if config_type == "simple" and default_backend == "simple":
+            LOG.info("Overriding Audio backend to 'ovos_audio_simple'")
+            self.config["backends"][default_backend]["type"] = \
+                "ovos_audio_simple"
+        elif config_type == "simple" and default_backend == "local":
+            LOG.info("Overriding Audio backend to 'ovos_common_play'")
+            self.config["backends"][default_backend]["type"] = \
+                "ovos_common_play"
+        elif config_type == "vlc":
+            LOG.info("Overriding Audio backend to 'ovos_vlc'")
+            self.config["backends"][default_backend]["type"] = "ovos_vlc"
 
     def load_services(self):
         """Method for loading services.

@@ -16,7 +16,7 @@ from os.path import dirname, join, abspath
 import unittest
 import unittest.mock as mock
 
-import mycroft.audio.audioservice as audio_service
+import mycroft
 from mycroft.messagebus import Message
 
 from .services.working import WorkingBackend
@@ -65,12 +65,14 @@ class TestService(unittest.TestCase):
     service_path = abspath(join(dirname(__file__), 'services'))
 
     def test_load(self):
+        import mycroft.audio.audioservice as audio_service
         service = audio_service.load_services({}, TestService.emitter,
                                               TestService.service_path)
         self.assertEqual(len(service), 1)
 
     @mock.patch('mycroft.audio.audioservice.load_plugins')
     def test_audio_backend_shutdown(self, mock_load_services):
+        import mycroft.audio.audioservice as audio_service
         """Test shutdown of audio backend."""
         backend, second_backend = setup_mock_backends(mock_load_services,
                                                       self.emitter)
@@ -87,6 +89,7 @@ class TestService(unittest.TestCase):
 
     @mock.patch('mycroft.audio.audioservice.load_services')
     def test_audio_service_track_start(self, mock_load_services):
+        import mycroft.audio.audioservice as audio_service
         """Test start of new track messages."""
         backend, second_backend = setup_mock_backends(mock_load_services,
                                                       self.emitter)
@@ -106,6 +109,7 @@ class TestService(unittest.TestCase):
 
     @mock.patch('mycroft.audio.audioservice.load_services')
     def test_audio_service_methods_not_playing(self, mock_load_services):
+        import mycroft.audio.audioservice as audio_service
         """Check that backend methods aren't called when stopped."""
         backend, second_backend = setup_mock_backends(mock_load_services,
                                                       self.emitter)
@@ -139,6 +143,7 @@ class TestService(unittest.TestCase):
 
     @mock.patch('mycroft.audio.audioservice.load_plugins')
     def test_audio_service_methods_playing(self, mock_load_services):
+        import mycroft.audio.audioservice as audio_service
         """Check that backend methods are called during playback."""
         backend, second_backend = setup_mock_backends(mock_load_services,
                                                       self.emitter)
@@ -201,6 +206,7 @@ class TestService(unittest.TestCase):
 
     @mock.patch('mycroft.audio.audioservice.load_plugins')
     def test_audio_service_queue_methods(self, mock_load_services):
+        import mycroft.audio.audioservice as audio_service
         """Check that backend methods are called during playback."""
         backend, second_backend = setup_mock_backends(mock_load_services,
                                                       self.emitter)
@@ -227,6 +233,49 @@ class TestService(unittest.TestCase):
         backend.add_list.called_with(['http://hello'])
         self.assertFalse(backend.play.called)
 
+        service.shutdown()
+
+    @mock.patch.object(mycroft.configuration.Configuration, '_real_get')
+    def test_patch_config(self, mock_config):
+        from mycroft.audio.audioservice import AudioService
+        from ovos_utils.messagebus import FakeBus
+        config = {"backends": {"local": {"type": "simple", "active": True},
+                               "simple": {"type": "simple", "active": True},
+                               "vlc": {"type": "vlc", "active": True},
+                               "custom": {"type": "custom", "active": True}
+                               },
+                  "default-backend": "local"}
+        # local backend
+        mock_config.return_value = config
+        service = AudioService(FakeBus())
+        self.assertEqual(service.config['backends'].keys(),
+                         config['backends'].keys())
+        self.assertEqual(service.config['backends']['local'],
+                         {"type": "ovos_common_play",
+                          "active": True})
+        service.shutdown()
+        # simple backend
+        config['default-backend'] = 'simple'
+        mock_config.return_value = config
+        service = AudioService(FakeBus())
+        self.assertEqual(service.config['backends']['simple'],
+                         {"type": "ovos_audio_simple",
+                          "active": True})
+        service.shutdown()
+        # vlc backend
+        config['default-backend'] = 'vlc'
+        mock_config.return_value = config
+        service = AudioService(FakeBus())
+        self.assertEqual(service.config['backends']['vlc'],
+                         {"type": "ovos_vlc",
+                          "active": True})
+        service.shutdown()
+        # custom backend
+        mock_config.return_value = config
+        service = AudioService(FakeBus())
+        self.assertEqual(service.config['backends']['custom'],
+                         {"type": "custom",
+                          "active": True})
         service.shutdown()
 
 
