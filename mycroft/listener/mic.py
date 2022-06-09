@@ -21,7 +21,6 @@ from collections import deque, namedtuple
 from enum import Enum
 from hashlib import md5
 from os.path import join
-from tempfile import gettempdir
 from threading import Lock, Event
 from time import sleep, time as get_time
 
@@ -400,7 +399,13 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
     def feed_hotwords(self, chunk):
         """ feed sound chunk to hotword engines that perform
          streaming predictions (eg, precise) """
-        for ww, hotword in self.loop.engines.items():
+        for ww, hotword in self.loop.hot_words.items():
+            hotword["engine"].update(chunk)
+
+    def feed_stopwords(self, chunk):
+        """ feed sound chunk to stopword engines that perform
+         streaming predictions (eg, precise) """
+        for ww, hotword in self.loop.stop_words.items():
             hotword["engine"].update(chunk)
 
     def check_for_wakeup(self, audio_data):
@@ -408,12 +413,29 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
             self._waiting_for_wakeup = False
         if not self._waiting_for_wakeup or not self.loop.state.sleeping:
             return
-        for ww, hotword in self.loop.engines.items():
-            if hotword.get("wakeup") and hotword["engine"].found_wake_word(audio_data):
-                self.loop.state.sleeping = False
-                self.loop.emit('recognizer_loop:awoken')
-                self._waiting_for_wakeup = False
-                return True
+        try:
+            for ww, hotword in self.loop.wakeup_words.items():
+                if hotword["engine"].found_wake_word(audio_data):
+                    self.loop.state.sleeping = False
+                    self.loop.emit('recognizer_loop:awoken')
+                    self._waiting_for_wakeup = False
+                    return 
+        except RuntimeError:  #  dictionary changed size during iteration
+            # seems like config changed and we hit this mid reload!
+            pass
+        return False
+
+    def check_for_stop(self, audio_data):
+        if self.listening_mode != ListeningMode.RECORDING:
+            return
+        try:
+            for ww, hotword in self.loop.stop_words.items():
+                if hotword["engine"].found_wake_word(audio_data):
+                    LOG.debug(f"Stopword detected - {ww}")
+                    return True
+        except RuntimeError:  #  dictionary changed size during iteration
+            # seems like config changed and we hit this mid reload!
+            pass
         return False
 
     def check_for_hotwords(self, audio_data):
@@ -421,16 +443,12 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
             return  # was a wake up command to come out of sleep state
         # check hot word
         try:
-            for ww, hotword in self.loop.engines.items():
-                if hotword.get("wakeup") and not hotword.get("listen"):
-                    # ignore sleep mode hotword, unless it claims to also listen
-                    # eg, vosk-ww-plugin can do both with a single model
-                    continue
+            for ww, hotword in self.loop.hot_words.items():
                 if hotword["engine"].found_wake_word(audio_data):
                     yield ww
         except RuntimeError:  #  dictionary changed size during iteration
             # seems like config changed and we hit this mid reload!
-            return
+            pass
 
     def stop_recording(self):
         self._stop_recording = True
@@ -491,7 +509,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         # if in wake word mode include full audio after wake word
         return self.silence_detector.stop(phrase_only=self.listening_mode == ListeningMode.CONTINUOUS)
 
-    def _record_audio(self, source):
+    def _record_audio(self, source, sec_per_buffer):
         """Record audio until signaled to stop
 
          recording can be interrupted by:
@@ -508,11 +526,33 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
                        silence at the end of the user's utterance
         """
         frame_data = bytes()
+
+        # Max bytes for byte_data before audio is removed from the front
+        max_size = source.duration_to_bytes(self.test_ww_sec)
+        test_size = max(3, max_size)
+        num_silent_bytes = int(self.SILENCE_SEC * source.SAMPLE_RATE *
+                               source.SAMPLE_WIDTH)
+        silence = get_silence(num_silent_bytes)
+        audio_buffer = CyclicAudioBuffer(max_size, silence)
+        buffers_per_check = self.SEC_BETWEEN_WW_CHECKS / sec_per_buffer
+        buffers_since_check = 0.0
+
         for chunk in source.stream.iter_chunks():
             if self._stop_recording or \
                check_for_signal('buttonPress'):
                 break
             frame_data += chunk
+
+            # check for stopwords
+            buffers_since_check += 1.0
+            self.feed_stopwords(chunk)
+            audio_buffer.append(chunk)
+            if buffers_since_check > buffers_per_check:
+                buffers_since_check -= buffers_per_check
+                audio_data = audio_buffer.get_last(test_size) + silence
+                if self.check_for_stop(audio_data):
+                    break
+
         audio_data = self._create_audio_data(frame_data, source)
         return audio_data
 
@@ -829,7 +869,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         elif self.listening_mode == ListeningMode.RECORDING:
             LOG.debug("Recording...")
             self.loop.emit("recognizer_loop:record_begin")
-            audio_data = self._record_audio(source)
+            audio_data = self._record_audio(source, sec_per_buffer)
             LOG.info("Saving Recording")
             # TODO allow name from trigger bus message ?
             stamp = str(datetime.datetime.now())

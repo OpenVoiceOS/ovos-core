@@ -131,21 +131,14 @@ class AudioConsumer(Thread):
         return self.loop.responsive_recognizer.listening_mode
 
     @property
-    def wakeup_engines(self):
-        """ wake from sleep mode """
-        return [(ww, w["engine"]) for ww, w in self.loop.engines.items()
-                if w["wakeup"]]
-
-    @property
-    def wakeword_strings(self):
+    def _listen_strings(self):
         """ wakewords can define a string to be cleaned from STT transcript
          this is removed only if the transcript starts with this text"""
         valid_strings = []
-        for ww, w in self.loop.engines.items():
-            if w.get("wakeup"):
-                continue
+        for ww, w in self.loop.listen_words.items():
             valid_strings += w.get("stt_strings", [])
-            valid_strings.append(ww)
+            if ww not in valid_strings:
+                valid_strings.append(ww)
         return [w for w in valid_strings if w]
 
     def run(self):
@@ -196,7 +189,7 @@ class AudioConsumer(Thread):
                 # clean wake words caught at start of transcript
                 clean = transcription
                 if self.listening_mode == ListeningMode.CONTINUOUS:
-                    for ww in self.wakeword_strings:
+                    for ww in self._listen_strings:
                         if clean.startswith(ww):
                             clean = clean[len(ww):]
 
@@ -263,6 +256,7 @@ def recognizer_conf_hash(config):
     return hash(json.dumps(c, sort_keys=True))
 
 
+
 class RecognizerLoop(EventEmitter):
     """ EventEmitter loop running speech recognition.
 
@@ -297,6 +291,26 @@ class RecognizerLoop(EventEmitter):
         self.stt = stt
         if fallback_stt:
             self.fallback_stt = fallback_stt
+
+    @property
+    def wakeup_words(self):
+        return {k: v for k, v in self.engines.items()
+                if v.get("wakeup")}
+
+    @property
+    def listen_words(self):
+        return {k: v for k, v in self.engines.items()
+                if v.get("listen")}
+
+    @property
+    def stop_words(self):
+        return {k: v for k, v in self.engines.items()
+                if v.get("stopword")}
+
+    @property
+    def hot_words(self):
+        return {k: v for k, v in self.engines.items()
+                if not v.get("stopword") and not v.get("wakeup")}
 
     @property
     def listening_mode(self):
@@ -340,6 +354,7 @@ class RecognizerLoop(EventEmitter):
                 utterance = data.get("utterance")
                 listen = data.get("listen", False)
                 wakeup = data.get("wakeup", False)
+                stopword = data.get("stopword", False)
                 trigger = data.get("trigger", False)
                 lang = data.get("stt_lang", self.lang)
                 enabled = data.get("active", True)
@@ -366,7 +381,8 @@ class RecognizerLoop(EventEmitter):
                                           "stt_lang": lang,
                                           "stt_strings": stt_strings,
                                           "listen": listen,
-                                          "wakeup": wakeup}
+                                          "wakeup": wakeup,
+                                          "stopword": stopword}
             except Exception as e:
                 LOG.error("Failed to load hotword: " + word)
 
