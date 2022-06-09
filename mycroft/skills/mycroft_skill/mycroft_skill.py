@@ -499,11 +499,13 @@ class MycroftSkill:
                 # reused and can't be sent over the messagebus
                 func = self.public_api[key].pop('func')
                 self.add_event(self.public_api[key]['type'],
-                               wrap_method(func))
+                               wrap_method(func),
+                               speak_errors=False)
 
         if self.public_api:
             self.add_event(f'{self.skill_id}.public_api',
-                           self._send_public_api)
+                           self._send_public_api,
+                               speak_errors=False)
 
     @property
     def stop_is_implemented(self):
@@ -520,18 +522,30 @@ class MycroftSkill:
         """
         # Only register stop if it's been implemented
         if self.stop_is_implemented:
-            self.add_event('mycroft.stop', self.__handle_stop)
-        self.add_event('skill.converse.ping', self._handle_converse_ack)
-        self.add_event('skill.converse.request', self._handle_converse_request)
-        self.add_event(f"{self.skill_id}.activate", self.handle_activate)
-        self.add_event(f"{self.skill_id}.deactivate", self.handle_deactivate)
-        self.add_event("intent.service.skills.deactivated", self._handle_skill_deactivated)
-        self.add_event("intent.service.skills.activated", self._handle_skill_activated)
-        self.add_event('mycroft.skill.enable_intent', self.handle_enable_intent)
-        self.add_event('mycroft.skill.disable_intent', self.handle_disable_intent)
-        self.add_event('mycroft.skill.set_cross_context', self.handle_set_cross_context)
-        self.add_event('mycroft.skill.remove_cross_context', self.handle_remove_cross_context)
-        self.add_event('mycroft.skills.settings.changed', self.handle_settings_change)
+            self.add_event('mycroft.stop', self.__handle_stop,
+                               speak_errors=False)
+        self.add_event('skill.converse.ping', self._handle_converse_ack,
+                               speak_errors=False)
+        self.add_event('skill.converse.request', self._handle_converse_request,
+                               speak_errors=False)
+        self.add_event(f"{self.skill_id}.activate", self.handle_activate,
+                               speak_errors=False)
+        self.add_event(f"{self.skill_id}.deactivate", self.handle_deactivate,
+                               speak_errors=False)
+        self.add_event("intent.service.skills.deactivated", self._handle_skill_deactivated,
+                               speak_errors=False)
+        self.add_event("intent.service.skills.activated", self._handle_skill_activated,
+                               speak_errors=False)
+        self.add_event('mycroft.skill.enable_intent', self.handle_enable_intent,
+                               speak_errors=False)
+        self.add_event('mycroft.skill.disable_intent', self.handle_disable_intent,
+                               speak_errors=False)
+        self.add_event('mycroft.skill.set_cross_context', self.handle_set_cross_context,
+                               speak_errors=False)
+        self.add_event('mycroft.skill.remove_cross_context', self.handle_remove_cross_context,
+                               speak_errors=False)
+        self.add_event('mycroft.skills.settings.changed', self.handle_settings_change,
+                               speak_errors=False)
 
     def handle_settings_change(self, message):
         """Update settings if the remote settings changes apply to this skill.
@@ -997,10 +1011,12 @@ class MycroftSkill:
                 self.log.info(f'Registering resting screen {method} for {self.resting_name}.')
 
                 # Register for handling resting screen
-                self.add_event(f'{self.skill_id}.idle', method)
+                self.add_event(f'{self.skill_id}.idle', method,
+                               speak_errors=False)
                 # Register handler for resting screen collect message
                 self.add_event('mycroft.mark2.collect_idle',
-                               self._handle_collect_resting)
+                               self._handle_collect_resting,
+                               speak_errors=False)
 
                 # Do a send at load to make sure the skill is registered
                 # if reloaded
@@ -1072,7 +1088,8 @@ class MycroftSkill:
         """Deprecated method for translating a template file"""
         return self._resources.load_template_file(template_name, data)
 
-    def add_event(self, name, handler, handler_info=None, once=False):
+    def add_event(self, name, handler, handler_info=None, once=False,
+                  speak_errors=True):
         """Create event handler for executing intent or other event.
 
         Args:
@@ -1082,6 +1099,9 @@ class MycroftSkill:
                                    handler status on messagebus.
             once (bool, optional): Event handler will be removed after it has
                                    been run once.
+            speak_errors (bool, optional): Determines if an error dialog should be
+                                           spoken to inform the user whenever
+                                           an exception happens inside the handler
         """
         skill_data = {'name': get_handler_name(handler)}
 
@@ -1091,7 +1111,8 @@ class MycroftSkill:
             handler_name = camel_case_split(self.name)
             msg_data = {'skill': handler_name}
             speech = dialog.get('skill.error', self.lang, msg_data)
-            self.speak(speech)
+            if speak_errors:
+                self.speak(speech)
             LOG.exception(error)
             # append exception information in message
             skill_data['exception'] = repr(error)

@@ -369,10 +369,13 @@ class CommonIoTSkill(MycroftSkill, ABC):
         """
         if bus:
             super().bind(bus)
-            self.add_event(_BusKeys.TRIGGER, self._handle_trigger)
-            self.add_event(_BusKeys.RUN + self.skill_id, self._run_request)
+            self.add_event(_BusKeys.TRIGGER, self._handle_trigger,
+                               speak_errors=False)
+            self.add_event(_BusKeys.RUN + self.skill_id, self._run_request,
+                               speak_errors=False)
             self.add_event(_BusKeys.CALL_FOR_REGISTRATION,
-                           self._handle_call_for_registration)
+                           self._handle_call_for_registration,
+                               speak_errors=False)
 
     @contextmanager
     def _current_request(self, id: str):
