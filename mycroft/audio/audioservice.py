@@ -22,6 +22,10 @@ from mycroft.util.log import LOG
 from mycroft.util.monotonic_event import MonotonicEvent
 from mycroft.util.plugins import find_plugins
 from ovos_plugin_manager.audio import setup_audio_service as setup_service, load_audio_service_plugins as load_plugins
+try:
+    from ovos_plugin_common_play import OCPAudioBackend
+except ImportError:
+    OCPAudioBackend = None
 # deprecated, but can not be deleted for backwards compat imports
 from mycroft.deprecated.audio import load_internal_services, load_services, create_service_spec, get_services
 
@@ -68,17 +72,24 @@ class AudioService:
         for s in self.service:
             s.set_track_start_callback(self.track_start)
 
-        # Find default backend
-        default_name = self.config.get('default-backend', '')
-        LOG.info('Finding default backend...')
-        for s in self.service:
-            if s.name == default_name:
+        # Find OCP
+        for s in local:
+            if OCPAudioBackend is not None and isinstance(s, OCPAudioBackend):
+                LOG.info('OCP - OVOS Common Play set as default backend')
                 self.default = s
-                LOG.info('Found ' + self.default.name)
                 break
         else:
-            self.default = None
-            LOG.info('no default found')
+            # Find default backend
+            default_name = self.config.get('default-backend', '')
+            LOG.info('Finding default backend...')
+            for s in self.service:
+                if s.name == default_name:
+                    self.default = s
+                    LOG.info('Found ' + self.default.name)
+                    break
+            else:
+                self.default = None
+                LOG.info('no default found')
 
         # Setup event handlers
         self.bus.on('mycroft.audio.service.play', self._play)
