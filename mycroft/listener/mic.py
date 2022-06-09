@@ -515,8 +515,8 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
          recording can be interrupted by:
          - button press
          - bus event
-         - timeout defined in trigger message (TODO)
-         - configured wake words (stop recording, end recording, the end) TODO
+         - max timeout defined in trigger message (TODO)
+         - configured wake words (stop recording, end recording, the end...)
 
         Args:
             source (AudioSource):  Source producing the audio chunks

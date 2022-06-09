@@ -256,7 +256,6 @@ def recognizer_conf_hash(config):
     return hash(json.dumps(c, sort_keys=True))
 
 
-
 class RecognizerLoop(EventEmitter):
     """ EventEmitter loop running speech recognition.
 
