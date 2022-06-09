@@ -507,7 +507,6 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
             bytearray: complete audio buffer recorded, including any
                        silence at the end of the user's utterance
         """
-        self.loop.emit("recognizer_loop:record_begin")
         frame_data = bytes()
         for chunk in source.stream.iter_chunks():
             if self._stop_recording or \
@@ -515,7 +514,6 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
                 break
             frame_data += chunk
         audio_data = self._create_audio_data(frame_data, source)
-        self.loop.emit("recognizer_loop:record_end")
         return audio_data
 
     def write_mic_level(self, energy, source):
@@ -830,6 +828,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
             audio_data = self._listen_phrase(source, sec_per_buffer, stream)
         elif self.listening_mode == ListeningMode.RECORDING:
             LOG.debug("Recording...")
+            self.loop.emit("recognizer_loop:record_begin")
             audio_data = self._record_audio(source)
             LOG.info("Saving Recording")
             # TODO allow name from trigger bus message ?
@@ -838,14 +837,15 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
             with open(filename, 'wb') as filea:
                 filea.write(audio_data.get_wav_data())
 
-            # TODO add a bus flag to reset mode or not back
-            single_recording = True
-            if single_recording:
-                # experimental setting, no wake word needed
-                if self.continuous_mode:
-                    self.listening_mode = ListeningMode.CONTINUOUS
-                else:
-                    self.listening_mode = ListeningMode.WAKEWORD
+            self.loop.emit("recognizer_loop:record_end",
+                           {"filename": filename})
+
+            # reset listening mode, we dont want to accidentally save 24h of audio per day ....
+            # experimental setting, no wake word needed
+            if self.continuous_mode:
+                self.listening_mode = ListeningMode.CONTINUOUS
+            else:
+                self.listening_mode = ListeningMode.WAKEWORD
 
             # recording mode should not trigger STT
             return None, lang
@@ -859,13 +859,14 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         self.loop.emit("recognizer_loop:record_begin")
         frame_data = self._record_phrase(source, sec_per_buffer, stream)
         audio_data = self._create_audio_data(frame_data, source)
-        self.loop.emit("recognizer_loop:record_end")
+        filename = None
         if self.save_utterances:
             LOG.info("Saving Utterance Recording")
             stamp = str(datetime.datetime.now())
             filename = f"/{self.saved_utterances_dir}/{stamp}.wav"
             with open(filename, 'wb') as filea:
                 filea.write(audio_data.get_wav_data())
+        self.loop.emit("recognizer_loop:record_end", {"filename": filename})
         return audio_data
 
     def adjust_for_ambient_noise(self, source, seconds=1.0):

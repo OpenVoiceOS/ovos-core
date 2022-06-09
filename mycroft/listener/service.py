@@ -70,12 +70,12 @@ class SpeechService(Thread):
                    'source': 'audio'}
         self.bus.emit(Message('recognizer_loop:record_begin', context=context))
 
-    def handle_record_end(self):
+    def handle_record_end(self, event):
         """Forward internal bus message to external bus."""
         LOG.info("End Recording...")
         context = {'client_name': 'mycroft_listener',
                    'source': 'audio'}
-        self.bus.emit(Message('recognizer_loop:record_end', context=context))
+        self.bus.emit(Message('recognizer_loop:record_end', event, context=context))
 
     def handle_no_internet(self):
         LOG.debug("Notifying enclosure of no internet connection")
