@@ -34,7 +34,7 @@ function help() {
     echo "  skills                   the skill service"
     echo "  voice                    voice capture service"
     echo "  gui                      gui protocol service"
-    echo "  enclosure                mark_1 enclosure service"
+    echo "  enclosure                phal service"
     echo
     echo "Tool COMMANDs:"
     echo "  cli                      the Command Line Interface"
@@ -59,7 +59,7 @@ function name-to-script-path() {
         "voice")             _module="mycroft.client.speech" ;;
         "cli")               _module="mycroft.client.text" ;;
         "gui")               _module="mycroft.gui" ;;
-        "enclosure")         _module="mycroft.client.enclosure" ;;
+        "enclosure")         _module="ovos_PHAL" ;;
         *)
             echo "Error: Unknown name '${1}'"
             exit 1
@@ -70,6 +70,7 @@ function launch-process() {
     name-to-script-path ${1}
     # Launch process in foreground
     echo "Starting $1"
+    source .venv/bin/activate
     python3 -m ${_module} $_params
 }
 
