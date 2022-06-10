@@ -249,7 +249,7 @@ class ResourceFile:
 
         # check non-lang specific core resources
         if file_path is None:
-            file_path = resolve_resource_file(file_path)
+            file_path = resolve_resource_file(file_name)
 
         if file_path is None:
             LOG.error(f"Could not find resource file {file_name}")
