@@ -86,7 +86,7 @@ class LocalConf(dict):
     """Config dictionary from file."""
 
     def __init__(self, path):
-        super(LocalConf, self).__init__()
+        super().__init__(self)
         self.path = path
         if path:
             self.load_local(path)
