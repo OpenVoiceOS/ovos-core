@@ -11,7 +11,7 @@ XDG locations are then merged over the select default config (if found)
 Examples config:
 
 {
-   // check xdg directories OR only check old style hardcoded paths 
+   // check xdg directories OR only check old style hardcoded paths
    "xdg": true,
 
    // the "name of the core",
@@ -26,6 +26,10 @@ Examples config:
    //      eg, ovos.conf, chatterbox.conf, neon.conf...
    // "mycroft.conf" paths are derived from this
    //        ~/.{base_folder}/{config_filename}
+   // supported file extensions:
+   //  - json (.json)
+   //  - commented json (.conf)
+   //  - yaml (.yml) are supported
    "config_filename": "mycroft.conf",
 
    // override the default.conf location, allows changing the default values
