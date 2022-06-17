@@ -92,8 +92,7 @@ class LocalConf(dict):
         if path:
             self.load_local(path)
 
-    @property
-    def file_format(self):
+    def get_file_format(self, path=None):
         """The config file format
         supported file extensions:
         - json (.json)
@@ -102,7 +101,10 @@ class LocalConf(dict):
 
         returns "yaml" or "json"
         """
-        if self.path.endswith(".yml"):
+        path = path or self.path
+        if not path:
+            return "dict"
+        if path.endswith(".yml") or path.endswith(".yaml"):
             return "yaml"
         else:
             return "json"
@@ -119,7 +121,7 @@ class LocalConf(dict):
             return
         if exists(path) and isfile(path):
             try:
-                if self.file_format == "yaml":
+                if self.get_file_format(path) == "yaml":
                     with open(path) as f:
                         config = yaml.safe_load(f)
                 else:
@@ -145,7 +147,7 @@ class LocalConf(dict):
         if not path:
             LOG.error(f"in memory configuration, no save location")
             return
-        if self.file_format == "yaml":
+        if self.get_file_format(path) == "yaml":
             with open(path, 'w') as f:
                 yaml.dump(self, f, allow_unicode=True,
                           default_flow_style=False)

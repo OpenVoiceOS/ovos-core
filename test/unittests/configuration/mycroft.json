@@ -1,0 +1,234 @@
+{
+  "Audio": {
+    "backends": {
+      "OCP": {
+        "active": true,
+        "type": "ovos_common_play"
+      },
+      "simple": {
+        "active": true,
+        "type": "ovos_audio_simple"
+      },
+      "vlc": {
+        "active": true,
+        "type": "ovos_vlc"
+      }
+    },
+    "default-backend": "OCP"
+  },
+  "cache_path": "/tmp/mycroft/cache",
+  "confirm_listening": true,
+  "date_format": "MDY",
+  "debug": false,
+  "enclosure": {
+    "force_mycroft_ntp": true,
+    "ntp_sync_on_boot": false,
+    "platform": "PHAL"
+  },
+  "gui": {
+    "extension": "generic",
+    "generic": {
+      "homescreen_supported": false
+    }
+  },
+  "gui_websocket": {
+    "base_port": 18181,
+    "host": "0.0.0.0",
+    "route": "/gui",
+    "ssl": false
+  },
+  "hotwords": {
+    "hey mycroft": {
+      "lang": "en-us",
+      "listen": true,
+      "model": "https://github.com/MycroftAI/precise-data/raw/models-dev/hey-mycroft.tar.gz",
+      "module": "ovos-ww-plugin-precise",
+      "phonemes": "HH EY . M AY K R AO F T",
+      "sound": "snd/start_listening.wav",
+      "threshold": 1e-90,
+      "version": "0.3"
+    },
+    "wake up": {
+      "lang": "en-us",
+      "module": "ovos-ww-plugin-pocketsphinx",
+      "phonemes": "W EY K . AH P",
+      "threshold": 1e-20,
+      "wakeup": true
+    }
+  },
+  "ignore_logs": [
+    "enclosure.mouth.viseme",
+    "enclosure.mouth.display"
+  ],
+  "lang": "en-us",
+  "listener": {
+    "VAD": {
+      "before_seconds": 0.5,
+      "initial_energy_threshold": 1000.0,
+      "max_current_ratio_threshold": 2,
+      "min_seconds": 1,
+      "module": "",
+      "ovos-vad-plugin-silero": {
+        "threshold": 0.2
+      },
+      "ovos-vad-plugin-webrtcvad": {
+        "vad_mode": 3
+      },
+      "silence_method": "vad_and_ratio",
+      "silence_seconds": 0.5,
+      "speech_seconds": 0.1
+    },
+    "duck_while_listening": 0.3,
+    "energy_ratio": 1.5,
+    "instant_listen": false,
+    "mic_meter_ipc": true,
+    "multiplier": 1.0,
+    "mute_during_output": true,
+    "phoneme_duration": 120,
+    "record_wake_words": false,
+    "recording_timeout": 10.0,
+    "recording_timeout_with_silence": 3.0,
+    "sample_rate": 16000,
+    "save_utterances": false,
+    "wake_word_upload": {
+      "disable": false,
+      "url": "https://training.mycroft.ai/precise/upload"
+    }
+  },
+  "location": {
+    "city": {
+      "code": "Lawrence",
+      "name": "Lawrence",
+      "state": {
+        "code": "KS",
+        "country": {
+          "code": "US",
+          "name": "United States"
+        },
+        "name": "Kansas"
+      }
+    },
+    "coordinate": {
+      "latitude": 38.971669,
+      "longitude": -95.23525
+    },
+    "timezone": {
+      "code": "America/Chicago",
+      "dstOffset": 3600000,
+      "name": "Central Standard Time",
+      "offset": -21600000
+    }
+  },
+  "network_tests": {
+    "dns_primary": "8.8.8.8",
+    "dns_secondary": "8.8.4.4",
+    "ncsi_endpoint": "http://www.msftncsi.com/ncsi.txt",
+    "ncsi_expected_text": "Microsoft NCSI",
+    "web_url": "https://www.google.com"
+  },
+  "opt_in": false,
+  "padatious": {
+    "intent_cache": "~/.local/share/mycroft/intent_cache",
+    "padaos_only": false,
+    "single_thread": false,
+    "train_delay": 4
+  },
+  "play_mp3_cmdline": "mpg123 %1",
+  "play_ogg_cmdline": "ogg123 -q %1",
+  "play_wav_cmdline": "paplay %1 --stream-name=mycroft-voice",
+  "precise": {
+    "dist_url": "https://github.com/MycroftAI/precise-data/raw/dist/{arch}/latest",
+    "model_url": "https://raw.githubusercontent.com/MycroftAI/precise-data/models/{wake_word}.tar.gz",
+    "use_precise": true
+  },
+  "ready_settings": [
+    "skills"
+  ],
+  "server": {
+    "disabled": true,
+    "metrics": false,
+    "sync_skill_settings": true,
+    "update": false,
+    "url": "https://api.mycroft.ai",
+    "version": "v1"
+  },
+  "session": {
+    "ttl": 180
+  },
+  "skills": {
+    "blacklisted_skills": [],
+    "converse": {
+      "converse_activation": "accept_all",
+      "converse_blacklist": [],
+      "converse_mode": "accept_all",
+      "converse_priorities": {},
+      "converse_whitelist": [],
+      "cross_activation": true,
+      "cross_deactivation": true,
+      "max_activations": -1,
+      "skill_activations": {},
+      "skill_timeouts": {},
+      "timeout": 300
+    },
+    "directory": "skills",
+    "fallbacks": {
+      "fallback_blacklist": [],
+      "fallback_mode": "accept_all",
+      "fallback_priorities": {},
+      "fallback_whitelist": []
+    },
+    "priority_skills": [
+      "mycroft-pairing",
+      "mycroft-volume"
+    ],
+    "upload_skill_manifest": true,
+    "wait_for_internet": false
+  },
+  "sounds": {
+    "acknowledge": "snd/acknowledge.mp3",
+    "end_listening": "snd/end_listening.wav",
+    "start_listening": "snd/start_listening.wav"
+  },
+  "stt": {
+    "fallback_module": "ovos-stt-plugin-vosk",
+    "module": "ovos-stt-plugin-server",
+    "ovos-stt-plugin-server": {
+      "url": "https://stt.openvoiceos.com/stt"
+    }
+  },
+  "system": {
+    "disable_remote_config": false,
+    "disable_user_config": false,
+    "protected_keys": {
+      "remote": [
+        "enclosure",
+        "server",
+        "system",
+        "websocket",
+        "gui_websocket",
+        "network_tests",
+        "listener:wake_word_upload:disable",
+        "skills:upload_skill_manifest",
+        "skills:auto_update",
+        "skills:priority_skills",
+        "skills:blacklisted_skills",
+        "opt_in"
+      ],
+      "user": []
+    }
+  },
+  "system_unit": "metric",
+  "time_format": "half",
+  "tts": {
+    "fallback_module": "ovos-tts-plugin-mimic",
+    "module": "ovos-tts-plugin-mimic2",
+    "pulse_duck": false
+  },
+  "websocket": {
+    "host": "0.0.0.0",
+    "port": 8181,
+    "route": "/core",
+    "shared_connection": true,
+    "ssl": false
+  }
+}

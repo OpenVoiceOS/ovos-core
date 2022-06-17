@@ -1,6 +1,8 @@
 from unittest.mock import MagicMock, patch
 from unittest import TestCase, skip
 import mycroft.configuration
+from os.path import dirname, isfile
+from mycroft.configuration import LocalConf
 
 
 class TestConfiguration(TestCase):
@@ -57,6 +59,25 @@ class TestConfiguration(TestCase):
         mock_exists.return_value = False
         lc = mycroft.configuration.LocalConf('test')
         self.assertEqual(lc, {})
+
+    def test_file_formats(self):
+        yml_cnf = LocalConf(f"{dirname(__file__)}/mycroft.yml")
+        json_config = LocalConf(f"{dirname(__file__)}/mycroft.json")
+        self.assertEqual(json_config, yml_cnf)
+
+        # test export json config as yaml
+        json_config.store("/tmp/not_mycroft.yml")
+        self.assertTrue(isfile("/tmp/not_mycroft.yml"))
+        test_conf = LocalConf("/tmp/not_mycroft.yml")
+        self.assertEqual(test_conf, yml_cnf)
+        self.assertEqual(test_conf, json_config)
+
+        # test export yaml config as json
+        yml_cnf.store("/tmp/not_mycroft.json")
+        self.assertTrue(isfile("/tmp/not_mycroft.json"))
+        test_conf = LocalConf("/tmp/not_mycroft.json")
+        self.assertEqual(test_conf, yml_cnf)
+        self.assertEqual(test_conf, json_config)
 
     def tearDown(self):
         mycroft.configuration.Configuration.load_config_stack([{}], True)
