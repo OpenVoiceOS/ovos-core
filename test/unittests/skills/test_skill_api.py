@@ -12,7 +12,7 @@ class Skill(MycroftSkill):
         super().__init__()
         self.registered_methods = {}
 
-    def add_event(self, event_type, func):
+    def add_event(self, event_type, func, **kwargs):
         """Mock handler of add_event, simply storing type and method.
 
         Used in testing to verify the wrapped methods
