@@ -93,10 +93,8 @@ class CommonQuerySkill(MycroftSkill, ABC):
         """
         if bus:
             super().bind(bus)
-            self.add_event('question:query', self.__handle_question_query,
-                               speak_errors=False)
-            self.add_event('question:action', self.__handle_query_action,
-                               speak_errors=False)
+            self.add_event('question:query', self.__handle_question_query, speak_errors=False)
+            self.add_event('question:action', self.__handle_query_action, speak_errors=False)
 
     def __handle_question_query(self, message):
         search_phrase = message.data["phrase"]

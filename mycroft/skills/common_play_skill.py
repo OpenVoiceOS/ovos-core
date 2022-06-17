@@ -80,10 +80,8 @@ class CommonPlaySkill(MycroftSkill, ABC):
         if bus:
             super().bind(bus)
             self.audioservice = AudioService(self.bus)
-            self.add_event('play:query', self.__handle_play_query,
-                               speak_errors=False)
-            self.add_event('play:start', self.__handle_play_start,
-                               speak_errors=False)
+            self.add_event('play:query', self.__handle_play_query, speak_errors=False)
+            self.add_event('play:start', self.__handle_play_start, speak_errors=False)
 
     def __handle_play_query(self, message):
         """Query skill if it can start playback from given phrase."""
