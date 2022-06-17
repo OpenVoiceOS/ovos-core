@@ -2,6 +2,7 @@ adapt-parser~=0.5
 padaos~=0.1
 ovos-lingua-franca~=0.4, >=0.4.2
 PyYAML~=5.4
+ovos_workshop~=0.0, >=0.0.7a9
 
 padatious~=0.4.8
 fann2==1.0.7
