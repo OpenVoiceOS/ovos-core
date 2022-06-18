@@ -28,15 +28,17 @@ gui_websocket:
   route: /gui
   ssl: false
 hotwords:
-  hey mycroft:
-    lang: en-us
-    listen: true
-    model: https://github.com/MycroftAI/precise-data/raw/models-dev/hey-mycroft.tar.gz
-    module: ovos-ww-plugin-precise
-    phonemes: HH EY . M AY K R AO F T
-    sound: snd/start_listening.wav
-    threshold: 1.0e-90
-    version: '0.3'
+  hey mycroft: {
+    "lang": "en-us",
+    "listen": true,
+    "model": "https://github.com/MycroftAI/precise-data/raw/models-dev/hey-mycroft.tar.gz",
+    "module": "ovos-ww-plugin-precise",
+    "phonemes": "HH EY . M AY K R AO F T",
+    "sound": "snd/start_listening.wav",
+    "threshold": 1.0e-90,
+    "version": '0.3'
+  }
+
   wake up:
     lang: en-us
     module: ovos-ww-plugin-pocketsphinx
