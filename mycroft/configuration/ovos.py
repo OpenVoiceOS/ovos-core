@@ -29,7 +29,7 @@ Examples config:
    // supported file extensions:
    //  - json (.json)
    //  - commented json (.conf)
-   //  - yaml (.yml) are supported
+   //  - yaml (.yaml/.yml) are supported
    "config_filename": "mycroft.conf",
 
    // override the default.conf location, allows changing the default values
