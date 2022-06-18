@@ -150,7 +150,7 @@ class LocalConf(dict):
         if self._get_file_format(path) == "yaml":
             with open(path, 'w') as f:
                 yaml.dump(dict(self), f, allow_unicode=True,
-                          default_flow_style=False)
+                          default_flow_style=False, sort_keys=False)
         else:
             with open(path, 'w') as f:
                 json.dump(self, f, indent=2)
