@@ -40,6 +40,7 @@ hotwords:
   }
 
   wake up:
+    # Handles the "wake up" hotword when Mycroft is sleeping
     lang: en-us
     module: ovos-ww-plugin-pocketsphinx
     phonemes: W EY K . AH P
