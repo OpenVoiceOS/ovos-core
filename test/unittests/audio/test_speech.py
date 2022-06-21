@@ -64,6 +64,76 @@ class TestSpeech(unittest.TestCase):
         #self.assertTrue(tts_mock.playback.stop.called)
         #self.assertTrue(tts_mock.playback.join.called)
 
+    def test_speak(self, tts_factory_mock, config_mock):
+        """Ensure the speech handler executes the tts."""
+        setup_mocks(config_mock, tts_factory_mock)
+        bus = mock.Mock()
+        speech = SpeechService(bus=bus)
+        speech.daemon = True
+        speech.run()
+
+        speak_msg = Message('speak',
+                            data={'utterance': 'hello there. world',
+                                  'listen': False},
+                            context={'ident': 'a'})
+        speech.handle_speak(speak_msg)
+        tts_mock.execute.assert_has_calls(
+            [mock.call('hello there. world', 'a', False)])
+        speech.shutdown()
+
+    def test_fallback_tts(self, tts_factory_mock, config_mock):
+        """Ensure the fallback tts is triggered if the remote times out."""
+        setup_mocks(config_mock, tts_factory_mock)
+        bus = mock.Mock()
+
+        mimic_mock = mock.Mock()
+
+        tts = tts_factory_mock.create.return_value
+        tts.execute.side_effect = RemoteTTSTimeoutException
+
+        speech = SpeechService(bus=bus)
+        speech.daemon = True
+        speech._get_tts_fallback = mock.Mock()
+        speech._get_tts_fallback.return_value = mimic_mock
+        speech.run()
+
+        speak_msg = Message('speak',
+                            data={'utterance': 'hello there. world',
+                                  'listen': False},
+                            context={'ident': 'a'})
+        speech.handle_speak(speak_msg)
+        mimic_mock.execute.assert_has_calls(
+            [mock.call('hello there. world', 'a', False)])
+        speech.shutdown()
+
+    @unittest.skip("# TODO refactor test for TTS.playback (now a singleton)")
+    @mock.patch('mycroft.audio.service.check_for_signal')
+    def test_abort_speak(self, check_for_signal_mock, tts_factory_mock,
+                         config_mock):
+        """Ensure the speech handler aborting speech on stop signal."""
+        setup_mocks(config_mock, tts_factory_mock)
+        check_for_signal_mock.return_value = True
+        tts = tts_factory_mock.create.return_value
+
+        bus = mock.Mock()
+        speech = SpeechService(bus=bus)
+        speech.daemon = True
+
+        def execute_trigger_stop():
+            speech.handle_stop(None)
+
+        tts.execute.side_effect = execute_trigger_stop
+
+        speech.run()
+
+        speak_msg = Message('speak',
+                            data={'utterance': 'hello there. world',
+                                  'listen': False},
+                            context={'ident': 'a'})
+        speech.handle_speak(speak_msg)
+        self.assertTrue(tts.playback.clear.called)
+        speech.shutdown()
+
     @mock.patch('mycroft.audio.service.check_for_signal')
     def test_stop(self, check_for_signal_mock, tts_factory_mock, config_mock):
         """Ensure the stop handler signals stop correctly."""
