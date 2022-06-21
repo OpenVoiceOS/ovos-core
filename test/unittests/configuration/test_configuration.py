@@ -1,5 +1,5 @@
 import json
-from typing import OrderedDict, MutableMapping
+from typing import OrderedDict
 from unittest.mock import MagicMock, patch
 from unittest import TestCase, skip
 import mycroft.configuration
