@@ -1,8 +1,14 @@
+import json
 import platform
-from ovos_utils import network_utils
+from os.path import exists, join
+
+from json_database import JsonStorage
 from mycroft.messagebus import Message
+from mycroft.util.log import LOG
 from mycroft.version import OVOS_VERSION_STR
+from ovos_utils import network_utils
 from ovos_utils.gui import GUIInterface
+from ovos_utils.xdg_utils import xdg_config_home
 
 
 class SmartSpeakerExtensionGuiInterface(GUIInterface):
@@ -11,13 +17,21 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
             skill_id="SmartSpeakerExtension.GuiInterface")
         self.bus = bus
         self.homescreen_manager = homescreen_manager
+        
+        # Paths to find the local display config
+        self.display_config_path_local = join(xdg_config_home(), "OvosDisplay.conf")
+        self.display_config_path_system = "/etc/xdg/OvosDisplay.conf"
+        self.local_display_config = JsonStorage(self.display_config_path_local)
+
+        if not exists(self.display_config_path_local):
+            self.handle_display_config_load()
 
         # Initiate Bind
         self.bind()
 
     def bind(self):
         super().set_bus(self.bus)
-
+        
         self.bus.on("mycroft.device.settings", self.handle_device_settings)
         self.bus.on("ovos.PHAL.dashboard.status.response",
                     self.update_device_dashboard_status)
@@ -41,6 +55,16 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
                               self.handle_device_create_theme)
         self.register_handler("mycroft.device.settings.about.page",
                               self.handle_device_about_page)
+        self.register_handler("mycroft.device.settings.display",
+                              self.handle_device_display_settings)
+        
+        # Display settings      
+        self.register_handler("speaker.extension.display.set.wallpaper.rotation",
+                              self.handle_display_wallpaper_rotation_config_set)
+        self.register_handler("speaker.extension.display.set.auto.dim",
+                              self.handle_display_auto_dim_config_set)
+        self.register_handler("speaker.extension.display.set.auto.nightmode",
+                              self.handle_display_auto_nightmode_config_set)
 
     def handle_device_settings(self, message):
         """ Display device settings page. """
@@ -108,6 +132,16 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
     def handle_device_create_theme(self, message):
         self['state'] = 'settings/customize_theme'
         self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
+        
+    def handle_device_display_settings(self, message):
+        LOG.info("Display settings")
+        LOG.info(self.local_display_config)
+          
+        self['state'] = 'settings/display_settings'
+        self['display_wallpaper_rotation'] = self.local_display_config.get("wallpaper_rotation", False)
+        self['display_auto_dim'] = self.local_display_config.get("auto_dim", False)
+        self['display_auto_nightmode'] = self.local_display_config.get("auto_nightmode", False)
+        self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
 
     def handle_device_about_page(self, message):
         uname_info = platform.uname()
@@ -122,6 +156,31 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
         self['state'] = 'settings/about_page'
         self['system_info'] = system_information
         self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
+
+    def handle_display_wallpaper_rotation_config_set(self, message):
+        wallpaper_rotation = message.data.get("wallpaper_rotation", False)
+        self.local_display_config["wallpaper_rotation"] = wallpaper_rotation
+        self.local_display_config.store()
+
+    def handle_display_auto_dim_config_set(self, message):
+        auto_dim = message.data.get("auto_dim", False)
+        self.local_display_config["auto_dim"] = auto_dim
+        self.local_display_config.store()
+
+    def handle_display_auto_nightmode_config_set(self, message):
+        auto_nightmode = message.data.get("auto_nightmode", False)
+        self.local_display_config["auto_nightmode"] = auto_nightmode
+        self.local_display_config.store()
+
+    def handle_display_config_load(self):
+        if exists(self.display_config_path_system):
+            LOG.info("Loading display config from system")
+            with open(self.display_config_path_system, "r") as f:
+                writeable_conf = json.load(f)
+                self.local_display_config["wallpaper_rotation"] = writeable_conf["wallpaper_rotation"]
+                self.local_display_config["auto_dim"] = writeable_conf["auto_dim"]
+                self.local_display_config["auto_nightmode"] = writeable_conf["auto_nightmode"]
+                self.local_display_config.store()
 
     def handle_get_dash_status(self):
         self.bus.emit(Message("ovos.PHAL.dashboard.get.status"))

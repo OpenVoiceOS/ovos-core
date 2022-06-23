@@ -20,6 +20,12 @@ ListModel {
         settingCall: ""
     }
     ListElement {
+        settingIcon: "images/display.svg"
+        settingName: "Display"
+        settingEvent: "mycroft.device.settings.display"
+        settingCall: ""
+    }
+    ListElement {
         settingIcon: "images/ssh.svg"
         settingName: "Enable SSH"
         settingEvent: "mycroft.device.settings.ssh"
