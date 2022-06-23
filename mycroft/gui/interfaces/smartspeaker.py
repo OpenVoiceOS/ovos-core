@@ -161,16 +161,19 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
         wallpaper_rotation = message.data.get("wallpaper_rotation", False)
         self.local_display_config["wallpaper_rotation"] = wallpaper_rotation
         self.local_display_config.store()
+        self.bus.emit(Message("speaker.extension.display.wallpaper.rotation.changed"))
 
     def handle_display_auto_dim_config_set(self, message):
         auto_dim = message.data.get("auto_dim", False)
         self.local_display_config["auto_dim"] = auto_dim
         self.local_display_config.store()
+        self.bus.emit(Message("speaker.extension.display.auto.dim.changed"))
 
     def handle_display_auto_nightmode_config_set(self, message):
         auto_nightmode = message.data.get("auto_nightmode", False)
         self.local_display_config["auto_nightmode"] = auto_nightmode
         self.local_display_config.store()
+        self.bus.emit(Message("speaker.extension.display.auto.nightmode.changed"))
 
     def handle_display_config_load(self):
         if exists(self.display_config_path_system):
