@@ -234,5 +234,5 @@ class SpeechService(Thread):
         
 class SpeechClient(SpeechService):
     def __init__(self, *args, **kwargs):
-        LOG.warning("SpeechClient has been renamed to SpeechService, it will be removed in 0.1.0)
+        LOG.warning("SpeechClient has been renamed to SpeechService, it will be removed in 0.1.0")
         super().__init__(self, *args, **kwargs)
