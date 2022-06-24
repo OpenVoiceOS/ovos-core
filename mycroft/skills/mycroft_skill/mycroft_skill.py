@@ -66,7 +66,6 @@ from ovos_utils.configuration import get_xdg_base, get_xdg_data_save_path, get_x
 from ovos_utils.enclosure.api import EnclosureAPI
 from ovos_utils.file_utils import get_temp_path
 from ovos_utils.messagebus import get_message_lang
-from ovos_workshop.decorators.killable import AbortEvent
 import shutil
 
 
@@ -1128,6 +1127,7 @@ class MycroftSkill:
         skill_data = {'name': get_handler_name(handler)}
 
         def on_error(error, message):
+            from ovos_workshop.decorators.killable import AbortEvent
             if isinstance(error, AbortEvent):
                 LOG.info("Skill execution aborted")
                 self._on_event_end(message, handler_info, skill_data)
