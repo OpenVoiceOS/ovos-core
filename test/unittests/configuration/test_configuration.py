@@ -31,9 +31,9 @@ class TestConfiguration(TestCase):
         self.assertEqual(rc['location']['city']['name'], 'Stockholm')
 
     @patch('json.dump')
-    @patch('mycroft.configuration.config.exists')
-    @patch('mycroft.configuration.config.isfile')
-    @patch('mycroft.configuration.config.load_commented_json')
+    @patch('ovos_config.config.exists')
+    @patch('ovos_config.config.isfile')
+    @patch('ovos_config.config.load_commented_json')
     def test_local(self, mock_json_loader, mock_isfile, mock_exists,
                    mock_json_dump):
         local_conf = {'answer': 42, 'falling_objects': ['flower pot', 'whale']}
