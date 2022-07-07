@@ -141,10 +141,11 @@ class MutableStream:
 
 class MutableMicrophone(Microphone):
     def __init__(self, device_index=None, sample_rate=16000, chunk_size=1024,
-                 mute=False):
+                 mute=False, retry=True):
         Microphone.__init__(self, device_index=device_index,
                             sample_rate=sample_rate, chunk_size=chunk_size)
         self.muted = False
+        self.retry_on_mic_error = retry
         if mute:
             self.mute()
 
@@ -153,7 +154,9 @@ class MutableMicrophone(Microphone):
         while not exit_flag:
             try:
                 return self._start()
-            except Exception:
+            except Exception as e:
+                if not self.retry_on_mic_error:
+                    raise e
                 LOG.exception("Can't start mic!")
             sleep(1)
 
