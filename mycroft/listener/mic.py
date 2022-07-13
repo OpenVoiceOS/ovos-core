@@ -402,12 +402,17 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         if self.check_for_wakeup(audio_data):
             return  # was a wake up command to come out of sleep state
         # check hot word
-        for ww, hotword in self.loop.engines.items():
-            if hotword.get("wakeup"):
-                # ignore sleep mode hotword
-                continue
-            if hotword["engine"].found_wake_word(audio_data):
-                yield ww
+        try:
+            for ww, hotword in self.loop.engines.items():
+                if hotword.get("wakeup") and not hotword.get("listen"):
+                    # ignore sleep mode hotword, unless it claims to also listen
+                    # eg, vosk-ww-plugin can do both with a single model
+                    continue
+                if hotword["engine"].found_wake_word(audio_data):
+                    yield ww
+        except RuntimeError:  #  dictionary changed size during iteration
+            # seems like config changed and we hit this mid reload!
+            return
 
     def _record_phrase(
             self,
