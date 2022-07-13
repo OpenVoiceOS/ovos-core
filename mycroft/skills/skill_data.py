@@ -799,6 +799,10 @@ def find_resource(res_name, root_dir, res_dirname, lang=None):
         for x in directory.iterdir():
             if x.is_file() and res_name == x.name:
                 return x
+            if x.is_dir():
+                for y in x.iterdir():
+                    if y.is_file() and res_name == y.name:
+                        return y
 
 
 def munge_regex(regex, skill_id):
