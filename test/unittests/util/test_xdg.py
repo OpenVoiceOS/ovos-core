@@ -8,7 +8,7 @@ from mycroft.skills.settings import REMOTE_CACHE
 
 class TestXdg(TestCase):
 
-    @mock.patch('ovos_utils.configuration.get_xdg_base')
+    @mock.patch('ovos_config.meta.get_xdg_base')
     def test_base_folder(self, mock_folder):
         mock_folder.return_value = "testcroft"
         self.assertTrue(get_xdg_config_save_path().endswith("/testcroft"))
