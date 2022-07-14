@@ -8,7 +8,7 @@ combo-lock~=0.2
 PyYAML~=5.4
 watchdog
 
-ovos-config~=0.0.1
+ovos-config~=0.0.1, >=0.0.4a3
 ovos-utils~=0.0, >=0.0.22
 ovos-plugin-manager~=0.0, >=0.0.18a8
 ovos-stt-plugin-server~=0.0, >=0.0.2
