@@ -266,8 +266,9 @@ class MycroftSkill:
 
     @property
     def _old_settings_path(self):
-        old_dir = self.config_core.get("data_dir", "/opt/mycroft")
-        old_folder = self.config_core.get("skills", {}).get("msm", {}).get("directory", "skills")
+        old_dir = self.config_core.get("data_dir") or "/opt/mycroft"
+        old_folder = self.config_core.get("skills", {}).get("msm", {})\
+                         .get("directory") or "skills"
         return join(old_dir, old_folder, self.skill_id, 'settings.json')
 
     @property
