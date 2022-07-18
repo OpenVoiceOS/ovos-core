@@ -388,8 +388,10 @@ class MycroftSkill:
     @property
     def _secondary_langs(self):
         """Get the configured secondary languages, mycroft is not
-        considered to be in these languages but i will load it's resource
-        files. This provides initial support for multilingual input
+        considered to be in these languages, but will load its resource
+        files. This provides initial support for multilingual input. A skill
+        may override this method to specify which languages intents are
+        registered in.
         NOTE: this should be public, but since if a skill uses this it wont
         work in regular mycroft-core it was made private!"""
         return [l.lower() for l in self.config_core.get('secondary_langs', [])
@@ -403,7 +405,7 @@ class MycroftSkill:
         work in regular mycroft-core it was made private!
         """
         valid = set([l.lower() for l in self._secondary_langs
-                 if '-' in l and l != self._core_lang] + [self._core_lang])
+                     if '-' in l and l != self._core_lang] + [self._core_lang])
         return list(valid)
 
     @property

@@ -601,6 +601,17 @@ class TestMycroftSkill(unittest.TestCase):
         # Restore lang to en-us
         s.config_core['lang'] = 'en-us'
 
+    def test_native_langs(self):
+        s = SimpleSkill1()
+        s.config_core['lang'] = 'en-US'
+        s.config_core['secondary_langs'] = ['en', 'en-us', 'en-AU',
+                                            'es', 'pt-PT']
+        self.assertEqual(s.lang, 'en-us')
+        self.assertEqual(s._secondary_langs, ['en', 'en-au', 'es',
+                                              'pt-pt'])
+        self.assertEqual(len(s._native_langs), len(set(s._native_langs)))
+        self.assertEqual(set(s._native_langs), {'en-us', 'en-au', 'pt-pt'})
+
 
 class _TestSkill(MycroftSkill):
     def __init__(self):
