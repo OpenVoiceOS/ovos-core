@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
 import json
 import sys
 import unittest
@@ -22,7 +23,7 @@ from re import error
 from unittest.mock import MagicMock, patch
 
 from adapt.intent import IntentBuilder
-
+from copy import deepcopy
 from mycroft.configuration import Configuration
 from mycroft.messagebus.message import Message
 from mycroft.skills.core import MycroftSkill, resting_screen_handler
@@ -602,7 +603,10 @@ class TestMycroftSkill(unittest.TestCase):
         s.config_core['lang'] = 'en-us'
 
     def test_native_langs(self):
-        s = SimpleSkill1()
+        s = _TestSkill()
+        lang = s.config_core['lang']
+        secondary = s.config_core['secondary_langs']
+
         s.config_core['lang'] = 'en-US'
         s.config_core['secondary_langs'] = ['en', 'en-us', 'en-AU',
                                             'es', 'pt-PT']
@@ -611,6 +615,8 @@ class TestMycroftSkill(unittest.TestCase):
                                               'pt-pt'])
         self.assertEqual(len(s._native_langs), len(set(s._native_langs)))
         self.assertEqual(set(s._native_langs), {'en-us', 'en-au', 'pt-pt'})
+        s.config_core['lang'] = lang
+        s.config_core['secondary_langs'] = secondary
 
 
 class _TestSkill(MycroftSkill):
