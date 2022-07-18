@@ -402,7 +402,9 @@ class MycroftSkill:
         NOTE: this should be public, but since if a skill uses this it wont
         work in regular mycroft-core it was made private!
         """
-        return [self._core_lang] + self._secondary_langs
+        valid = set([l.lower() for l in self._secondary_langs
+                 if '-' in l and l != self._core_lang] + [self._core_lang])
+        return list(valid)
 
     @property
     def _alphanumeric_skill_id(self):
