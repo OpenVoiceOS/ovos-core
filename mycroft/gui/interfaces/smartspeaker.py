@@ -35,6 +35,12 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
         self.bus.on("mycroft.device.settings", self.handle_device_settings)
         self.bus.on("ovos.PHAL.dashboard.status.response",
                     self.update_device_dashboard_status)
+
+        self.bus.on("ovos.phal.configuration.provider.get.response",
+                    self.display_advanced_config_for_group)
+        self.bus.on("ovos.phal.configuration.provider.list.groups.response",
+                    self.display_advanced_config_groups)
+
         self.register_handler("mycroft.device.settings",
                               self.handle_device_settings)
         self.register_handler(
@@ -184,6 +190,20 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
                 self.local_display_config["auto_dim"] = writeable_conf["auto_dim"]
                 self.local_display_config["auto_nightmode"] = writeable_conf["auto_nightmode"]
                 self.local_display_config.store()
+
+    def display_advanced_config_for_group(self, message=None):
+        group_meta = message.data.get("settingsMetaData")
+        group_name = message.data.get("groupName")
+        self["groupName"] = group_name
+        self["groupConfigurationData"] = group_meta
+        self['state'] = 'settings/configuration_generator_display'
+        self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
+
+    def display_advanced_config_groups(self, message=None):
+        groups_list = message.data.get("groups")
+        self["groupList"] = groups_list
+        self['state'] = 'settings/configuration_groups_display'
+        self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
 
     def handle_get_dash_status(self):
         self.bus.emit(Message("ovos.PHAL.dashboard.get.status"))

@@ -1,6 +1,6 @@
 /*
  * Copyright 2018 Aditya Mehra <aix.m@outlook.com>
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -31,14 +31,14 @@ Item {
     onDashActiveChanged: {
         developerSettingsView.busyVisible = false
     }
-    
+
     Item {
         id: topArea
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
         height: Kirigami.Units.gridUnit * 2
-        
+
         Kirigami.Heading {
             id: brightnessSettingPageTextHeading
             level: 1
@@ -75,12 +75,68 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: bottomArea.top
-        
+
         ColumnLayout {
             anchors.left: parent.left
             anchors.right: parent.right
             spacing: Kirigami.Units.smallSpacing
-            
+
+            Kirigami.Separator {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 1
+            }
+
+            Button {
+                id: advancedSettingButton
+                Layout.fillWidth: true
+                Layout.preferredHeight: Mycroft.Units.gridUnit * 4
+
+                background: Rectangle {
+                    color: "transparent"
+                }
+
+                contentItem: RowLayout {
+                    Image {
+                        id: iconAdvancedSettingHolder
+                        Layout.alignment: Qt.AlignVCenter | Qt.AlignLeft
+                        Layout.preferredHeight: units.iconSizes.medium
+                        Layout.preferredWidth: units.iconSizes.medium
+                        source: "images/settings.png"
+
+                        ColorOverlay {
+                            anchors.fill: parent
+                            source: iconAdvancedSettingHolder
+                            color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.7)
+                        }
+                    }
+
+
+                    Kirigami.Heading {
+                        id: connectionNameLabel
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        height: paintedHeight
+                        elide: Text.ElideRight
+                        font.weight: Font.DemiBold
+                        text: "Advanced Settings"
+                        textFormat: Text.PlainText
+                        color: Kirigami.Theme.textColor
+                        level: 2
+                    }
+                }
+
+                onClicked: {
+                    Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
+                    Mycroft.MycroftController.sendRequest("ovos.phal.configuration.provider.list.groups", {})
+                }
+            }
+
+            Kirigami.Separator {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 1
+            }
+
             Kirigami.Heading {
                 id: warnText
                 level: 3
@@ -89,13 +145,13 @@ Item {
                 color: Kirigami.Theme.textColor
                 text: "Enabling OVOS Dashboard will provide you access to control various services on this device, the OVOS Dashboard can be accessed on any device located in your LAN network"
             }
-            
+
             Item {
                 Layout.fillWidth: true
                 Layout.preferredHeight: Kirigami.Units.largeSpacing
             }
-            
-            Button { 
+
+            Button {
                 Layout.fillWidth: true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 3
                 text: "Enable Dashboard"
@@ -107,7 +163,7 @@ Item {
                     developerSettingsView.busyVisible = true
                 }
             }
-            
+
             Button {
                 Layout.fillWidth: true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 3
@@ -120,7 +176,7 @@ Item {
                     developerSettingsView.busyVisible = true
                 }
             }
-            
+
             Kirigami.Separator {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 1
@@ -159,7 +215,7 @@ Item {
             }
         }
     }
-    
+
     Item {
         id: bottomArea
         anchors.left: parent.left
@@ -178,7 +234,7 @@ Item {
 
         RowLayout {
             anchors.fill: parent
-            
+
             Kirigami.Icon {
                 id: backIcon
                 source: Qt.resolvedUrl("images/back.svg")
@@ -191,7 +247,7 @@ Item {
                     color: Kirigami.Theme.textColor
                 }
             }
-            
+
             Kirigami.Heading {
                 level: 2
                 wrapMode: Text.WordWrap
@@ -203,7 +259,7 @@ Item {
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 2
             }
         }
-        
+
         MouseArea {
             anchors.fill: parent
             onClicked: {
@@ -212,4 +268,4 @@ Item {
             }
         }
     }
-} 
+}
