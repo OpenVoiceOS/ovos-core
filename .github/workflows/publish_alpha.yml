@@ -65,6 +65,7 @@ jobs:
             ${{ steps.changelog.outputs.changelog }}
           draft: false
           prerelease: true
+          commitish: dev
       - name: Build Distribution Packages
         run: |
           python setup.py bdist_wheel
