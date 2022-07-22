@@ -44,7 +44,7 @@ Item {
             wrapMode: Text.WordWrap
             anchors.centerIn: parent
             font.bold: true
-            text: "Display Settings"
+            text: qsTr("Display Settings")
             color: Kirigami.Theme.textColor
         }
     }
@@ -75,7 +75,7 @@ Item {
 
                     Label {
                         id: settingOneLabel
-                        text: "Wallpaper Rotation"
+                        text: qsTr("Wallpaper Rotation")
                         font.pixelSize: 25
                         fontSizeMode: Text.Fit
                         minimumPixelSize: 15
@@ -86,7 +86,7 @@ Item {
                     }
 
                     Label {
-                        text: "Changes the wallpaper automatically"
+                        text: qsTr("Changes the wallpaper automatically")
                         font.pixelSize: settingOneLabel.font.pixelSize / 2
                         color: Kirigami.Theme.textColor
                         wrapMode: Text.WordWrap
@@ -104,7 +104,7 @@ Item {
                     height: parent.height
                     checkable: true
                     checked: displaySettingsView.wallpaper_rotation_enabled
-                    text: checked ? "ON" : "OFF"
+                    text: checked ? qsTr("ON") : qsTr("OFF")
 
                     Kirigami.Icon {
                         source: autoWallpaperRotationSwitch.checked ? Qt.resolvedUrl("images/switch-green.svg") : Qt.resolvedUrl("images/switch-red.svg")
@@ -135,7 +135,7 @@ Item {
 
                     Label {
                         id: settingTwoLabel
-                        text: "Auto Dim"
+                        text: qsTr("Auto Dim")
                         font.pixelSize: 25
                         fontSizeMode: Text.Fit
                         minimumPixelSize: 15
@@ -146,7 +146,7 @@ Item {
                     }
 
                     Label {
-                        text: "Dim's the display in 60 seconds"
+                        text: qsTr("Dim's the display in 60 seconds")
                         font.pixelSize: settingTwoLabel.font.pixelSize / 2
                         wrapMode: Text.WordWrap
                         elide: Text.ElideRight
@@ -164,7 +164,7 @@ Item {
                     height: parent.height
                     checkable: true
                     checked: displaySettingsView.auto_dim_enabled
-                    text: checked ? "ON" : "OFF"
+                    text: checked ? qsTr("ON") : qsTr("OFF")
 
                     Kirigami.Icon {
                         source: autoDimSwitch.checked ? Qt.resolvedUrl("images/switch-green.svg") : Qt.resolvedUrl("images/switch-red.svg")
@@ -195,7 +195,7 @@ Item {
 
                     Label {
                         id: settingThreeLabel
-                        text: "Auto Nightmode"
+                        text: qsTr("Auto Nightmode")
                         font.pixelSize: 25
                         fontSizeMode: Text.Fit
                         minimumPixelSize: 15
@@ -206,7 +206,7 @@ Item {
                     }
 
                     Label {
-                        text: "Activates nightmode on homescreen, depending on the time of the day"
+                        text: qsTr("Activates nightmode on homescreen, depending on the time of the day")
                         font.pixelSize: settingThreeLabel.font.pixelSize / 2
                         color: Kirigami.Theme.textColor
                         elide: Text.ElideRight
@@ -224,7 +224,7 @@ Item {
                     height: parent.height
                     checkable: true
                     checked: displaySettingsView.auto_nightmode_enabled
-                    text: checked ? "ON" : "OFF"
+                    text: checked ? qsTr("ON") : qsTr("OFF")
 
                     Kirigami.Icon {
                         source: autoNightmodeSwitch.checked ? Qt.resolvedUrl("images/switch-green.svg") : Qt.resolvedUrl("images/switch-red.svg")
@@ -281,7 +281,7 @@ Item {
                 level: 2
                 wrapMode: Text.WordWrap
                 font.bold: true
-                text: "Device Settings"
+                text: qsTr("Device Settings")
                 color: Kirigami.Theme.textColor
                 verticalAlignment: Text.AlignVCenter
                 Layout.fillWidth: true

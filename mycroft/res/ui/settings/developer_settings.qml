@@ -45,7 +45,7 @@ Item {
             wrapMode: Text.WordWrap
             anchors.centerIn: parent
             font.bold: true
-            text: "Developer Settings"
+            text: qsTr("Developer Settings")
             color: Kirigami.Theme.textColor
         }
     }
@@ -81,11 +81,6 @@ Item {
             anchors.right: parent.right
             spacing: Kirigami.Units.smallSpacing
 
-            Kirigami.Separator {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 1
-            }
-
             Button {
                 id: advancedSettingButton
                 Layout.fillWidth: true
@@ -105,7 +100,7 @@ Item {
 
                         ColorOverlay {
                             anchors.fill: parent
-                            source: iconAdvancedSettingHolder
+                            source: iconSettingHolder
                             color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.7)
                         }
                     }
@@ -119,7 +114,7 @@ Item {
                         height: paintedHeight
                         elide: Text.ElideRight
                         font.weight: Font.DemiBold
-                        text: "Advanced Settings"
+                        text: qsTr("Advanced Settings")
                         textFormat: Text.PlainText
                         color: Kirigami.Theme.textColor
                         level: 2
@@ -154,7 +149,7 @@ Item {
             Button {
                 Layout.fillWidth: true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 3
-                text: "Enable Dashboard"
+                text: qsTr("Enable Dashboard")
                 visible: !dashActive
                 enabled: visible
                 onClicked: {
@@ -167,7 +162,7 @@ Item {
             Button {
                 Layout.fillWidth: true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 3
-                text: "Disable Dashboard"
+                text: qsTr("Disable Dashboard")
                 visible: dashActive
                 enabled: visible
                 onClicked: {
@@ -189,7 +184,7 @@ Item {
                 wrapMode: Text.WordWrap
                 level: 3
                 color: Kirigami.Theme.textColor
-                text: "Dashboard Address: " +  sessionData.dashboard_url
+                text: qsTr("Dashboard Address") + ": " +  sessionData.dashboard_url
                 visible: dashActive
                 enabled: visible
             }
@@ -199,7 +194,7 @@ Item {
                 wrapMode: Text.WordWrap
                 level: 3
                 color: Kirigami.Theme.textColor
-                text: "Dashboard Username: " + sessionData.dashboard_user
+                text: qsTr("Dashboard Username")+ ": " + sessionData.dashboard_user
                 visible: dashActive
                 enabled: visible
             }
@@ -209,7 +204,7 @@ Item {
                 wrapMode: Text.WordWrap
                 level: 3
                 color: Kirigami.Theme.textColor
-                text: "Dashboard Password: " + sessionData.dashboard_password
+                text: qsTr("Dashboard Password") + ": " + sessionData.dashboard_password
                 visible: dashActive
                 enabled: visible
             }
@@ -252,7 +247,7 @@ Item {
                 level: 2
                 wrapMode: Text.WordWrap
                 font.bold: true
-                text: "Device Settings"
+                text: qsTr("Device Settings")
                 color: Kirigami.Theme.textColor
                 verticalAlignment: Text.AlignVCenter
                 Layout.fillWidth: true

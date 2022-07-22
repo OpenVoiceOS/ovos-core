@@ -83,7 +83,7 @@ Item {
         configDataView.update()
         if(configurationData !== null){
             configDataView.model = configurationData.group_sections
-            configPageHeading.text = groupName.toUpperCase() + " Configuration"
+            configPageHeading.text = groupName.toUpperCase() + " " + qsTr("Configuration")
         }
     }
 
@@ -276,7 +276,7 @@ Item {
                     wrapMode: Text.WordWrap
                     font.bold: true
                     color: Kirigami.Theme.textColor
-                    text: "Back"
+                    text: qsTr("Back")
                     verticalAlignment: Text.AlignVCenter
                     Layout.fillWidth: true
                     Layout.preferredHeight: Kirigami.Units.gridUnit * 2
@@ -306,7 +306,7 @@ Item {
                     wrapMode: Text.WordWrap
                     font.bold: true
                     color: Kirigami.Theme.textColor
-                    text: "Update Settings"
+                    text: qsTr("Update Settings")
                     horizontalAlignment: Text.AlignRight
                     verticalAlignment: Text.AlignVCenter
                     Layout.fillWidth: true

@@ -36,7 +36,7 @@ Popup  {
         if(nameValue != "" && nameValue.length > 2 || nameValue != "  " && nameValue.length > 2) {
             createThemeView.selectedThemeName = nameValue[0].toUpperCase() + nameValue.slice(1) + " Scheme"
         } else {
-            createThemeView.selectedThemeName = "Example Theme"
+            createThemeView.selectedThemeName = qsTr("Example Theme")
         }
     }
 
@@ -86,7 +86,7 @@ Popup  {
                 minimumPixelSize: 5
                 fontSizeMode: Text.Fit
                 maximumLineCount: 1
-                text: "Set Scheme Name"
+                text: qsTr("Set Scheme Name")
                 color: Kirigami.Theme.textColor
                 elide: Text.ElideRight
             }
@@ -112,7 +112,7 @@ Popup  {
                     verticalAlignment: Text.AlignVCenter
                     horizontalAlignment: Text.AlignHCenter
                     visible: popupMainContent.activeFocus ? 0 : 1
-                    text: "Unique 1 word scheme name, example: Midnight"
+                    text: qsTr("Unique 1 word scheme name, example: Midnight")
                     color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.5)
                     wrapMode: Text.WordWrap
                 }

@@ -42,7 +42,7 @@ Item {
             wrapMode: Text.WordWrap
             anchors.centerIn: parent
             font.bold: true
-            text: "About"
+            text: qsTr("About")
             color: Kirigami.Theme.textColor
         }
     }
@@ -73,7 +73,8 @@ Item {
                 level: 2
                 wrapMode: Text.WrodWrap
                 font.bold: true
-                text: "<b>System Information</b>"
+                font.weight: Font.ExtraBold
+                text: qsTr("System Information")
                 color: Kirigami.Theme.textColor
             }
         }
@@ -85,7 +86,7 @@ Item {
             anchors.margins: Mycroft.Units.gridUnit / 2
 
             Label {
-                text: "<b>Kernel Version:</b> " + systemInformation.uname_kernelversion
+                text: "<b>" + qsTr("Kernel Version") + ":</b> " + systemInformation.uname_kernelversion
                 font.pixelSize: 25
                 fontSizeMode: Text.Fit
                 minimumPixelSize: 5
@@ -93,7 +94,7 @@ Item {
                 Layout.alignment: Qt.AlignLeft
             }
             Label {
-                text: "<b>OpenVoiceOS Core Version:</b> " + systemInformation.ovos_core_version
+                text: "<b>OpenVoiceOS Core " + qsTr("Version") + ":</b> " + systemInformation.ovos_core_version
                 font.pixelSize: 25
                 fontSizeMode: Text.Fit
                 minimumPixelSize: 5
@@ -101,7 +102,7 @@ Item {
                 Layout.alignment: Qt.AlignLeft
             }
             Label {
-                text: "<b>Python Version:</b> " + systemInformation.python_version
+                text: "<b>Python " + qsTr("Version")+ ":</b> " + systemInformation.python_version
                 font.pixelSize: 25
                 fontSizeMode: Text.Fit
                 minimumPixelSize: 5
@@ -109,7 +110,7 @@ Item {
                 Layout.alignment: Qt.AlignLeft
             }
             Label {
-                text: "<b>Local Address:</b> " + systemInformation.local_address
+                text: "<b>" + qsTr("Local Address") + ":</b> " + systemInformation.local_address
                 font.pixelSize: 25
                 fontSizeMode: Text.Fit
                 minimumPixelSize: 5
@@ -118,7 +119,7 @@ Item {
 
                 Component.onCompleted: {
                     if(!systemInformation.local_address) {
-                        text = "<b>Local Address:</b> No Active Connection"
+                        text = "<b>" + qsTr("Local Address") + ":</b> " + qsTr("No Active Connection")
                     }
                 }
             }
@@ -161,7 +162,7 @@ Item {
                 level: 2
                 wrapMode: Text.WordWrap
                 font.bold: true
-                text: "Device Settings"
+                text: qsTr("Device Settings")
                 color: Kirigami.Theme.textColor
                 verticalAlignment: Text.AlignVCenter
                 Layout.fillWidth: true

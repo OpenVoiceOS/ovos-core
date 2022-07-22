@@ -32,7 +32,7 @@ Item {
     property color selectedPrimaryColor: Kirigami.Theme.backgroundColor
     property color selectedSecondaryColor: Kirigami.Theme.highlightColor
     property color selectedTextColor: Kirigami.Theme.textColor
-    property string selectedThemeName: "Example Scheme"
+    property string selectedThemeName: qsTr("Example Scheme")
 
     onSelectedPrimaryColorChanged: {
         selectedTextColor = ColorUtils.autoTextColor(selectedPrimaryColor.r, selectedPrimaryColor.g, selectedPrimaryColor.b)
@@ -43,7 +43,6 @@ Item {
 
         onIntentRecevied: {
             if (type == "ovos.shell.gui.color.scheme.generated") {
-                console.log("Theme Generated")
                 timeoutMessageTimer.stop()
                 visualBusyIndicatorBox.visible = false
                 visualBusyIndicatorBox.enabled = false
@@ -81,7 +80,7 @@ Item {
             wrapMode: Text.WordWrap
             anchors.centerIn: parent
             font.bold: true
-            text: "Create Scheme"
+            text: qsTr("Create Scheme")
             color: Kirigami.Theme.textColor
         }
     }
@@ -140,7 +139,7 @@ Item {
                         font.bold: true
                         elide: Text.ElideRight
                         wrapMode: Text.WordWrap
-                        text: "Select Primary Color"
+                        text: qsTr("Select Primary Color")
                     }
 
                     MouseArea {
@@ -182,7 +181,7 @@ Item {
                         font.bold: true
                         elide: Text.ElideRight
                         wrapMode: Text.WordWrap
-                        text: "Select Secondary Color"
+                        text: qsTr("Select Secondary Color")
                     }
 
                     MouseArea {
@@ -224,7 +223,7 @@ Item {
                         font.bold: true
                         elide: Text.ElideRight
                         wrapMode: Text.WordWrap
-                        text: "Auto Text Color"
+                        text: qsTr("Auto Text Color")
                     }
                 }
                 Rectangle {
@@ -258,7 +257,7 @@ Item {
                         font.bold: true
                         elide: Text.ElideRight
                         wrapMode: Text.WordWrap
-                        text: "Set Name"
+                        text: qsTr("Set Name")
                     }
 
                     MouseArea {
@@ -320,7 +319,7 @@ Item {
                         wrapMode: Text.WordWrap
                         font.bold: true
                         color: Kirigami.Theme.textColor
-                        text: "Preview"
+                        text: qsTr("Preview")
                         verticalAlignment: Text.AlignVCenter
                         Layout.fillWidth: true
                         Layout.preferredHeight: Kirigami.Units.gridUnit * 2
@@ -376,7 +375,7 @@ Item {
                         wrapMode: Text.WordWrap
                         font.bold: true
                         color: Kirigami.Theme.textColor
-                        text: "Create"
+                        text: qsTr("Create")
                         verticalAlignment: Text.AlignVCenter
                         Layout.fillWidth: true
                         Layout.preferredHeight: Kirigami.Units.gridUnit * 2
@@ -437,7 +436,7 @@ Item {
                 wrapMode: Text.WordWrap
                 font.bold: true
                 color: Kirigami.Theme.textColor
-                text: "Back"
+                text: qsTr("Back")
                 verticalAlignment: Text.AlignVCenter
                 Layout.fillWidth: true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 2
@@ -507,7 +506,7 @@ Item {
                     minimumPixelSize: 5
                     fontSizeMode: Text.Fit
                     maximumLineCount: 1
-                    text: "Preview"
+                    text: qsTr("Preview")
                     color: Kirigami.Theme.textColor
                     elide: Text.ElideRight
                 }
@@ -578,7 +577,7 @@ Item {
                         wrapMode: Text.WordWrap
                         font.bold: true
                         color: Kirigami.Theme.textColor
-                        text: "Cancel"
+                        text: qsTr("Cancel")
                         verticalAlignment: Text.AlignVCenter
                         Layout.fillWidth: true
                         Layout.preferredHeight: Kirigami.Units.gridUnit * 2

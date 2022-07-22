@@ -1,6 +1,6 @@
 /*
  * Copyright 2018 Aditya Mehra <aix.m@outlook.com>
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -28,15 +28,15 @@ Item {
     anchors.fill: parent
     property var modelItemList: mainLoaderView.idleScreenList
     property var activeIdle: mainLoaderView.activeIdle
-    
+
     ButtonGroup {
         id: idleSelectionGroup
     }
-    
+
     onModelItemListChanged: {
        listIdleFaces.model = modelItemList.screenBlob
     }
-    
+
     function checkIfActive(screenId){
         if(screenId == activeIdle) {
             return true
@@ -44,21 +44,21 @@ Item {
             return false
         }
     }
-    
+
     Item {
         id: topArea
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
         height: Kirigami.Units.gridUnit * 2
-        
+
         Kirigami.Heading {
             id: idleSettingPageTextHeading
             level: 1
             wrapMode: Text.WordWrap
             anchors.centerIn: parent
             font.bold: true
-            text: "Homescreen Settings"
+            text: qsTr("Homescreen Settings")
             color: Kirigami.Theme.textColor
         }
     }
@@ -69,7 +69,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: bottomArea.top
-        
+
       ListView {
             id: listIdleFaces
             anchors.fill: parent
@@ -80,7 +80,7 @@ Item {
                 contentItem: Item {
                 implicitWidth: delegateLayout.implicitWidth;
                 implicitHeight: delegateLayout.implicitHeight;
-                
+
                     ColumnLayout {
                         id: delegateLayout
                         anchors {
@@ -88,11 +88,11 @@ Item {
                             top: parent.top;
                             right: parent.right;
                         }
-                    
+
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: Math.round(units.gridUnit / 2)
-                
+
                             Kirigami.Heading {
                                 Layout.fillWidth: true
                                 Layout.alignment: Qt.AlignHCenter
@@ -105,7 +105,7 @@ Item {
                                 textFormat: Text.PlainText
                                 level: 2
                             }
-                            
+
                             Image {
                                 id: selectedItemIcon
                                 Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
@@ -117,19 +117,19 @@ Item {
                         }
                     }
                 }
-                
+
                 onClicked: {
                     Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
                     triggerGuiEvent("mycroft.device.set.idle", {"selected": modelData.id})
                 }
             }
-            
+
             Component.onCompleted: {
                 listIdleFaces.count
             }
         }
     }
-    
+
     Item {
         id: bottomArea
         anchors.left: parent.left
@@ -148,7 +148,7 @@ Item {
 
         RowLayout {
             anchors.fill: parent
-            
+
             Kirigami.Icon {
                 id: backIcon
                 source: Qt.resolvedUrl("images/back.svg")
@@ -161,19 +161,19 @@ Item {
                     color: Kirigami.Theme.textColor
                 }
             }
-            
+
             Kirigami.Heading {
                 level: 2
                 wrapMode: Text.WordWrap
                 font.bold: true
-                text: "Device Settings"
+                text: qsTr("Device Settings")
                 color: Kirigami.Theme.textColor
                 verticalAlignment: Text.AlignVCenter
                 Layout.fillWidth: true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 2
             }
         }
-        
+
         MouseArea {
             anchors.fill: parent
             onClicked: {
@@ -182,4 +182,4 @@ Item {
             }
         }
     }
-} 
+}

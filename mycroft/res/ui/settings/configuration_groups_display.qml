@@ -40,7 +40,7 @@ Item {
             wrapMode: Text.WordWrap
             anchors.centerIn: parent
             font.bold: true
-            text: "Advanced Configuration"
+            text: qsTr("Advanced Configuration")
             color: Kirigami.Theme.textColor
         }
     }
@@ -149,7 +149,7 @@ Item {
                 level: 2
                 wrapMode: Text.WordWrap
                 font.bold: true
-                text: "Back"
+                text: qsTr("Back")
                 color: Kirigami.Theme.textColor
                 verticalAlignment: Text.AlignVCenter
                 Layout.fillWidth: true

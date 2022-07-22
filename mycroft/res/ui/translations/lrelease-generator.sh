@@ -1,0 +1,14 @@
+#!/bin/bash
+
+lrelease about_page_de.ts settingspage_de.ts ssh_settings_de.ts homescreen_settings_de.ts configuration_generator_display_de.ts  configuration_groups_display_de.ts customize_settings_de.ts customize_theme_de.ts developer_settings_de.ts display_settings_de.ts settingListBox_de.ts -qm SmartSpeakerExtension.GuiInterface_de.qm
+
+lrelease about_page_es.ts settingspage_es.ts ssh_settings_es.ts homescreen_settings_es.ts configuration_generator_display_es.ts  configuration_groups_display_es.ts customize_settings_es.ts customize_theme_es.ts developer_settings_es.ts display_settings_es.ts settingListBox_es.ts -qm SmartSpeakerExtension.GuiInterface_es.qm
+
+lrelease about_page_nl.ts settingspage_nl.ts ssh_settings_nl.ts homescreen_settings_nl.ts configuration_generator_display_nl.ts  configuration_groups_display_nl.ts customize_settings_nl.ts customize_theme_nl.ts developer_settings_nl.ts display_settings_nl.ts settingListBox_nl.ts -qm SmartSpeakerExtension.GuiInterface_nl.qm
+
+lrelease about_page_fr.ts settingspage_fr.ts ssh_settings_fr.ts homescreen_settings_fr.ts configuration_generator_display_fr.ts  configuration_groups_display_fr.ts customize_settings_fr.ts customize_theme_fr.ts developer_settings_fr.ts display_settings_fr.ts settingListBox_fr.ts -qm SmartSpeakerExtension.GuiInterface_fr.qm
+
+lrelease about_page_pt.ts settingspage_pt.ts ssh_settings_pt.ts homescreen_settings_pt.ts configuration_generator_display_pt.ts  configuration_groups_display_pt.ts customize_settings_pt.ts customize_theme_pt.ts developer_settings_pt.ts display_settings_pt.ts settingListBox_pt.ts -qm SmartSpeakerExtension.GuiInterface_pt.qm
+
+lrelease about_page_it.ts settingspage_it.ts ssh_settings_it.ts homescreen_settings_it.ts configuration_generator_display_it.ts  configuration_groups_display_it.ts customize_settings_it.ts customize_theme_it.ts developer_settings_it.ts display_settings_it.ts settingListBox_it.ts -qm SmartSpeakerExtension.GuiInterface_it.qm
+

@@ -20,7 +20,6 @@ import QtQuick 2.9
 import QtQuick.Controls 2.3
 import org.kde.kirigami 2.11 as Kirigami
 import Mycroft 1.0 as Mycroft
-import QtGraphicalEffects 1.12
 
 ColumnLayout {
     id: listGeneratedItem
@@ -78,7 +77,6 @@ ColumnLayout {
                 }
 
                 Button {
-                    id: editButtonDelegateRemoveListItem
                     Layout.preferredWidth: Mycroft.Units.gridUnit * 6
                     Layout.fillHeight: true
                     visible: listGeneratedItem.editMode ? 1 : 0
@@ -90,21 +88,11 @@ ColumnLayout {
                     }
 
                     contentItem: Item {
-                        width: editButtonDelegateRemoveListItem.width
-                        height: editButtonDelegateRemoveListItem.height
-
                         Kirigami.Icon {
-                            id: listRemoveIconHolder
-                            width: Kirigami.Units.iconSizes.large
-                            height: Kirigami.Units.iconSizes.large
-                            anchors.centerIn: parent
-                            source: "list-remove"
-
-                            ColorOverlay {
-                                anchors.fill: parent
-                                source: listRemoveIconHolder
-                                color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.7)
-                            }
+                            anchors.fill: parent
+                            anchors.margins: Mycroft.Units.gridUnit / 2
+                            source: "edit-delete-remove"
+                            color: Kirigami.Theme.textColor
                         }
                     }
 
@@ -192,7 +180,7 @@ ColumnLayout {
                 id: addListItemTextBox
                 Layout.fillWidth: true
                 Layout.preferredHeight: Mycroft.Units.gridUnit * 4
-                placeholderText: "Type here to add an item to the list"
+                placeholderText: qsTr("Type here to add an item to the list")
             }
 
             Button {
@@ -205,7 +193,7 @@ ColumnLayout {
                 }
 
                 contentItem: Label {
-                    text: "Add Item"
+                    text: qsTr("Add Item")
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }

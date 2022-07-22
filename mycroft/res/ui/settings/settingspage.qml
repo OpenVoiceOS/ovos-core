@@ -10,21 +10,62 @@ Item {
     id: deviceSettingsView
     anchors.fill: parent
     z: 2
-    
+
+    ListModel {
+        id: settingsListModel
+
+        ListElement {
+            settingIcon: "images/home.svg"
+            settingName: QT_TR_NOOP("Homescreen Settings")
+            settingEvent: "mycroft.device.settings.homescreen"
+            settingCall: "show homescreen settings"
+        }
+        ListElement {
+            settingIcon: "images/paint.svg"
+            settingName: QT_TR_NOOP("Customize")
+            settingEvent: "mycroft.device.settings.customize"
+            settingCall: ""
+        }
+        ListElement {
+            settingIcon: "images/display.svg"
+            settingName: QT_TR_NOOP("Display")
+            settingEvent: "mycroft.device.settings.display"
+            settingCall: ""
+        }
+        ListElement {
+            settingIcon: "images/ssh.svg"
+            settingName: QT_TR_NOOP("Enable SSH")
+            settingEvent: "mycroft.device.settings.ssh"
+            settingCall: "show ssh settings"
+        }
+        ListElement {
+            settingIcon: "images/settings.png"
+            settingName: QT_TR_NOOP("Developer Settings")
+            settingEvent: "mycroft.device.settings.developer"
+            settingCall: ""
+        }
+        ListElement {
+            settingIcon: "images/info.svg"
+            settingName: QT_TR_NOOP("About")
+            settingEvent: "mycroft.device.settings.about.page"
+            settingCall: ""
+        }
+    }
+
     Item {
         id: topArea
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
         height: Kirigami.Units.gridUnit * 2
-        
+
         Kirigami.Heading {
             id: settingPageTextHeading
             level: 1
             wrapMode: Text.WordWrap
             anchors.centerIn: parent
             font.bold: true
-            text: "Device Settings"
+            text: qsTr("Device Settings")
             color: Kirigami.Theme.textColor
         }
     }
@@ -36,18 +77,18 @@ Item {
         anchors.right: parent.right
         anchors.bottom: bottomArea.top
         anchors.bottomMargin: Kirigami.Units.largeSpacing
-        
+
         ListView {
             anchors.fill: parent
             clip: true
-            model: SettingsModel{}
+            model: settingsListModel
             boundsBehavior: Flickable.StopAtBounds
             delegate: Kirigami.AbstractListItem {
                 activeBackgroundColor: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.7)
                 contentItem: Item {
                 implicitWidth: delegateLayout.implicitWidth;
                 implicitHeight: delegateLayout.implicitHeight;
-        
+
                     ColumnLayout {
                         id: delegateLayout
                         anchors {
@@ -55,11 +96,11 @@ Item {
                             top: parent.top;
                             right: parent.right;
                         }
-                    
+
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: Math.round(units.gridUnit / 2)
-                
+
                             Image {
                                 id: iconSettingHolder
                                 Layout.alignment: Qt.AlignVCenter | Qt.AlignLeft
@@ -74,7 +115,7 @@ Item {
                                 }
                             }
 
-                            
+
                             Kirigami.Heading {
                                 id: connectionNameLabel
                                 Layout.fillWidth: true
@@ -83,7 +124,7 @@ Item {
                                 height: paintedHeight
                                 elide: Text.ElideRight
                                 font.weight: Font.DemiBold
-                                text: model.settingName
+                                text: qsTr(model.settingName)
                                 textFormat: Text.PlainText
                                 color: Kirigami.Theme.textColor
                                 level: 2
@@ -91,7 +132,7 @@ Item {
                         }
                     }
                 }
-                
+
                 onClicked: {
                     Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
                     triggerGuiEvent(model.settingEvent, {})
@@ -99,7 +140,7 @@ Item {
             }
         }
     }
-    
+
     Item {
         id: bottomArea
         anchors.left: parent.left
@@ -118,7 +159,7 @@ Item {
 
         RowLayout {
             anchors.fill: parent
-            
+
             Kirigami.Icon {
                 id: backIcon
                 source: Qt.resolvedUrl("images/back.svg")
@@ -131,19 +172,19 @@ Item {
                     color: Kirigami.Theme.textColor
                 }
             }
-            
+
             Kirigami.Heading {
                 level: 2
                 wrapMode: Text.WordWrap
                 font.bold: true
-                text: "Home"
+                text: qsTr("Home")
                 color: Kirigami.Theme.textColor
                 verticalAlignment: Text.AlignVCenter
                 Layout.fillWidth: true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 2
             }
         }
-        
+
         MouseArea {
             anchors.fill: parent
             onClicked: {

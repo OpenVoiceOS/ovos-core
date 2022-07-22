@@ -57,7 +57,7 @@ Item {
             wrapMode: Text.WordWrap
             anchors.centerIn: parent
             font.bold: true
-            text: "Customize Settings"
+            text: qsTr("Customize Settings")
             color: Kirigami.Theme.textColor
         }
     }
@@ -261,7 +261,7 @@ Item {
                     wrapMode: Text.WordWrap
                     font.bold: true
                     color: Kirigami.Theme.textColor
-                    text: "Device Settings"
+                    text: qsTr("Device Settings")
                     verticalAlignment: Text.AlignVCenter
                     Layout.fillWidth: true
                     Layout.preferredHeight: Kirigami.Units.gridUnit * 2
@@ -291,7 +291,7 @@ Item {
                     wrapMode: Text.WordWrap
                     font.bold: true
                     color: Kirigami.Theme.textColor
-                    text: "Create Scheme"
+                    text: qsTr("Create Scheme")
                     horizontalAlignment: Text.AlignRight
                     verticalAlignment: Text.AlignVCenter
                     Layout.fillWidth: true
@@ -396,7 +396,7 @@ Item {
                     minimumPixelSize: 5
                     fontSizeMode: Text.Fit
                     maximumLineCount: 1
-                    text: "Select Style"
+                    text: qsTr("Select Style")
                     color: Kirigami.Theme.textColor
                     elide: Text.ElideRight
                 }
@@ -465,7 +465,7 @@ Item {
                         wrapMode: Text.WordWrap
                         font.bold: true
                         color: Kirigami.Theme.textColor
-                        text: "Cancel"
+                        text: qsTr("Cancel")
                         verticalAlignment: Text.AlignVCenter
                         Layout.fillWidth: true
                         Layout.preferredHeight: Kirigami.Units.gridUnit * 2

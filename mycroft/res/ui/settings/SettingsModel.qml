@@ -6,40 +6,40 @@ import Mycroft 1.0 as Mycroft
 
 ListModel {
     id: settingsListModel
-    
+
     ListElement {
         settingIcon: "images/home.svg"
-        settingName: "Homescreen Settings"
+        settingName: QT_TR_NOOP("Homescreen Settings")
         settingEvent: "mycroft.device.settings.homescreen"
         settingCall: "show homescreen settings"
     }
     ListElement {
         settingIcon: "images/paint.svg"
-        settingName: "Customize"
+        settingName: QT_TR_NOOP("Customize")
         settingEvent: "mycroft.device.settings.customize"
         settingCall: ""
     }
     ListElement {
         settingIcon: "images/display.svg"
-        settingName: "Display"
+        settingName: QT_TR_NOOP("Display")
         settingEvent: "mycroft.device.settings.display"
         settingCall: ""
     }
     ListElement {
         settingIcon: "images/ssh.svg"
-        settingName: "Enable SSH"
+        settingName: QT_TR_NOOP("Enable SSH")
         settingEvent: "mycroft.device.settings.ssh"
-        settingCall: "show ssh settings" 
+        settingCall: "show ssh settings"
     }
     ListElement {
         settingIcon: "images/settings.png"
-        settingName: "Developer Settings"
+        settingName: QT_TR_NOOP("Developer Settings")
         settingEvent: "mycroft.device.settings.developer"
-        settingCall: "" 
+        settingCall: ""
     }
     ListElement {
         settingIcon: "images/info.svg"
-        settingName: "About"
+        settingName: QT_TR_NOOP("About")
         settingEvent: "mycroft.device.settings.about.page"
         settingCall: ""
     }
