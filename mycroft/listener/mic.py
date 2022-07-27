@@ -270,6 +270,9 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         listener_config = self.config.get('listener') or {}
         self.instant_listen = listener_config.get("instant_listen", False)
         self.continuous_mode = listener_config.get("continuous_listen", False)
+        self.hybrid_listening = listener_config.get("hybrid_listen", False)
+        self.listen_timeout = listener_config.get("listen_timeout", 15)
+        self._listen_ts = 0
         # experimental setting, no wake word needed
         if self.continuous_mode:
             self.listening_mode = ListeningMode.CONTINUOUS
@@ -862,10 +865,18 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
                 return None, lang
 
             audio_data = self._listen_phrase(source, sec_per_buffer, stream)
+            if self.hybrid_listening:
+                self.listening_mode = ListeningMode.CONTINUOUS
+                self._listen_ts = time.time()
 
         elif self.listening_mode == ListeningMode.CONTINUOUS:
             LOG.debug("Listening...")
             audio_data = self._listen_phrase(source, sec_per_buffer, stream)
+
+            # reset to wake word mode if 15 seconds elapsed
+            if self.hybrid_listening and time.time() - self._listen_ts > self.listen_timeout:
+                self.listening_mode = ListeningMode.WAKEWORD
+
         elif self.listening_mode == ListeningMode.RECORDING:
             LOG.debug("Recording...")
             self.loop.emit("recognizer_loop:record_begin")
