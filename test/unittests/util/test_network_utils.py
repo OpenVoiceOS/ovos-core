@@ -9,7 +9,7 @@ class TestNetworkConnected(TestCase):
         self.assertTrue(connected())
 
 
-@mock.patch('mycroft.configuration.Configuration')
+@mock.patch('ovos_config.config.Configuration')
 class TestNetworkFailure(TestCase):
 
     def test_dns_and_ncsi_fail(self, mock_conf):

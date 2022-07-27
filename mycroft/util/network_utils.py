@@ -1,14 +1,14 @@
 import socket
 from urllib.error import URLError
 from urllib.request import urlopen
-from ovos_config.config import Configuration
+import ovos_config.config
 import requests
 from mycroft.util.log import LOG
 
 
 def _get_network_tests_config():
     """Get network_tests object from mycroft.configuration."""
-    config = Configuration()
+    config = ovos_config.config.Configuration()
     return config.get('network_tests', {
         "dns_primary": "8.8.8.8",
         "dns_secondary": "8.8.4.4",
