@@ -19,7 +19,7 @@ This code is re-used in both to load config values.
 """
 from collections import namedtuple
 
-import mycroft.configuration
+from ovos_config.config import Configuration
 from mycroft.util.log import LOG
 
 MessageBusConfig = namedtuple(
@@ -31,7 +31,7 @@ MessageBusConfig = namedtuple(
 def load_message_bus_config(**overrides):
     """Load the bits of device configuration needed to run the message bus."""
     LOG.info('Loading message bus configs')
-    config = mycroft.configuration.Configuration()
+    config = Configuration()
 
     try:
         websocket_configs = config['websocket']

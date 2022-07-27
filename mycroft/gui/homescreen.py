@@ -1,5 +1,6 @@
 from mycroft.messagebus import Message
-from mycroft.configuration import Configuration, LocalConf, USER_CONFIG
+from ovos_config.config import Configuration, LocalConf
+from ovos_config.locations import USER_CONFIG
 from mycroft.util.log import LOG
 from .namespace import NamespaceManager
 

@@ -23,8 +23,8 @@ to be a drop in replacement for mycroft-core
 
 """
 
-from mycroft.configuration import setup_locale
-from mycroft.configuration import Configuration
+from ovos_config.locale import setup_locale
+from ovos_config.config import Configuration
 from mycroft.gui.service import GUIService
 from mycroft.util.log import LOG
 from mycroft.util import wait_for_exit_signal, reset_sigint_handler

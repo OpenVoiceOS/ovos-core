@@ -28,7 +28,7 @@ from watchdog.events import FileSystemEventHandler
 from ovos_utils.file_utils import get_temp_path
 from ovos_utils.configuration import get_xdg_base, get_xdg_data_dirs, \
     get_xdg_data_save_path, get_xdg_cache_save_path
-import mycroft.configuration
+from ovos_config.config import Configuration
 from mycroft.util.log import LOG
 # do not delete these imports, here for backwards compat!
 from ovos_plugin_manager.utils.tts_cache import curate_cache, mb_to_bytes
@@ -62,7 +62,7 @@ def resolve_resource_file(res_name):
     Returns:
         (str) path to resource or None if no resource found
     """
-    config = mycroft.configuration.Configuration()
+    config = Configuration()
 
     # First look for fully qualified file (e.g. a user setting)
     if os.path.isfile(res_name):
@@ -156,7 +156,7 @@ def get_cache_directory(domain=None):
     Returns:
         (str) a path to the directory where you can cache data
     """
-    config = mycroft.configuration.Configuration()
+    config = Configuration()
     directory = config.get("cache_path") or get_xdg_cache_save_path()
     return ensure_directory_exists(directory, domain)
 

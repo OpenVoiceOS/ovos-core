@@ -14,7 +14,7 @@
 #
 from websocket import create_connection
 
-import mycroft.configuration
+from ovos_config.config import Configuration
 from mycroft.messagebus.client import MessageBusClient
 from mycroft.messagebus.message import Message
 
@@ -30,7 +30,7 @@ def send(message_to_send, data_to_send=None):
     data_to_send = data_to_send or {}
 
     # Calculate the standard Mycroft messagebus websocket address
-    config = mycroft.configuration.Configuration()
+    config = Configuration()
     config = config.get("websocket")
     url = MessageBusClient.build_url(
         config.get("host"),

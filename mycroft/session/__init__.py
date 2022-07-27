@@ -16,7 +16,7 @@ import time
 from threading import Lock
 from uuid import uuid4
 
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from mycroft.util.log import LOG
 
 

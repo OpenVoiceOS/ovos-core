@@ -22,7 +22,7 @@ from pyee import EventEmitter
 
 from mycroft.listener.hotword_factory import HotWordFactory
 from mycroft.listener.mic import MutableMicrophone, ResponsiveRecognizer
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from mycroft.metrics import Stopwatch, report_timing
 from mycroft.session import SessionManager
 from mycroft.listener.stt import STTFactory

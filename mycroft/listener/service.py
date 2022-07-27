@@ -17,7 +17,7 @@ from threading import Thread
 
 from mycroft import dialog
 from mycroft.listener import RecognizerLoop
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from mycroft.enclosure.api import EnclosureAPI
 from mycroft.identity import IdentityManager
 from mycroft.messagebus.message import Message

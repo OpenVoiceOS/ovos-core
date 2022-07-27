@@ -23,7 +23,7 @@ to be a drop in replacement for mycroft-core
 
 """
 
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from mycroft.messagebus.client import MessageBusClient
 from mycroft.util import start_message_bus_client
 

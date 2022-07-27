@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 from mycroft.audio.service import PlaybackService, on_ready, on_error, on_stopping
-from mycroft.configuration import setup_locale
+from ovos_config.locale import setup_locale
 from mycroft.lock import Lock as PIDLock  # Create/Support PID locking file
 from mycroft.util import reset_sigint_handler, wait_for_exit_signal, \
     check_for_signal

@@ -4,7 +4,7 @@ Speech client moved into mycroft.listener module
 """
 
 from mycroft.listener.service import SpeechService, on_error, on_stopping, on_ready
-from mycroft.configuration import setup_locale
+from ovos_config.locale import setup_locale
 from mycroft.lock import Lock as PIDLock  # Create/Support PID locking file
 from mycroft.util import (
     reset_sigint_handler,

@@ -1,5 +1,5 @@
 from ovos_plugin_manager.tts import OVOSTTSFactory, load_tts_plugin
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.tts import TTS, RemoteTTS, \
     RemoteTTSException, RemoteTTSTimeoutException
 

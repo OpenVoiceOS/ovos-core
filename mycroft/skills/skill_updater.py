@@ -19,7 +19,7 @@ from os.path import join, isfile, isdir
 from json_database import JsonStorage
 
 from mycroft.api import DeviceApi, is_paired
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from ovos_utils.configuration import get_xdg_data_save_path
 from combo_lock import ComboLock
 from mycroft.util.log import LOG

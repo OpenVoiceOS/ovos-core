@@ -23,7 +23,7 @@ from mycroft.util.process_utils import ProcessStatus, StatusCallbackMap, Process
 
 from mycroft.api import is_paired
 from mycroft.enclosure.api import EnclosureAPI
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from mycroft.messagebus.message import Message
 from mycroft.util.log import LOG
 from mycroft.util import connected

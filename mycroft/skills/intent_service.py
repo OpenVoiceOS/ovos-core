@@ -13,7 +13,8 @@
 # limitations under the License.
 #
 """Mycroft's intent service, providing intent parsing since forever!"""
-from mycroft.configuration import Configuration, setup_locale
+from ovos_config.config import Configuration
+from ovos_config.locale import setup_locale
 from mycroft.messagebus.message import Message, dig_for_message
 from mycroft.metrics import report_timing, Stopwatch
 from mycroft.skills.intent_service_interface import open_intent_envelope

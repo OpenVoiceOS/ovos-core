@@ -15,7 +15,7 @@
 """ Interface for interacting with the Mycroft gui qml viewer. """
 from os.path import join
 
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from mycroft.messagebus.message import Message
 from mycroft.util import resolve_resource_file
 from mycroft.util.log import LOG

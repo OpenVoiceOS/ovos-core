@@ -37,7 +37,8 @@ from mycroft.audio import wait_while_speaking
 from mycroft.deprecated.enclosure.mark1.arduino import EnclosureArduino
 from mycroft.deprecated.enclosure.mark1.eyes import EnclosureEyes
 from mycroft.deprecated.enclosure.mark1.mouth import EnclosureMouth
-from mycroft.configuration import LocalConf, USER_CONFIG
+from ovos_config.config import LocalConf
+from ovos_config.locations import USER_CONFIG
 from mycroft.messagebus.message import Message
 from mycroft.util import play_wav, create_signal, connected, check_for_signal
 from mycroft.util.audio_test import record

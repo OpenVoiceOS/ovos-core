@@ -32,7 +32,7 @@ from tornado.options import parse_command_line
 from tornado.web import Application
 from tornado.websocket import WebSocketHandler
 
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from mycroft.messagebus import Message
 from mycroft.util.log import LOG
 from mycroft.util.process_utils import create_daemon

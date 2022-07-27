@@ -18,7 +18,7 @@ from copy import copy, deepcopy
 
 import requests
 from requests import HTTPError, RequestException
-import mycroft.configuration
+from ovos_config.config import Configuration
 from mycroft.identity import IdentityManager, identity_lock
 from mycroft.version import VersionManager, OVOS_VERSION_STR
 from mycroft.util import get_arch, connected, LOG
@@ -47,7 +47,7 @@ class Api:
 
         # Load the config, skipping the remote config since we are
         # getting the info needed to get to it!
-        config = mycroft.configuration.Configuration()
+        config = Configuration()
         config_server = config.get("server") or {}
         self.url = config_server.get("url")
         self.version = config_server.get("version")
@@ -529,7 +529,7 @@ def check_remote_pairing(ignore_errors):
 
 
 def is_backend_disabled():
-    config = mycroft.configuration.Configuration()
+    config = Configuration()
     if not config.get("server"):
         # missing server block implies disabling backend
         return True

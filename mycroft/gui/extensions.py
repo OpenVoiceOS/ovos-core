@@ -1,5 +1,5 @@
 import threading
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from mycroft.messagebus import Message
 from mycroft.util.log import LOG
 from mycroft.api import is_paired

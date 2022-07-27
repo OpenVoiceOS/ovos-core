@@ -65,7 +65,7 @@ from threading import Timer
 import yaml
 
 from mycroft.api import DeviceApi, is_paired, is_backend_disabled
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from ovos_utils.configuration import get_xdg_cache_save_path
 from mycroft.messagebus.message import Message
 from mycroft.util import camel_case_split

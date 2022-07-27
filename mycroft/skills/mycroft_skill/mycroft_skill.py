@@ -30,7 +30,7 @@ from json_database import JsonStorage
 from mycroft import dialog
 from mycroft.api import DeviceApi
 from mycroft.audio import wait_while_speaking
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from mycroft.dialog import load_dialogs
 from mycroft.filesystem import FileSystemAccess
 from mycroft.gui import SkillGUI

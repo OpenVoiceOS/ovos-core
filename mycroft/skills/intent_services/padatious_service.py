@@ -21,7 +21,7 @@ from time import time as get_time, sleep
 from os import path
 from os.path import expanduser, isfile
 
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from mycroft.messagebus.message import Message
 from mycroft.util.log import LOG
 from mycroft.skills.intent_services.base import IntentMatch

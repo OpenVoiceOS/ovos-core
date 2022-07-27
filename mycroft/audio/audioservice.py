@@ -16,7 +16,7 @@ import time
 from threading import Lock
 
 from mycroft.audio.services import RemoteAudioBackend
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from mycroft.messagebus.message import Message
 from mycroft.util.log import LOG
 from mycroft.util.monotonic_event import MonotonicEvent

@@ -3,7 +3,7 @@ import logging
 import signal as sig
 from threading import Event
 from mycroft.util.log import LOG
-import mycroft.configuration
+from ovos_config.config import Configuration
 from ovos_utils import create_daemon, wait_for_exit_signal
 import mycroft.messagebus.client
 
@@ -72,7 +72,7 @@ def create_echo_function(name, whitelist=None):
     Returns:
         func: The echo function
     """
-    blacklist = mycroft.configuration.Configuration().get("ignore_logs")
+    blacklist = Configuration().get("ignore_logs")
 
     # Make sure whitelisting doesn't remove the log level setting command
     if whitelist:
@@ -123,7 +123,7 @@ def start_message_bus_client(service, bus=None, whitelist=None):
     # Create a client if one was not provided
     if bus is None:
         bus = mycroft.messagebus.client.MessageBusClient()
-    mycroft.configuration.Configuration.set_config_update_handlers(bus)
+    Configuration.set_config_update_handlers(bus)
     bus_connected = Event()
     bus.on('message', create_echo_function(service, whitelist))
     # Set the bus connected event when connection is established

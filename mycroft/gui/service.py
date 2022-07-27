@@ -1,7 +1,5 @@
-from mycroft.messagebus import Message
 from mycroft.messagebus.client import MessageBusClient
-from mycroft.util import create_daemon, start_message_bus_client
-from mycroft.configuration import Configuration, LocalConf, USER_CONFIG
+from mycroft.util import start_message_bus_client
 from mycroft.util.log import LOG
 from .namespace import NamespaceManager
 from mycroft.gui.extensions import ExtensionsManager

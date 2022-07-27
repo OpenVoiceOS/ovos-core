@@ -22,8 +22,8 @@ from datetime import datetime, timedelta
 from threading import Thread, Lock
 from os.path import isfile, join, expanduser
 
-from mycroft.configuration import Configuration
-from ovos_utils.configuration import get_xdg_base, get_xdg_data_save_path, get_xdg_config_save_path
+from ovos_config.config import Configuration
+from ovos_config.locations import get_xdg_data_save_path, get_xdg_config_save_path
 from mycroft.messagebus.message import Message
 from mycroft.util.log import LOG
 from mycroft.skills.mycroft_skill.event_container import EventContainer, \

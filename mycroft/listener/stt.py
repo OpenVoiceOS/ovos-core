@@ -1,5 +1,5 @@
 from mycroft.api import STTApi, HTTPError
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from mycroft.util.log import LOG
 
 from ovos_plugin_manager.stt import OVOSSTTFactory, load_stt_plugin

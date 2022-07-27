@@ -1,6 +1,6 @@
 import time
 
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from mycroft.messagebus.message import Message
 from mycroft.skills.intent_services import (
     IntentMatch

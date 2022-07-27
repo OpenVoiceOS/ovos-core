@@ -43,7 +43,7 @@ from threading import Lock, Timer
 from time import time, sleep
 from typing import List, Union
 
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from mycroft.messagebus import Message, MessageBusClient
 from mycroft.util.log import LOG
 from .bus import (

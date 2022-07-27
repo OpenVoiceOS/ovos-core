@@ -19,7 +19,7 @@ import time
 from adapt.context import ContextManagerFrame
 from adapt.engine import IntentDeterminationEngine
 from ovos_utils.intents import AdaptIntent, IntentBuilder, Intent
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from mycroft.util.log import LOG
 from mycroft.skills.intent_services.base import IntentMatch
 

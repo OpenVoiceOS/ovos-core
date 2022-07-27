@@ -4,7 +4,7 @@ from threading import Thread, Lock
 from mycroft_bus_client import Message
 
 from mycroft.audio.tts import TTSFactory
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from mycroft.metrics import report_timing, Stopwatch
 from mycroft.audio.audioservice import AudioService
 from mycroft.util import check_for_signal, start_message_bus_client

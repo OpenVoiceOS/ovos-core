@@ -161,7 +161,7 @@ def get(phrase, lang=None, context=None):
     """
 
     if not lang:
-        from mycroft.configuration import Configuration
+        from ovos_config.config import Configuration
         lang = Configuration().get('lang', "en-us")
 
     filename = join('text', lang.lower(), phrase + '.dialog')

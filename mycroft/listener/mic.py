@@ -33,7 +33,7 @@ from speech_recognition import (
 from tempfile import gettempdir
 from threading import Lock, Event
 from mycroft.api import DeviceApi
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from mycroft.session import SessionManager
 from mycroft.util import (
     check_for_signal,

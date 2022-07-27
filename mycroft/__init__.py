@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 from os.path import abspath, dirname, join
-import mycroft.configuration
+from ovos_config.config import Configuration
 from mycroft.api import Api
 from mycroft.messagebus.message import Message
 
@@ -29,7 +29,7 @@ __all__ = ['MYCROFT_ROOT_PATH',
            'Api',
            'Message']
 
-_cfg = mycroft.configuration.Configuration()
+_cfg = Configuration()
 _log_level = _cfg.get("log_level", "INFO")
 _logs_conf = _cfg.get("logs") or {}
 _logs_conf["level"] = _log_level

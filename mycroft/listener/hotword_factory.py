@@ -1,4 +1,4 @@
-from mycroft.configuration import Configuration
+from ovos_config.config import Configuration
 from ovos_plugin_manager.wakewords import OVOSWakeWordFactory, \
     load_wake_word_plugin, find_wake_word_plugins
 from ovos_plugin_manager.templates.hotwords import HotWordEngine

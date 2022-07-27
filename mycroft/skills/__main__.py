@@ -20,7 +20,7 @@ directory.  The executable gets added to the bin directory when installed
 """
 
 import mycroft.lock
-from mycroft.configuration import setup_locale
+from ovos_config.locale import setup_locale
 from mycroft.skills.api import SkillApi
 from mycroft.skills.core import FallbackSkill
 from mycroft.skills.event_scheduler import EventScheduler
