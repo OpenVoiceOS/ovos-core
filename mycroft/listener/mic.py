@@ -865,7 +865,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
                 return None, lang
 
             audio_data = self._listen_phrase(source, sec_per_buffer, stream)
-            if self.hybrid_listening:
+            if self.hybrid_listening or self.continuous_mode:
                 self.listening_mode = ListeningMode.CONTINUOUS
                 self._listen_ts = time.time()
 
@@ -874,7 +874,9 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
             audio_data = self._listen_phrase(source, sec_per_buffer, stream)
 
             # reset to wake word mode if 15 seconds elapsed
-            if self.hybrid_listening and time.time() - self._listen_ts > self.listen_timeout:
+            if not self.continuous_mode and \
+                    self.hybrid_listening and \
+                    time.time() - self._listen_ts > self.listen_timeout:
                 self.listening_mode = ListeningMode.WAKEWORD
 
         elif self.listening_mode == ListeningMode.RECORDING:
