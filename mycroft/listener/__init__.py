@@ -130,17 +130,6 @@ class AudioConsumer(Thread):
     def listening_mode(self):
         return self.loop.responsive_recognizer.listening_mode
 
-    @property
-    def _listen_strings(self):
-        """ wakewords can define a string to be cleaned from STT transcript
-         this is removed only if the transcript starts with this text"""
-        valid_strings = []
-        for ww, w in self.loop.listen_words.items():
-            valid_strings += w.get("stt_strings", [])
-            if ww not in valid_strings:
-                valid_strings.append(ww)
-        return [w for w in valid_strings if w]
-
     def run(self):
         while self.loop.state.running:
             self.read()
@@ -186,15 +175,8 @@ class AudioConsumer(Thread):
             if transcription:
                 ident = str(stopwatch.timestamp) + str(hash(transcription))
 
-                # clean wake words caught at start of transcript
-                clean = transcription
-                if self.listening_mode == ListeningMode.CONTINUOUS:
-                    for ww in self._listen_strings:
-                        if clean.startswith(ww):
-                            clean = clean[len(ww):]
-
                 # STT succeeded, send the transcribed speech on for processing
-                utts = [clean, transcription] if clean != transcription else [transcription]
+                utts = [transcription]
                 payload = {
                     'utterances': utts,
                     'lang': self.loop.stt.lang,
@@ -358,7 +340,6 @@ class RecognizerLoop(EventEmitter):
                 lang = data.get("stt_lang", self.lang)
                 enabled = data.get("active", True)
                 event = data.get("bus_event")
-                stt_strings = data.get("stt_strings", [])
                 # global listening sound
                 if not sound and listen and global_listen:
                     sound = global_sounds.get("start_listening")
@@ -378,7 +359,6 @@ class RecognizerLoop(EventEmitter):
                                           "trigger": trigger,
                                           "utterance": utterance,
                                           "stt_lang": lang,
-                                          "stt_strings": stt_strings,
                                           "listen": listen,
                                           "wakeup": wakeup,
                                           "stopword": stopword}
