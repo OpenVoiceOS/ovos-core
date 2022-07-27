@@ -271,7 +271,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         self.instant_listen = listener_config.get("instant_listen", False)
         self.continuous_mode = listener_config.get("continuous_listen", False)
         self.hybrid_listening = listener_config.get("hybrid_listen", False)
-        self.listen_timeout = listener_config.get("listen_timeout", 15)
+        self.listen_timeout = listener_config.get("listen_timeout", 45)
         self._listen_ts = 0
         # experimental setting, no wake word needed
         if self.continuous_mode:
