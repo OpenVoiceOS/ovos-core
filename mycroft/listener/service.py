@@ -17,7 +17,7 @@ from threading import Thread
 
 from mycroft import dialog
 from mycroft.listener import RecognizerLoop
-from mycroft.listener.mic import ListeningMode
+from mycroft.listener.mic import ListenerState, ListeningMode
 from ovos_config.config import Configuration
 from mycroft.enclosure.api import EnclosureAPI
 from mycroft.identity import IdentityManager
@@ -135,23 +135,37 @@ class SpeechService(Thread):
                    'source': 'audio'}
         self.bus.emit(Message('speak', data, context))
 
-    def handle_change_mode(self, event):
-        """Set listening mode."""
+    def handle_change_state(self, event):
+        """Set listening state."""
+        state = event.data.get("state")
         mode = event.data.get("mode")
-        if mode == ListeningMode.WAKEWORD:
-            self.loop.listening_mode = ListeningMode.WAKEWORD
-        elif mode == ListeningMode.CONTINUOUS:
-            self.loop.listening_mode = ListeningMode.CONTINUOUS
-        elif mode == ListeningMode.RECORDING:
-            self.loop.listening_mode = ListeningMode.RECORDING
-        else:
-            LOG.error(f"Invalid listening mode: {mode}")
-        self.handle_get_mode(event)
+        if state:
+            if state == ListenerState.WAKEWORD:
+                self.loop.listening_state = ListenerState.WAKEWORD
+            elif state == ListenerState.CONTINUOUS:
+                self.loop.listening_state = ListenerState.CONTINUOUS
+            elif state == ListenerState.RECORDING:
+                self.loop.listening_state = ListenerState.RECORDING
+            else:
+                LOG.error(f"Invalid listening state: {state}")
 
-    def handle_get_mode(self, event):
-        """Query listening mode"""
-        data = {'mode': self.loop.listening_mode}
-        self.bus.emit(event.reply("recognizer_loop:listening_mode", data))
+        if mode:
+            if mode == ListeningMode.WAKEWORD:
+                self.loop.listen_mode = ListeningMode.WAKEWORD
+            elif mode == ListeningMode.CONTINUOUS:
+                self.loop.listen_mode = ListeningMode.CONTINUOUS
+            elif mode == ListeningMode.HYBRID:
+                self.loop.listen_mode = ListeningMode.HYBRID
+            else:
+                LOG.error(f"Invalid listen mode: {mode}")
+
+        self.handle_get_state(event)
+
+    def handle_get_state(self, event):
+        """Query listening state"""
+        data = {'mode': self.loop.listen_mode,
+                "state": self.loop.listening_state}
+        self.bus.emit(event.reply("recognizer_loop:state", data))
 
     def handle_stop_recording(self, event):
         """Stop current recording session """
@@ -246,8 +260,8 @@ class SpeechService(Thread):
         self.bus.on('recognizer_loop:sleep', self.handle_sleep)
         self.bus.on('recognizer_loop:wake_up', self.handle_wake_up)
         self.bus.on('recognizer_loop:record_stop', self.handle_stop_recording)
-        self.bus.on('recognizer_loop:listening_mode.set', self.handle_change_mode)
-        self.bus.on('recognizer_loop:listening_mode.get', self.handle_get_mode)
+        self.bus.on('recognizer_loop:state.set', self.handle_change_state)
+        self.bus.on('recognizer_loop:state.get', self.handle_get_state)
         self.bus.on('mycroft.mic.mute', self.handle_mic_mute)
         self.bus.on('mycroft.mic.unmute', self.handle_mic_unmute)
         self.bus.on('mycroft.mic.get_status', self.handle_mic_get_status)

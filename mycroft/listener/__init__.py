@@ -21,7 +21,7 @@ import pyaudio
 from pyee import EventEmitter
 
 from mycroft.listener.hotword_factory import HotWordFactory
-from mycroft.listener.mic import MutableMicrophone, ResponsiveRecognizer, ListeningMode
+from mycroft.listener.mic import MutableMicrophone, ResponsiveRecognizer, ListenerState
 from ovos_config.config import Configuration
 from mycroft.metrics import Stopwatch, report_timing
 from mycroft.session import SessionManager
@@ -127,8 +127,12 @@ class AudioConsumer(Thread):
         self.loop = loop
 
     @property
-    def listening_mode(self):
-        return self.loop.responsive_recognizer.listening_mode
+    def listening_state(self):
+        return self.loop.responsive_recognizer.listener_state
+
+    @property
+    def listen_mode(self):
+        return self.loop.responsive_recognizer.listen_mode
 
     def run(self):
         while self.loop.state.running:
@@ -195,7 +199,7 @@ class AudioConsumer(Thread):
     def transcribe(self, audio, lang):
         def send_unknown_intent():
             """ Send message that nothing was transcribed. """
-            if self.listening_mode == ListeningMode.WAKEWORD:
+            if self.listening_state == ListenerState.WAKEWORD:
                 self.loop.emit('recognizer_loop:speech.recognition.unknown')
 
         try:
@@ -294,12 +298,20 @@ class RecognizerLoop(EventEmitter):
                 if not v.get("stopword") and not v.get("wakeup")}
 
     @property
-    def listening_mode(self):
-        return self.responsive_recognizer.listening_mode
+    def listening_state(self):
+        return self.responsive_recognizer.listener_state
 
-    @listening_mode.setter
-    def listening_mode(self, val):
-        self.responsive_recognizer.listening_mode = val
+    @listening_state.setter
+    def listening_state(self, val):
+        self.responsive_recognizer.listener_state = val
+
+    @property
+    def listen_mode(self):
+        return self.responsive_recognizer.listen_mode
+
+    @listen_mode.setter
+    def listen_mode(self, val):
+        self.responsive_recognizer.listen_mode = val
 
     def _load_config(self):
         """Load configuration parameters from configuration."""

@@ -54,10 +54,18 @@ WakeWordData = namedtuple('WakeWordData',
                           ['audio', 'found', 'stopped', 'end_audio'])
 
 
-class ListeningMode(str, Enum):
+class ListenerState(str, Enum):
+    """ current listener state """
     WAKEWORD = "wakeword"
     CONTINUOUS = "continuous"
     RECORDING = "recording"
+
+
+class ListeningMode(str, Enum):
+    """ global listening mode """
+    WAKEWORD = "wakeword"
+    CONTINUOUS = "continuous"
+    HYBRID = "hybrid"
 
 
 class MutableStream:
@@ -269,15 +277,17 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         self.config = Configuration()
         listener_config = self.config.get('listener') or {}
         self.instant_listen = listener_config.get("instant_listen", False)
-        self.continuous_mode = listener_config.get("continuous_listen", False)
-        self.hybrid_listening = listener_config.get("hybrid_listen", False)
         self.listen_timeout = listener_config.get("listen_timeout", 45)
         self._listen_ts = 0
-        # experimental setting, no wake word needed
-        if self.continuous_mode:
-            self.listening_mode = ListeningMode.CONTINUOUS
+
+        self.listener_state = ListenerState.WAKEWORD
+        if listener_config.get("continuous_listen", False):
+            self.listen_mode = ListeningMode.CONTINUOUS
+            self.listener_state = ListenerState.CONTINUOUS
+        elif listener_config.get("hybrid_listen", False):
+            self.listen_mode = ListeningMode.HYBRID
         else:
-            self.listening_mode = ListeningMode.WAKEWORD
+            self.listen_mode = ListeningMode.WAKEWORD
 
         self.upload_url = listener_config['wake_word_upload']['url']
         self.upload_disabled = listener_config['wake_word_upload']['disable']
@@ -429,7 +439,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         return False
 
     def check_for_stop(self, audio_data):
-        if self.listening_mode != ListeningMode.RECORDING:
+        if self.listener_state != ListenerState.RECORDING:
             return
         try:
             for ww, hotword in self.loop.stop_words.items():
@@ -496,7 +506,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
                 stream.stream_chunk(chunk)
             result = self.silence_detector.process(chunk)
 
-            if self.listening_mode == ListeningMode.CONTINUOUS:
+            if self.listener_state == ListenerState.CONTINUOUS:
                 if result.type == SilenceResultType.PHRASE_END:
                     break
             elif result.type in {SilenceResultType.PHRASE_END, SilenceResultType.TIMEOUT}:
@@ -510,7 +520,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
 
         # if in continuous mode do not include silence before phrase
         # if in wake word mode include full audio after wake word
-        return self.silence_detector.stop(phrase_only=self.listening_mode == ListeningMode.CONTINUOUS)
+        return self.silence_detector.stop(phrase_only=self.listener_state == ListenerState.CONTINUOUS)
 
     def _record_audio(self, source, sec_per_buffer):
         """Record audio until signaled to stop
@@ -856,7 +866,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         lang = get_message_lang()
         self._stop_recording = False
 
-        if self.listening_mode == ListeningMode.WAKEWORD:
+        if self.listener_state == ListenerState.WAKEWORD:
             LOG.debug("Waiting for wake word...")
             ww_data, lang = self._wait_until_wake_word(source, sec_per_buffer)
 
@@ -865,21 +875,20 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
                 return None, lang
 
             audio_data = self._listen_phrase(source, sec_per_buffer, stream)
-            if self.hybrid_listening or self.continuous_mode:
-                self.listening_mode = ListeningMode.CONTINUOUS
+            if self.listen_mode != ListeningMode.WAKEWORD:
+                self.listener_state = ListenerState.CONTINUOUS
                 self._listen_ts = time.time()
 
-        elif self.listening_mode == ListeningMode.CONTINUOUS:
+        elif self.listener_state == ListenerState.CONTINUOUS:
             LOG.debug("Listening...")
             audio_data = self._listen_phrase(source, sec_per_buffer, stream)
 
             # reset to wake word mode if 15 seconds elapsed
-            if not self.continuous_mode and \
-                    self.hybrid_listening and \
+            if self.listen_mode == ListeningMode.HYBRID and \
                     time.time() - self._listen_ts > self.listen_timeout:
-                self.listening_mode = ListeningMode.WAKEWORD
+                self.listener_state = ListenerState.WAKEWORD
 
-        elif self.listening_mode == ListeningMode.RECORDING:
+        elif self.listener_state == ListenerState.RECORDING:
             LOG.debug("Recording...")
             self.loop.emit("recognizer_loop:record_begin")
             audio_data = self._record_audio(source, sec_per_buffer)
@@ -893,12 +902,12 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
             self.loop.emit("recognizer_loop:record_end",
                            {"filename": filename})
 
-            # reset listening mode, we dont want to accidentally save 24h of audio per day ....
+            # reset listener state, we dont want to accidentally save 24h of audio per day ....
             # experimental setting, no wake word needed
-            if self.continuous_mode:
-                self.listening_mode = ListeningMode.CONTINUOUS
+            if self.listen_mode == ListeningMode.CONTINUOUS:
+                self.listener_state = ListenerState.CONTINUOUS
             else:
-                self.listening_mode = ListeningMode.WAKEWORD
+                self.listener_state = ListenerState.WAKEWORD
 
             # recording mode should not trigger STT
             return None, lang
