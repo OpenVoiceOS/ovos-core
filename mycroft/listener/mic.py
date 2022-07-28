@@ -869,6 +869,11 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         """
         return AudioData(raw_data, source.SAMPLE_RATE, source.SAMPLE_WIDTH)
 
+    def extend_listening(self):
+        """ reset the timeout until wakeword is needed again
+         only used when in hybrid listening mode """
+        self._listen_ts = time.time()
+
     def listen(self, source, stream):
         """Listens for chunks of audio that Mycroft should perform STT on.
 
@@ -914,13 +919,13 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
             audio_data = self._listen_phrase(source, sec_per_buffer, stream)
             if self.listen_mode != ListeningMode.WAKEWORD:
                 self.listen_state = ListenerState.CONTINUOUS
-                self._listen_ts = time.time()
+                self.extend_listening()
 
         elif self.listen_state == ListenerState.CONTINUOUS:
             LOG.debug("Listening...")
             audio_data = self._listen_phrase(source, sec_per_buffer, stream)
 
-            # reset to wake word mode if 15 seconds elapsed
+            # reset to wake word mode if 45 seconds elapsed
             if self.listen_mode == ListeningMode.HYBRID and \
                     time.time() - self._listen_ts > self.listen_timeout:
                 self.listen_state = ListenerState.WAKEWORD

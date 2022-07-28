@@ -186,6 +186,13 @@ class SpeechService(Thread):
         """Stop current recording session """
         self.loop.responsive_recognizer.stop_recording()
 
+    def handle_extend_listening(self, event):
+        """ when a skill is activated (converse) reset
+        the timeout until wakeword is needed again
+        only used when in hybrid listening mode """
+        if self.loop.listen_mode == ListeningMode.HYBRID:
+            self.loop.responsive_recognizer.extend_listening()
+
     def handle_sleep(self, event):
         """Put the recognizer loop to sleep."""
         self.loop.sleep()
@@ -289,6 +296,7 @@ class SpeechService(Thread):
         self.bus.on('recognizer_loop:audio_output_end', self.handle_audio_end)
         self.bus.on('mycroft.stop', self.handle_stop)
         self.bus.on("ovos.languages.stt", self.handle_get_languages_stt)
+        self.bus.on("intent.service.skills.activated", self.handle_extend_listening)
 
     def run(self):
         self.status.set_started()
