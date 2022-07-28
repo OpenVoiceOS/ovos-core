@@ -330,7 +330,9 @@ class AudioService:
             return True
         destination = message.context.get("destination")
         if destination:
-            if "audio" in destination or "debug_cli" in destination:
+            native_sources = Configuration()["Audio"].get(
+                "native_sources", ["debug_cli", "audio"]) or []
+            if any(s in destination for s in native_sources):
                 # request from device
                 return True
             # external request, do not handle

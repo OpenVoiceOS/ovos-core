@@ -47,6 +47,8 @@ class PlaybackService(Thread):
         self.status.set_started()
 
         self.config = Configuration()
+        self.native_sources = self.config["Audio"].get("native_sources",
+                                                       ["debug_cli", "audio"]) or []
         self.tts = None
         self._tts_hash = None
         self.lock = Lock()
@@ -95,8 +97,7 @@ class PlaybackService(Thread):
         # don't synthesise speech
         message.context = message.context or {}
         if message.context.get('destination') and not \
-                ('debug_cli' in message.context['destination'] or
-                 'audio' in message.context['destination']):
+                any(s in message.context['destination'] for s in self.native_sources):
             return
 
         # Get conversation ID
