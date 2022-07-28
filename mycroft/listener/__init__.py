@@ -126,14 +126,6 @@ class AudioConsumer(Thread):
         self.daemon = True
         self.loop = loop
 
-    @property
-    def listening_state(self):
-        return self.loop.responsive_recognizer.listener_state
-
-    @property
-    def listen_mode(self):
-        return self.loop.responsive_recognizer.listen_mode
-
     def run(self):
         while self.loop.state.running:
             self.read()
@@ -199,7 +191,7 @@ class AudioConsumer(Thread):
     def transcribe(self, audio, lang):
         def send_unknown_intent():
             """ Send message that nothing was transcribed. """
-            if self.listening_state == ListenerState.WAKEWORD:
+            if self.loop.responsive_recognizer.listen_state == ListenerState.WAKEWORD:
                 self.loop.emit('recognizer_loop:speech.recognition.unknown')
 
         try:
@@ -298,12 +290,12 @@ class RecognizerLoop(EventEmitter):
                 if not v.get("stopword") and not v.get("wakeup")}
 
     @property
-    def listening_state(self):
-        return self.responsive_recognizer.listener_state
+    def listen_state(self):
+        return self.responsive_recognizer.listen_state
 
-    @listening_state.setter
-    def listening_state(self, val):
-        self.responsive_recognizer.listener_state = val
+    @listen_state.setter
+    def listen_state(self, val):
+        self.responsive_recognizer.listen_state = val
 
     @property
     def listen_mode(self):

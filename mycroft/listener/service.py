@@ -141,11 +141,11 @@ class SpeechService(Thread):
         mode = event.data.get("mode")
         if state:
             if state == ListenerState.WAKEWORD:
-                self.loop.listening_state = ListenerState.WAKEWORD
+                self.loop.listen_state = ListenerState.WAKEWORD
             elif state == ListenerState.CONTINUOUS:
-                self.loop.listening_state = ListenerState.CONTINUOUS
+                self.loop.listen_state = ListenerState.CONTINUOUS
             elif state == ListenerState.RECORDING:
-                self.loop.listening_state = ListenerState.RECORDING
+                self.loop.listen_state = ListenerState.RECORDING
             else:
                 LOG.error(f"Invalid listening state: {state}")
 
@@ -164,7 +164,7 @@ class SpeechService(Thread):
     def handle_get_state(self, event):
         """Query listening state"""
         data = {'mode': self.loop.listen_mode,
-                "state": self.loop.listening_state}
+                "state": self.loop.listen_state}
         self.bus.emit(event.reply("recognizer_loop:state", data))
 
     def handle_stop_recording(self, event):
