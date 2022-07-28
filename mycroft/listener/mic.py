@@ -462,7 +462,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
                     self.loop.state.sleeping = False
                     self.loop.emit('recognizer_loop:awoken')
                     self._waiting_for_wakeup = False
-                    return 
+                    return True
         except RuntimeError:  #  dictionary changed size during iteration
             # seems like config changed and we hit this mid reload!
             pass
@@ -487,11 +487,6 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         return False
 
     def check_for_hotwords(self, audio_data, source):
-        if self.check_for_wakeup(audio_data, source):
-            # was a wake up command to come out of sleep state
-            # a bus event was emitted to handle this
-            return
-
         # check hot word
         try:
             for ww, hotword in self.loop.hot_words.items():
@@ -817,14 +812,20 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
                     buffers_since_check -= buffers_per_check
                     audio_data = audio_buffer.get_last(test_size) + silence
                     said_hot_word = False
-                    for hotword in self.check_for_hotwords(audio_data, source):
-                        said_hot_word = True
-                        listen = self.loop.engines[hotword]["listen"]
-                        stt_lang = self.loop.engines[hotword]["stt_lang"]
-                        self._handle_hotword_found(hotword, audio_data, source)
-                        if listen and not self.loop.state.sleeping:
-                            return WakeWordData(audio_data, said_wake_word,
-                                                self._stop_signaled, ww_frames), stt_lang
+
+                    # check for wake up command to come out of sleep state
+                    was_wakeup = self.check_for_wakeup(audio_data, source)
+
+                    # else check for hotwords
+                    if not was_wakeup:
+                        for hotword in self.check_for_hotwords(audio_data, source):
+                            said_hot_word = True
+                            listen = self.loop.engines[hotword]["listen"]
+                            stt_lang = self.loop.engines[hotword]["stt_lang"]
+                            self._handle_hotword_found(hotword, audio_data, source)
+                            if listen and not self.loop.state.sleeping:
+                                return WakeWordData(audio_data, said_wake_word,
+                                                    self._stop_signaled, ww_frames), stt_lang
 
                     if said_hot_word:
                         # reset bytearray to store wake word audio in, else many
