@@ -147,6 +147,8 @@ class SpeechService(Thread):
         """Set listening state."""
         state = event.data.get("state")
         mode = event.data.get("mode")
+        needs_skip = self.loop.listen_state == ListenerState.WAKEWORD
+
         if state:
             if state == ListenerState.WAKEWORD:
                 self.loop.listen_state = ListenerState.WAKEWORD
@@ -166,6 +168,11 @@ class SpeechService(Thread):
                 self.loop.listen_mode = ListeningMode.HYBRID
             else:
                 LOG.error(f"Invalid listen mode: {mode}")
+
+        # signal the recognizer to stop waiting for a wakeword
+        # in order for it to enter the new state
+        if needs_skip:
+            self.loop.responsive_recognizer._listen_triggered = True
 
         self.handle_get_state(event)
 
