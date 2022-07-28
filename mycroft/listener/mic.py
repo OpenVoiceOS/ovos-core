@@ -654,6 +654,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
                         '.wav')
         with open(filename, 'wb') as f:
             f.write(audio.get_wav_data())
+        return filename
 
     def _handle_hotword_found(self, hotword, audio_data, source):
         """Perform actions to be triggered after a hotword is found.
@@ -681,6 +682,14 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         payload["hotword"] = hotword
         payload["engine"] = engine.__class__.__name__
 
+        filename = None
+        audio = self._create_audio_data(audio_data, source)
+        metadata = self._compile_metadata(engine)
+        if self.save_wake_words:
+            # Save wake word locally
+            filename = self._write_hotword_to_disk(audio, metadata)
+            payload["filename"] = filename
+
         if event:
             self.loop.emit("recognizer_loop:hotword_event",
                            {"msg_type": event})
@@ -690,7 +699,8 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
             # send the transcribed word on for processing
             payload = {
                 'utterances': [utterance],
-                "lang": stt_lang
+                "lang": stt_lang,
+                "filename": filename
             }
             self.loop.emit("recognizer_loop:utterance", payload)
         elif listen:
@@ -724,17 +734,10 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
             except Exception as e:
                 LOG.warning(e)
 
-        # Save and upload positive wake words as appropriate
+        # Upload wake word for opt_in people
         upload_allowed = (self.config['opt_in'] and not self.upload_disabled)
-        if (self.save_wake_words or upload_allowed):
-            audio = self._create_audio_data(audio_data, source)
-            metadata = self._compile_metadata(engine)
-            if self.save_wake_words:
-                # Save wake word locally
-                self._write_hotword_to_disk(audio, metadata)
-            # Upload wake word for opt_in people
-            if upload_allowed:
-                self._upload_hotword(audio, metadata)
+        if upload_allowed:
+            self._upload_hotword(audio, metadata)
 
     def _wait_until_wake_word(self, source, sec_per_buffer):
         """Listen continuously on source until a wake word is spoken
