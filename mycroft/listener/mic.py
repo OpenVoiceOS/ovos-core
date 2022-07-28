@@ -421,7 +421,28 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         for ww, hotword in self.loop.stop_words.items():
             hotword["engine"].update(chunk)
 
-    def check_for_wakeup(self, audio_data):
+    def _process_hotword(self, audio_data, source, engine, payload, wordtype="hotword"):
+        """emits a bus event signaling the detection
+         if mycroft is configured to do so also handles saving to disk and uploading to selene"""
+        upload_allowed = (self.config['opt_in'] and not self.upload_disabled)
+
+        if upload_allowed or self.save_wake_words:
+            audio = self._create_audio_data(audio_data, source)
+            metadata = self._compile_metadata(engine)
+
+            # Save wake word locally
+            if self.save_wake_words:
+                filename = self._write_hotword_to_disk(audio, metadata)
+                payload["filename"] = filename
+
+            # Upload wake word for opt_in people
+            if upload_allowed:
+                self._upload_hotword(audio, metadata)
+
+        payload["engine"] = engine.__class__.__name__
+        self.loop.emit(f"recognizer_loop:{wordtype}", payload)
+
+    def check_for_wakeup(self, audio_data, source):
         if time.time() - self._last_ww_ts >= 5:
             self._waiting_for_wakeup = False
         if not self._waiting_for_wakeup or not self.loop.state.sleeping:
@@ -429,6 +450,9 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         try:
             for ww, hotword in self.loop.wakeup_words.items():
                 if hotword["engine"].found_wake_word(audio_data):
+                    self._process_hotword(audio_data, source,
+                                          hotword["engine"], dict(hotword),
+                                          "wakeupword")
                     self.loop.state.sleeping = False
                     self.loop.emit('recognizer_loop:awoken')
                     self._waiting_for_wakeup = False
@@ -438,21 +462,24 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
             pass
         return False
 
-    def check_for_stop(self, audio_data):
+    def check_for_stop(self, audio_data, source):
         if self.listen_state != ListenerState.RECORDING:
             return
         try:
             for ww, hotword in self.loop.stop_words.items():
                 if hotword["engine"].found_wake_word(audio_data):
                     LOG.debug(f"Stopword detected - {ww}")
+                    self._process_hotword(audio_data, source,
+                                          hotword["engine"], dict(hotword),
+                                          "stopword")
                     return True
         except RuntimeError:  #  dictionary changed size during iteration
             # seems like config changed and we hit this mid reload!
             pass
         return False
 
-    def check_for_hotwords(self, audio_data):
-        if self.check_for_wakeup(audio_data):
+    def check_for_hotwords(self, audio_data, source):
+        if self.check_for_wakeup(audio_data, source):
             return  # was a wake up command to come out of sleep state
         # check hot word
         try:
@@ -563,7 +590,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
             if buffers_since_check > buffers_per_check:
                 buffers_since_check -= buffers_per_check
                 audio_data = audio_buffer.get_last(test_size) + silence
-                if self.check_for_stop(audio_data):
+                if self.check_for_stop(audio_data, source):
                     break
 
         audio_data = self._create_audio_data(frame_data, source)
@@ -633,8 +660,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         """Upload the wakeword in a background thread."""
         LOG.debug(
             "Wakeword uploading has been disabled. The API endpoint used in "
-            "Mycroft-core v20.2 and below has been deprecated. To contribute "
-            "new wakeword samples please upgrade to v20.8 or above."
+            "Mycroft-core v20.2 and below has been deprecated."
         )
         # def upload(audio, metadata):
         #     requests.post(self.upload_url,
@@ -680,34 +706,26 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
 
         payload = dict(self.loop.engines[hotword])
         payload["hotword"] = hotword
-        payload["engine"] = engine.__class__.__name__
-
-        filename = None
-        audio = self._create_audio_data(audio_data, source)
-        metadata = self._compile_metadata(engine)
-        if self.save_wake_words:
-            # Save wake word locally
-            filename = self._write_hotword_to_disk(audio, metadata)
-            payload["filename"] = filename
-
-        if event:
-            self.loop.emit("recognizer_loop:hotword_event",
-                           {"msg_type": event})
 
         if utterance:
             LOG.debug("Hotword utterance: " + utterance)
             # send the transcribed word on for processing
             payload = {
                 'utterances': [utterance],
-                "lang": stt_lang,
-                "filename": filename
+                "lang": stt_lang
             }
             self.loop.emit("recognizer_loop:utterance", payload)
         elif listen:
-            payload["utterance"] = payload["hotword"]
-            self.loop.emit("recognizer_loop:wakeword", payload)
+            payload["utterance"] = hotword
+            self._process_hotword(audio_data, source,
+                                  engine, payload, "wakeword")
         else:
-            self.loop.emit("recognizer_loop:hotword", payload)
+            self._process_hotword(audio_data, source,
+                                  engine, payload, "hotword")
+
+        if event:
+            self.loop.emit("recognizer_loop:hotword_event",
+                           {"msg_type": event})
 
         # If enabled, play a wave file with a short sound to audibly
         # indicate hotword was detected.
@@ -733,11 +751,6 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
                     source.unmute()
             except Exception as e:
                 LOG.warning(e)
-
-        # Upload wake word for opt_in people
-        upload_allowed = (self.config['opt_in'] and not self.upload_disabled)
-        if upload_allowed:
-            self._upload_hotword(audio, metadata)
 
     def _wait_until_wake_word(self, source, sec_per_buffer):
         """Listen continuously on source until a wake word is spoken
@@ -793,7 +806,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
                     buffers_since_check -= buffers_per_check
                     audio_data = audio_buffer.get_last(test_size) + silence
                     said_hot_word = False
-                    for hotword in self.check_for_hotwords(audio_data):
+                    for hotword in self.check_for_hotwords(audio_data, source):
                         said_hot_word = True
                         listen = self.loop.engines[hotword]["listen"]
                         stt_lang = self.loop.engines[hotword]["stt_lang"]
