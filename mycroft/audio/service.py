@@ -3,7 +3,7 @@ from threading import Thread, Lock
 
 from mycroft_bus_client import Message
 
-from mycroft.audio.tts import TTSFactory
+from mycroft.audio.tts import TTSFactory, TTS
 from ovos_config.config import Configuration
 from mycroft.metrics import report_timing, Stopwatch
 from mycroft.audio.audioservice import AudioService
@@ -202,6 +202,15 @@ class PlaybackService(Thread):
             self.tts.playback.clear()  # Clear here to get instant stop
             self.bus.emit(Message("mycroft.stop.handled", {"by": "TTS"}))
 
+    def handle_queue_audio(self, message):
+        viseme = message.data.get("viseme")
+        ident = message.data.get("ident") or message.context.get("ident")  # unused ?
+        audio_ext = message.data.get("audio_ext")  # unused ?
+        audio_file = message.data.get("filename")
+        audio_ext = audio_ext or audio_file.split(".")[-1]
+        listen = message.data.get("listen", False)
+        TTS.queue.put((audio_ext, str(audio_file), viseme, ident, listen))
+
     def shutdown(self):
         """Shutdown the audio service cleanly.
 
@@ -220,4 +229,5 @@ class PlaybackService(Thread):
         Configuration.set_config_update_handlers(self.bus)
         self.bus.on('mycroft.stop', self.handle_stop)
         self.bus.on('mycroft.audio.speech.stop', self.handle_stop)
+        self.bus.on('mycroft.audio.queue', self.handle_queue_audio)
         self.bus.on('speak', self.handle_speak)
