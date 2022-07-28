@@ -443,15 +443,21 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         self.loop.emit(f"recognizer_loop:{wordtype}", payload)
 
     def check_for_wakeup(self, audio_data, source):
+        # only check for wake up if:
+        # - a wakeword was detected in previous 5 seconds
+        # - we are in sleep state
         if time.time() - self._last_ww_ts >= 5:
             self._waiting_for_wakeup = False
         if not self._waiting_for_wakeup or not self.loop.state.sleeping:
             return
+
         try:
             for ww, hotword in self.loop.wakeup_words.items():
                 if hotword["engine"].found_wake_word(audio_data):
+                    payload = dict(hotword)
+                    payload["hotword"] = ww
                     self._process_hotword(audio_data, source,
-                                          hotword["engine"], dict(hotword),
+                                          hotword["engine"], payload,
                                           "wakeupword")
                     self.loop.state.sleeping = False
                     self.loop.emit('recognizer_loop:awoken')
@@ -463,14 +469,16 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         return False
 
     def check_for_stop(self, audio_data, source):
+        # only check for stopwords during recording state
         if self.listen_state != ListenerState.RECORDING:
             return
         try:
             for ww, hotword in self.loop.stop_words.items():
                 if hotword["engine"].found_wake_word(audio_data):
-                    LOG.debug(f"Stopword detected - {ww}")
+                    payload = dict(hotword)
+                    payload["hotword"] = ww
                     self._process_hotword(audio_data, source,
-                                          hotword["engine"], dict(hotword),
+                                          hotword["engine"], payload,
                                           "stopword")
                     return True
         except RuntimeError:  #  dictionary changed size during iteration
@@ -480,7 +488,10 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
 
     def check_for_hotwords(self, audio_data, source):
         if self.check_for_wakeup(audio_data, source):
-            return  # was a wake up command to come out of sleep state
+            # was a wake up command to come out of sleep state
+            # a bus event was emitted to handle this
+            return
+
         # check hot word
         try:
             for ww, hotword in self.loop.hot_words.items():

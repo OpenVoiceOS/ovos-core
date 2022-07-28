@@ -91,12 +91,20 @@ class SpeechService(Thread):
         self.bus.emit(Message('mycroft.awoken', context=context))
 
     def handle_wakeword(self, event):
-        LOG.info("Wakeword Detected: " + event['utterance'])
+        LOG.info("Wakeword Detected: " + event['hotword'])
         self.bus.emit(Message('recognizer_loop:wakeword', event))
 
     def handle_hotword(self, event):
         LOG.info("Hotword Detected: " + event['hotword'])
         self.bus.emit(Message('recognizer_loop:hotword', event))
+
+    def handle_stopword(self, event):
+        LOG.info("Stop word Detected: " + event['hotword'])
+        self.bus.emit(Message('recognizer_loop:stopword', event))
+
+    def handle_wakeupword(self, event):
+        LOG.info("WakeUp word Detected: " + event['hotword'])
+        self.bus.emit(Message('recognizer_loop:wakeupword', event))
 
     def handle_hotword_event(self, event):
         """ hotword configured to emit a bus event
@@ -247,6 +255,8 @@ class SpeechService(Thread):
         self.loop.on('recognizer_loop:awoken', self.handle_awoken)
         self.loop.on('recognizer_loop:wakeword', self.handle_wakeword)
         self.loop.on('recognizer_loop:hotword', self.handle_hotword)
+        self.loop.on('recognizer_loop:stopword', self.handle_stopword)
+        self.loop.on('recognizer_loop:wakeupword', self.handle_wakeupword)
         self.loop.on('recognizer_loop:record_end', self.handle_record_end)
         self.loop.on('recognizer_loop:no_internet', self.handle_no_internet)
         self.loop.on('recognizer_loop:hotword_event',
