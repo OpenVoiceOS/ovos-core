@@ -421,6 +421,12 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         for ww, hotword in self.loop.stop_words.items():
             hotword["engine"].update(chunk)
 
+    def feed_wakeupwords(self, chunk):
+        """ feed sound chunk to wakeupword engines that perform
+         streaming predictions (eg, precise) """
+        for ww, hotword in self.loop.wakeup_words.items():
+            hotword["engine"].update(chunk)
+
     def _process_hotword(self, audio_data, source, engine, payload, wordtype="hotword"):
         """emits a bus event signaling the detection
          if mycroft is configured to do so also handles saving to disk and uploading to selene"""
@@ -706,6 +712,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
 
         if self.loop.state.sleeping:
             if listen:
+                # start listening for follow up wakeup words
                 self._waiting_for_wakeup = True
                 self._last_ww_ts = time.time()
             return  # no wake word handling during sleep mode
@@ -807,6 +814,8 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
                 ww_frames.append(chunk)
 
                 buffers_since_check += 1.0
+                if self.loop.state.sleeping:
+                    self.feed_wakeupwords(chunk)
                 self.feed_hotwords(chunk)
                 if buffers_since_check > buffers_per_check:
                     buffers_since_check -= buffers_per_check
