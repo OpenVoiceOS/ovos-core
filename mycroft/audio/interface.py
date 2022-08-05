@@ -12,10 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from os.path import abspath
+from os.path import abspath, basename
 from datetime import timedelta
-
+from ovos_utils.log import LOG
 from mycroft.messagebus.message import Message, dig_for_message
+from ovos_plugin_common_play.ocp.utils import extract_metadata
+from ovos_plugin_common_play.ocp.status import PlaybackType, TrackState
+from ovos_plugin_common_play.ocp.mycroft_cps import MycroftAudioService
+from ovos_plugin_common_play.ocp.base import _uri2meta
 
 
 def ensure_uri(s):
@@ -42,7 +46,7 @@ def ensure_uri(s):
 
 
 class AudioService:
-    """AudioService class for interacting with the audio subsystem
+    """AudioService class for interacting with OCP subsystem
 
     Args:
         bus: Mycroft messagebus connection
@@ -66,8 +70,13 @@ class AudioService:
             msg.context["source"] = "audio_service"
         return msg
 
+    # OCP bus api
     def queue(self, tracks=None):
         """Queue up a track to playing playlist.
+
+        TODO allow rich metadata for OCP:
+         - support dicts in tracks
+         NOTE: skills using this won't be compatible with mycroft-core ...
 
         Args:
             tracks: track uri or list of track uri's
@@ -79,13 +88,23 @@ class AudioService:
             tracks = [tracks]
         elif not isinstance(tracks, list):
             raise ValueError
-        tracks = [ensure_uri(t) for t in tracks]
-        msg = self._format_msg('mycroft.audio.service.queue',
+        tracks = [_uri2meta(t) for t in tracks]
+        msg = self._format_msg('ovos.common_play.playlist.queue',
                                {'tracks': tracks})
         self.bus.emit(msg)
 
     def play(self, tracks=None, utterance=None, repeat=None):
         """Start playback.
+
+        TODO handle utterance, idea:
+         - allow services to register .voc files
+         - match utterance against vocs in OCP
+         - select audio service based on parsing
+         eg. "play X in spotify"
+
+        TODO allow rich metadata for OCP:
+         - support dicts in tracks
+        NOTE: skills using this won't be compatible with mycroft-core ...
 
         Args:
             tracks: track uri or list of track uri's
@@ -102,68 +121,38 @@ class AudioService:
             tracks = [tracks]
         elif not isinstance(tracks, list):
             raise ValueError
-        tracks = [ensure_uri(t) for t in tracks]
-        msg = self._format_msg('mycroft.audio.service.play',
-                               {'tracks': tracks,
-                                'utterance': utterance,
+        tracks = [_uri2meta(t) for t in tracks]
+
+        msg = self._format_msg('ovos.common_play.play',
+                               {"media": tracks[0],
+                                "playlist": tracks,
+                                "utterance": utterance,
                                 'repeat': repeat})
         self.bus.emit(msg)
 
     def stop(self):
         """Stop the track."""
-        msg = self._format_msg('mycroft.audio.service.stop')
+        msg = self._format_msg("ovos.common_play.stop")
         self.bus.emit(msg)
 
     def next(self):
         """Change to next track."""
-        msg = self._format_msg('mycroft.audio.service.next')
+        msg = self._format_msg("ovos.common_play.next")
         self.bus.emit(msg)
 
     def prev(self):
         """Change to previous track."""
-        msg = self._format_msg('mycroft.audio.service.prev')
+        msg = self._format_msg("ovos.common_play.previous")
         self.bus.emit(msg)
 
     def pause(self):
         """Pause playback."""
-        msg = self._format_msg('mycroft.audio.service.pause')
+        msg = self._format_msg("ovos.common_play.pause")
         self.bus.emit(msg)
 
     def resume(self):
         """Resume paused playback."""
-        msg = self._format_msg('mycroft.audio.service.resume')
-        self.bus.emit(msg)
-
-    def get_track_length(self):
-        """
-        getting the duration of the audio in seconds
-        """
-        length = 0
-        msg = self._format_msg('mycroft.audio.service.get_track_length')
-        info = self.bus.wait_for_response(msg, timeout=1)
-        if info:
-            length = info.data.get("length", 0)
-        return length / 1000  # convert to seconds
-
-    def get_track_position(self):
-        """
-        get current position in seconds
-        """
-        pos = 0
-        msg = self._format_msg('mycroft.audio.service.get_track_position')
-        info = self.bus.wait_for_response(msg, timeout=1)
-        if info:
-            pos = info.data.get("position", 0)
-        return pos / 1000  # convert to seconds
-
-    def set_track_position(self, seconds):
-        """Seek X seconds.
-
-        Arguments:
-            seconds (int): number of seconds to seek, if negative rewind
-        """
-        msg = self._format_msg('mycroft.audio.service.set_track_position',
-                               {"position": seconds * 1000})  # convert to ms
+        msg = self._format_msg("ovos.common_play.resume")
         self.bus.emit(msg)
 
     def seek(self, seconds=1):
@@ -187,7 +176,7 @@ class AudioService:
         """
         if isinstance(seconds, timedelta):
             seconds = seconds.total_seconds()
-        msg = self._format_msg('mycroft.audio.service.seek_forward',
+        msg = self._format_msg('ovos.common_play.seek',
                                {"seconds": seconds})
         self.bus.emit(msg)
 
@@ -199,8 +188,40 @@ class AudioService:
         """
         if isinstance(seconds, timedelta):
             seconds = seconds.total_seconds()
-        msg = self._format_msg('mycroft.audio.service.seek_backward',
-                               {"seconds": seconds})
+        msg = self._format_msg('ovos.common_play.seek',
+                               {"seconds": seconds * -1})
+        self.bus.emit(msg)
+
+    def get_track_length(self):
+        """
+        getting the duration of the audio in miliseconds
+        """
+        length = 0
+        msg = self._format_msg('ovos.common_play.get_track_length')
+        info = self.bus.wait_for_response(msg, timeout=1)
+        if info:
+            length = info.data.get("length", 0)
+        return length
+
+    def get_track_position(self):
+        """
+        get current position in miliseconds
+        """
+        pos = 0
+        msg = self._format_msg('ovos.common_play.get_track_position')
+        info = self.bus.wait_for_response(msg, timeout=1)
+        if info:
+            pos = info.data.get("position", 0)
+        return pos
+
+    def set_track_position(self, miliseconds):
+        """Go to X position.
+
+        Arguments:
+           miliseconds (int): position to go to in miliseconds
+        """
+        msg = self._format_msg('ovos.common_play.set_track_position',
+                               {"position": miliseconds})
         self.bus.emit(msg)
 
     def track_info(self):
@@ -209,11 +230,9 @@ class AudioService:
         Returns:
             Dict with track info.
         """
-        msg = self._format_msg('mycroft.audio.service.track_info')
-        info = self.bus.wait_for_response(
-            msg, reply_type='mycroft.audio.service.track_info_reply',
-            timeout=1)
-        return info.data if info else {}
+        msg = self._format_msg('ovos.common_play.track_info')
+        response = self.bus.wait_for_response(msg)
+        return response.data if response else {}
 
     def available_backends(self):
         """Return available audio backends.
@@ -221,11 +240,11 @@ class AudioService:
         Returns:
             dict with backend names as keys
         """
-        msg = self._format_msg('mycroft.audio.service.list_backends')
+        msg = self._format_msg('ovos.common_play.list_backends')
         response = self.bus.wait_for_response(msg)
         return response.data if response else {}
 
     @property
     def is_playing(self):
-        """True if the audioservice is playing, else False."""
+        """True if OCP is playing, else False."""
         return self.track_info() != {}
