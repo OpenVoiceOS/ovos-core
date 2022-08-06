@@ -56,7 +56,7 @@ def create_gui_service(enclosure) -> Application:
     parse_command_line(['--logging=None'])
 
     routes = [(websocket_config['route'], GUIWebsocketHandler)]
-    application = Application(routes, debug=True)
+    application = Application(routes)
     application.enclosure = enclosure
     application.listen(
         websocket_config['base_port'], websocket_config['host']

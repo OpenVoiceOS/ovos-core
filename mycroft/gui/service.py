@@ -1,7 +1,7 @@
 from mycroft.messagebus.client import MessageBusClient
 from mycroft.util import start_message_bus_client
 from mycroft.util.log import LOG
-from .namespace import NamespaceManager
+from mycroft.gui.namespace import NamespaceManager
 from mycroft.gui.extensions import ExtensionsManager
 from mycroft.util.process_utils import ProcessStatus, StatusCallbackMap, ProcessState
 

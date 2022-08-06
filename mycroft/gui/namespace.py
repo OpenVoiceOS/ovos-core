@@ -46,13 +46,13 @@ from typing import List, Union
 from ovos_config.config import Configuration
 from mycroft.messagebus import Message, MessageBusClient
 from mycroft.util.log import LOG
-from .bus import (
+from mycroft.gui.bus import (
     create_gui_service,
     determine_if_gui_connected,
     get_gui_websocket_config,
     send_message_to_gui
 )
-from .page import GuiPage
+from mycroft.gui.page import GuiPage
 import sys
 
 namespace_lock = Lock()
@@ -209,7 +209,7 @@ class Namespace:
         new_pages = list()
 
         for page in pages:
-            if page.url not in [page.url for page in self.pages]:
+            if page.url not in [p.url for p in self.pages]:
                 new_pages.append(page)
 
         self.pages.extend(new_pages)
@@ -287,7 +287,7 @@ class Namespace:
         Args:
             positions: page position to remove
         """
-        print(f"Removing pages from GUI namespace {self.name}: {positions}")
+        LOG.info(f"Removing pages from GUI namespace {self.name}: {positions}")
         for position in positions:
             page = self.pages.pop(position)
             LOG.info(f"Deleting {page} from GUI namespace {self.name}")
