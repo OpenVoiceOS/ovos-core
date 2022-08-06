@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 """Intent service wrapping padatious."""
-from functools import lru_cache
 from subprocess import call
 from threading import Event
 from time import time as get_time, sleep
@@ -29,8 +28,11 @@ from mycroft.skills.intent_services.base import IntentMatch
 from padacioso import IntentContainer as FallbackIntentContainer
 
 try:
+    import padatious as _pd
     from padatious.match_data import MatchData as PadatiousIntent
 except ImportError:
+    _pd = None
+
     # padatious is optional, this class is just for compat
     class PadatiousIntent:
         """
@@ -137,34 +139,28 @@ class PadatiousService:
         self.bus = bus
         intent_cache = expanduser(self.padatious_config['intent_cache'])
 
-        self._regex_only = self.padatious_config.get("regex_only") or False
-
         core_config = Configuration()
         self.lang = core_config.get("lang", "en-us")
         langs = core_config.get('secondary_langs') or []
         if self.lang not in langs:
             langs.append(self.lang)
 
-        try:
-            if not self._regex_only:
-                from padatious import IntentContainer
-                self.containers = {
-                    lang: IntentContainer(path.join(intent_cache, lang))
-                    for lang in langs}
-        except ImportError:
-            LOG.error('Padatious not installed. Falling back to pure regex alternative')
-            try:
-                call(['notify-send', 'Padatious not installed',
-                      'Falling back to pure regex alternative'])
-            except OSError:
-                pass
-            self._regex_only = True
-
-        if self._regex_only:
+        if self.is_regex_only:
+            if not _pd:
+                LOG.error('Padatious not installed. Falling back to pure regex alternative')
+                try:
+                    call(['notify-send', 'Padatious not installed',
+                          'Falling back to pure regex alternative'])
+                except OSError:
+                    pass
             LOG.warning('using pure regex intent parser. '
                         'Some intents may be hard to trigger')
-            self.containers = {lang: FallbackIntentContainer()
+            self.containers = {lang: FallbackIntentContainer(self.padatious_config.get("fuzz"))
                                for lang in langs}
+        else:
+            self.containers = {
+                lang: _pd.IntentContainer(path.join(intent_cache, lang))
+                for lang in langs}
 
         self.bus.on('padatious:register_intent', self.register_intent)
         self.bus.on('padatious:register_entity', self.register_entity)
@@ -181,6 +177,12 @@ class PadatiousService:
         self.registered_intents = []
         self.registered_entities = []
 
+    @property
+    def is_regex_only(self):
+        if not _pd:
+            return True
+        return self.padatious_config.get("regex_only") or False
+
     def train(self, message=None):
         """Perform padatious training.
 
@@ -188,7 +190,7 @@ class PadatiousService:
             message (Message): optional triggering message
         """
         self.finished_training_event.clear()
-        if not self._regex_only:
+        if not self.is_regex_only:
             padatious_single_thread = self.padatious_config['single_thread']
             if message is None:
                 single_thread = padatious_single_thread
@@ -263,7 +265,7 @@ class PadatiousService:
             LOG.warning('Could not find file ' + file_name)
             return
 
-        if self._regex_only:
+        if self.is_regex_only:
             # padaos does not accept a file path like padatious
             with open(file_name) as f:
                 samples = [l.strip() for l in f.readlines()]
@@ -283,7 +285,7 @@ class PadatiousService:
         lang = lang.lower()
         if lang in self.containers:
             self.registered_intents.append(message.data['name'])
-            if self._regex_only:
+            if self.is_regex_only:
                 self._register_object(
                     message, 'intent', self.containers[lang].add_intent)
             else:
@@ -300,7 +302,7 @@ class PadatiousService:
         lang = lang.lower()
         if lang in self.containers:
             self.registered_entities.append(message.data)
-            if self._regex_only:
+            if self.is_regex_only:
                 self._register_object(
                     message, 'intent', self.containers[lang].add_entity)
             else:
