@@ -1,5 +1,6 @@
 import unittest
 
+from adapt.intent import IntentBuilder
 from mycroft.skills.intent_service_interface import IntentServiceInterface
 
 
@@ -84,3 +85,61 @@ class KeywordRegistrationTest(unittest.TestCase):
         intent_service = IntentServiceInterface(self.emitter)
         intent_service.register_adapt_regex('.*', lang="en-us")
         self.check_emitter([{'regex': '.*', 'lang': 'en-us'}])
+
+
+class KeywordIntentRegistrationTest(unittest.TestCase):
+    def check_emitter(self, expected_message_data):
+        """Verify that the registration messages matches the expected."""
+        for msg_type in self.emitter.get_types():
+            self.assertEqual(msg_type, 'register_intent')
+
+        self.assertEqual(
+            sorted(self.emitter.get_results(),
+                   key=lambda d: sorted(d.items())),
+            sorted(expected_message_data, key=lambda d: sorted(d.items())))
+        self.emitter.reset()
+
+    def setUp(self):
+        self.emitter = MockEmitter()
+
+    def test_register_intent(self):
+        intent_service = IntentServiceInterface(self.emitter)
+        intent_service.register_adapt_keyword('testA', 'testA', lang='en-US')
+        intent_service.register_adapt_keyword('testB', 'testB', lang='en-US')
+        self.emitter.reset()
+
+        intent = IntentBuilder("test").require("testA").optionally("testB")
+        intent_service.register_adapt_intent("test", intent)
+        expected_data = {'at_least_one': [],
+                         'name': 'test',
+                         'optional': [('testB', 'testB')],
+                         'requires': [('testA', 'testA')]}
+        self.check_emitter([expected_data])
+
+
+
+class UtteranceIntentRegistrationTest(unittest.TestCase):
+    def check_emitter(self, expected_message_data):
+        """Verify that the registration messages matches the expected."""
+        for msg_type in self.emitter.get_types():
+            self.assertEqual(msg_type, 'padatious:register_intent')
+
+        self.assertEqual(
+            sorted(self.emitter.get_results(),
+                   key=lambda d: sorted(d.items())),
+            sorted(expected_message_data, key=lambda d: sorted(d.items())))
+        self.emitter.reset()
+
+    def setUp(self):
+        self.emitter = MockEmitter()
+
+    def test_register_intent(self):
+        intent_service = IntentServiceInterface(self.emitter)
+        filename = "/tmp/test.intent"
+        with open(filename, "w") as f:
+            f.write("this is a test\ntest the intent")
+
+        intent_service.register_padatious_intent('test', filename, lang='en-US')
+        expected_data = {'file_name': '/tmp/test.intent', 'lang': 'en-US', 'name': 'test'}
+        self.check_emitter([expected_data])
+
