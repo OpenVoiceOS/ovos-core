@@ -146,7 +146,7 @@ class IntentServiceInterface:
         if not isinstance(filename, str):
             raise ValueError('Filename path must be a string')
         if not exists(filename):
-            raise FileNotFoundError('Unable to find "{}"'.format(filename))
+            raise FileNotFoundError(f'Unable to find "{filename}"')
 
         data = {'file_name': filename,
                 'name': intent_name,

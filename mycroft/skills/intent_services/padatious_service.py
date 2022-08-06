@@ -28,6 +28,39 @@ from mycroft.skills.intent_services.base import IntentMatch
 
 from padacioso import IntentContainer as FallbackIntentContainer
 
+try:
+    from padatious.match_data import MatchData as PadatiousIntent
+except ImportError:
+    # padatious is optional, this class is just for compat
+    class PadatiousIntent:
+        """
+        A set of data describing how a query fits into an intent
+        Attributes:
+            name (str): Name of matched intent
+            sent (str): The query after entity extraction
+            conf (float): Confidence (from 0.0 to 1.0)
+            matches (dict of str -> str): Key is the name of the entity and
+                value is the extracted part of the sentence
+        """
+
+        def __init__(self, name, sent, matches=None, conf=0.0):
+            self.name = name
+            self.sent = sent
+            self.matches = matches or {}
+            self.conf = conf
+
+        def __getitem__(self, item):
+            return self.matches.__getitem__(item)
+
+        def __contains__(self, item):
+            return self.matches.__contains__(item)
+
+        def get(self, key, default=None):
+            return self.matches.get(key, default)
+
+        def __repr__(self):
+            return repr(self.__dict__)
+
 
 class PadatiousMatcher:
     """Matcher class to avoid redundancy in padatious intent matching."""
@@ -53,17 +86,6 @@ class PadatiousMatcher:
             for utt in utterances:
                 for variant in utt:
                     intent = self.service.calc_intent(variant, lang)
-                    if self.service._regex_only:
-                        if not intent.get("name"):
-                            continue
-                        # exact matches only
-                        return IntentMatch(
-                            'Padacioso',
-                            intent["name"],
-                            intent["entities"],
-                            intent["name"].split(':')[0]
-                        )
-
                     if intent:
                         best = padatious_intent.conf if padatious_intent else 0.0
                         if best < intent.conf:
@@ -115,9 +137,7 @@ class PadatiousService:
         self.bus = bus
         intent_cache = expanduser(self.padatious_config['intent_cache'])
 
-        self._regex_only = self.padatious_config.get("regex_only", False) or \
-                           self.padatious_config.get("padaos_only",
-                                                 False)  # backwards compat TODO remove, not used in the wild
+        self._regex_only = self.padatious_config.get("regex_only") or False
 
         core_config = Configuration()
         self.lang = core_config.get("lang", "en-us")
@@ -175,11 +195,10 @@ class PadatiousService:
             else:
                 single_thread = message.data.get('single_thread',
                                                  padatious_single_thread)
-            LOG.info('Training... (single_thread={})'.format(single_thread))
             for lang in self.containers:
                 self.containers[lang].train(single_thread=single_thread)
-            LOG.info('Training complete.')
 
+        LOG.info('Training complete.')
         self.finished_training_event.set()
         if not self.finished_initial_train:
             self.bus.emit(Message('mycroft.skills.trained'))
@@ -261,6 +280,7 @@ class PadatiousService:
             message (Message): message triggering action
         """
         lang = message.data.get('lang', self.lang)
+        lang = lang.lower()
         if lang in self.containers:
             self.registered_intents.append(message.data['name'])
             if self._regex_only:
@@ -277,6 +297,7 @@ class PadatiousService:
             message (Message): message triggering action
         """
         lang = message.data.get('lang', self.lang)
+        lang = lang.lower()
         if lang in self.containers:
             self.registered_entities.append(message.data)
             if self._regex_only:
@@ -292,13 +313,16 @@ class PadatiousService:
         This improves speed when called multiple times for different confidence
         levels.
 
-        NOTE: This cache will keep a reference to this class
-        (PadatiousService), but we can live with that since it is used as a
-        singleton.
-
         Args:
             utt (str): utterance to calculate best intent for
         """
         lang = lang or self.lang
+        lang = lang.lower()
         if lang in self.containers:
-            return self.containers[lang].calc_intent(utt)
+            intent = self.containers[lang].calc_intent(utt)
+            if isinstance(intent, dict):
+                if "entities" in intent:
+                    intent["matches"] = intent.pop("entities")
+                intent["sent"] = utt
+                intent = PadatiousIntent(**intent)
+            return intent
