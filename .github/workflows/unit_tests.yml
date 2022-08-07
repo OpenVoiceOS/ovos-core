@@ -61,7 +61,7 @@ jobs:
           #       (for an example, see OVOS Skill Manager's workflow)
       - name: Run integration tests
         run: |
-          pytest --cov-append --cov=mycroft --cov-report xml test/unittests
+          pytest --cov-append --cov=mycroft --cov-report xml test/integrationtests
           # NOTE: additional pytest invocations should also add the --cov-append flag
           #       or they will overwrite previous invocations' coverage reports
           #       (for an example, see OVOS Skill Manager's workflow)
