@@ -150,15 +150,14 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
         self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
 
     def handle_device_about_page(self, message):
+        # TODO: Move `system_information` generation to util method
         uname_info = platform.uname()
-        system_information = {
-            "uname_os": uname_info[0],
-            "uname_systemversion": uname_info[1],
-            "uname_kernelversion": uname_info[2],
-            "ovos_core_version": OVOS_VERSION_STR,
-            "python_version": platform.python_version(),
-            "local_address": network_utils.get_ip()
-        }
+        system_information = {"display_list": [
+            {"display_key": "Kernel", "display_value": uname_info[2]},
+            {"display_key": "Core Version", "display_value": OVOS_VERSION_STR},
+            {"display_key": "Python Version", "display_value": platform.python_version()},
+            {"display_key": "Local Address", "display_value": network_utils.get_ip()}
+        ]}
         self['state'] = 'settings/about_page'
         self['system_info'] = system_information
         self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
