@@ -29,6 +29,19 @@ Item {
     anchors.fill: parent
     property var systemInformation: sessionData.system_info
 
+    function get_translated_string(entry) {
+        if(entry.indexOf("Kernel Version") != -1) {
+            return qsTr("Kernel Version")
+        }
+        if(entry.indexOf("Version") != -1) {
+            var e = entry.split(" ")
+            return e[0] + " " + qsTr("Version")
+        }
+        if(entry.indexOf("Local Address") != -1) {
+            return qsTr("Local Address")
+        }
+    }
+
     Item {
         id: topArea
         anchors.left: parent.left
@@ -71,7 +84,7 @@ Item {
                 horizontalAlignment: Text.AlignLeft
                 verticalAlignment: Text.AlignVCenter
                 level: 2
-                wrapMode: Text.WrodWrap
+                wrapMode: Text.WordWrap
                 font.bold: true
                 font.weight: Font.ExtraBold
                 text: qsTr("System Information")
@@ -79,38 +92,17 @@ Item {
             }
         }
 
-        ColumnLayout {
+        ListView {
             anchors.top: sysInfoHeaderBox.bottom
             anchors.left: parent.left
             anchors.right: parent.right
+            anchors.bottom: parent.bottom
             anchors.margins: Mycroft.Units.gridUnit / 2
-
-            Label {
-                text: "<b>" + qsTr("Kernel Version") + ":</b> " + systemInformation.uname_kernelversion
-                font.pixelSize: 25
-                fontSizeMode: Text.Fit
-                minimumPixelSize: 5
-                color: Kirigami.Theme.textColor
-                Layout.alignment: Qt.AlignLeft
-            }
-            Label {
-                text: "<b>OpenVoiceOS Core " + qsTr("Version") + ":</b> " + systemInformation.ovos_core_version
-                font.pixelSize: 25
-                fontSizeMode: Text.Fit
-                minimumPixelSize: 5
-                color: Kirigami.Theme.textColor
-                Layout.alignment: Qt.AlignLeft
-            }
-            Label {
-                text: "<b>Python " + qsTr("Version")+ ":</b> " + systemInformation.python_version
-                font.pixelSize: 25
-                fontSizeMode: Text.Fit
-                minimumPixelSize: 5
-                color: Kirigami.Theme.textColor
-                Layout.alignment: Qt.AlignLeft
-            }
-            Label {
-                text: "<b>" + qsTr("Local Address") + ":</b> " + systemInformation.local_address
+            clip: true
+            model: systemInformation.display_list
+            spacing: Mycroft.Units.gridUnit / 2
+            delegate: Label {
+                text: "<b>" + get_translated_string(modelData.display_key) + ":</b> " + modelData.display_value
                 font.pixelSize: 25
                 fontSizeMode: Text.Fit
                 minimumPixelSize: 5
@@ -118,8 +110,10 @@ Item {
                 Layout.alignment: Qt.AlignLeft
 
                 Component.onCompleted: {
-                    if(!systemInformation.local_address) {
-                        text = "<b>" + qsTr("Local Address") + ":</b> " + qsTr("No Active Connection")
+                    if(modelData.display_key.indexOf("Local Address") != -1){
+                        if(!modelData.display_value) {
+                            text = "<b>" + qsTr("Local Address") + ":</b> " + qsTr("No Active Connection")
+                        }
                     }
                 }
             }
@@ -178,4 +172,3 @@ Item {
         }
     }
 }
-

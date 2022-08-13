@@ -22,6 +22,7 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
         self.display_config_path_local = join(xdg_config_home(), "OvosDisplay.conf")
         self.display_config_path_system = "/etc/xdg/OvosDisplay.conf"
         self.local_display_config = JsonStorage(self.display_config_path_local)
+        self.about_page_data = []
 
         if not exists(self.display_config_path_local):
             self.handle_display_config_load()
@@ -40,6 +41,8 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
                     self.display_advanced_config_for_group)
         self.bus.on("ovos.phal.configuration.provider.list.groups.response",
                     self.display_advanced_config_groups)
+        self.bus.on("smartspeaker.extension.extend.about",
+                    self.extend_about_page_data_from_event)
 
         self.register_handler("mycroft.device.settings",
                               self.handle_device_settings)
@@ -71,6 +74,8 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
                               self.handle_display_auto_dim_config_set)
         self.register_handler("speaker.extension.display.set.auto.nightmode",
                               self.handle_display_auto_nightmode_config_set)
+        
+        self.build_initial_about_page_data()
 
     def handle_device_settings(self, message):
         """ Display device settings page. """
@@ -152,12 +157,7 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
     def handle_device_about_page(self, message):
         # TODO: Move `system_information` generation to util method
         uname_info = platform.uname()
-        system_information = {"display_list": [
-            {"display_key": "Kernel", "display_value": uname_info[2]},
-            {"display_key": "Core Version", "display_value": OVOS_VERSION_STR},
-            {"display_key": "Python Version", "display_value": platform.python_version()},
-            {"display_key": "Local Address", "display_value": network_utils.get_ip()}
-        ]}
+        system_information = {"display_list": self.about_page_data}
         self['state'] = 'settings/about_page'
         self['system_info'] = system_information
         self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
@@ -206,3 +206,30 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
 
     def handle_get_dash_status(self):
         self.bus.emit(Message("ovos.PHAL.dashboard.get.status"))
+    
+    def build_initial_about_page_data(self):
+        uname_info = platform.uname()
+        self.about_page_data.append({"display_key": "Kernel Version", "display_value": uname_info[2]})
+        self.about_page_data.append({"display_key": "Core Version", "display_value": OVOS_VERSION_STR})
+        self.about_page_data.append({"display_key": "Python Version", "display_value": platform.python_version()})
+        self.about_page_data.append({"display_key": "Local Address", "display_value": network_utils.get_ip()})
+        
+    def check_about_page_data_contains_key(self, key):
+        for item in self.about_page_data:
+            if item["display_key"] == key:
+                return True
+        return False
+    
+    def add_about_page_data(self, key, value):
+        if not self.check_about_page_data_contains_key(key):
+            self.about_page_data.append({"display_key": key, "display_value": value})
+        else:
+            for item in self.about_page_data:
+                if item["display_key"] == key:
+                    item["display_value"] = value
+                    break
+    
+    def extend_about_page_data_from_event(self, message=None):
+        extended_list = message.data.get("display_list")
+        for item in extended_list:
+            self.add_about_page_data(item["display_key"], item["display_value"])
