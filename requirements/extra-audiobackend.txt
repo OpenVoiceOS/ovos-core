@@ -1,1 +1,2 @@
-ovos_plugin_common_play~=0.0, >=0.0.1
+# TODO bump OCP to 0.0.2
+ovos_plugin_common_play~=0.0, >=0.0.2a8 
