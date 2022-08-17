@@ -105,6 +105,7 @@ class TestCPS(unittest.TestCase):
 
         cls.bus.on("message", get_msg)
 
+    @pytest.mark.skip  # TODO?
     def test_auto_unload(self):
         intents = IntentService(self.bus)
         skill = SkillLoader(self.bus, f"{dirname(__file__)}/ovos_tskill_mycroft_cps")
