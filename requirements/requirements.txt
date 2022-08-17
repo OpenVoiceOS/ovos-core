@@ -18,8 +18,7 @@ ovos-tts-plugin-google-tx~=0.0, >=0.0.3
 ovos-ww-plugin-pocketsphinx~=0.1
 ovos-ww-plugin-precise~=0.1
 ovos_workshop~=0.0, >=0.0.7a9
-ovos_PHAL~=0.0, >=0.0.2a8
-# TODO: Bump to stable version
+ovos_PHAL~=0.0, >=0.0.2
 
 ovos-lingua-franca~=0.4, >=0.4.2
 

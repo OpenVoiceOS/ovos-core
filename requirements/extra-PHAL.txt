@@ -1,2 +1,1 @@
-ovos_PHAL~=0.0, >=0.0.2a6
-# TODO: Bump to stable version
+ovos_PHAL~=0.0, >=0.0.2
