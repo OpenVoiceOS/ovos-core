@@ -10,9 +10,7 @@ watchdog
 
 ovos-config~=0.0.1, >=0.0.4
 ovos-utils~=0.0, >=0.0.23
-ovos-plugin-manager~=0.0, >=0.0.18a8
-# TODO: Bump to stable version
-
+ovos-plugin-manager~=0.0, >=0.0.18
 ovos-stt-plugin-server~=0.0, >=0.0.2
 ovos-tts-plugin-mimic~=0.2, >=0.2.6
 ovos-tts-plugin-mimic2~=0.1, >=0.1.5
