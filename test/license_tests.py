@@ -70,7 +70,8 @@ class TestBusLicensing(unittest.TestCase):
     def setUpClass(self):
         with open(join(REQUIREMENTS_DIR, "extra-bus.txt")) as f:
             pkgs = f.read().split("\n")
-        self.pkgs = [p.split("~")[0].split("=")[0].split("<")[0].split(">")[0] for p in pkgs if p]
+        self.pkgs = [p.split("~")[0].split("=")[0].split("<")[0].split(">")[0]
+                     for p in pkgs if p and not p.strip().startswith("#")]
 
     def test_license_compliance(self):
         for pkg_name in self.pkgs:
@@ -103,7 +104,8 @@ class TestGUILicensing(unittest.TestCase):
     def setUpClass(self):
         with open(join(REQUIREMENTS_DIR, "extra-gui.txt")) as f:
             pkgs = f.read().split("\n")
-        self.pkgs = [p.split("~")[0].split("=")[0].split("<")[0].split(">")[0] for p in pkgs if p]
+        self.pkgs = [p.split("~")[0].split("=")[0].split("<")[0].split(">")[0]
+                     for p in pkgs if p and not p.strip().startswith("#")]
 
     def test_license_compliance(self):
         for pkg_name in self.pkgs:
@@ -136,7 +138,8 @@ class TestPHALLicensing(unittest.TestCase):
     def setUpClass(self):
         with open(join(REQUIREMENTS_DIR, "extra-PHAL.txt")) as f:
             pkgs = f.read().split("\n")
-        self.pkgs = [p.split("~")[0].split("=")[0].split("<")[0].split(">")[0] for p in pkgs if p]
+        self.pkgs = [p.split("~")[0].split("=")[0].split("<")[0].split(">")[0]
+                     for p in pkgs if p and not p.strip().startswith("#")]
 
     def test_license_compliance(self):
         for pkg_name in self.pkgs:
@@ -169,7 +172,8 @@ class TestMk1Licensing(unittest.TestCase):
     def setUpClass(self):
         with open(join(REQUIREMENTS_DIR, "extra-mark1.txt")) as f:
             pkgs = f.read().split("\n")
-        self.pkgs = [p.split("~")[0].split("=")[0].split("<")[0].split(">")[0] for p in pkgs if p]
+        self.pkgs = [p.split("~")[0].split("=")[0].split("<")[0].split(">")[0]
+                     for p in pkgs if p and not p.strip().startswith("#")]
 
     def test_license_compliance(self):
         for pkg_name in self.pkgs:
@@ -202,8 +206,8 @@ class TestAudioLicensing(unittest.TestCase):
     def setUpClass(self):
         with open(join(REQUIREMENTS_DIR, "extra-audiobackend.txt")) as f:
             pkgs = f.read().split("\n")
-        self.pkgs = [p.split("~")[0].split("=")[0].split("<")[0].split(">")[0] for p in pkgs
-                     if p and not p.strip().startswith("#")]
+        self.pkgs = [p.split("~")[0].split("=")[0].split("<")[0].split(">")[0]
+                     for p in pkgs if p and not p.strip().startswith("#")]
 
     def test_license_compliance(self):
         for pkg_name in self.pkgs:
@@ -236,7 +240,8 @@ class TestSkillsLicensing(unittest.TestCase):
     def setUpClass(self):
         with open(join(REQUIREMENTS_DIR, "extra-skills.txt")) as f:
             pkgs = f.read().split("\n")
-        self.pkgs = [p.split("~")[0].split("=")[0].split("<")[0].split(">")[0] for p in pkgs if p]
+        self.pkgs = [p.split("~")[0].split("=")[0].split("<")[0].split(">")[0]
+                     for p in pkgs if p and not p.strip().startswith("#")]
 
     def test_license_compliance(self):
         for pkg_name in self.pkgs:
@@ -269,7 +274,8 @@ class TestSTTLicensing(unittest.TestCase):
     def setUpClass(self):
         with open(join(REQUIREMENTS_DIR, "extra-stt.txt")) as f:
             pkgs = f.read().split("\n")
-        self.pkgs = [p.split("~")[0].split("=")[0].split("<")[0].split(">")[0] for p in pkgs if p]
+        self.pkgs = [p.split("~")[0].split("=")[0].split("<")[0].split(">")[0]
+                     for p in pkgs if p and not p.strip().startswith("#")]
 
     def test_license_compliance(self):
         for pkg_name in self.pkgs:
@@ -302,7 +308,8 @@ class TestTTSLicensing(unittest.TestCase):
     def setUpClass(self):
         with open(join(REQUIREMENTS_DIR, "extra-tts.txt")) as f:
             pkgs = f.read().split("\n")
-        self.pkgs = [p.split("~")[0].split("=")[0].split("<")[0].split(">")[0] for p in pkgs if p]
+        self.pkgs = [p.split("~")[0].split("=")[0].split("<")[0].split(">")[0]
+                     for p in pkgs if p and not p.strip().startswith("#")]
 
     def test_license_compliance(self):
         for pkg_name in self.pkgs:
