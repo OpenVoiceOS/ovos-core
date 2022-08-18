@@ -261,6 +261,7 @@ class TestAudioServiceApi(unittest.TestCase):
         cls.api = MycroftAudioService(cls.bus)
         cls.audio = AudioService(cls.bus)
 
+    @pytest.mark.skip  # Also skipped in OCP Plugin tests
     def test_ocp_plugin_compat_layer(self):
         self.bus.emitted_msgs = []
 
@@ -403,6 +404,7 @@ class TestAudioServiceApi(unittest.TestCase):
         for m in expected:
             self.assertIn(m, self.bus.emitted_msgs)
 
+    @pytest.mark.skip  # Also skipped in OCP Plugin tests
     def test_play_mycroft_backend(self):
         self.bus.emitted_msgs = []
         selected = "mycroft_test"
@@ -429,6 +431,7 @@ class TestAudioServiceApi(unittest.TestCase):
         self.audio.current._track_start_callback("track_name")
         self.assertEqual(self.audio.default.ocp.player.now_playing.status, TrackState.PLAYING_AUDIOSERVICE)
 
+    @pytest.mark.skip  # Also skipped in OCP Plugin tests
     def test_play_ocp_backend(self):
         self.bus.emitted_msgs = []
 
