@@ -54,7 +54,6 @@ jobs:
       - name: Install test dependencies
         run: |
           pip install -r requirements/tests.txt
-          pip install git+https://github.com/OpenVoiceOS/skill-ovos-common-query
           pip install ./test/unittests/common_query/ovos_tskill_fakewiki
       - name: Run unittests
         run: |

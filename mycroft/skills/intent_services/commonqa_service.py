@@ -32,6 +32,7 @@ class CommonQAService:
         self.enclosure = EnclosureAPI(self.bus, self.skill_id)
         self._vocabs = {}
         self.bus.on('question:query.response', self.handle_query_response)
+        self.bus.on('common_query.question', self.handle_question)
 
     def voc_match(self, utterance, voc_filename, lang, exact=False):
         """Determine if the given utterance contains the vocabulary provided.
@@ -169,7 +170,7 @@ class CommonQAService:
 
         # Prevent any late-comers from retriggering this query handler
         with self.lock:
-            LOG.info('Timeout occured check responses')
+            LOG.info('Timeout occurred check responses')
             search_phrase = message.data.get('phrase', "")
             if search_phrase in self.query_extensions:
                 self.query_extensions[search_phrase] = []
