@@ -32,7 +32,7 @@ class TestDialog(unittest.TestCase):
     def test_continuous_dialog(self):
         self.bus.emitted_msgs = []
 
-        # "ask the wolf X"
+        # "ask the wiki X"
         self.assertFalse(self.skill.has_context)
         self.skill.handle_search(Message("search_fakewiki.intent",
                                          {"query": "what is the speed of light"}))
