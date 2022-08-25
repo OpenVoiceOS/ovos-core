@@ -407,14 +407,7 @@ class SkillLoader:
         self.last_loaded = time()
         self._communicate_load_status()
         self._start_filewatcher()
-        if self.loaded:
-            self._prepare_settings_meta()
         return self.loaded
-
-    def _prepare_settings_meta(self):
-        settings_meta = SettingsMetaUploader(self.skill_directory,
-                                             self.instance.skill_id)
-        self.instance.settings_meta = settings_meta
 
     def _start_filewatcher(self):
         if not self._watchdog:
@@ -532,6 +525,4 @@ class PluginSkillLoader(SkillLoader):
 
         self.last_loaded = time()
         self._communicate_load_status()
-        if self.loaded:
-            self._prepare_settings_meta()
         return self.loaded

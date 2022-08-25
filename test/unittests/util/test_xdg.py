@@ -1,7 +1,7 @@
 from unittest import TestCase, mock
 
 from ovos_utils.configuration import get_xdg_config_save_path, get_xdg_data_save_path, get_xdg_cache_save_path
-from mycroft.identity import IdentityManager
+from selene_api.identity import IdentityManager
 from mycroft.filesystem import FileSystemAccess
 from mycroft.skills.settings import REMOTE_CACHE
 

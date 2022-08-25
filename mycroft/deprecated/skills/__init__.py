@@ -5,18 +5,24 @@ in case someone is importing from here
 This is only meant for 3rd party code expecting ovos-core
 to be a drop in replacement for mycroft-core
 """
+
 import collections
 import csv
-from os import walk
 import re
+from os import walk
 from os.path import splitext, join
+import mycroft.skills.skill_data
 from mycroft.api import is_paired
 from mycroft.enclosure.api import EnclosureAPI
 from mycroft.util.format import expand_options
-from ovos_utils.log import LOG
-import mycroft.skills.skill_data
+from mycroft.util.log import LOG
 
 RASPBERRY_PI_PLATFORMS = ('mycroft_mark_1', 'picroft', 'mycroft_mark_2pi')
+
+ONE_MINUTE = 60
+
+# these 2 methods are maintained as part of ovos_utils but need to be available from this location for compatibility
+from ovos_utils.skills.settings import get_local_settings, save_settings
 
 
 def skill_is_blacklisted(skill):
@@ -207,5 +213,3 @@ def to_alnum(skill_id):
         (str) String of letters
     """
     return ''.join(c if c.isalnum() else '_' for c in str(skill_id))
-
-

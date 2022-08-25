@@ -21,7 +21,7 @@ from collections import deque, namedtuple
 from enum import Enum
 from hashlib import md5
 from os.path import join
-from threading import Lock, Event
+from threading import Lock, Event, Thread
 from time import sleep, time as get_time
 
 import pyaudio
@@ -32,6 +32,7 @@ from speech_recognition import (
     AudioSource,
     AudioData
 )
+
 
 from mycroft.api import DeviceApi
 from ovos_config.config import Configuration
@@ -671,15 +672,31 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
 
     def _upload_hotword(self, audio, metadata):
         """Upload the wakeword in a background thread."""
-        LOG.debug(
-            "Wakeword uploading has been disabled. The API endpoint used in "
-            "Mycroft-core v20.2 and below has been deprecated."
-        )
-        # def upload(audio, metadata):
-        #     requests.post(self.upload_url,
-        #                   files={'audio': BytesIO(audio.get_wav_data()),
-        #                          'metadata': StringIO(json.dumps(metadata))})
-        # Thread(target=upload, daemon=True, args=(audio, metadata)).start()
+        def upload(audio, metadata):
+            api = DeviceApi()
+
+            if self.upload_url:
+                api.precise_url_v1 = self.upload_url
+
+                # try old endpoint - new selene endpoint can not be set in mycroft.conf
+                # user is either using local backend or custom code
+                if self.upload_url != "https://training.mycroft.ai/precise/upload":
+                    try:
+                        api.upload_wake_word_v1(audio.get_wav_data(), metadata)
+                    except:
+                        pass
+
+                    # do not try V2 endpoint, user is not expecting things to be sent to selene
+                    return
+
+            try:
+                # try new endpoint - may not be live depending on backend version
+                api.upload_wake_word(audio.get_wav_data(), metadata)
+            except:
+                # try old endpoint - should be supported by older selene version and all local backend versions
+                api.upload_wake_word_v1(audio.get_wav_data(), metadata)
+
+        Thread(target=upload, daemon=True, args=(audio, metadata)).start()
 
     def _write_hotword_to_disk(self, audio, metadata):
         """Write wakeword to disk.
