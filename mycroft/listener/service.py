@@ -197,8 +197,7 @@ class SpeechService(Thread):
         :param message: ovos.languages.stt request
         """
         stt_langs = self.loop.stt.available_languages or \
-            [self.config.get('language', {}).get('user') or
-             self.config.get('lang') or 'en-us']
+            [self.config.get('lang') or 'en-us']
         LOG.debug(f"Got stt_langs: {stt_langs}")
         self.bus.emit(message.response({'langs': stt_langs}))
 
