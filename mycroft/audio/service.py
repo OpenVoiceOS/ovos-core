@@ -225,8 +225,8 @@ class PlaybackService(Thread):
         """
         tts_langs = self.tts.available_languages or \
             [self.config.get('language', {}).get('user') or 'en-us']
-        LOG.info(f"Got tts_langs: {tts_langs}")
-        self.bus.emit(message.response({'tts_langs': tts_langs}))
+        LOG.debug(f"Got tts_langs: {tts_langs}")
+        self.bus.emit(message.response({'langs': tts_langs}))
 
     def shutdown(self):
         """Shutdown the audio service cleanly.
@@ -248,4 +248,4 @@ class PlaybackService(Thread):
         self.bus.on('mycroft.audio.speech.stop', self.handle_stop)
         self.bus.on('mycroft.audio.queue', self.handle_queue_audio)
         self.bus.on('speak', self.handle_speak)
-        self.bus.on('neon.get_languages_tts', self.handle_get_languages_tts)
+        self.bus.on('ovos.languages.tts', self.handle_get_languages_tts)

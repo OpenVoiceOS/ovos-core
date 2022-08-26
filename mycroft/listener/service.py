@@ -198,8 +198,8 @@ class SpeechService(Thread):
         """
         stt_langs = self.loop.stt.available_languages or \
             [self.config.get('language', {}).get('user') or 'en-us']
-        LOG.info(f"Got stt_langs: {stt_langs}")
-        self.bus.emit(message.response({'stt_langs': stt_langs}))
+        LOG.debug(f"Got stt_langs: {stt_langs}")
+        self.bus.emit(message.response({'langs': stt_langs}))
 
     def connect_loop_events(self):
         self.loop.on('recognizer_loop:utterance', self.handle_utterance)
@@ -231,7 +231,7 @@ class SpeechService(Thread):
                     self.handle_audio_start)
         self.bus.on('recognizer_loop:audio_output_end', self.handle_audio_end)
         self.bus.on('mycroft.stop', self.handle_stop)
-        self.bus.on("neon.get_languages_stt", self.handle_get_languages_stt)
+        self.bus.on("ovos.languages.stt", self.handle_get_languages_stt)
 
     def run(self):
         self.status.set_started()
