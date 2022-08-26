@@ -221,10 +221,11 @@ class PlaybackService(Thread):
     def handle_get_languages_tts(self, message):
         """
         Handle a request for supported TTS languages
-        :param message: neon.get_languages_tts request
+        :param message: ovos.languages.tts request
         """
         tts_langs = self.tts.available_languages or \
-            [self.config.get('language', {}).get('user') or 'en-us']
+            [self.config.get('lang') or
+             self.config.get('language', {}).get('user') or 'en-us']
         LOG.debug(f"Got tts_langs: {tts_langs}")
         self.bus.emit(message.response({'langs': tts_langs}))
 
