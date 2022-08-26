@@ -218,6 +218,16 @@ class PlaybackService(Thread):
         listen = message.data.get("listen", False)
         TTS.queue.put((audio_ext, str(audio_file), viseme, ident, listen))
 
+    def handle_get_languages_tts(self, message):
+        """
+        Handle a request for supported TTS languages
+        :param message: neon.get_languages_tts request
+        """
+        tts_langs = self.tts.available_languages or \
+            [self.config.get('language', {}).get('user') or 'en-us']
+        LOG.info(f"Got tts_langs: {tts_langs}")
+        self.bus.emit(message.response({'tts_langs': tts_langs}))
+
     def shutdown(self):
         """Shutdown the audio service cleanly.
 
@@ -238,3 +248,4 @@ class PlaybackService(Thread):
         self.bus.on('mycroft.audio.speech.stop', self.handle_stop)
         self.bus.on('mycroft.audio.queue', self.handle_queue_audio)
         self.bus.on('speak', self.handle_speak)
+        self.bus.on('neon.get_languages_tts', self.handle_get_languages_tts)

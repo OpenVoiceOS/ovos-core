@@ -191,6 +191,16 @@ class SpeechService(Thread):
         # Reset the UI to indicate ready for speech processing
         EnclosureAPI(self.bus).reset()
 
+    def handle_get_languages_stt(self, message):
+        """
+        Handle a request for supported STT languages
+        :param message: neon.get_languages_stt request
+        """
+        stt_langs = self.loop.stt.available_languages or \
+            [self.config.get('language', {}).get('user') or 'en-us']
+        LOG.info(f"Got stt_langs: {stt_langs}")
+        self.bus.emit(message.response({'stt_langs': stt_langs}))
+
     def connect_loop_events(self):
         self.loop.on('recognizer_loop:utterance', self.handle_utterance)
         self.loop.on('recognizer_loop:speech.recognition.unknown',
@@ -221,6 +231,7 @@ class SpeechService(Thread):
                     self.handle_audio_start)
         self.bus.on('recognizer_loop:audio_output_end', self.handle_audio_end)
         self.bus.on('mycroft.stop', self.handle_stop)
+        self.bus.on("neon.get_languages_stt", self.handle_get_languages_stt)
 
     def run(self):
         self.status.set_started()
