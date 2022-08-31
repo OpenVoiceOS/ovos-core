@@ -624,6 +624,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         For example when we are in a dialog with the user.
         """
         if self._listen_triggered:
+            self._listen_triggered = False
             return True
 
         # Pressing the Mark 1 button can start recording (unless
