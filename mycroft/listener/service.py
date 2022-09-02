@@ -258,7 +258,7 @@ class SpeechService(Thread):
         stt_langs = self.loop.stt.available_languages or \
             [self.config.get('lang') or 'en-us']
         LOG.debug(f"Got stt_langs: {stt_langs}")
-        self.bus.emit(message.response({'langs': stt_langs}))
+        self.bus.emit(message.response({'langs': list(stt_langs)}))
 
     def connect_loop_events(self):
         self.loop.on('recognizer_loop:utterance', self.handle_utterance)

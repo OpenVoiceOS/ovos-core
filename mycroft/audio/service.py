@@ -226,7 +226,7 @@ class PlaybackService(Thread):
         tts_langs = self.tts.available_languages or \
             [self.config.get('lang') or 'en-us']
         LOG.debug(f"Got tts_langs: {tts_langs}")
-        self.bus.emit(message.response({'langs': tts_langs}))
+        self.bus.emit(message.response({'langs': list(tts_langs)}))
 
     def shutdown(self):
         """Shutdown the audio service cleanly.
