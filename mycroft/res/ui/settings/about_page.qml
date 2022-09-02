@@ -40,6 +40,9 @@ Item {
         if(entry.indexOf("Local Address") != -1) {
             return qsTr("Local Address")
         }
+        else {
+            return qsTr(entry)
+        }
     }
 
     Item {
