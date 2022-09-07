@@ -7,7 +7,7 @@ from ovos_utils.system import ssh_enable, ssh_disable
 
 from mycroft.gui.homescreen import HomescreenManager
 from mycroft.gui.interfaces.smartspeaker import SmartSpeakerExtensionGuiInterface
-
+from mycroft.gui.interfaces.mobile import MobileExtensionGuiInterface
 
 class ExtensionsManager:
     def __init__(self, name, bus, gui):
@@ -28,7 +28,7 @@ class ExtensionsManager:
         self.active_extension = enclosure_config.get("extension", "generic")
 
         # ToDo: Add Exclusive Support For "Desktop", "Mobile" Extensions
-        self.supported_extensions = ["smartspeaker", "bigscreen", "generic"]
+        self.supported_extensions = ["smartspeaker", "bigscreen", "generic", "mobile"]
 
         if self.active_extension.lower() not in self.supported_extensions:
             self.active_extension = "generic"
@@ -45,6 +45,8 @@ class ExtensionsManager:
             self.extension = SmartSpeakerExtension(self.bus, self.gui)
         elif extension_id == "bigscreen":
             self.extension = BigscreenExtension(self.bus, self.gui)
+        elif extension_id == "mobile":
+            self.extension = MobileExtension(self.bus, self.gui)
         else:
             self.extension = GenericExtension(self.bus, self.gui)
 
@@ -237,3 +239,39 @@ class GenericExtension:
         if get_skill_namespace:
             self.bus.emit(Message("gui.clear.namespace",
                                   {"__from": get_skill_namespace}))
+
+
+class MobileExtension:
+    """ Mobile Platform Extension: This extension is responsible for managing the mobile GUI behaviours.
+        This extension adds support for Homescreens and Homescreen Management and global page back navigation.
+
+    Args:
+        name: Name of the extension manager
+        bus: MessageBus instance
+        gui: GUI instance
+    """
+
+    def __init__(self, bus, gui):
+        LOG.info("Mobile: Initializing")
+
+        self.bus = bus
+        self.gui = gui
+        self.homescreen_manager = HomescreenManager(self.bus, self.gui)
+
+        self.homescreen_thread = threading.Thread(
+            target=self.homescreen_manager.run)
+        self.homescreen_thread.start()
+
+        self.gui_interface = MobileExtensionGuiInterface(
+            self.bus, self.homescreen_manager)
+
+        self.bus.on('mycroft.gui.screen.close',
+                    self.force_idle_screen)
+        self.bus.on('mycroft.gui.forceHome',
+                       self.force_home)
+
+    def force_idle_screen(self, message):
+        self.homescreen_manager.show_homescreen()
+
+    def force_home(self, message):
+        self.homescreen_manager.show_homescreen()
