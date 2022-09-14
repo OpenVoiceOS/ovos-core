@@ -342,6 +342,12 @@ class Namespace:
     def index_in_pages_list(self, index):
         return(index < len(self.pages))
 
+    def global_back(self):
+        """Returns to the previous page in the active page list."""
+        if self.page_number > 0:
+            self.remove_pages([self.page_number])
+            self.page_gained_focus(self.page_number - 1)
+
 
 def _validate_page_message(message: Message):
     """Validates the contents of the message data for page add/remove messages.
@@ -769,6 +775,17 @@ class NamespaceManager:
             # if the namespace is already active, check if the page number has changed
             if namespace_page_number != namespace.page_number:
                 namespace.page_gained_focus(namespace_page_number)
+
+    def handle_namespace_global_back(self, message: None):
+        """Handles global back events from the GUI.
+
+        Args:
+            message: the event sent by the GUI
+        """
+        namespace_name = self.active_namespaces[0].name
+        namespace = self.loaded_namespaces.get(namespace_name)
+        if namespace in self.active_namespaces:
+            namespace.global_back()
 
     def _del_namespace_in_remove_timers(self, namespace_name):
         """ Delete namespace from remove_namespace_timers dict.

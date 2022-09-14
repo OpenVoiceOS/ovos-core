@@ -268,10 +268,15 @@ class MobileExtension:
         self.bus.on('mycroft.gui.screen.close',
                     self.force_idle_screen)
         self.bus.on('mycroft.gui.forceHome',
-                       self.force_home)
+                    self.force_home)
+        self.bus.on('mycroft.gui.screen.request.page.back',
+                    self.handle_page_back)
 
     def force_idle_screen(self, message):
         self.homescreen_manager.show_homescreen()
 
     def force_home(self, message):
         self.homescreen_manager.show_homescreen()
+
+    def handle_page_back(self, message):
+        self.gui.handle_namespace_global_back({})
