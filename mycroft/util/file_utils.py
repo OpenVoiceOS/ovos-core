@@ -237,5 +237,8 @@ class FileEventHandler(FileSystemEventHandler):
         elif event.event_type in self._events:
             if event.src_path == self._file_path:
                 if time.time() - self._last_update >= self._debounce:
-                    self._callback(event.src_path)
-                    self._last_update = time.time()
+                    try:
+                        self._callback(event.src_path)
+                        self._last_update = time.time()
+                    except:
+                        LOG.exception("An error occurred handling file change event callback")
