@@ -256,6 +256,18 @@ def get_silence(num_bytes):
     return b'\0' * num_bytes
 
 
+def play_sound(sound):
+    audio_file = resolve_resource_file(sound)
+    if audio_file.endswith(".mp3"):
+        return play_mp3(audio_file)
+    elif audio_file.endswith(".ogg"):
+        return play_ogg(audio_file)
+    else:
+        # default behaviour, maybe .conf was set to use sox
+        # that support all sorts of audio extensions
+        return play_wav(audio_file)
+
+
 class ResponsiveRecognizer(speech_recognition.Recognizer):
     # Padding of silence when feeding to pocketsphinx
     SILENCE_SEC = 0.01
@@ -668,6 +680,10 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         """Externally trigger listening."""
         LOG.info('Listen triggered from external source.')
         self._listen_triggered = True
+        if self.config.get("confirm_listening"):
+            sounds = self.config.get("sounds", {})
+            sound = sounds.get("start_listening") or "snd/start_listening.wav"
+            play_sound(sound)
 
     def _upload_hotword(self, audio, metadata):
         """Upload the wakeword in a background thread."""
@@ -745,23 +761,11 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         # indicate hotword was detected.
         if sound:
             try:
-                audio_file = resolve_resource_file(sound)
-
-                def play_audio():
-                    if audio_file.endswith(".mp3"):
-                        return play_mp3(audio_file)
-                    elif audio_file.endswith(".ogg"):
-                        return play_ogg(audio_file)
-                    else:
-                        # default behaviour, maybe .conf was set to use sox
-                        # that support all sorts of audio extensions
-                        return play_wav(audio_file)
-
                 if self.instant_listen or not listen:
-                    play_audio()
+                    play_sound(sound)
                 else:
                     source.mute()
-                    play_audio().wait()
+                    play_sound(sound).wait()
                     source.unmute()
             except Exception as e:
                 LOG.warning(e)
