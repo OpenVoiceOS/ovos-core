@@ -175,56 +175,6 @@ class IntentService:
             LOG.exception(f"Failed to set lingua_franca default lang to {lang}")
         self.converse.converse_with_skills([], lang, message)
 
-    def do_converse(self, utterances, skill_id, lang, message):
-        """DEPRECATED: do not use, method only for api backwards compatibility
-
-        Logs a warning and calls ConverseService.converse
-
-        Args:
-            utterances (list of tuples): utterances paired with normalized
-                                         versions.
-            skill_id: skill to query.
-            lang (str): current language
-            message (Message): message containing interaction info.
-        """
-        # NOTE: can not delete method for backwards compat with upstream
-        LOG.warning("self.do_converse has been deprecated!\n"
-                    "use self.converse.converse instead")
-        return self.converse.converse(utterances, skill_id, lang, message)
-
-    def handle_converse_error(self, message):
-        """DEPRECATED: do not use, method only for api backwards compatibility
-        Logs a warning
-        """
-        # NOTE: can not delete method for backwards compat with upstream
-        LOG.warning("handle_converse_error has been deprecated!")
-
-    def remove_active_skill(self, skill_id):
-        """DEPRECATED: do not use, method only for api backwards compatibility
-
-        Logs a warning and calls ConverseService.deactivate_skill
-
-        Args:
-            skill_id (str): skill to remove
-        """
-        # NOTE: can not delete method for backwards compat with upstream
-        LOG.warning("self.remove_active_skill has been deprecated!\n"
-                    "use self.converse.deactivate_skill instead")
-        self.converse.deactivate_skill(skill_id)
-
-    def add_active_skill(self, skill_id):
-        """DEPRECATED: do not use, method only for api backwards compatibility
-
-        Logs a warning and calls ConverseService.activate_skill
-
-        Args:
-            skill_id (str): identifier of skill to be added.
-        """
-        # NOTE: can not delete method for backwards compat with upstream
-        LOG.warning("self.add_active_skill has been deprecated!\n"
-                    "use self.converse.activate_skill instead")
-        self.converse.activate_skill(skill_id)
-
     def send_metrics(self, intent, context, stopwatch):
         """Send timing metrics to the backend.
 

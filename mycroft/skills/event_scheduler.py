@@ -275,14 +275,8 @@ class EventScheduler(Thread):
 class EventSchedulerInterface:
     """Interface for accessing the event scheduler over the message bus."""
 
-    def __init__(self, name=None, sched_id=None, bus=None, skill_id=None):
-        # NOTE: can not rename or move sched_id/name arguments to keep api compatibility
-        if name:
-            LOG.warning("name argument has been deprecated! use skill_id instead")
-        if sched_id:
-            LOG.warning("sched_id argument has been deprecated! use skill_id instead")
-
-        self.skill_id = skill_id or sched_id or name or self.__class__.__name__
+    def __init__(self, bus=None, skill_id=None):
+        self.skill_id = skill_id or self.__class__.__name__
         self.bus = bus
         self.events = EventContainer(bus)
         self.scheduled_repeats = []
@@ -476,35 +470,3 @@ class EventSchedulerInterface:
         """Shutdown the interface unregistering any event handlers."""
         self.cancel_all_repeating_events()
         self.events.clear()
-
-    @property
-    def sched_id(self):
-        """DEPRECATED: do not use, method only for api backwards compatibility
-        Logs a warning and returns self.skill_id
-        """
-        LOG.warning("self.sched_id has been deprecated! use self.skill_id instead")
-        return self.skill_id
-
-    @sched_id.setter
-    def sched_id(self, skill_id):
-        """DEPRECATED: do not use, method only for api backwards compatibility
-        Logs a warning and sets self.skill_id
-        """
-        LOG.warning("self.sched_id has been deprecated! use self.skill_id instead")
-        self.skill_id = skill_id
-
-    @property
-    def name(self):
-        """DEPRECATED: do not use, method only for api backwards compatibility
-        Logs a warning and returns self.skill_id
-        """
-        LOG.warning("self.name has been deprecated! use self.skill_id instead")
-        return self.skill_id
-
-    @name.setter
-    def name(self, skill_id):
-        """DEPRECATED: do not use, method only for api backwards compatibility
-        Logs a warning and sets self.skill_id
-        """
-        LOG.warning("self.name has been deprecated! use self.skill_id instead")
-        self.skill_id = skill_id

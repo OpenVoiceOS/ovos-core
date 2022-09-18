@@ -31,9 +31,6 @@ from mycroft.skills.skill_loader import get_skill_directories, SkillLoader, Plug
 from mycroft.skills.skill_updater import SeleneSkillManifestUploader
 from mycroft.messagebus import MessageBusClient
 
-# do not delete - bacwards compat imports
-from mycroft.deprecated.skills.settings import UploadQueue, SkillSettingsDownloader
-from mycroft.deprecated.skills.skill_updater import SkillUpdater
 
 SKILL_MAIN_MODULE = '__init__.py'
 
@@ -106,7 +103,6 @@ class SkillManager(Thread):
         self._connected_event = Event()
         self.config = Configuration()
         self.manifest_uploader = SeleneSkillManifestUploader()
-        self.upload_queue = UploadQueue()  # DEPRECATED
 
         self.skill_loaders = {}
         self.plugin_skills = {}
@@ -214,45 +210,6 @@ class SkillManager(Thread):
     @property
     def skills_config(self):
         return self.config['skills']
-
-    @property
-    def msm(self):
-        """DEPRECATED: do not use, method only for api backwards compatibility
-        Logs a warning and returns None
-        """
-        LOG.warning("msm has been deprecated!")
-        return None
-
-    @property
-    def settings_downloader(self):
-        """DEPRECATED: do not use, method only for api backwards compatibility
-        Logs a warning and returns None
-        """
-        LOG.warning("settings_downloader has been deprecated, "
-                    "it is now managed at skill level")
-        return None
-
-    @property
-    def skill_updater(self):
-        LOG.warning("SkillUpdater has been deprecated! Please use self.manifest_uploader instead")
-        return SkillUpdater()
-
-    @staticmethod
-    def create_msm():
-        """DEPRECATED: do not use, method only for api backwards compatibility
-        Logs a warning and returns None
-        """
-        return None
-
-    def schedule_now(self, _):
-        """DEPRECATED: do not use, method only for api backwards compatibility
-        Logs a warning
-        """
-
-    def handle_paired(self, _):
-        """DEPRECATED: do not use, method only for api backwards compatibility
-        upload of settings is done at individual skill level in ovos-core """
-        pass
 
     def load_plugin_skills(self):
         plugins = find_skill_plugins()

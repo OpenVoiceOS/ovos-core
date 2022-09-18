@@ -65,12 +65,6 @@ from ovos_utils.log import LOG
 from selene_api.settings import RemoteSkillSettings, get_display_name
 from mycroft_bus_client.message import Message, dig_for_message
 
-# backwards compat imports
-from mycroft.deprecated.skills.settings import SkillSettingsDownloader, SettingsMetaUploader, load_remote_settings_cache, \
-    save_remote_settings_cache, REMOTE_CACHE
-# these 2 methods are maintained as part of ovos_utils but need to be available from this location for compatibility
-from ovos_utils.skills.settings import get_local_settings, save_settings
-
 
 class SkillSettingsManager:
     def __init__(self, skill):

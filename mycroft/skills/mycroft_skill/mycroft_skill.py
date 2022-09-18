@@ -64,12 +64,6 @@ from ovos_utils.file_utils import get_temp_path
 from ovos_utils.messagebus import get_message_lang
 import shutil
 
-# backwards compat imports, do not delete!
-from mycroft.deprecated.skills import (
-    read_vocab_file, read_value_file, read_translated_file,
-    load_vocabulary, load_regex, to_alnum)
-from mycroft.deprecated.skills.settings import SettingsMetaUploader
-
 
 def simple_trace(stack_trace):
     """Generate a simplified traceback.
@@ -97,16 +91,14 @@ class MycroftSkill:
     Args:
         name (str): skill name
         bus (MycroftWebsocketClient): Optional bus connection
-        use_settings (bool): Set to false to not use skill settings at all (DEPRECATED)
     """
 
-    def __init__(self, name=None, bus=None, use_settings=True):
+    def __init__(self, name=None, bus=None):
         self._init_event = Event()
 
         self.name = name or self.__class__.__name__
         self.resting_name = None
         self.skill_id = ''  # will be set by SkillLoader, guaranteed unique
-        self._settings_meta = None  # DEPRECATED - backwards compat only
         self.settings_manager = None
 
         # Get directory of skill
@@ -124,12 +116,7 @@ class MycroftSkill:
 
         self._settings = None
         self._initial_settings = {}
-        self.settings_write_path = None
         self._settings_watchdog = None
-
-        # old kludge from fallback skills, unused according to grep
-        if use_settings is False:
-            LOG.warning("use_settings has been deprecated! skill settings are always enabled")
 
         #: Set to register a callback method that will be called every time
         #: the skills settings are updated. The referenced method should
@@ -250,9 +237,6 @@ class MycroftSkill:
                     self._settings[k] = v
         self._initial_settings = copy(self.settings)
 
-        # backwards compat - self.settings_meta has been deprecated in favor of settings manager
-        self._settings_meta = SettingsMetaUploader(self.root_dir, self.skill_id)
-
         self._start_filewatcher()
 
     def _start_filewatcher(self):
@@ -280,16 +264,6 @@ class MycroftSkill:
                 self.settings_manager.save_meta()
 
     @property
-    def settings_meta(self):
-        LOG.warning("self.settings_meta has been deprecated! please use self.settings_manager instead")
-        return self._settings_meta
-
-    @settings_meta.setter
-    def settings_meta(self, val):
-        LOG.warning("self.settings_meta has been deprecated! please use self.settings_manager instead")
-        self._settings_meta = val
-
-    @property
     def _old_settings_path(self):
         old_dir = self.config_core.get("data_dir") or "/opt/mycroft"
         old_folder = self.config_core.get("skills", {}).get("msm", {})\
@@ -298,10 +272,6 @@ class MycroftSkill:
 
     @property
     def _settings_path(self):
-        if self.settings_write_path:
-            LOG.warning("self.settings_write_path has been deprecated! "
-                        "Support will be dropped in a future release")
-            return join(self.settings_write_path, 'settings.json')
         return join(get_xdg_config_save_path(), 'skills', self.skill_id, 'settings.json')
 
     @property
@@ -987,17 +957,6 @@ class MycroftSkill:
         """
         DeviceApi().send_email(title, body, basename(self.root_dir))
 
-    def make_active(self):
-        """Bump skill to active_skill list in intent_service.
-
-        This enables converse method to be called even without skill being
-        used in last 5 minutes.
-
-        deprecated: use self.activate() instead
-        """
-        # TODO deprecate, backwards compat
-        self.activate()
-
     def _handle_collect_resting(self, message=None):
         """Handler for collect resting screen messages.
 
@@ -1053,10 +1012,6 @@ class MycroftSkill:
                 for intent_file in getattr(method, 'intent_files'):
                     self.register_intent_file(intent_file, method)
 
-    def translate(self, text, data=None):
-        """Deprecated method for translating a dialog file."""
-        return self._resources.render_dialog(text, data)
-
     def find_resource(self, res_name, res_dirname=None, lang=None):
         """Find a resource file.
 
@@ -1087,18 +1042,6 @@ class MycroftSkill:
             return str(x)
         self.log.error(f"Skill {self.skill_id} resource '{res_name}' for lang "
                        f"'{lang}' not found in skill")
-
-    def translate_namedvalues(self, name, delim=','):
-        """Deprecated method for translating a name/value file."""
-        return self._resources.load_named_value_file(name, delim)
-
-    def translate_list(self, list_name, data=None):
-        """Deprecated method for translating a list."""
-        return self._resources.load_list_file(list_name, data)
-
-    def translate_template(self, template_name, data=None):
-        """Deprecated method for translating a template file"""
-        return self._resources.load_template_file(template_name, data)
 
     def _on_event_start(self, message, handler_info, skill_data):
         """Indicate that the skill handler is starting."""
@@ -1575,8 +1518,6 @@ class MycroftSkill:
         # Store settings
         if self.settings != self._initial_settings:
             self.settings.store()
-        if self._settings_meta:
-            self._settings_meta.stop()
         if self._settings_watchdog:
             self._settings_watchdog.shutdown()
 

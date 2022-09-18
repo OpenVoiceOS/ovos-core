@@ -252,16 +252,6 @@ class AdaptService:
             ret = None
         return ret
 
-    def register_vocab(self, start_concept, end_concept,
-                       alias_of, regex_str, lang):
-        """Register Vocabulary. DEPRECATED
-
-        This method should not be used, it has been replaced by
-        register_vocabulary().
-        """
-        self.register_vocabulary(start_concept, end_concept, alias_of,
-                                 regex_str, lang)
-
     def register_vocabulary(self, entity_value, entity_type,
                             alias_of, regex_str, lang):
         """Register skill vocabulary as adapt entity.

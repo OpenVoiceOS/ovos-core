@@ -37,17 +37,7 @@ SKILL_MAIN_MODULE = '__init__.py'
 def _get_skill_folder_name(conf=None):
     # TODO deprecate on version 0.0.3 when the warning is no longer needed
     conf = conf or Configuration()
-    folder = conf["skills"].get("directory")
-
-    if not folder:
-        # also check under old "msm" section for backwards compat
-        folder = conf["skills"].get("msm", {}).get("directory")
-        if folder:
-            LOG.warning("msm has been deprecated\n"
-                        "please move 'skills.msm.directory' to 'skills.directory' in mycroft.conf\n"
-                        "support will be removed on version 0.0.3")
-        else:
-            folder = "skills"
+    folder = conf["skills"].get("directory") or "skills"
     return folder
 
 
@@ -131,18 +121,9 @@ def get_default_skills_directory(conf=None):
     Args:
         conf (dict): mycroft.conf dict, will be loaded automatically if None
     """
-    conf = conf or Configuration()
-    path_override = conf["skills"].get("directory_override")
     folder = _get_skill_folder_name()
 
-    # if .conf wants to use a specific path, use it!
-    if path_override:
-        LOG.warning("'directory_override' is deprecated!\n"
-                    "It will no longer be supported after version 0.0.3\n"
-                    "add the new path to 'extra_directories' instead")
-        skills_folder = path_override
-    else:
-        skills_folder = os.path.join(get_xdg_data_save_path(), folder)
+    skills_folder = os.path.join(get_xdg_data_save_path(), folder)
     # create folder if needed
     try:
         makedirs(skills_folder, exist_ok=True)
@@ -324,13 +305,6 @@ class SkillLoader:
     @property
     def reload_allowed(self):
         return self.active and (self.instance is None or self.instance.reload_skill)
-
-    def reload_needed(self):
-        """DEPRECATED: backwards compatibility only
-
-        this is now event based and always returns False after initial load
-        """
-        return self.instance is None
 
     def reload(self):
         LOG.info('ATTEMPTING TO RELOAD SKILL: ' + self.skill_id)
