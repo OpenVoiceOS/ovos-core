@@ -26,12 +26,7 @@ from mycroft.util.file_utils import resolve_resource_file
 from mycroft.util.format import expand_options
 from mycroft.util.log import LOG
 from mycroft.dialog import load_dialogs
-# backwards compat imports, do not delete
-from mycroft.deprecated.skills import (
-    read_value_file, read_translated_file, read_vocab_file,
-    load_vocabulary, load_regex, load_regex_from_file,
-    to_alnum
-)
+
 
 SkillResourceTypes = namedtuple(
     "SkillResourceTypes",

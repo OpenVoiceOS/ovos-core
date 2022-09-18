@@ -13,8 +13,7 @@
 # limitations under the License.
 #
 from mycroft.version import VersionManager, OVOS_VERSION_STR
-from selene_api.api import DeviceApi as _DeviceApi
-from mycroft.deprecated.api import Api, UUID, GeolocationApi, STTApi
+from selene_api.api import DeviceApi as _DeviceApi, BaseApi
 from ovos_config.config import Configuration
 from selene_api.exceptions import BackendDown, InternetDown
 from functools import wraps
@@ -65,37 +64,32 @@ def requires_backend(f):
     return decorated
 
 
-class DeviceApi(Api):
+class DeviceApi:
     """ Web API wrapper for obtaining device-level information
     selene_api is not used directly to account for disabled_backend setting"""
 
-    def __init__(self):
-        super(DeviceApi, self).__init__("device")
-
     @property
-    def _backend_url(self):
+    def backend_url(self):
         """ this is a property to reflect live updates to mycroft.conf
          this value can change during pairing process or via GUI setup
          """
         config = Configuration()
         config_server = config.get("server") or {}
-        self.backend_url = config_server.get("url") or self.backend_url or "https://api.mycroft.ai"
-        return self.backend_url
+        return config_server.get("url") or "https://api.mycroft.ai"
 
     @property
-    def _backend_version(self):
+    def backend_version(self):
         """ this is a property to reflect live updates to mycroft.conf
          this value can change during pairing process or via GUI setup
          """
         config = Configuration()
         config_server = config.get("server") or {}
-        self.backend_version = config_server.get("version") or self.backend_version or "v1"
-        return self.backend_version
+        return config_server.get("version") or "v1"
 
     @property
     def _real_api(self):
         """ this is a property to reflect live updates to backend url """
-        return _DeviceApi(self._backend_url, self._backend_version)
+        return _DeviceApi(self.backend_url, self.backend_version)
 
     @requires_backend
     def get_code(self, state):

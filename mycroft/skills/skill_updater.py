@@ -2,8 +2,6 @@ from mycroft.api import DeviceApi, is_paired
 from mycroft.util.log import LOG
 from selene_api.settings import SeleneSkillsManifest
 from ovos_config import Configuration
-# backwards compat import - do not delete
-from mycroft.deprecated.skills.skill_updater import SkillUpdater
 
 
 class SeleneSkillManifestUploader:

@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 """Data structures used by the speech client."""
-from mycroft.deprecated.speech_client import RollingMean
 
 
 class CyclicAudioBuffer:

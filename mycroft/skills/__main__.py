@@ -33,9 +33,6 @@ from mycroft.util import (
 )
 from mycroft.util.log import LOG
 
-# keep these imports for backwards compat!
-from mycroft.deprecated.skills import DevicePrimer, RASPBERRY_PI_PLATFORMS
-
 
 def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
          error_hook=on_error, stopping_hook=on_stopping, watchdog=None):
