@@ -56,8 +56,11 @@ STT_INVALID_FB_CONFIG.merge({
 
 class TestSTT(unittest.TestCase):
     def test_factory(self):
-        config = {'module': 'ovos-stt-plugin-selene',
-                  'ovos-stt-plugin-selene': {'uri': 'https://test.com'}}
+        config = {'module': 'mycroft'}
+        stt = mycroft.listener.stt.STTFactory.create(config)
+        self.assertEqual(type(stt), SeleneSTT)
+
+        config = {'module': 'ovos-stt-plugin-selene'}
         stt = mycroft.listener.stt.STTFactory.create(config)
         self.assertEqual(type(stt), SeleneSTT)
 
