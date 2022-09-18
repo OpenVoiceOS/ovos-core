@@ -2,4 +2,5 @@ SpeechRecognition~=3.8
 PyAudio~=0.2
 ovos-ww-plugin-pocketsphinx~=0.1
 ovos-ww-plugin-precise~=0.1
+ovos-stt-plugin-selene
 ovos-stt-plugin-server~=0.0, >=0.0.2

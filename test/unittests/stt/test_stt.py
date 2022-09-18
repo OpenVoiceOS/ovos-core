@@ -12,11 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import sys
 import unittest
-from io import StringIO
 from unittest.mock import MagicMock, patch
-
+from ovos_stt_plugin_selene import SeleneSTT
 import mycroft.configuration
 from mycroft.configuration import Configuration
 import mycroft.listener.stt
@@ -58,28 +56,27 @@ STT_INVALID_FB_CONFIG.merge({
 
 class TestSTT(unittest.TestCase):
     def test_factory(self):
-        config = {'module': 'mycroft',
-                  'mycroft': {'uri': 'https://test.com'}}
+        config = {'module': 'ovos-stt-plugin-selene',
+                  'ovos-stt-plugin-selene': {'uri': 'https://test.com'}}
         stt = mycroft.listener.stt.STTFactory.create(config)
-        self.assertEqual(type(stt), mycroft.listener.stt.MycroftSTT)
+        self.assertEqual(type(stt), SeleneSTT)
 
         config = {'stt': config}
         stt = mycroft.listener.stt.STTFactory.create(config)
-        self.assertEqual(type(stt), mycroft.listener.stt.MycroftSTT)
+        self.assertEqual(type(stt), SeleneSTT)
 
     @patch.dict(Configuration._Configuration__patch, STT_CONFIG)
     def test_factory_from_config(self):
-        mycroft.listener.stt.STTApi = MagicMock()
         stt = mycroft.listener.stt.STTFactory.create()
-        self.assertEqual(type(stt), mycroft.listener.stt.MycroftSTT)
+        self.assertEqual(type(stt), SeleneSTT)
 
     @patch.dict(Configuration._Configuration__patch, STT_CONFIG)
     def test_mycroft_stt(self,):
-        mycroft.listener.stt.STTApi = MagicMock()
-        stt = mycroft.listener.stt.MycroftSTT()
+        stt = SeleneSTT()
+        stt.api = MagicMock()
         audio = MagicMock()
         stt.execute(audio, 'en-us')
-        self.assertTrue(mycroft.listener.stt.STTApi.called)
+        self.assertTrue(stt.api.stt.called)
 
     @patch.dict(Configuration._Configuration__patch, STT_CONFIG)
     def test_fallback_stt(self):

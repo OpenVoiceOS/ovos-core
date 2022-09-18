@@ -48,11 +48,6 @@ from mycroft.skills.skill_data import (
     SkillResources,
     CoreResources
 )
-# backwards compat imports, do not delete!
-from mycroft.deprecated.skills import (
-    read_vocab_file, read_value_file, read_translated_file,
-    load_vocabulary, load_regex,
-    to_alnum,)
 from mycroft.util import (
     resolve_resource_file,
     play_audio_file,
@@ -61,12 +56,19 @@ from mycroft.util import (
 from mycroft.util.format import pronounce_number, join_list
 from mycroft.util.log import LOG
 from mycroft.util.parse import match_one, extract_number
+from mycroft.skills.settings import SkillSettingsManager
 from mycroft.util.file_utils import FileWatcher
 from ovos_utils.configuration import get_xdg_base, get_xdg_data_save_path, get_xdg_config_save_path
 from ovos_utils.enclosure.api import EnclosureAPI
 from ovos_utils.file_utils import get_temp_path
 from ovos_utils.messagebus import get_message_lang
 import shutil
+
+# backwards compat imports, do not delete!
+from mycroft.deprecated.skills import (
+    read_vocab_file, read_value_file, read_translated_file,
+    load_vocabulary, load_regex, to_alnum)
+from mycroft.deprecated.skills.settings import SettingsMetaUploader
 
 
 def simple_trace(stack_trace):
@@ -104,7 +106,8 @@ class MycroftSkill:
         self.name = name or self.__class__.__name__
         self.resting_name = None
         self.skill_id = ''  # will be set by SkillLoader, guaranteed unique
-        self.settings_meta = None  # set when skill is loaded in SkillLoader
+        self._settings_meta = None  # DEPRECATED - backwards compat only
+        self.settings_manager = None
 
         # Get directory of skill
         #: Member variable containing the absolute path of the skill's root
@@ -211,6 +214,7 @@ class MycroftSkill:
             self.load_data_files()
             self._register_decorated()
             self.register_resting_screen()
+            self.settings_manager = SkillSettingsManager(self)
 
             # run skill developer initialization code
             self.initialize()
@@ -246,6 +250,9 @@ class MycroftSkill:
                     self._settings[k] = v
         self._initial_settings = copy(self.settings)
 
+        # backwards compat - self.settings_meta has been deprecated in favor of settings manager
+        self._settings_meta = SettingsMetaUploader(self.root_dir, self.skill_id)
+
         self._start_filewatcher()
 
     def _start_filewatcher(self):
@@ -263,6 +270,24 @@ class MycroftSkill:
             except:
                 self.log.exception("settings change callback failed, "
                                    "file changes not handled!")
+
+        # upload new settings to backend
+        if self.config_core.get("skills", {}).get("sync2way"):
+            generate = self.config_core.get("skills", {}).get("autogen_meta", True)
+            self.settings_manager.upload(generate)  # this will check global sync flag
+            if generate:
+                # update settingsmeta file on disk
+                self.settings_manager.save_meta()
+
+    @property
+    def settings_meta(self):
+        LOG.warning("self.settings_meta has been deprecated! please use self.settings_manager instead")
+        return self._settings_meta
+
+    @settings_meta.setter
+    def settings_meta(self, val):
+        LOG.warning("self.settings_meta has been deprecated! please use self.settings_manager instead")
+        self._settings_meta = val
 
     @property
     def _old_settings_path(self):
@@ -548,21 +573,18 @@ class MycroftSkill:
         that had their settings changed.  Only update this skill's settings
         if its remote settings were among those changed
         """
-        if self.settings_meta is None or self.settings_meta.skill_gid is None:
-            LOG.error(f'The skill_gid was not set when {self.name} was loaded!')
-        else:
-            remote_settings = message.data.get(self.settings_meta.skill_gid)
-            if remote_settings is not None:
-                LOG.info('Updating settings for skill ' + self.skill_id)
-                self.settings.update(**remote_settings)
-                self.settings.store()
-                if self.settings_change_callback is not None:
-                    try:
-                        self.settings_change_callback()
-                    except:
-                        self.log.exception("settings change callback failed, "
-                                           "remote changes not handled!")
-                self._start_filewatcher()
+        remote_settings = message.data.get(self.skill_id)
+        if remote_settings is not None:
+            LOG.info('Updating settings for skill ' + self.skill_id)
+            self.settings.update(**remote_settings)
+            self.settings.store()
+            if self.settings_change_callback is not None:
+                try:
+                    self.settings_change_callback()
+                except:
+                    self.log.exception("settings change callback failed, "
+                                       "remote changes not handled!")
+            self._start_filewatcher()
 
     def detach(self):
         for (name, _) in self.intent_service:
@@ -1553,8 +1575,8 @@ class MycroftSkill:
         # Store settings
         if self.settings != self._initial_settings:
             self.settings.store()
-        if self.settings_meta:
-            self.settings_meta.stop()
+        if self._settings_meta:
+            self._settings_meta.stop()
         if self._settings_watchdog:
             self._settings_watchdog.shutdown()
 

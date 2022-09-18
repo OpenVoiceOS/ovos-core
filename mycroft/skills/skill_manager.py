@@ -27,66 +27,15 @@ from ovos_config.config import Configuration
 from mycroft.messagebus.message import Message
 from mycroft.util.log import LOG
 from mycroft.util import connected
-from mycroft.skills.settings import SkillSettingsDownloader
 from mycroft.skills.skill_loader import get_skill_directories, SkillLoader, PluginSkillLoader, find_skill_plugins
-from mycroft.skills.skill_updater import SkillUpdater
+from mycroft.skills.skill_updater import SeleneSkillManifestUploader
 from mycroft.messagebus import MessageBusClient
 
+# do not delete - bacwards compat imports
+from mycroft.deprecated.skills.settings import UploadQueue, SkillSettingsDownloader
+from mycroft.deprecated.skills.skill_updater import SkillUpdater
+
 SKILL_MAIN_MODULE = '__init__.py'
-
-
-class UploadQueue:
-    """Queue for holding loaders with data that still needs to be uploaded.
-
-    This queue can be used during startup to capture all loaders
-    and then processing can be triggered at a later stage when the system is
-    connected to the backend.
-
-    After all queued settingsmeta has been processed and the queue is empty
-    the queue will set the self.started flag.
-    """
-
-    def __init__(self):
-        self._queue = []
-        self.started = False
-        self.lock = Lock()
-
-    def start(self):
-        """Start processing of the queue."""
-        self.started = True
-        self.send()
-
-    def stop(self):
-        """Stop the queue, and hinder any further transmissions."""
-        self.started = False
-
-    def send(self):
-        """Loop through all stored loaders triggering settingsmeta upload."""
-        with self.lock:
-            queue = self._queue
-            self._queue = []
-        if queue:
-            LOG.info('New Settings meta to upload.')
-            for loader in queue:
-                if self.started:
-                    loader.instance.settings_meta.upload()
-                else:
-                    break
-
-    def __len__(self):
-        return len(self._queue)
-
-    def put(self, loader):
-        """Append a skill loader to the queue.
-
-        If a loader is already present it's removed in favor of the new entry.
-        """
-        if self.started:
-            LOG.info('Updating settings meta during runtime...')
-        with self.lock:
-            # Remove existing loader
-            self._queue = [e for e in self._queue if e != loader]
-            self._queue.append(loader)
 
 
 def _shutdown_skill(instance):
@@ -156,18 +105,16 @@ class SkillManager(Thread):
         self._stop_event = Event()
         self._connected_event = Event()
         self.config = Configuration()
-        self.upload_queue = UploadQueue()
+        self.manifest_uploader = SeleneSkillManifestUploader()
+        self.upload_queue = UploadQueue()  # DEPRECATED
 
         self.skill_loaders = {}
         self.plugin_skills = {}
         self.enclosure = EnclosureAPI(bus)
         self.initial_load_complete = False
         self.num_install_retries = 0
-        self.settings_downloader = SkillSettingsDownloader(self.bus)
-
         self.empty_skill_dirs = set()  # Save a record of empty skill dirs.
 
-        self.skill_updater = SkillUpdater()
         self._define_message_bus_events()
         self.daemon = True
 
@@ -186,9 +133,6 @@ class SkillManager(Thread):
         self.bus.on('skillmanager.deactivate', self.deactivate_skill)
         self.bus.on('skillmanager.keep', self.deactivate_except)
         self.bus.on('skillmanager.activate', self.activate_skill)
-        self.bus.on('mycroft.paired', self.handle_paired)
-        self.bus.on('mycroft.skills.settings.update',
-                    self.settings_downloader.download)
         self.bus.once('mycroft.skills.initialized',
                       self.handle_check_device_readiness)
         self.bus.once('mycroft.skills.trained', self.handle_initial_training)
@@ -276,7 +220,22 @@ class SkillManager(Thread):
         """DEPRECATED: do not use, method only for api backwards compatibility
         Logs a warning and returns None
         """
+        LOG.warning("msm has been deprecated!")
         return None
+
+    @property
+    def settings_downloader(self):
+        """DEPRECATED: do not use, method only for api backwards compatibility
+        Logs a warning and returns None
+        """
+        LOG.warning("settings_downloader has been deprecated, "
+                    "it is now managed at skill level")
+        return SkillSettingsDownloader(self.bus)
+
+    @property
+    def skill_updater(self):
+        LOG.warning("SkillUpdater has been deprecated! Please use self.manifest_uploader instead")
+        return SkillUpdater()
 
     @staticmethod
     def create_msm():
@@ -290,17 +249,10 @@ class SkillManager(Thread):
         Logs a warning
         """
 
-    def _start_settings_update(self):
-        LOG.info('Start settings update')
-        self.skill_updater.post_manifest(reload_skills_manifest=True)
-        self.upload_queue.start()
-        LOG.info('All settings meta has been processed or upload has started')
-        self.settings_downloader.download()
-        LOG.info('Skill settings downloading has started')
-
     def handle_paired(self, _):
-        """Trigger upload of skills manifest after pairing."""
-        self._start_settings_update()
+        """DEPRECATED: do not use, method only for api backwards compatibility
+        upload of settings is done at individual skill level in ovos-core """
+        pass
 
     def load_plugin_skills(self):
         plugins = find_skill_plugins()
@@ -328,9 +280,7 @@ class SkillManager(Thread):
         for skill_id in priority_skills:
             skill_path = skill_ids.get(skill_id)
             if skill_path is not None:
-                loader = self._load_skill(skill_path)
-                if loader:
-                    self.upload_queue.put(loader)
+                self._load_skill(skill_path)
             else:
                 LOG.error(f'Priority skill {skill_id} can\'t be found')
 
@@ -353,9 +303,9 @@ class SkillManager(Thread):
         self._load_on_startup()
 
         # Sync backend and skills.
-        if is_paired() and not self.upload_queue.started:
-            self.skill_updater.post_manifest()
-            self._start_settings_update()
+        # why does selene need to know about skills without settings?
+        if is_paired():
+            self.manifest_uploader.post_manifest()
 
         # wait for initial intents training
         while not self.initial_load_complete:
@@ -415,9 +365,7 @@ class SkillManager(Thread):
                 self._unload_skill(old_skill_dir)
 
             if skill_dir not in self.skill_loaders:
-                loader = self._load_skill(skill_dir)
-                if loader:
-                    self.upload_queue.put(loader)
+                self._load_skill(skill_dir)
 
     def _load_skill(self, skill_directory):
         if not self.config["websocket"].get("shared_connection", True):
@@ -491,7 +439,7 @@ class SkillManager(Thread):
         # If skills were removed make sure to update the manifest on the
         # mycroft backend.
         if removed_skills:
-            self.skill_updater.post_manifest(reload_skills_manifest=True)
+            self.manifest_uploader.post_manifest(reload_skills_manifest=True)
 
     def _unload_plugin_skill(self, skill_id):
         if skill_id in self.plugin_skills:
@@ -570,7 +518,6 @@ class SkillManager(Thread):
         """Tell the manager to shutdown."""
         self.status.set_stopping()
         self._stop_event.set()
-        self.settings_downloader.stop_downloading()
         self.upload_queue.stop()
 
         # Do a clean shutdown of all skills
