@@ -11,7 +11,7 @@ watchdog
 selene_api~=0.0.3a1
 ovos-config~=0.0.1, >=0.0.4
 ovos-utils~=0.0, >=0.0.23
-ovos-plugin-manager~=0.0, >=0.0.19a3
+ovos-plugin-manager~=0.0, >=0.0.19a4
 ovos-stt-plugin-server~=0.0, >=0.0.2
 ovos-tts-plugin-mimic~=0.2, >=0.2.6
 ovos-tts-plugin-mimic2~=0.1, >=0.1.5

@@ -55,8 +55,6 @@ jobs:
         run: |
           pip install -r requirements/tests.txt
           pip install ./test/unittests/common_query/ovos_tskill_fakewiki
-          pip install git+https://github.com/OpenVoiceOS/selene_api
-          pip install git+https://github.com/OpenVoiceOS/OVOS-plugin-manager@fix/config_factories
       - name: Run unittests
         run: |
           pytest --cov=mycroft --cov-report xml test/unittests
