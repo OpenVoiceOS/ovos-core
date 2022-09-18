@@ -5,5 +5,5 @@ ovos-utils~=0.0, >=0.0.23
 ovos-plugin-manager~=0.0, >=0.0.19a4
 ovos-config~=0.0,>=0.0.4
 python-dateutil~=2.6
-selene_api~=0.0.3a1
+selene_api~=0.0, >=0.0.3
 watchdog
