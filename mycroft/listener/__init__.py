@@ -332,7 +332,7 @@ class RecognizerLoop(EventEmitter):
         hot_words = self.config_core.get("hotwords", {})
         global_listen = self.config_core.get("confirm_listening")
         global_sounds = self.config_core.get("sounds", {})
-        for word in hot_words:
+        for word in dict(hot_words):
             try:
                 data = hot_words[word]
                 sound = data.get("sound")
@@ -357,6 +357,14 @@ class RecognizerLoop(EventEmitter):
                     if hasattr(engine, "bind"):
                         engine.bind(self.bus)
                         # not all plugins implement this
+                    if data.get('engine'):
+                        LOG.info(f"Engine previously defined. "
+                                 f"Deleting old instance.")
+                        try:
+                            data['engine'].stop()
+                            del data['engine']
+                        except Exception as e:
+                            LOG.error(e)
                     self.engines[word] = {"engine": engine,
                                           "sound": sound,
                                           "bus_event": event,
