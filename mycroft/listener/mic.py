@@ -47,6 +47,7 @@ from mycroft.util import (
 )
 from mycroft.util.log import LOG
 from ovos_utils.configuration import get_xdg_data_save_path
+from mycroft.util.audio_utils import play_audio_file
 from ovos_plugin_manager.vad import OVOSVADFactory
 from ovos_utils.messagebus import get_message_lang
 
@@ -254,18 +255,6 @@ class MutableMicrophone(Microphone):
 
 def get_silence(num_bytes):
     return b'\0' * num_bytes
-
-
-def play_sound(sound):
-    audio_file = resolve_resource_file(sound)
-    if audio_file.endswith(".mp3"):
-        return play_mp3(audio_file)
-    elif audio_file.endswith(".ogg"):
-        return play_ogg(audio_file)
-    else:
-        # default behaviour, maybe .conf was set to use sox
-        # that support all sorts of audio extensions
-        return play_wav(audio_file)
 
 
 class ResponsiveRecognizer(speech_recognition.Recognizer):
@@ -683,7 +672,8 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         if self.config.get("confirm_listening"):
             sounds = self.config.get("sounds", {})
             sound = sounds.get("start_listening") or "snd/start_listening.wav"
-            play_sound(sound)
+            sound = resolve_resource_file(sound)
+            play_audio_file(sound)
 
     def _upload_hotword(self, audio, metadata):
         """Upload the wakeword in a background thread."""
@@ -761,11 +751,12 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         # indicate hotword was detected.
         if sound:
             try:
+                sound = resolve_resource_file(sound)
                 if self.instant_listen or not listen:
-                    play_sound(sound)
+                    play_audio_file(sound)
                 else:
                     source.mute()
-                    play_sound(sound).wait()
+                    play_audio_file(sound).wait()
                     source.unmute()
             except Exception as e:
                 LOG.warning(e)
