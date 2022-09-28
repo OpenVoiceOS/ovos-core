@@ -55,7 +55,7 @@ class TestNamespace(TestCase):
             type='mycroft.events.triggered',
             namespace="foo",
             event_name="bar",
-            params="foobar"
+            data="foobar"
         )
         patch_function = PATCH_MODULE + ".send_message_to_gui"
         with mock.patch(patch_function) as send_message_mock:
