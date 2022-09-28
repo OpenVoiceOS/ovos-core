@@ -459,7 +459,7 @@ class NamespaceManager:
                 type='mycroft.events.triggered',
                 namespace=message.data.get('__from'),
                 event_name=message.data.get('event_name'),
-                params=message.data.get('params')
+                data=message.data.get('params')
             )
             send_message_to_gui(message)
         except Exception:
