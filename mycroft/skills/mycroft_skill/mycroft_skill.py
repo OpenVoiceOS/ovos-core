@@ -22,6 +22,7 @@ from inspect import signature
 from itertools import chain
 from os.path import join, abspath, dirname, basename, exists, isfile
 from threading import Event
+from hashlib import md5
 
 from ovos_utils.intents import Intent, IntentBuilder
 from ovos_utils.skills import get_non_properties
@@ -1272,7 +1273,7 @@ class MycroftSkill:
                 self.log.error(f'Unable to find "{entity_file}"')
                 continue
             filename = str(entity.file_path)
-            name = f'{self.skill_id}:{entity_file}'
+            name = f"{self.skill_id}:{basename(entity_file)}_{md5(entity_file.encode('utf-8')).hexdigest()}"
             self.intent_service.register_padatious_entity(name, filename, lang)
 
     def handle_enable_intent(self, message):
