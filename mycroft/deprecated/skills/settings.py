@@ -21,7 +21,7 @@ from mycroft.util.file_utils import ensure_directory_exists
 from mycroft.util.log import LOG
 from ovos_config.config import Configuration
 from ovos_utils.configuration import get_xdg_cache_save_path
-from selene_api.settings import get_display_name
+from ovos_backend_client.settings import get_display_name
 
 
 # Path to remote cache

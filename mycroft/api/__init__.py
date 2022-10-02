@@ -13,12 +13,12 @@
 # limitations under the License.
 #
 from mycroft.version import VersionManager, OVOS_VERSION_STR
-from selene_api.api import DeviceApi as _DeviceApi
+from ovos_backend_client.api import DeviceApi as _DeviceApi
 from mycroft.deprecated.api import Api, UUID, GeolocationApi, STTApi
 from ovos_config.config import Configuration
-from selene_api.exceptions import BackendDown, InternetDown
+from ovos_backend_client.exceptions import BackendDown, InternetDown
 from functools import wraps
-from selene_api.pairing import has_been_paired as _hp, is_paired as _ip, check_remote_pairing
+from ovos_backend_client.pairing import has_been_paired as _hp, is_paired as _ip, check_remote_pairing
 _paired_cache = False
 
 
@@ -67,7 +67,7 @@ def requires_backend(f):
 
 class DeviceApi(Api):
     """ Web API wrapper for obtaining device-level information
-    selene_api is not used directly to account for disabled_backend setting"""
+    ovos_backend_client is not used directly to account for disabled_backend setting"""
 
     def __init__(self):
         super(DeviceApi, self).__init__("device")

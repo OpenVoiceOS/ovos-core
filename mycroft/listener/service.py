@@ -20,7 +20,7 @@ from mycroft.listener import RecognizerLoop
 from mycroft.listener.mic import ListenerState, ListeningMode
 from ovos_config.config import Configuration
 from mycroft.enclosure.api import EnclosureAPI
-from selene_api.identity import IdentityManager
+from ovos_backend_client.identity import IdentityManager
 from mycroft.messagebus.message import Message
 from mycroft.util import (
     start_message_bus_client

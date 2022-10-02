@@ -2,7 +2,7 @@ from copy import copy
 
 import requests
 from requests.exceptions import HTTPError
-from selene_api.api import STTApi as _STTApi, GeolocationApi as _GeoApi, BaseApi
+from ovos_backend_client.api import STTApi as _STTApi, GeolocationApi as _GeoApi, BaseApi
 from ovos_config.config import Configuration
 from ovos_utils.log import LOG
 
@@ -11,7 +11,7 @@ UUID = '{MYCROFT_UUID}'
 
 class Api(BaseApi):
     """ Generic class to wrap web APIs
-    backwards compat only, please use selene_api package directly"""
+    backwards compat only, please use ovos_backend_client package directly"""
 
     params_to_etag = {}
     etag_to_response = {}
@@ -160,8 +160,8 @@ class GeolocationApi(Api):
     """Web API wrapper for performing geolocation lookups."""
 
     def __init__(self):
-        LOG.warning("mycroft.api module has been deprecated, please use selene_api directly")
-        LOG.warning("use 'from selene_api.api import GeolocationApi' instead")
+        LOG.warning("mycroft.api module has been deprecated, please use ovos_backend_client directly")
+        LOG.warning("use 'from ovos_backend_client.api import GeolocationApi' instead")
         super().__init__('geolocation')
         self._real_api = _GeoApi(self.url, self.version)
 
@@ -181,8 +181,8 @@ class STTApi(Api):
     """ Web API wrapper for performing Speech to Text (STT) """
 
     def __init__(self, path):
-        LOG.warning("mycroft.api module has been deprecated, please use selene_api directly")
-        LOG.warning("use 'from selene_api.api import STTApi' instead")
+        LOG.warning("mycroft.api module has been deprecated, please use ovos_backend_client directly")
+        LOG.warning("use 'from ovos_backend_client.api import STTApi' instead")
         super(STTApi, self).__init__(path)
         self._real_api = _STTApi(self.url, self.version)
 

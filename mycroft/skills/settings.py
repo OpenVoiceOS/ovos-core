@@ -62,7 +62,7 @@ import yaml
 from threading import Timer
 from mycroft.api import DeviceApi, requires_backend, is_paired
 from ovos_utils.log import LOG
-from selene_api.settings import RemoteSkillSettings, get_display_name
+from ovos_backend_client.settings import RemoteSkillSettings, get_display_name
 from mycroft_bus_client.message import Message, dig_for_message
 
 # backwards compat imports
