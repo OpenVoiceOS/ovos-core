@@ -4,3 +4,4 @@ ovos-ww-plugin-pocketsphinx~=0.1
 ovos-ww-plugin-precise~=0.1
 ovos-stt-plugin-selene
 ovos-stt-plugin-server~=0.0, >=0.0.2
+ovos-stt-plugin-vosk~=0.1, >=0.1.4a1
