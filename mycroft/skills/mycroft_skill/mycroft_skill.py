@@ -985,7 +985,7 @@ class MycroftSkill:
             body  (str): HTML body of email. This supports
                          simple HTML like bold and italics
         """
-        EmailApi().send_email(title, body, basename(self.root_dir))
+        EmailApi().send_email(title, body, self.skill_id)
 
     def make_active(self):
         """Bump skill to active_skill list in intent_service.
