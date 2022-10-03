@@ -34,7 +34,7 @@ from speech_recognition import (
 )
 
 
-from ovos_backend_client.api import DeviceApi
+from ovos_backend_client.api import DeviceApi, DatasetApi
 from ovos_config.config import Configuration
 from mycroft.deprecated.speech_client import NoiseTracker
 from mycroft.listener.data_structures import RollingMean, CyclicAudioBuffer
@@ -679,28 +679,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
     def _upload_hotword(self, audio, metadata):
         """Upload the wakeword in a background thread."""
         def upload(audio, metadata):
-            api = DeviceApi()
-
-            if self.upload_url:
-                api.precise_url_v1 = self.upload_url
-
-                # try old endpoint - new selene endpoint can not be set in mycroft.conf
-                # user is either using local backend or custom code
-                if self.upload_url != "https://training.mycroft.ai/precise/upload":
-                    try:
-                        api.upload_wake_word_v1(audio.get_wav_data(), metadata)
-                    except:
-                        pass
-
-                    # do not try V2 endpoint, user is not expecting things to be sent to selene
-                    return
-
-            try:
-                # try new endpoint - may not be live depending on backend version
-                api.upload_wake_word(audio.get_wav_data(), metadata)
-            except:
-                # try old endpoint - should be supported by older selene version and all local backend versions
-                api.upload_wake_word_v1(audio.get_wav_data(), metadata)
+            DatasetApi().upload_wake_word(audio.get_wav_data(), metadata, upload_url=self.upload_url)
 
         Thread(target=upload, daemon=True, args=(audio, metadata)).start()
 

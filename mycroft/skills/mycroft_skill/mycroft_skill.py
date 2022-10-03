@@ -28,7 +28,7 @@ from ovos_utils.skills import get_non_properties
 from json_database import JsonStorage
 
 from mycroft import dialog
-from ovos_backend_client.api import DeviceApi
+from ovos_backend_client.api import EmailApi
 from mycroft.audio import wait_while_speaking
 from ovos_config.config import Configuration
 from mycroft.dialog import load_dialogs
@@ -985,7 +985,7 @@ class MycroftSkill:
             body  (str): HTML body of email. This supports
                          simple HTML like bold and italics
         """
-        DeviceApi().send_email(title, body, basename(self.root_dir))
+        EmailApi().send_email(title, body, basename(self.root_dir))
 
     def make_active(self):
         """Bump skill to active_skill list in intent_service.
