@@ -34,7 +34,7 @@ from speech_recognition import (
 )
 
 
-from mycroft.api import DeviceApi
+from ovos_backend_client.api import DeviceApi
 from ovos_config.config import Configuration
 from mycroft.deprecated.speech_client import NoiseTracker
 from mycroft.listener.data_structures import RollingMean, CyclicAudioBuffer

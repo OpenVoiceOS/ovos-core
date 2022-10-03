@@ -1,4 +1,5 @@
-from mycroft.api import DeviceApi, is_paired
+from ovos_backend_client.api import DeviceApi
+from ovos_backend_client.pairing import is_paired
 from mycroft.util.log import LOG
 from ovos_backend_client.settings import SeleneSkillsManifest
 from ovos_config import Configuration

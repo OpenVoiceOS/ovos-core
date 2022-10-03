@@ -15,7 +15,8 @@ from threading import Timer, Lock
 
 import yaml
 
-from mycroft.api import DeviceApi, is_paired, is_backend_disabled
+from ovos_backend_client.pairing import is_paired, is_backend_disabled
+from ovos_backend_client.api import DeviceApi
 from mycroft.messagebus.message import Message
 from mycroft.util.file_utils import ensure_directory_exists
 from mycroft.util.log import LOG

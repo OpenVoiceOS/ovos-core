@@ -20,8 +20,7 @@ from threading import Thread, Event, Lock
 from time import sleep, monotonic
 from mycroft.util.process_utils import ProcessStatus, StatusCallbackMap, ProcessState
 
-
-from mycroft.api import is_paired
+from ovos_backend_client.pairing import is_paired
 from mycroft.enclosure.api import EnclosureAPI
 from ovos_config.config import Configuration
 from mycroft.messagebus.message import Message

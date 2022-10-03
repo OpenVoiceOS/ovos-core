@@ -60,7 +60,8 @@ from os.path import isfile
 import yaml
 
 from threading import Timer
-from mycroft.api import DeviceApi, requires_backend, is_paired
+from ovos_backend_client.api import DeviceApi
+from ovos_backend_client.pairing import is_paired, requires_backend
 from ovos_utils.log import LOG
 from ovos_backend_client.settings import RemoteSkillSettings, get_display_name
 from mycroft_bus_client.message import Message, dig_for_message

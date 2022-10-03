@@ -12,7 +12,7 @@ import re
 from os import walk
 from os.path import splitext, join
 import mycroft.skills.skill_data
-from mycroft.api import is_paired
+from ovos_backend_client.pairing import is_paired
 from mycroft.enclosure.api import EnclosureAPI
 from mycroft.util.format import expand_options
 from mycroft.util.log import LOG

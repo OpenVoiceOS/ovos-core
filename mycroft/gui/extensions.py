@@ -2,7 +2,7 @@ import threading
 from ovos_config.config import Configuration
 from mycroft.messagebus import Message
 from mycroft.util.log import LOG
-from mycroft.api import is_paired
+from ovos_backend_client.pairing import is_paired
 from ovos_utils.system import ssh_enable, ssh_disable
 
 from mycroft.gui.homescreen import HomescreenManager

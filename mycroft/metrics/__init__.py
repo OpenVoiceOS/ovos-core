@@ -19,7 +19,8 @@ import time
 
 import requests
 
-from mycroft.api import DeviceApi, is_paired
+from ovos_backend_client.api import DeviceApi
+from ovos_backend_client.pairing import is_paired
 from ovos_config.config import Configuration
 from mycroft.session import SessionManager
 from mycroft.util.log import LOG

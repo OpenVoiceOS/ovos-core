@@ -2,11 +2,13 @@ from copy import copy
 
 import requests
 from requests.exceptions import HTTPError
-
 from mycroft.version import VersionManager, OVOS_VERSION_STR
 from ovos_backend_client.api import STTApi as _STTApi, GeolocationApi as _GeoApi, BaseApi, DeviceApi as _DeviceApi
 from ovos_config.config import Configuration
 from ovos_utils.log import LOG
+from ovos_backend_client.pairing import has_been_paired, is_paired, check_remote_pairing, \
+    is_backend_disabled, requires_backend
+
 
 UUID = '{MYCROFT_UUID}'
 
@@ -25,7 +27,6 @@ class Api(BaseApi):
         url = config_server.get("url")
         version = config_server.get("version")
         super().__init__(url, version)
-        from mycroft.api import is_backend_disabled
         self.disabled = is_backend_disabled()
 
     @property
