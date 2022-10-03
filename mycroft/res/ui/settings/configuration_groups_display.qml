@@ -45,7 +45,7 @@ Item {
         }
     }
 
-    Item {
+    ColumnLayout {
         anchors.top: topArea.bottom
         anchors.topMargin: Kirigami.Units.largeSpacing
         anchors.left: parent.left
@@ -53,8 +53,23 @@ Item {
         anchors.bottom: bottomArea.top
         anchors.bottomMargin: Kirigami.Units.largeSpacing
 
+        Kirigami.Heading {
+            id: warnText
+            level: 3
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            color: Kirigami.Theme.textColor
+            text: "<b> All configuration changes made here can alter the functionality of your device, some changes might also require a reboot to take affect </b>"
+        }
+
+        Item {
+            Layout.fillWidth: true
+            Layout.preferredHeight: Kirigami.Units.largeSpacing
+        }
+
         ListView {
-            anchors.fill: parent
+            Layout.fillWidth: true
+            Layout.fillHeight: true
             clip: true
             model: sessionData.groupList
             boundsBehavior: Flickable.StopAtBounds

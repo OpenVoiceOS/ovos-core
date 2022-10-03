@@ -45,7 +45,7 @@ Item {
             wrapMode: Text.WordWrap
             anchors.centerIn: parent
             font.bold: true
-            text: qsTr("Developer Settings")
+            text: "Developer Settings"
             color: Kirigami.Theme.textColor
         }
     }
@@ -69,68 +69,21 @@ Item {
         }
     }
 
-    Item {
+    Flickable {
         anchors.top: topArea.bottom
         anchors.topMargin: Kirigami.Units.largeSpacing
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: bottomArea.top
+        anchors.bottom: midBottomArea.top
+        contentWidth: width
+        contentHeight: colMiddleContents.implicitHeight
+        clip: true
 
         ColumnLayout {
+            id: colMiddleContents
             anchors.left: parent.left
             anchors.right: parent.right
             spacing: Kirigami.Units.smallSpacing
-
-            Button {
-                id: advancedSettingButton
-                Layout.fillWidth: true
-                Layout.preferredHeight: Mycroft.Units.gridUnit * 4
-
-                background: Rectangle {
-                    color: "transparent"
-                }
-
-                contentItem: RowLayout {
-                    Image {
-                        id: iconAdvancedSettingHolder
-                        Layout.alignment: Qt.AlignVCenter | Qt.AlignLeft
-                        Layout.preferredHeight: units.iconSizes.medium
-                        Layout.preferredWidth: units.iconSizes.medium
-                        source: "images/settings.png"
-
-                        ColorOverlay {
-                            anchors.fill: parent
-                            source: iconSettingHolder
-                            color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.7)
-                        }
-                    }
-
-
-                    Kirigami.Heading {
-                        id: connectionNameLabel
-                        Layout.fillWidth: true
-                        Layout.alignment: Qt.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                        height: paintedHeight
-                        elide: Text.ElideRight
-                        font.weight: Font.DemiBold
-                        text: qsTr("Advanced Settings")
-                        textFormat: Text.PlainText
-                        color: Kirigami.Theme.textColor
-                        level: 2
-                    }
-                }
-
-                onClicked: {
-                    Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
-                    Mycroft.MycroftController.sendRequest("ovos.phal.configuration.provider.list.groups", {})
-                }
-            }
-
-            Kirigami.Separator {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 1
-            }
 
             Kirigami.Heading {
                 id: warnText
@@ -149,7 +102,7 @@ Item {
             Button {
                 Layout.fillWidth: true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 3
-                text: qsTr("Enable Dashboard")
+                text: "Enable Dashboard"
                 visible: !dashActive
                 enabled: visible
                 onClicked: {
@@ -162,7 +115,7 @@ Item {
             Button {
                 Layout.fillWidth: true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 3
-                text: qsTr("Disable Dashboard")
+                text: "Disable Dashboard"
                 visible: dashActive
                 enabled: visible
                 onClicked: {
@@ -184,7 +137,7 @@ Item {
                 wrapMode: Text.WordWrap
                 level: 3
                 color: Kirigami.Theme.textColor
-                text: qsTr("Dashboard Address") + ": " +  sessionData.dashboard_url
+                text: "Dashboard Address: " +  sessionData.dashboard_url
                 visible: dashActive
                 enabled: visible
             }
@@ -194,7 +147,7 @@ Item {
                 wrapMode: Text.WordWrap
                 level: 3
                 color: Kirigami.Theme.textColor
-                text: qsTr("Dashboard Username")+ ": " + sessionData.dashboard_user
+                text: "Dashboard Username: " + sessionData.dashboard_user
                 visible: dashActive
                 enabled: visible
             }
@@ -204,9 +157,78 @@ Item {
                 wrapMode: Text.WordWrap
                 level: 3
                 color: Kirigami.Theme.textColor
-                text: qsTr("Dashboard Password") + ": " + sessionData.dashboard_password
+                text: "Dashboard Password: " + sessionData.dashboard_password
                 visible: dashActive
                 enabled: visible
+            }
+        }
+    }
+
+    Item {
+        id: midBottomArea
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: bottomArea.top
+        height: Math.max(Mycroft.Units.gridUnit * 5, Kirigami.Units.iconSizes.large)
+
+        Kirigami.Separator {
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 1
+        }
+
+        Button {
+            id: advancedSettingButton
+            width: parent.width
+            height: Math.max(Mycroft.Units.gridUnit * 5, Kirigami.Units.iconSizes.large)
+
+            background: Rectangle {
+                id: advancedSettingButtonBg
+                color: "transparent"
+            }
+
+            contentItem: RowLayout {
+                Image {
+                    id: iconAdvancedSettingHolder
+                    Layout.alignment: Qt.AlignVCenter | Qt.AlignLeft
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.medium
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.medium
+                    source: "images/settings.png"
+
+                    ColorOverlay {
+                        anchors.fill: parent
+                        source: iconAdvancedSettingHolder
+                        color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.7)
+                    }
+                }
+
+
+                Kirigami.Heading {
+                    id: connectionNameLabel
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    height: paintedHeight
+                    elide: Text.ElideRight
+                    font.weight: Font.DemiBold
+                    text: "Advanced Settings"
+                    textFormat: Text.PlainText
+                    color: Kirigami.Theme.textColor
+                    level: 2
+                }
+            }
+
+            onClicked: {
+                Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
+                Mycroft.MycroftController.sendRequest("ovos.phal.configuration.provider.list.groups", {})
+            }
+
+            onPressed: {
+                advancedSettingButtonBg.color = Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.4)
+            }
+            onReleased: {
+                advancedSettingButtonBg.color = "transparent"
             }
         }
     }
@@ -247,7 +269,7 @@ Item {
                 level: 2
                 wrapMode: Text.WordWrap
                 font.bold: true
-                text: qsTr("Device Settings")
+                text: "Device Settings"
                 color: Kirigami.Theme.textColor
                 verticalAlignment: Text.AlignVCenter
                 Layout.fillWidth: true
