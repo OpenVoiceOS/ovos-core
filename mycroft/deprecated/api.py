@@ -2,7 +2,9 @@ from copy import copy
 
 import requests
 from requests.exceptions import HTTPError
-from ovos_backend_client.api import STTApi as _STTApi, GeolocationApi as _GeoApi, BaseApi
+
+from mycroft.version import VersionManager, OVOS_VERSION_STR
+from ovos_backend_client.api import STTApi as _STTApi, GeolocationApi as _GeoApi, BaseApi, DeviceApi as _DeviceApi
 from ovos_config.config import Configuration
 from ovos_utils.log import LOG
 
@@ -163,7 +165,11 @@ class GeolocationApi(Api):
         LOG.warning("mycroft.api module has been deprecated, please use ovos_backend_client directly")
         LOG.warning("use 'from ovos_backend_client.api import GeolocationApi' instead")
         super().__init__('geolocation')
-        self._real_api = _GeoApi(self.url, self.version)
+
+    @property
+    def _real_api(self):
+        """ this is a property to reflect live updates to backend url """
+        return _GeoApi()
 
     def get_geolocation(self, location):
         """Call the geolocation endpoint.
@@ -184,7 +190,11 @@ class STTApi(Api):
         LOG.warning("mycroft.api module has been deprecated, please use ovos_backend_client directly")
         LOG.warning("use 'from ovos_backend_client.api import STTApi' instead")
         super(STTApi, self).__init__(path)
-        self._real_api = _STTApi(self.url, self.version)
+
+    @property
+    def _real_api(self):
+        """ this is a property to reflect live updates to backend url """
+        return _STTApi()
 
     def stt(self, audio, language, limit):
         """ Web API wrapper for performing Speech to Text (STT)
@@ -201,3 +211,113 @@ class STTApi(Api):
         return self._real_api.stt(audio, language, limit)
 
 
+class DeviceApi(Api):
+    """ Web API wrapper for obtaining device-level information
+    selene_api is not used directly to account for disabled_backend setting"""
+
+    def __init__(self):
+        LOG.warning("mycroft.api module has been deprecated, please use ovos_backend_client directly")
+        LOG.warning("use 'from ovos_backend_client.api import DeviceApi' instead")
+        super(DeviceApi, self).__init__("device")
+
+    @property
+    def _real_api(self):
+        """ this is a property to reflect live updates to backend url """
+        return _DeviceApi()
+
+    def get_code(self, state):
+        return self._real_api.get_code(state)
+
+    def activate(self, state, token):
+        version = VersionManager.get()
+        platform = "ovos-core"
+        platform_build = OVOS_VERSION_STR
+        return self._real_api.activate(state, token, version.get("coreVersion"),
+                                       platform, platform_build, version.get("enclosureVersion"))
+
+    def update_version(self):
+        version = VersionManager.get()
+        platform = "ovos-core"
+        platform_build = OVOS_VERSION_STR
+        return self._real_api.update_version(version.get("coreVersion"),
+                                             platform, platform_build,
+                                             version.get("enclosureVersion"))
+
+    def send_email(self, title, body, sender):
+        return self._real_api.send_email(title, body, sender)
+
+    def report_metric(self, name, data):
+        return self._real_api.report_metric(name, data)
+
+    def get(self):
+        """ Retrieve all device information from the web backend """
+        return self._real_api.get()
+
+    def get_settings(self):
+        """ Retrieve device settings information from the web backend
+
+        Returns:
+            str: JSON string with user configuration information.
+        """
+        return self._real_api.get_settings()
+
+    def get_location(self):
+        """ Retrieve device location information from the web backend
+
+        Returns:
+            str: JSON string with user location.
+        """
+        return self._real_api.get_location()
+
+    def get_subscription(self):
+        """
+            Get information about type of subscrition this unit is connected
+            to.
+
+            Returns: dictionary with subscription information
+        """
+        return self._real_api.get_subscription()
+
+    @property
+    def is_subscriber(self):
+        """
+            status of subscription. True if device is connected to a paying
+            subscriber.
+        """
+        return self._real_api.is_subscriber
+
+    def get_subscriber_voice_url(self, voice=None):
+        return self._real_api.get_subscriber_voice_url(voice)
+
+    def get_oauth_token(self, dev_cred):
+        """
+            Get Oauth token for dev_credential dev_cred.
+
+            Argument:
+                dev_cred:   development credentials identifier
+
+            Returns:
+                json string containing token and additional information
+        """
+        return self._real_api.get_oauth_token(dev_cred)
+
+    def get_skill_settings(self):
+        """Get the remote skill settings for all skills on this device."""
+        return self._real_api.get_skill_settings()
+
+    def upload_skill_metadata(self, settings_meta):
+        """Upload skill metadata.
+
+        Args:
+            settings_meta (dict): skill info and settings in JSON format
+        """
+        return self._real_api.upload_skill_metadata(settings_meta)
+
+    def upload_skills_data(self, data):
+        """ Upload skills.json file. This file contains a manifest of installed
+        and failed installations for use with the Marketplace.
+
+        Args:
+             data: dictionary with skills data from msm
+        """
+        return self._real_api.upload_skills_data(data)
