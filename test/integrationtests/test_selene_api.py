@@ -37,7 +37,7 @@ CONFIG.merge(
     }
 )
 
-ovos_backend_client.api.requests.post = MagicMock()
+ovos_backend_client.backends.base.requests.post = MagicMock()
 
 
 def create_identity(uuid, expired=False):
@@ -68,7 +68,7 @@ class TestApi(unittest.TestCase):
 
     @unittest.skip("requires backend to be enabled, TODO refactor test!")
     @patch('ovos_backend_client.identity.IdentityManager')
-    @patch('ovos_backend_client.api.requests.request')
+    @patch('ovos_backend_client.backends.base.requests.request')
     def test_send(self, mock_request, mock_identity_manager):
         # Setup an OK response
         mock_response_ok = create_response(200, {})
@@ -108,7 +108,7 @@ class TestApi(unittest.TestCase):
 class TestDeviceApi(unittest.TestCase):
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.request')
+    @patch('ovos_backend_client.backends.base.requests.request')
     def test_init(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(200)
         mock_identity_get.return_value = create_identity('1234')
@@ -118,7 +118,7 @@ class TestDeviceApi(unittest.TestCase):
         self.assertTrue(device.url.endswith("/device"))
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.post')
+    @patch('ovos_backend_client.backends.base.requests.post')
     def test_device_activate(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(200)
         mock_identity_get.return_value = create_identity('1234')
@@ -130,7 +130,7 @@ class TestDeviceApi(unittest.TestCase):
         self.assertEqual(json['token'], 'token')
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.get')
+    @patch('ovos_backend_client.backends.base.requests.get')
     def test_device_get(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(200)
         mock_identity_get.return_value = create_identity('1234')
@@ -142,7 +142,7 @@ class TestDeviceApi(unittest.TestCase):
 
     @patch('ovos_backend_client.identity.IdentityManager.update')
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.get')
+    @patch('ovos_backend_client.backends.base.requests.get')
     def test_device_get_code(self, mock_request, mock_identity_get,
                              mock_identit_update):
         mock_request.return_value = create_response(200, '123ABC')
@@ -156,7 +156,7 @@ class TestDeviceApi(unittest.TestCase):
         self.assertEqual(params["params"], {"state": "state"})
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.get')
+    @patch('ovos_backend_client.backends.base.requests.get')
     def test_device_get_settings(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
@@ -167,7 +167,7 @@ class TestDeviceApi(unittest.TestCase):
             url, 'https://api-test.mycroft.ai/v1/device/1234/setting')
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.post')
+    @patch('ovos_backend_client.backends.base.requests.post')
     def test_device_report_metric(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
@@ -184,7 +184,7 @@ class TestDeviceApi(unittest.TestCase):
             url, 'https://api-test.mycroft.ai/v1/device/1234/metric/mymetric')
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.put')
+    @patch('ovos_backend_client.backends.base.requests.put')
     def test_device_send_email(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
@@ -201,7 +201,7 @@ class TestDeviceApi(unittest.TestCase):
             url, 'https://api-test.mycroft.ai/v1/device/1234/message')
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.get')
+    @patch('ovos_backend_client.backends.base.requests.get')
     def test_device_get_oauth_token(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
@@ -213,7 +213,7 @@ class TestDeviceApi(unittest.TestCase):
             url, 'https://api-test.mycroft.ai/v1/device/1234/token/1')
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.get')
+    @patch('ovos_backend_client.backends.base.requests.get')
     def test_device_get_location(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
@@ -224,7 +224,7 @@ class TestDeviceApi(unittest.TestCase):
             url, 'https://api-test.mycroft.ai/v1/device/1234/location')
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.get')
+    @patch('ovos_backend_client.backends.base.requests.get')
     def test_device_get_subscription(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
@@ -244,7 +244,7 @@ class TestDeviceApi(unittest.TestCase):
         self.assertTrue(device.is_subscriber)
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.put')
+    @patch('ovos_backend_client.backends.base.requests.put')
     def test_device_upload_skills_data(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(200)
         mock_identity_get.return_value = create_identity('1234')
@@ -265,7 +265,7 @@ class TestDeviceApi(unittest.TestCase):
             device.upload_skills_data('This isn\'t right at all')
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.get')
+    @patch('ovos_backend_client.backends.base.requests.get')
     def test_stt(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
@@ -273,7 +273,7 @@ class TestDeviceApi(unittest.TestCase):
         self.assertTrue(stt.url.endswith('stt'))
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.post')
+    @patch('ovos_backend_client.backends.base.requests.post')
     def test_stt_stt(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
@@ -306,7 +306,7 @@ class TestDeviceApi(unittest.TestCase):
 class TestSettingsMeta(unittest.TestCase):
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.put')
+    @patch('ovos_backend_client.backends.base.requests.put')
     def test_upload_meta(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
@@ -341,7 +341,7 @@ class TestSettingsMeta(unittest.TestCase):
             url, 'https://api-test.mycroft.ai/v1/device/1234/settingsMeta')
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.get')
+    @patch('ovos_backend_client.backends.base.requests.get')
     def test_get_skill_settings(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
@@ -358,7 +358,7 @@ class TestSettingsMeta(unittest.TestCase):
 @patch('ovos_backend_client.pairing._paired_cache', False)
 class TestIsPaired(unittest.TestCase):
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.get')
+    @patch('ovos_backend_client.backends.base.requests.get')
     def test_is_paired_true(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(200)
         mock_identity = MagicMock()
@@ -375,7 +375,7 @@ class TestIsPaired(unittest.TestCase):
         self.assertEqual(url, 'https://api-test.mycroft.ai/v1/device/1234')
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.get')
+    @patch('ovos_backend_client.backends.base.requests.get')
     def test_is_paired_false_local(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(200)
         mock_identity = MagicMock()
@@ -389,7 +389,7 @@ class TestIsPaired(unittest.TestCase):
 
     @unittest.skip("TODO - refactor/fix test")
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.get')
+    @patch('ovos_backend_client.backends.base.requests.get')
     def test_is_paired_false_remote(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(401)
         mock_identity = MagicMock()
@@ -401,7 +401,7 @@ class TestIsPaired(unittest.TestCase):
 
     @unittest.skip("TODO - refactor/fix test")
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.api.requests.get')
+    @patch('ovos_backend_client.backends.base.requests.get')
     def test_is_paired_error_remote(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(500)
         mock_identity = MagicMock()
