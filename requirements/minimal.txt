@@ -5,5 +5,6 @@ ovos-utils~=0.0, >=0.0.23
 ovos-plugin-manager~=0.0, >=0.0.19a4
 ovos-config~=0.0,>=0.0.5a5
 python-dateutil~=2.6
+ovos-lingua-franca~=0.4, >=0.4.6a1
 ovos_backend_client~=0.0, >=0.0.5a3
 watchdog

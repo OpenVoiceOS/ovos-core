@@ -61,6 +61,7 @@ from mycroft.util.file_utils import FileWatcher
 from ovos_utils.configuration import get_xdg_base, get_xdg_data_save_path, get_xdg_config_save_path
 from ovos_utils.enclosure.api import EnclosureAPI
 from ovos_utils.file_utils import get_temp_path
+from lingua_franca.parse import yes_or_no
 from ovos_utils.messagebus import get_message_lang
 import shutil
 
@@ -866,11 +867,11 @@ class MycroftSkill:
                        one of those, including None
         """
         resp = self.get_response(dialog=prompt, data=data)
-
-        if self.voc_match(resp, 'yes'):
-            return 'yes'
-        elif self.voc_match(resp, 'no'):
-            return 'no'
+        answer = yes_or_no(resp)
+        if answer is True:
+            return "yes"
+        elif answer is False:
+            return "no"
         else:
             return resp
 
