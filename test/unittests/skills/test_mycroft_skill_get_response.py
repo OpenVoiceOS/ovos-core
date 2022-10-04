@@ -176,19 +176,50 @@ class TestMycroftSkillAskYesNo(TestCase):
         """Check that a negative response is interpreted as a no."""
         skill = create_skill()
         skill.get_response = mock.Mock()
-        skill.get_response.return_value = 'nope'
 
-        response = skill.ask_yesno('Do you like breakfast')
-        self.assertEqual(response, 'no')
+        for ans in ['nope',
+                    "i think not",
+                    "don't think so",
+                    "no",
+                    "no, I obviously hate it",
+                    "yes, but actually, no",
+                    "wrong answer",
+                    "yes, yes, yes, but actually, no",
+                    "please don't",
+                    "no! please! I beg you",
+                    "yes, i don't want it for sure",
+                    "it's a lie",
+                    "that's certainly undesirable",
+                    "he is lying",
+                    "no, it's a lie",
+                    "you are mistaken",
+                    "that's a mistake"]:
+            skill.get_response.return_value = ans
+            response = skill.ask_yesno('Do you like breakfast')
+            self.assertEqual(response, 'no')
 
     def test_ask_yesno_yes(self):
         """Check that an affirmative response is interpreted as a yes."""
         skill = create_skill()
         skill.get_response = mock.Mock()
-        skill.get_response.return_value = 'yes'
 
-        response = skill.ask_yesno('Do you like breakfast')
-        self.assertEqual(response, 'yes')
+        for ans in ['yes',
+                    "that's affirmative",
+                    "no, but actually, yes",
+                    "i want it for sure", "obviously",
+                    "please",
+                    "yes, it's a lie",
+                    "indeed",
+                    "tou are not wrong"
+                    "correct, he is lying",
+                    "he is not lying",
+                    "you are not mistaken"
+                    "it's not a lie",
+                    "do I hate it when companies sell my data? yes, that's certainly undesirable",
+                    "please! I beg you"]:
+            skill.get_response.return_value = ans
+            response = skill.ask_yesno('Do you like breakfast')
+            self.assertEqual(response, 'yes')
 
     def test_ask_yesno_other(self):
         """Check that non yes no response gets returned."""
@@ -205,6 +236,7 @@ class TestMycroftSkillAskYesNo(TestCase):
         # lang is session based, it comes from originating message in ovos-core
         dig_mock.return_value = Message("", {"lang": "de-de"})
 
+        load_language("de-de")
         skill = create_skill(lang='de-de')
         skill.get_response = mock.Mock()
         skill.get_response.return_value = 'ja'
