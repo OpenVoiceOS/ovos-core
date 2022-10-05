@@ -33,7 +33,7 @@ from mock_msm import \
     MycroftSkillsManager as MockMSM, \
     SkillRepo as MockSkillRepo
 
-from ovos_utils.configuration import get_xdg_data_save_path
+from ovos_config.locations import get_xdg_data_save_path
 
 import warnings
 

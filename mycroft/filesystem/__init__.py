@@ -15,7 +15,8 @@
 import os
 import shutil
 from os.path import join, expanduser, isdir
-from ovos_utils.configuration import get_xdg_data_save_path, get_xdg_base
+from ovos_config.locations import get_xdg_data_save_path
+from ovos_config.meta import get_xdg_base
 
 
 class FileSystemAccess:

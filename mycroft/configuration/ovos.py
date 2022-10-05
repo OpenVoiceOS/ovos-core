@@ -66,4 +66,4 @@ Examples config:
    }
 }
 """
-from ovos_utils.configuration import get_ovos_config
+from ovos_config.meta import get_ovos_config

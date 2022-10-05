@@ -21,7 +21,8 @@ from inspect import isclass, signature
 from os import path, makedirs
 from time import time
 
-from ovos_utils.configuration import get_xdg_base, get_xdg_data_dirs, get_xdg_data_save_path
+from ovos_config.locations import get_xdg_data_dirs, get_xdg_data_save_path
+from ovos_config.meta import get_xdg_base
 from ovos_plugin_manager.skills import find_skill_plugins
 
 from ovos_config.config import Configuration

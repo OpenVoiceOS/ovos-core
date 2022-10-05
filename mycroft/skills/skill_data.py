@@ -21,7 +21,7 @@ from os.path import dirname
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from ovos_utils.configuration import get_xdg_data_save_path
+from ovos_config.locations import get_xdg_data_save_path
 from mycroft.util.file_utils import resolve_resource_file
 from mycroft.util.format import expand_options
 from mycroft.util.log import LOG

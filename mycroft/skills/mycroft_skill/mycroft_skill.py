@@ -58,7 +58,8 @@ from mycroft.util.log import LOG
 from mycroft.util.parse import match_one, extract_number
 from mycroft.skills.settings import SkillSettingsManager
 from mycroft.util.file_utils import FileWatcher
-from ovos_utils.configuration import get_xdg_base, get_xdg_data_save_path, get_xdg_config_save_path
+from ovos_config.locations import get_xdg_data_save_path, get_xdg_config_save_path
+from ovos_config.meta import get_xdg_base
 from ovos_utils.enclosure.api import EnclosureAPI
 from ovos_utils.file_utils import get_temp_path
 from lingua_franca.parse import yes_or_no

@@ -26,7 +26,8 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 from ovos_utils.file_utils import get_temp_path
-from ovos_utils.configuration import get_xdg_base, get_xdg_data_dirs, \
+from ovos_config.meta import get_xdg_base
+from ovos_config.locations import get_xdg_data_dirs, \
     get_xdg_data_save_path, get_xdg_cache_save_path
 from ovos_config.config import Configuration
 from mycroft.util.log import LOG

@@ -14,7 +14,7 @@
 #
 from signal import getsignal, signal, SIGKILL, SIGINT, SIGTERM, \
     SIG_DFL, default_int_handler, SIG_IGN  # signals
-from ovos_utils.configuration import get_xdg_base
+from ovos_config.meta import get_xdg_base
 import os  # Operating System functions
 
 #

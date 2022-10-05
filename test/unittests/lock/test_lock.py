@@ -22,7 +22,7 @@ from os.path import exists, isfile
 
 from mycroft.lock import Lock
 from mycroft.util.file_utils import get_temp_path
-from ovos_utils.configuration import get_xdg_base
+from ovos_config.meta import get_xdg_base
 
 
 class TestLock(unittest.TestCase):

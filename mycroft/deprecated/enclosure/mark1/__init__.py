@@ -29,7 +29,7 @@ import subprocess
 import time
 from threading import Thread, Timer
 
-from ovos_utils.configuration import get_xdg_config_save_path
+from ovos_config.locations import get_xdg_config_save_path
 import mycroft.dialog
 from mycroft.deprecated.enclosure.base import Enclosure
 from ovos_backend_client.pairing import has_been_paired
