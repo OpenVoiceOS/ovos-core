@@ -184,6 +184,14 @@ class SkillManager(Thread):
                 # already reported ready
                 continue
             if ser in ["pairing", "setup"]:
+
+                def setup_finish_interrupt(message):
+                    nonlocal services
+                    services[ser] = True
+
+                # if setup finishes naturally be ready early
+                self.bus.once("ovos.setup.finished", setup_finish_interrupt)
+
                 # pairing service (setup skill) needs to be available
                 # in offline mode (default) is_paired always returns True
                 # but setup skill may enable backend
@@ -194,9 +202,9 @@ class SkillManager(Thread):
                 if response:
                     state = response.data['state']
                     LOG.debug(f"Setup state: {state}")
-                    if state == "inactive":
+                    if state == "finished":
                         services[ser] = True
-                else:
+                elif not services[ser]:
                     # older verson / alternate setup skill installed
                     services[ser] = is_paired(ignore_errors=True)
             elif ser in ["gui", "enclosure"]:
