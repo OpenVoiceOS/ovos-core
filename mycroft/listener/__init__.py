@@ -332,12 +332,17 @@ class RecognizerLoop(EventEmitter):
         hot_words = self.config_core.get("hotwords", {})
         global_listen = self.config_core.get("confirm_listening")
         global_sounds = self.config_core.get("sounds", {})
-        main_ww = self.config_core.get("listener", {}).get("wake_word", "hey_mycroft")
-        wakeupw = self.config_core.get("listener", {}).get("stand_up_word", "wake_up")
+
+        main_ww = self.config_core.get("listener", {}).get("wake_word", "hey_mycroft").replace(" ", "_")
+        wakeupw = self.config_core.get("listener", {}).get("stand_up_word", "wake_up").replace(" ", "_")
 
         for word, data in dict(hot_words).items():
             try:
-                word = word.replace(" ", "_")  # normalization step to avoid naming collisions across configs
+                # normalization step to avoid naming collisions
+                # TODO - move this to ovos_config package, on changes to the hotwords section this should be enforced directly
+                # this approach does not fully solve the issue, config merging may be messed up
+                word = word.replace(" ", "_")
+
                 sound = data.get("sound")
                 utterance = data.get("utterance")
                 listen = data.get("listen", False)
