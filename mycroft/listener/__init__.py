@@ -332,9 +332,12 @@ class RecognizerLoop(EventEmitter):
         hot_words = self.config_core.get("hotwords", {})
         global_listen = self.config_core.get("confirm_listening")
         global_sounds = self.config_core.get("sounds", {})
-        for word in dict(hot_words):
+        main_ww = self.config_core.get("listener", {}).get("wake_word", "hey_mycroft")
+        wakeupw = self.config_core.get("listener", {}).get("stand_up_word", "wake_up")
+
+        for word, data in dict(hot_words).items():
             try:
-                data = hot_words[word]
+                word = word.replace(" ", "_")  # normalization step to avoid naming collisions across configs
                 sound = data.get("sound")
                 utterance = data.get("utterance")
                 listen = data.get("listen", False)
@@ -342,8 +345,17 @@ class RecognizerLoop(EventEmitter):
                 stopword = data.get("stopword", False)
                 trigger = data.get("trigger", False)
                 lang = data.get("stt_lang", self.lang)
-                enabled = data.get("active", True)
+                enabled = data.get("active")
                 event = data.get("bus_event")
+
+                # automatically enable default wake words
+                # only if the active status is undefined
+                if enabled is None:
+                    if word == main_ww or word == wakeupw:
+                        enabled = True
+                    else:
+                        enabled = False
+
                 # global listening sound
                 if not sound and listen and global_listen:
                     sound = global_sounds.get("start_listening")
@@ -419,7 +431,9 @@ class RecognizerLoop(EventEmitter):
         if self.audio_producer:
             self.audio_producer.stop()
         # stop wake word detectors
-        for ww, hotword in self.engines.items():
+        # NOTE: self.engines can change during iteration due to config changes
+        # so lets use a copy
+        for ww, hotword in dict(self.engines).items():
             try:
                 hotword["engine"].stop()
             except:
