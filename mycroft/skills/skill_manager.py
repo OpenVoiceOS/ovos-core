@@ -179,6 +179,7 @@ class SkillManager(Thread):
 
         services (iterable): service names to check.
         """
+        backend_type = self.config.get("server", {}).get("backend_type", "offline")
         for ser, rdy in services.items():
             if rdy:
                 # already reported ready
@@ -204,7 +205,7 @@ class SkillManager(Thread):
                     LOG.debug(f"Setup state: {state}")
                     if state == "finished":
                         services[ser] = True
-                elif not services[ser]:
+                elif not services[ser] and backend_type == "selene":
                     # older verson / alternate setup skill installed
                     services[ser] = is_paired(ignore_errors=True)
             elif ser in ["gui", "enclosure"]:
