@@ -8,14 +8,13 @@ to be a drop in replacement for mycroft-core
 
 import json
 import os
-import re
 from os.path import dirname, basename
 from pathlib import Path
 from threading import Timer, Lock
 
 import yaml
 
-from ovos_backend_client.pairing import is_paired, is_backend_disabled
+from ovos_backend_client.pairing import is_paired
 from ovos_backend_client.api import DeviceApi
 from mycroft.messagebus.message import Message
 from mycroft.util.file_utils import ensure_directory_exists
@@ -105,10 +104,7 @@ class SettingsMetaUploader:
         self.settings_meta = {}
         self.api = None
         self.upload_timer = None
-        if is_backend_disabled():
-            self.sync_enabled = False
-        else:
-            self.sync_enabled = self.config["server"] \
+        self.sync_enabled = self.config["server"] \
                 .get("sync_skill_settings", False)
         if not self.sync_enabled:
             LOG.info("Skill settings sync is disabled, settingsmeta will "
@@ -325,10 +321,7 @@ class SkillSettingsDownloader:
         self.api = DeviceApi()
         self.download_timer = None
 
-        if is_backend_disabled():
-            self.sync_enabled = False
-        else:
-            self.sync_enabled = Configuration().get("server", {}).get("sync_skill_settings", False)
+        self.sync_enabled = Configuration().get("server", {}).get("sync_skill_settings", False)
 
         if not self.sync_enabled:
             LOG.debug("Skill settings sync is disabled, backend settings will "
