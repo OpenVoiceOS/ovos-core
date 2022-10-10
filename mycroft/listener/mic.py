@@ -46,6 +46,7 @@ from mycroft.util import (
     resolve_resource_file,
     play_wav, play_ogg, play_mp3
 )
+from mycroft.util.audio_utils import play_listening_sound
 from mycroft.util.log import LOG
 from ovos_config.locations import get_xdg_data_save_path
 from mycroft.util.audio_utils import play_audio_file
@@ -674,10 +675,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         LOG.info('Listen triggered from external source.')
         self._listen_triggered = True
         if self.config.get("confirm_listening"):
-            sounds = self.config.get("sounds", {})
-            sound = sounds.get("start_listening") or "snd/start_listening.wav"
-            sound = resolve_resource_file(sound)
-            play_audio_file(sound)
+            play_listening_sound()
 
     def _upload_hotword(self, audio, metadata):
         """Upload the wakeword in a background thread."""
