@@ -64,6 +64,20 @@ def play_listening_sound():
     return process
 
 
+def play_end_listening_sound():
+    """Audibly indicate speech recording is no longer happening."""
+    audio_file = resolve_resource_file(
+        Configuration().get('sounds', {}).get('end_listening'))
+
+    if not audio_file:
+        LOG.debug("Could not find 'end_listening' audio file!")
+        return
+
+    process = play_audio_file(audio_file)
+    if not process:
+        LOG.warning("Unable to play 'end_listening' audio file!")
+    return process
+
 def play_error_sound():
     """Audibly indicate a failed request.
 

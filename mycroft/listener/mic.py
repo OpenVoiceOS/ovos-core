@@ -46,7 +46,7 @@ from mycroft.util import (
     resolve_resource_file,
     play_wav, play_ogg, play_mp3
 )
-from mycroft.util.audio_utils import play_listening_sound
+from mycroft.util.audio_utils import play_listening_sound, play_end_listening_sound
 from mycroft.util.log import LOG
 from ovos_config.locations import get_xdg_data_save_path
 from mycroft.util.audio_utils import play_audio_file
@@ -948,6 +948,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
             return None, lang
 
         LOG.debug("Thinking...")
+        play_end_listening_sound()
         return audio_data, lang
 
     def _listen_phrase(self, source, sec_per_buffer, stream):
