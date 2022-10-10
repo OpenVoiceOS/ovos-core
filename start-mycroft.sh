@@ -97,8 +97,8 @@ function launch-background() {
         echo "Starting background service $1"
     fi
 
-    # Launch process in background, sending logs to standard location
-    python3 -m ${_module} $_params >> /var/log/mycroft/${1}.log 2>&1 &
+    # Launch process in background
+    python3 -m ${_module} $_params &
 }
 
 function launch-all() {
