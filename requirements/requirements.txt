@@ -10,7 +10,7 @@ watchdog
 
 ovos_backend_client~=0.0, >=0.0.5a3
 ovos-config~=0.0,>=0.0.5a5
-ovos-utils~=0.0, >=0.0.23
+ovos-utils~=0.0, >=0.0.25a8
 ovos-plugin-manager~=0.0, >=0.0.19a4
 ovos-stt-plugin-server~=0.0, >=0.0.2
 ovos-tts-plugin-mimic~=0.2, >=0.2.6

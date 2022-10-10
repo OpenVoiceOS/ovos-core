@@ -1,6 +1,6 @@
 from ovos_config.locale import setup_locale
 from mycroft.gui.service import GUIService
-from mycroft.util import wait_for_exit_signal, reset_sigint_handler
+from mycroft.util import wait_for_exit_signal, reset_sigint_handler, init_service_logger
 from mycroft.util.log import LOG
 
 
@@ -17,6 +17,7 @@ def on_error(e='Unknown'):
 
 
 def main(ready_hook=on_ready, error_hook=on_error, stopping_hook=on_stopping):
+    init_service_logger("gui")
     LOG.debug("GUI websocket created")
     try:
         reset_sigint_handler()

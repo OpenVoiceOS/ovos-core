@@ -8,12 +8,13 @@ from ovos_config.locale import setup_locale
 from mycroft.lock import Lock as PIDLock  # Create/Support PID locking file
 from mycroft.util import (
     reset_sigint_handler,
-    wait_for_exit_signal
+    wait_for_exit_signal, init_service_logger
 )
 
 
 def main(ready_hook=on_ready, error_hook=on_error, stopping_hook=on_stopping,
          watchdog=lambda: None):
+    init_service_logger("voice")
     reset_sigint_handler()
     PIDLock("voice")
     setup_locale()

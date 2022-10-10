@@ -6,3 +6,4 @@ from ovos_utils.log import LOG
 def getLogger(name="MYCROFT"):
     """Depreciated. Use LOG instead"""
     return LOG
+

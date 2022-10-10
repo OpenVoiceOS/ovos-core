@@ -23,7 +23,7 @@ from mycroft.messagebus.service.event_handler import MessageBusEventHandler
 from mycroft.util import (
     reset_sigint_handler,
     create_daemon,
-    wait_for_exit_signal
+    wait_for_exit_signal, init_service_logger
 )
 from mycroft.util.log import LOG
 from tornado import web, ioloop
@@ -42,6 +42,7 @@ def on_stopping():
 
 
 def main(ready_hook=on_ready, error_hook=on_error, stopping_hook=on_stopping):
+    init_service_logger("bus")
     LOG.info('Starting message bus service...')
     reset_sigint_handler()
     config = load_message_bus_config()

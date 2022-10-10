@@ -29,7 +29,7 @@ from mycroft.skills.skill_manager import SkillManager, on_error, on_stopping, on
 from mycroft.util import (
     reset_sigint_handler,
     start_message_bus_client,
-    wait_for_exit_signal
+    wait_for_exit_signal, init_service_logger
 )
 from mycroft.util.log import LOG
 
@@ -44,6 +44,7 @@ def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
     Returns:
         SkillManager instance or None if it couldn't be initialized
     """
+    init_service_logger("skills")
     reset_sigint_handler()
     # Create PID file, prevent multiple instances of this service
     mycroft.lock.Lock('skills')

@@ -16,8 +16,7 @@ from mycroft.audio.service import PlaybackService, on_ready, on_error, on_stoppi
 from ovos_config.locale import setup_locale
 from mycroft.lock import Lock as PIDLock  # Create/Support PID locking file
 from mycroft.util import reset_sigint_handler, wait_for_exit_signal, \
-    check_for_signal
-
+    check_for_signal, init_service_logger
 service = None  # Added for backwards-compat.
 
 
@@ -25,6 +24,7 @@ def main(ready_hook=on_ready, error_hook=on_error, stopping_hook=on_stopping,
          watchdog=lambda: None):
     global service
     """Start the Audio Service and connect to the Message Bus"""
+    init_service_logger("audio")
     reset_sigint_handler()
     check_for_signal("isSpeaking")
     PIDLock("audio")
