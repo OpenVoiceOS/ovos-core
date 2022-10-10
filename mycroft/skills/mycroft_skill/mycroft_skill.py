@@ -53,6 +53,7 @@ from mycroft.util import (
     play_audio_file,
     camel_case_split
 )
+from mycroft.util.audio_utils import play_acknowledge_sound
 from mycroft.util.format import pronounce_number, join_list
 from mycroft.util.log import LOG
 from mycroft.util.parse import match_one, extract_number
@@ -1481,16 +1482,7 @@ class MycroftSkill:
         require a verbal response. This is intended to provide simple feedback
         to the user that their request was handled successfully.
         """
-        audio_file = resolve_resource_file(
-            self.config_core.get('sounds').get('acknowledge'))
-
-        if not audio_file:
-            LOG.warning("Could not find 'acknowledge' audio file!")
-            return
-
-        process = play_audio_file(audio_file)
-        if not process:
-            LOG.warning("Unable to play 'acknowledge' audio file!")
+        return play_acknowledge_sound()
 
     def init_dialog(self, root_directory=None):
         root_directory = root_directory or self.root_dir

@@ -19,14 +19,69 @@ from copy import deepcopy
 import os
 import re
 import subprocess
-
+from ovos_config import Configuration
 import ovos_config.config
 from mycroft.util.log import LOG
-
+from mycroft.util.file_utils import resolve_resource_file
 try:
     import pyaudio
 except ImportError:
     pyaudio = None
+
+
+def play_acknowledge_sound():
+    """Acknowledge a successful request.
+
+    This method plays a sound to acknowledge a request that does not
+    require a verbal response. This is intended to provide simple feedback
+    to the user that their request was handled successfully.
+    """
+    audio_file = resolve_resource_file(
+        Configuration().get('sounds', {}).get('acknowledge'))
+
+    if not audio_file:
+        LOG.warning("Could not find 'acknowledge' audio file!")
+        return
+
+    process = play_audio_file(audio_file)
+    if not process:
+        LOG.warning("Unable to play 'acknowledge' audio file!")
+    return process
+
+
+def play_listening_sound():
+    """Audibly indicate speech recording started."""
+    audio_file = resolve_resource_file(
+        Configuration().get('sounds', {}).get('start_listening'))
+
+    if not audio_file:
+        LOG.warning("Could not find 'start_listening' audio file!")
+        return
+
+    process = play_audio_file(audio_file)
+    if not process:
+        LOG.warning("Unable to play 'start_listening' audio file!")
+    return process
+
+
+def play_error_sound():
+    """Audibly indicate a failed request.
+
+    This method plays a error sound to signal an error that does not
+    require a verbal response. This is intended to provide simple feedback
+    to the user that their request was NOT handled successfully.
+    """
+    audio_file = resolve_resource_file(
+        Configuration().get('sounds', {}).get('error'))
+
+    if not audio_file:
+        LOG.warning("Could not find 'error' audio file!")
+        return
+
+    process = play_audio_file(audio_file)
+    if not process:
+        LOG.warning("Unable to play 'error' audio file!")
+    return process
 
 
 def play_audio_file(uri: str, environment=None):

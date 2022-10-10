@@ -15,7 +15,6 @@
 
 from threading import Thread
 
-from mycroft import dialog
 from mycroft.listener import RecognizerLoop
 from mycroft.listener.mic import ListenerState, ListeningMode
 from ovos_config.config import Configuration
@@ -136,12 +135,7 @@ class SpeechService(Thread):
         self.bus.emit(Message('speak', event, context))
 
     def handle_complete_intent_failure(self, event):
-        """Extreme backup for answering completely unhandled intent requests."""
-        LOG.info("Failed to find intent.")
-        data = {'utterance': dialog.get('not.loaded')}
-        context = {'client_name': 'mycroft_listener',
-                   'source': 'audio'}
-        self.bus.emit(Message('speak', data, context))
+        """DEPRECATED - this handler is no longer called """
 
     def handle_change_state(self, event):
         """Set listening state."""
@@ -279,8 +273,6 @@ class SpeechService(Thread):
     def connect_bus_events(self):
         # Register handlers for events on main Mycroft messagebus
         self.bus.on('open', self.handle_open)
-        self.bus.on('complete_intent_failure',
-                    self.handle_complete_intent_failure)
         self.bus.on('recognizer_loop:sleep', self.handle_sleep)
         self.bus.on('recognizer_loop:wake_up', self.handle_wake_up)
         self.bus.on('recognizer_loop:record_stop', self.handle_stop_recording)
