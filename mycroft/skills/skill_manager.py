@@ -197,9 +197,9 @@ class SkillManager(Thread):
                 # in offline mode (default) is_paired always returns True
                 # but setup skill may enable backend
                 # wait for backend selection event
-                response = self.bus.wait_for_response(Message('ovos.setup.state',
+                response = self.bus.wait_for_response(Message('ovos.setup.state.get',
                                                               context={"source": "skills",
-                                                                       "destination": "ovos-setup"}))
+                                                                       "destination": "ovos-setup"}), 'ovos.setup.state)
                 if response:
                     state = response.data['state']
                     LOG.debug(f"Setup state: {state}")
