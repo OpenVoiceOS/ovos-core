@@ -199,7 +199,7 @@ class SkillManager(Thread):
                 # wait for backend selection event
                 response = self.bus.wait_for_response(Message('ovos.setup.state.get',
                                                               context={"source": "skills",
-                                                                       "destination": "ovos-setup"}), 'ovos.setup.state)
+                                                                       "destination": "ovos-setup"}), 'ovos.setup.state')
                 if response:
                     state = response.data['state']
                     LOG.debug(f"Setup state: {state}")
