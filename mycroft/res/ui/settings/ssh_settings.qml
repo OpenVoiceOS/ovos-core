@@ -78,7 +78,7 @@ Item {
                 text: qsTr("Enable SSH")
                 onClicked: {
                     Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
-                    triggerGuiEvent("system.ssh.enable", {"display": false})
+                    Mycroft.MycroftController.sendRequest("system.ssh.enable", {"display": false})
                 }
             }
 
@@ -88,7 +88,7 @@ Item {
                 text: qsTr("Disable SSH")
                 onClicked: {
                     Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
-                    triggerGuiEvent("system.ssh.disable", {"display": false})
+                    Mycroft.MycroftController.sendRequest("system.ssh.disable", {"display": false})
                 }
             }
         }
