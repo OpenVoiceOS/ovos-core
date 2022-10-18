@@ -37,8 +37,8 @@ jobs:
         id: license_check_report
         uses: pilosus/action-pip-license-checker@v0.5.0
         with:
-          requirements: 'requirements-all.txt'
-          fail: 'Copyleft'
+          requirements: 'requirements/requirements.txt'
+          fail: 'StrongCopyleft,NetworkCopyleft,Other,Error'
           exclude: 'pylint.*'
       - name: Print report
         if: ${{ always() }}
