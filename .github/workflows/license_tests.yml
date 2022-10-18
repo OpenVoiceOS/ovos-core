@@ -37,7 +37,8 @@ jobs:
           requirements: 'requirements-all.txt'
           fail: 'Copyleft,Other,Error'
           fails-only: true
-          exclude: '^(precise-runner)'
+          exclude: '^(precise-runner|fann2)'
+          exclude-license: '^(Mozilla).*$'
       - name: Print report
         if: ${{ always() }}
         run: echo "${{ steps.license_check_report.outputs.report }}"
