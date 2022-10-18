@@ -36,6 +36,7 @@ jobs:
         with:
           requirements: 'requirements-all.txt'
           fail: 'StrongCopyleft,NetworkCopyleft,Other,Error'
+          fails-only: true
           exclude: 'pylint.*'
       - name: Print report
         if: ${{ always() }}
