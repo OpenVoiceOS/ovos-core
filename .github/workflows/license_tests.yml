@@ -6,9 +6,6 @@ on:
   pull_request:
     branches:
       - dev
-    paths:
-      - 'requirements/**'
-      - 'setup.py'
   workflow_dispatch:
 
 jobs:
@@ -37,7 +34,7 @@ jobs:
         id: license_check_report
         uses: pilosus/action-pip-license-checker@v0.5.0
         with:
-          requirements: 'requirements/requirements.txt'
+          requirements: 'requirements-all.txt'
           fail: 'StrongCopyleft,NetworkCopyleft,Other,Error'
           exclude: 'pylint.*'
       - name: Print report
