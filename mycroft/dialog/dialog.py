@@ -16,10 +16,7 @@
 Provides utilities for reading dialog files and rendering dialogs populated
 with custom data.
 """
-from os.path import join
-from ovos_utils.log import LOG
-from ovos_workshop.resource_files import resolve_resource_file
-from ovos_utils.dialog import MustacheDialogRenderer, load_dialogs
+from ovos_utils.dialog import MustacheDialogRenderer, load_dialogs, get_dialog
 
 
 def get(phrase, lang=None, context=None):
@@ -36,19 +33,7 @@ def get(phrase, lang=None, context=None):
     Returns:
         str: a randomized and/or translated version of the phrase
     """
-
     if not lang:
         from ovos_config.config import Configuration
         lang = Configuration().get('lang', "en-us")
-
-    filename = join('text', lang.lower(), phrase + '.dialog')
-    template = resolve_resource_file(filename)
-    if not template:
-        LOG.debug('Resource file not found: {}'.format(filename))
-        return phrase
-
-    stache = MustacheDialogRenderer()
-    stache.load_template_file('template', template)
-    if not context:
-        context = {}
-    return stache.render('template', context)
+    return get_dialog(phrase, lang, context)
