@@ -31,7 +31,6 @@ from mycroft import dialog
 from ovos_backend_client.api import EmailApi
 from mycroft.audio import wait_while_speaking
 from ovos_config.config import Configuration
-from mycroft.dialog import load_dialogs
 from mycroft.filesystem import FileSystemAccess
 from mycroft.gui import SkillGUI
 from mycroft.messagebus.message import Message, dig_for_message
@@ -59,10 +58,8 @@ from mycroft.util.log import LOG
 from mycroft.util.parse import match_one, extract_number
 from mycroft.skills.settings import SkillSettingsManager
 from mycroft.util.file_utils import FileWatcher
-from ovos_config.locations import get_xdg_data_save_path, get_xdg_config_save_path
-from ovos_config.meta import get_xdg_base
+from ovos_config.locations import get_xdg_config_save_path
 from ovos_utils.enclosure.api import EnclosureAPI
-from ovos_utils.file_utils import get_temp_path
 from lingua_franca.parse import yes_or_no
 from ovos_utils.messagebus import get_message_lang
 import shutil
