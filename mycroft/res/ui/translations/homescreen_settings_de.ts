@@ -6,7 +6,7 @@
     <message>
         <location filename="homescreen_settings.qml" line="61"/>
         <source>Homescreen Settings</source>
-        <translation>Homescreen-Einstellungen</translation>
+        <translation>Einstellungen Homescreen</translation>
     </message>
     <message>
         <location filename="homescreen_settings.qml" line="169"/>

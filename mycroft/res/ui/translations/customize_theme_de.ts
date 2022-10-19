@@ -16,12 +16,12 @@
     <message>
         <location filename="customize_theme.qml" line="142"/>
         <source>Select Primary Color</source>
-        <translation>Wählen Sie Primärfarbe</translation>
+        <translation>Wähle Primärfarbe</translation>
     </message>
     <message>
         <location filename="customize_theme.qml" line="184"/>
         <source>Select Secondary Color</source>
-        <translation>Wählen Sie Sekundärfarbe</translation>
+        <translation>Wähle Sekundärfarbe</translation>
     </message>
     <message>
         <location filename="customize_theme.qml" line="226"/>
@@ -31,7 +31,7 @@
     <message>
         <location filename="customize_theme.qml" line="260"/>
         <source>Set Name</source>
-        <translation>Name einsetzen</translation>
+        <translation>Name</translation>
     </message>
     <message>
         <location filename="customize_theme.qml" line="322"/>
@@ -42,17 +42,17 @@
     <message>
         <location filename="customize_theme.qml" line="378"/>
         <source>Create</source>
-        <translation>Schaffen</translation>
+        <translation>Erstellen</translation>
     </message>
     <message>
         <location filename="customize_theme.qml" line="439"/>
         <source>Back</source>
-        <translation>Der Rücken</translation>
+        <translation>Zurück</translation>
     </message>
     <message>
         <location filename="customize_theme.qml" line="580"/>
         <source>Cancel</source>
-        <translation>Absagen</translation>
+        <translation>Abbrechen</translation>
     </message>
 </context>
 </TS>

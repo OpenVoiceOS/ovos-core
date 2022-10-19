@@ -6,22 +6,22 @@
     <message>
         <location filename="about_page.qml" line="45"/>
         <source>About</source>
-        <translation>Um</translation>
+        <translation>Über</translation>
     </message>
     <message>
         <location filename="about_page.qml" line="77"/>
         <source>System Information</source>
-        <translation>System Information</translation>
+        <translation>Systeminfo</translation>
     </message>
     <message>
         <location filename="about_page.qml" line="89"/>
         <source>Kernel Version</source>
-        <translation>Kernel Ausführung</translation>
+        <translation>Kernel Version</translation>
     </message>
     <message>
         <location filename="about_page.qml" line="105"/>
         <source>Version</source>
-        <translation>Ausführung</translation>
+        <translation>Version</translation>
     </message>
     <message>
         <location filename="about_page.qml" line="113"/>

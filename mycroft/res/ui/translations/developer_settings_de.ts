@@ -26,17 +26,17 @@
     <message>
         <location filename="developer_settings.qml" line="187"/>
         <source>Dashboard Address</source>
-        <translation>Dashboard-Adresse</translation>
+        <translation>Dashboard Adresse</translation>
     </message>
     <message>
         <location filename="developer_settings.qml" line="197"/>
         <source>Dashboard Username</source>
-        <translation>Dashboard-Benutzername</translation>
+        <translation>Dashboard Benutzername</translation>
     </message>
     <message>
         <location filename="developer_settings.qml" line="207"/>
         <source>Dashboard Password</source>
-        <translation>Dashboard-Passwort</translation>
+        <translation>Dashboard Passwort</translation>
     </message>
     <message>
         <location filename="developer_settings.qml" line="250"/>

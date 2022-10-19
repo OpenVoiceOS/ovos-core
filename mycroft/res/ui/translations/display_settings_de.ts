@@ -11,7 +11,7 @@
     <message>
         <location filename="display_settings.qml" line="78"/>
         <source>Wallpaper Rotation</source>
-        <translation>Tapetendrehung</translation>
+        <translation>Hintergrundrotation</translation>
     </message>
     <message>
         <location filename="display_settings.qml" line="89"/>
@@ -23,14 +23,14 @@
         <location filename="display_settings.qml" line="167"/>
         <location filename="display_settings.qml" line="227"/>
         <source>ON</source>
-        <translation>An</translation>
+        <translation>AN</translation>
     </message>
     <message>
         <location filename="display_settings.qml" line="107"/>
         <location filename="display_settings.qml" line="167"/>
         <location filename="display_settings.qml" line="227"/>
         <source>OFF</source>
-        <translation>Aus</translation>
+        <translation>AUS</translation>
     </message>
     <message>
         <location filename="display_settings.qml" line="138"/>
@@ -40,7 +40,7 @@
     <message>
         <location filename="display_settings.qml" line="149"/>
         <source>Dim&apos;s the display in 60 seconds</source>
-        <translation>Dimmen Sie das Display in 60 Sekunden</translation>
+        <translation>Dimme das Display in 60 Sekunden</translation>
     </message>
     <message>
         <location filename="display_settings.qml" line="198"/>

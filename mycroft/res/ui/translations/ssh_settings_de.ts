@@ -6,27 +6,27 @@
     <message>
         <location filename="ssh_settings.qml" line="44"/>
         <source>SSH Settings</source>
-        <translation type="unfinished"></translation>
+        <translation>Einstellungen SSH</translation>
     </message>
     <message>
         <location filename="ssh_settings.qml" line="67"/>
         <source>By enabling SSH Mode, anyone can access, change or delete anything on this device by connecting to it via another device.</source>
-        <translation type="unfinished"></translation>
+        <translation>Es besteht die Möglichkeit mit aktivem SSH, das Unbefugte an Daten dieses Geräts gelangen </translation>
     </message>
     <message>
         <location filename="ssh_settings.qml" line="78"/>
         <source>Enable SSH</source>
-        <translation type="unfinished"></translation>
+        <translation>SSH aktivieren</translation>
     </message>
     <message>
         <location filename="ssh_settings.qml" line="88"/>
         <source>Disable SSH</source>
-        <translation type="unfinished"></translation>
+        <translation>SSH deaktivieren</translation>
     </message>
     <message>
         <location filename="ssh_settings.qml" line="133"/>
         <source>Device Settings</source>
-        <translation type="unfinished"></translation>
+        <translation>Geräteeinstellungen</translation>
     </message>
 </context>
 </TS>

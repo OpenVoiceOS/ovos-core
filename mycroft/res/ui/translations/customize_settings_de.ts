@@ -16,17 +16,17 @@
     <message>
         <location filename="customize_settings.qml" line="294"/>
         <source>Create Scheme</source>
-        <translation>Thema erstellen</translation>
+        <translation>Schema erstellen</translation>
     </message>
     <message>
         <location filename="customize_settings.qml" line="399"/>
         <source>Select Style</source>
-        <translation>Wählen Sie Stil</translation>
+        <translation>Stilauswahl</translation>
     </message>
     <message>
         <location filename="customize_settings.qml" line="468"/>
         <source>Cancel</source>
-        <translation>Absagen</translation>
+        <translation>Abbrechen</translation>
     </message>
 </context>
 </TS>

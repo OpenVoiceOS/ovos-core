@@ -6,12 +6,12 @@
     <message>
         <location filename="configuration_generator_display.qml" line="86"/>
         <source>Configuration</source>
-        <translation>Aufbau</translation>
+        <translation>Konfiguration</translation>
     </message>
     <message>
         <location filename="configuration_generator_display.qml" line="279"/>
         <source>Back</source>
-        <translation>Der Rücken</translation>
+        <translation>Zurück</translation>
     </message>
     <message>
         <location filename="configuration_generator_display.qml" line="309"/>

@@ -6,12 +6,12 @@
     <message>
         <location filename="configuration_ui/settingListBox.qml" line="183"/>
         <source>Type here to add an item to the list</source>
-        <translation>Geben Sie hier ein, um ein Element zur Liste hinzuzufügen</translation>
+        <translation>Namen des Elements, das zur Liste hinzugefügt werden soll</translation>
     </message>
     <message>
         <location filename="configuration_ui/settingListBox.qml" line="196"/>
         <source>Add Item</source>
-        <translation>Artikel hinzufügen</translation>
+        <translation>Element hinzufügen</translation>
     </message>
 </context>
 </TS>

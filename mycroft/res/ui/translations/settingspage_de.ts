@@ -6,7 +6,7 @@
     <message>
         <location filename="settingspage.qml" line="19"/>
         <source>Homescreen Settings</source>
-        <translation>Homescreen-Einstellungen</translation>
+        <translation>Einstellungen Homescreen</translation>
     </message>
     <message>
         <location filename="settingspage.qml" line="25"/>
@@ -31,7 +31,7 @@
     <message>
         <location filename="settingspage.qml" line="49"/>
         <source>About</source>
-        <translation>Um</translation>
+        <translation>Über</translation>
     </message>
     <message>
         <location filename="settingspage.qml" line="68"/>
@@ -41,7 +41,7 @@
     <message>
         <location filename="settingspage.qml" line="180"/>
         <source>Home</source>
-        <translation>Heim</translation>
+        <translation>Home</translation>
     </message>
 </context>
 </TS>

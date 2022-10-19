@@ -11,7 +11,7 @@
     <message>
         <location filename="configuration_groups_display.qml" line="152"/>
         <source>Back</source>
-        <translation>Der Rücken</translation>
+        <translation>Zurück</translation>
     </message>
 </context>
 </TS>
