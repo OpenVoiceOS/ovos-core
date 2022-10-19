@@ -80,6 +80,17 @@ class PlaybackService(Thread):
 
     @staticmethod
     def get_tts_lang_options(lang, blacklist=None):
+        """ returns a list of options to be consumed by an external UI
+        each dict contains metadata about the plugins
+
+        eg:
+          [{"engine": "ovos-tts-plugin-mimic3",
+          "offline": True,
+          "lang": "en-us",
+          "gender": "male",
+          "display_name": "Alan Pope",
+          "plugin_name": 'OVOS TTS Plugin Mimic3'}]
+        """
         blacklist = blacklist or []
         opts = []
         cfgs = get_tts_lang_configs(lang=lang, include_dialects=True)
@@ -97,6 +108,17 @@ class PlaybackService(Thread):
 
     @staticmethod
     def get_g2p_lang_options(lang, blacklist=None):
+        """ returns a list of options to be consumed by an external UI
+        each dict contains metadata about the plugins
+
+        eg:
+          [{"engine": "ovos-g2p-plugin-mimic",
+          "offline": True,
+          "lang": "en-us",
+          "native_alphabet": "ARPA",
+          "display_name": "Mimic G2P",
+          "plugin_name": 'OVOS G2P Plugin Mimic'}]
+        """
         blacklist = blacklist or []
         opts = []
         cfgs = get_g2p_lang_configs(lang=lang, include_dialects=True)
@@ -114,6 +136,14 @@ class PlaybackService(Thread):
 
     @staticmethod
     def get_audio_options(blacklist=None):
+        """ returns a list of options to be consumed by an external UI
+        each dict contains metadata about the plugins
+
+        eg:
+          [{"type": "ovos_common_play",
+          "active": True,
+          "plugin_name": 'Ovos Common Play'}]
+        """
         blacklist = blacklist or []
         opts = []
         cfgs = get_audio_service_configs()
