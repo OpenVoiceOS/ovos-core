@@ -88,6 +88,7 @@ class PlaybackService(Thread):
           "offline": True,
           "lang": "en-us",
           "gender": "male",
+          "voice": "ap",
           "display_name": "Alan Pope",
           "plugin_name": 'OVOS TTS Plugin Mimic3'}]
         """
@@ -158,6 +159,14 @@ class PlaybackService(Thread):
         return opts
 
     def handle_opm_tts_query(self, message):
+        """ Responds to opm.tts.query with data about installed plugins
+
+        Response message.data will contain:
+        "langs" - list of supported languages
+        "plugins" - {lang: [list_of_plugins]}
+        "configs" - {plugin_name: {lang: [list_of_valid_configs]}}
+        "options" - {lang: [list_of_valid_ui_metadata]}
+        """
         plugs = get_tts_supported_langs()
         configs = {}
         opts = {}
@@ -175,6 +184,14 @@ class PlaybackService(Thread):
         self.bus.emit(message.response(data))
 
     def handle_opm_g2p_query(self, message):
+        """ Responds to opm.g2p.query with data about installed plugins
+
+        Response message.data will contain:
+        "langs" - list of supported languages
+        "plugins" - {lang: [list_of_plugins]}
+        "configs" - {plugin_name: {lang: [list_of_valid_configs]}}
+        "options" - {lang: [list_of_valid_ui_metadata]}
+        """
         plugs = get_g2p_supported_langs()
         configs = {}
         opts = {}
@@ -192,6 +209,13 @@ class PlaybackService(Thread):
         self.bus.emit(message.response(data))
 
     def handle_opm_audio_query(self, message):
+        """ Responds to opm.audio.query with data about installed plugins
+
+        Response message.data will contain:
+        "plugins" - [list_of_plugins]
+        "configs" - {backend_name: backend_cfg}}
+        "options" - {lang: [list_of_valid_ui_metadata]}
+        """
         cfgs = get_audio_service_configs()
         data = {
             "plugins": list(cfgs.keys()),
