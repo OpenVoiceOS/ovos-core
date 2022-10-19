@@ -9,7 +9,10 @@ from mycroft.metrics import report_timing, Stopwatch
 from mycroft.audio.audioservice import AudioService
 from mycroft.util import check_for_signal, start_message_bus_client
 from mycroft.util.log import LOG
-from mycroft.util.process_utils import ProcessStatus, StatusCallbackMap
+from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
+from ovos_plugin_manager.tts import get_tts_supported_langs, get_tts_lang_configs, get_tts_module_configs
+from ovos_plugin_manager.audio import get_audio_service_configs
+from ovos_plugin_manager.g2p import get_g2p_lang_configs, get_g2p_supported_langs, get_g2p_module_configs
 
 
 def on_ready():
@@ -75,7 +78,100 @@ class PlaybackService(Thread):
             LOG.exception(e)
             self.status.set_error(e)
 
+    @staticmethod
+    def get_tts_lang_options(lang, blacklist=None):
+        blacklist = blacklist or []
+        opts = []
+        cfgs = get_tts_lang_configs(lang=lang, include_dialects=True)
+        for engine, configs in cfgs.items():
+            if engine in blacklist:
+                continue
+            # For Display purposes, we want to show the engine name without the underscore or dash and capitalized all
+            plugin_display_name = engine.replace("_", " ").replace("-", " ").title()
+            for voice in configs:
+                voice["plugin_name"] = plugin_display_name
+                voice["engine"] = engine
+                voice["lang"] = voice.get("lang") or lang
+                opts.append(voice)
+        return opts
+
+    @staticmethod
+    def get_g2p_lang_options(lang, blacklist=None):
+        blacklist = blacklist or []
+        opts = []
+        cfgs = get_g2p_lang_configs(lang=lang, include_dialects=True)
+        for engine, configs in cfgs.items():
+            if engine in blacklist:
+                continue
+            # For Display purposes, we want to show the engine name without the underscore or dash and capitalized all
+            plugin_display_name = engine.replace("_", " ").replace("-", " ").title()
+            for voice in configs:
+                voice["plugin_name"] = plugin_display_name
+                voice["engine"] = engine
+                voice["lang"] = voice.get("lang") or lang
+                opts.append(voice)
+        return opts
+
+    @staticmethod
+    def get_audio_options(blacklist=None):
+        blacklist = blacklist or []
+        opts = []
+        cfgs = get_audio_service_configs()
+        for name, config in cfgs.items():
+            engine = config["type"]
+            if engine in blacklist:
+                continue
+            # For Display purposes, we want to show the engine name without the underscore or dash and capitalized all
+            plugin_display_name = engine.replace("_", " ").replace("-", " ").title()
+            config["plugin_name"] = plugin_display_name
+            opts.append(config)
+        return opts
+
+    def handle_opm_tts_query(self, message):
+        plugs = get_tts_supported_langs()
+        configs = {}
+        opts = {}
+        for lang, m in plugs.items():
+            for p in m:
+                configs[p] = get_tts_module_configs(p)
+            opts[lang] = self.get_tts_lang_options(lang)
+
+        data = {
+            "plugins": plugs,
+            "langs": list(plugs.keys()),
+            "configs": configs,
+            "options": opts
+        }
+        self.bus.emit(message.response(data))
+
+    def handle_opm_g2p_query(self, message):
+        plugs = get_g2p_supported_langs()
+        configs = {}
+        opts = {}
+        for lang, m in plugs.items():
+            for p in m:
+                configs[p] = get_g2p_module_configs(p)
+            opts[lang] = self.get_g2p_lang_options(lang)
+
+        data = {
+            "plugins": plugs,
+            "langs": list(plugs.keys()),
+            "configs": configs,
+            "options": opts
+        }
+        self.bus.emit(message.response(data))
+
+    def handle_opm_audio_query(self, message):
+        cfgs = get_audio_service_configs()
+        data = {
+            "plugins": list(cfgs.keys()),
+            "configs": cfgs,
+            "options": self.get_audio_options()
+        }
+        self.bus.emit(message.response(data))
+
     def run(self):
+        self.status.set_alive()
         if self.audio.wait_for_load():
             if len(self.audio.service) == 0:
                 LOG.warning('No audio backends loaded! '
@@ -184,9 +280,9 @@ class PlaybackService(Thread):
             listen (bool): True if interaction should end with mycroft listening
         """
         try:
-            self.tts = self._get_tts_fallback()
+            tts = self._get_tts_fallback()
             LOG.debug("TTS fallback, utterance : " + str(utterance))
-            self.tts.execute(utterance, ident, listen)
+            tts.execute(utterance, ident, listen)
             return
         except Exception as e:
             LOG.error(e)
@@ -249,3 +345,6 @@ class PlaybackService(Thread):
         self.bus.on('mycroft.audio.queue', self.handle_queue_audio)
         self.bus.on('speak', self.handle_speak)
         self.bus.on('ovos.languages.tts', self.handle_get_languages_tts)
+        self.bus.on("opm.tts.query", self.handle_opm_tts_query)
+        self.bus.on("opm.audio.query", self.handle_opm_audio_query)
+        self.bus.on("opm.g2p.query", self.handle_opm_g2p_query)
