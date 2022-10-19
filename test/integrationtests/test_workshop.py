@@ -2,8 +2,9 @@ import json
 import unittest
 from os.path import dirname
 from time import sleep
-from ovos_workshop.skills import OVOSSkill, MycroftSkill
 from mycroft.skills.skill_loader import SkillLoader
+from mycroft.skills.mycroft_skill.mycroft_skill import MycroftSkill
+from ovos_workshop.skills.ovos import OVOSSkill
 from ovos_utils.messagebus import FakeBus, Message
 
 # tests taken from ovos_workshop
