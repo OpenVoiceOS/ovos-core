@@ -26,8 +26,8 @@ from ovos_config.config import Configuration
 from ovos_config.locations import get_xdg_data_save_path, get_xdg_config_save_path
 from mycroft.messagebus.message import Message
 from mycroft.util.log import LOG
-from mycroft.skills.mycroft_skill.event_container import EventContainer, \
-    create_basic_wrapper
+from ovos_utils.messagebus import create_basic_wrapper, EventContainer
+
 
 
 def repeat_time(sched_time, repeat):

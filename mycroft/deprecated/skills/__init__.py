@@ -16,6 +16,8 @@ from ovos_backend_client.pairing import is_paired
 from mycroft.enclosure.api import EnclosureAPI
 from mycroft.util.format import expand_options
 from mycroft.util.log import LOG
+from ovos_utils.messagebus import to_alnum
+
 
 RASPBERRY_PI_PLATFORMS = ('mycroft_mark_1', 'picroft', 'mycroft_mark_2pi')
 
@@ -200,16 +202,3 @@ def read_translated_file(filename, data):
             return text.format(**data or {}).rstrip('\n').split('\n')
     else:
         return None
-
-
-def to_alnum(skill_id):
-    """Convert a skill id to only alphanumeric characters
-
-     Non alpha-numeric characters are converted to "_"
-
-    Args:
-        skill_id (str): identifier to be converted
-    Returns:
-        (str) String of letters
-    """
-    return ''.join(c if c.isalnum() else '_' for c in str(skill_id))

@@ -37,8 +37,7 @@ from mycroft.messagebus.message import Message, dig_for_message
 from mycroft.metrics import report_metric
 from mycroft.skills.event_scheduler import EventSchedulerInterface
 from mycroft.skills.intent_service_interface import IntentServiceInterface
-from mycroft.skills.mycroft_skill.event_container import EventContainer, \
-    create_wrapper, get_handler_name
+from ovos_utils.messagebus import get_handler_name, create_wrapper, EventContainer
 from mycroft.skills.skill_data import (
     munge_regex,
     munge_intent_parser,

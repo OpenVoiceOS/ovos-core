@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 from mycroft.skills.mycroft_skill.mycroft_skill import MycroftSkill
-from mycroft.skills.mycroft_skill.event_container import get_handler_name
+from ovos_utils.messagebus import get_handler_name
 from mycroft.skills.mycroft_skill.decorators import (intent_handler,
                                                      intent_file_handler,
                                                      resting_screen_handler,

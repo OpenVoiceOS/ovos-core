@@ -1,7 +1,6 @@
 import unittest
 from unittest import mock
-
-from mycroft.skills.mycroft_skill.event_container import EventContainer
+from ovos_utils.messagebus import EventContainer
 
 
 def example_handler(message):
