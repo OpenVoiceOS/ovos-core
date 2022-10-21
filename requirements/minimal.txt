@@ -7,4 +7,5 @@ ovos-config~=0.0,>=0.0.5a5
 python-dateutil~=2.6
 ovos-lingua-franca~=0.4, >=0.4.6a1
 ovos_backend_client~=0.0, >=0.0.5a3
+ovos_workshop~=0.0, >=0.0.9a1
 watchdog
