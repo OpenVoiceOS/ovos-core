@@ -33,7 +33,7 @@ class SkillGUI(GUIInterface):
 
     def __init__(self, skill):
         self.skill = skill
-        super().__init__(skill.skill_id, skill.bus, config=Configuration())
+        super().__init__(skill.skill_id, config=Configuration())
 
     @property
     def bus(self):
