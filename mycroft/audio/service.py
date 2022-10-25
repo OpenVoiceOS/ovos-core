@@ -106,15 +106,14 @@ class PlaybackService(Thread):
         else:
             ident = 'unknown'
 
-        with self.lock:
-            stopwatch = Stopwatch()
-            stopwatch.start()
+        stopwatch = Stopwatch()
+        stopwatch.start()
 
-            utterance = message.data['utterance']
-            listen = message.data.get('expect_response', False)
-            self.execute_tts(utterance, ident, listen)
+        utterance = message.data['utterance']
+        listen = message.data.get('expect_response', False)
+        self.execute_tts(utterance, ident, listen)
 
-            stopwatch.stop()
+        stopwatch.stop()
 
         report_timing(ident, 'speech', stopwatch,
                       {'utterance': utterance,
@@ -125,13 +124,14 @@ class PlaybackService(Thread):
 
         # update TTS object if configuration has changed
         if not self._tts_hash or self._tts_hash != config.get("module", ""):
-            if self.tts:
-                self.tts.shutdown()
-            # Create new tts instance
-            LOG.info("(re)loading TTS engine")
-            self.tts = TTSFactory.create(config)
-            self.tts.init(self.bus)
-            self._tts_hash = config.get("module", "")
+            with self.lock:
+                if self.tts:
+                    self.tts.shutdown()
+                # Create new tts instance
+                LOG.info("(re)loading TTS engine")
+                self.tts = TTSFactory.create(config)
+                self.tts.init(self.bus)
+                self._tts_hash = config.get("module", "")
 
         # if fallback TTS is the same as main TTS dont load it
         if config.get("module", "") == config.get("fallback_module", ""):
@@ -139,12 +139,13 @@ class PlaybackService(Thread):
 
         if not self._fallback_tts_hash or \
                 self._fallback_tts_hash != config.get("fallback_module", ""):
-            if self.fallback_tts:
-                self.fallback_tts.shutdown()
-            # Create new tts instance
-            LOG.info("(re)loading fallback TTS engine")
-            self._get_tts_fallback()
-            self._fallback_tts_hash = config.get("fallback_module", "")
+            with self.lock:
+                if self.fallback_tts:
+                    self.fallback_tts.shutdown()
+                # Create new tts instance
+                LOG.info("(re)loading fallback TTS engine")
+                self._get_tts_fallback()
+                self._fallback_tts_hash = config.get("fallback_module", "")
 
     def execute_tts(self, utterance, ident, listen=False):
         """Mute mic and start speaking the utterance using selected tts backend.
@@ -155,12 +156,13 @@ class PlaybackService(Thread):
             listen:     True if a user response is expected
         """
         LOG.info("Speak: " + utterance)
-        try:
-            self.tts.execute(utterance, ident, listen)
-        except Exception as e:
-            LOG.exception(f"TTS synth failed! {e}")
-            if self._tts_hash != self._fallback_tts_hash:
-                self.execute_fallback_tts(utterance, ident, listen)
+        with self.lock:
+            try:
+                self.tts.execute(utterance, ident, listen)
+            except Exception as e:
+                LOG.exception(f"TTS synth failed! {e}")
+                if self._tts_hash != self._fallback_tts_hash:
+                    self.execute_fallback_tts(utterance, ident, listen)
 
     def _get_tts_fallback(self):
         """Lazily initializes the fallback TTS if needed."""

@@ -15,7 +15,7 @@
 import json
 import time
 from queue import Queue, Empty
-from threading import Thread
+from threading import Thread, Lock
 
 import pyaudio
 from pyee import EventEmitter
@@ -196,14 +196,15 @@ class AudioConsumer(Thread):
 
         try:
             # Invoke the STT engine on the audio clip
-            try:
-                text = self.loop.stt.execute(audio, language=lang)
-            except Exception as e:
-                if self.loop.fallback_stt:
-                    LOG.warning(f"Using fallback STT, main plugin failed: {e}")
-                    text = self.loop.fallback_stt.execute(audio, language=lang)
-                else:
-                    raise e
+            with self.loop.lock:
+                try:
+                    text = self.loop.stt.execute(audio, language=lang)
+                except Exception as e:
+                    if self.loop.fallback_stt:
+                        LOG.warning(f"Using fallback STT, main plugin failed: {e}")
+                        text = self.loop.fallback_stt.execute(audio, language=lang)
+                    else:
+                        raise e
             if text is not None:
                 text = text.lower().strip()
                 LOG.debug("STT: " + text)
@@ -251,6 +252,7 @@ class RecognizerLoop(EventEmitter):
         super(RecognizerLoop, self).__init__()
         self._watchdog = watchdog
         self.mute_calls = 0
+        self.lock = Lock()
         self.stt = stt
         self.fallback_stt = fallback_stt
         self.bus = bus
@@ -517,9 +519,10 @@ class RecognizerLoop(EventEmitter):
 
     def reload(self):
         """Reload configuration and restart consumer and producer."""
-        self.stop()
-        # load config
-        self._load_config()
-        # restart
-        self.needs_reload = False
-        self.start_async()
+        with self.lock:
+            self.stop()
+            # load config
+            self._load_config()
+            # restart
+            self.needs_reload = False
+            self.start_async()
