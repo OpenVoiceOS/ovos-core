@@ -181,6 +181,7 @@ ItemDelegate {
             Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
             styleViewPopUp.setTheme(modelDataStyle)
             styleViewPopUp.close()
+            Mycroft.MycroftController.sendRequest("ovos.theme.get", {})
         }
     }
 }
