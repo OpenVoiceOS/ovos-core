@@ -208,3 +208,43 @@ class TestService(unittest.TestCase):
         bus.on("message", rcvm)
 
         speech.handle_opm_vad_query(Message("opm.vad.query"))
+
+    @patch('mycroft.listener.service.get_ww_lang_configs')
+    @patch('mycroft.listener.service.get_ww_supported_langs')
+    @patch('mycroft.listener.service.get_ww_module_configs')
+    def test_opm_ww(self,
+                     mock_get_configs, mock_get_lang, mock_get_lang_configs):
+        loop = Mock()
+
+        en = {'display_name': 'Pretty Name',
+              'lang': 'en-us',
+              'offline': True,
+              'priority': 50}
+
+        mock_get_lang.return_value = {"en-us": ['my-plugin']}
+        # mocking same return val for all lang inputs (!)
+        # used to generate selectable options list
+        mock_get_lang_configs.return_value = {
+            "my-plugin": [en]}
+
+        # per module configs, mocking same return val for all plugin inputs (!)
+        mock_get_configs.return_value = {"en-us": [en]}
+
+        bus = FakeBus()
+        speech = SpeechService(bus=bus, loop=loop)
+
+        def rcvm(msg):
+            msg = json.loads(msg)
+
+            self.assertEqual(msg["type"], "opm.ww.query.response")
+            en2 = dict(en)
+            en2["engine"] = "my-plugin"
+            self.assertEqual(msg["data"]["langs"], ['en-us'])
+            self.assertEqual(msg["data"]["plugins"], {'en-us': ['my-plugin']})
+            self.assertEqual(msg["data"]["configs"]["my-plugin"]["en-us"], [en2])
+            en2["plugin_name"] = 'My Plugin'
+            self.assertEqual(msg["data"]["options"]["en-us"], [en2])
+
+        bus.on("message", rcvm)
+
+        speech.handle_opm_ww_query(Message("opm.ww.query"))

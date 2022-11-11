@@ -327,13 +327,18 @@ class SpeechService(Thread):
 
     def handle_opm_ww_query(self, message):
         plugs = get_ww_supported_langs()
+        configs = {}
+        opts = {}
+        for lang, m in plugs.items():
+            for p in m:
+                configs[p] = get_ww_module_configs(p)
+            opts[lang] = self.get_ww_lang_options(lang)
+
         data = {
-            "plugins": list(plugs.values()),
+            "plugins": plugs,
             "langs": list(plugs.keys()),
-            "configs": {m: get_ww_module_configs(m)
-                        for m in plugs.values()},
-            "options": {lang:  self.get_ww_lang_options(lang)
-                        for lang in plugs.keys()}
+            "configs": configs,
+            "options": opts
         }
         self.bus.emit(message.response(data))
 
