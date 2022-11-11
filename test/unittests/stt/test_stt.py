@@ -125,6 +125,8 @@ class TestService(unittest.TestCase):
         def run():
             while speech.status.state != ProcessState.READY:
                 sleep(1)
+            while speech.status.state != ProcessState.STOPPING:
+                sleep(1)
 
         loop.run = run
 
@@ -132,7 +134,6 @@ class TestService(unittest.TestCase):
         speech.start()
         sleep(1)
         self.assertTrue(speech.status.state >= ProcessState.ALIVE)
-
         self.assertTrue(speech.status.state > ProcessState.STOPPING)
         speech.shutdown()
         sleep(1)

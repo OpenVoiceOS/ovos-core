@@ -399,9 +399,9 @@ class SpeechService(Thread):
             self.status.set_error(e)
 
         self.shutdown()
-        self.status.set_stopping()
 
     def shutdown(self):
+        self.status.set_stopping()
         self.loop.stop()
 
 
