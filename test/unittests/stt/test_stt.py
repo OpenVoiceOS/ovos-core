@@ -12,46 +12,53 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import json
 import unittest
-from unittest.mock import MagicMock, patch
+from time import sleep
+from unittest.mock import MagicMock, patch, Mock
+
 from ovos_stt_plugin_selene import SeleneSTT
-import mycroft.configuration
-from mycroft.configuration import Configuration
-import mycroft.listener.stt
-from mycroft.listener import RecognizerLoop
-from mycroft.util.log import LOG
 from ovos_stt_plugin_vosk import VoskKaldiSTT
+
+import mycroft.configuration
+import mycroft.listener.stt
+from mycroft.configuration import Configuration
+from mycroft.listener import RecognizerLoop
+from mycroft.listener.service import SpeechService
+from mycroft.util.log import LOG
+from ovos_utils.messagebus import Message, FakeBus
+from ovos_utils.process_utils import ProcessState
 from test.util import base_config
 
 STT_CONFIG = base_config()
 STT_CONFIG.merge({
-        'stt': {
-            'module': 'mycroft',
-            "fallback_module": "ovos-stt-plugin-vosk",
-            'mycroft': {'uri': 'https://test.com'}
-        },
-        'lang': 'en-US'
-    })
+    'stt': {
+        'module': 'mycroft',
+        "fallback_module": "ovos-stt-plugin-vosk",
+        'mycroft': {'uri': 'https://test.com'}
+    },
+    'lang': 'en-US'
+})
 
 STT_NO_FB_CONFIG = base_config()
 STT_NO_FB_CONFIG.merge({
-        'stt': {
-            'module': 'mycroft',
-            'fallback_module': None,
-            'mycroft': {'uri': 'https://test.com'}
-        },
-        'lang': 'en-US'
-    })
+    'stt': {
+        'module': 'mycroft',
+        'fallback_module': None,
+        'mycroft': {'uri': 'https://test.com'}
+    },
+    'lang': 'en-US'
+})
 
 STT_INVALID_FB_CONFIG = base_config()
 STT_INVALID_FB_CONFIG.merge({
-        'stt': {
-            'module': 'mycroft',
-            'fallback_module': 'invalid',
-            'mycroft': {'uri': 'https://test.com'}
-        },
-        'lang': 'en-US'
-    })
+    'stt': {
+        'module': 'mycroft',
+        'fallback_module': 'invalid',
+        'mycroft': {'uri': 'https://test.com'}
+    },
+    'lang': 'en-US'
+})
 
 
 class TestSTT(unittest.TestCase):
@@ -74,7 +81,7 @@ class TestSTT(unittest.TestCase):
         self.assertEqual(type(stt), SeleneSTT)
 
     @patch.dict(Configuration._Configuration__patch, STT_CONFIG)
-    def test_mycroft_stt(self,):
+    def test_mycroft_stt(self, ):
         stt = SeleneSTT()
         stt.api = MagicMock()
         audio = MagicMock()
@@ -99,9 +106,78 @@ class TestSTT(unittest.TestCase):
     @patch.dict(Configuration._Configuration__patch, STT_NO_FB_CONFIG)
     @patch.object(LOG, 'error')
     @patch.object(LOG, 'warning')
-    def test_fallback_stt_not_set(self,  mock_warn, mock_error):
+    def test_fallback_stt_not_set(self, mock_warn, mock_error):
         fallback_stt = RecognizerLoop.get_fallback_stt()
         self.assertIsNone(fallback_stt)
         mock_warn.assert_called_with("No fallback STT configured")
         mock_error.assert_called_with("Failed to create fallback STT")
 
+
+@patch('mycroft.listener.service.Configuration')
+@patch('mycroft.listener.stt.STTFactory')
+class TestService(unittest.TestCase):
+    def test_life_cycle(self, tts_factory_mock, config_mock):
+        """Ensure the init and shutdown behaves as expected."""
+        bus = Mock()
+        loop = Mock()
+
+        speech = SpeechService(bus=bus, loop=loop)
+        speech.daemon = True
+
+        def run():
+            while speech.status.state != ProcessState.READY:
+                sleep(1)
+
+        loop.run = run
+
+        self.assertTrue(ProcessState.NOT_STARTED <= speech.status.state <= ProcessState.ALIVE)
+        speech.start()
+        sleep(1)
+        self.assertTrue(speech.status.state >= ProcessState.ALIVE)
+
+        self.assertTrue(speech.status.state > ProcessState.STOPPING)
+        speech.shutdown()
+        sleep(1)
+        self.assertTrue(speech.status.state <= ProcessState.STOPPING)
+        self.assertFalse(speech.is_alive())
+
+    @patch('mycroft.listener.service.get_stt_lang_configs')
+    @patch('mycroft.listener.service.get_stt_supported_langs')
+    @patch('mycroft.listener.service.get_stt_module_configs')
+    def test_opm_stt(self,
+                     mock_get_configs, mock_get_lang, mock_get_lang_configs,
+                     stt_factory_mock, config_mock):
+        loop = Mock()
+
+        en = {'display_name': 'Pretty Name',
+              'lang': 'en-us',
+              'offline': True,
+              'priority': 50}
+
+        mock_get_lang.return_value = {"en-us": ['my-plugin']}
+        # mocking same return val for all lang inputs (!)
+        # used to generate selectable options list
+        mock_get_lang_configs.return_value = {
+            "my-plugin": [en]}
+
+        # per module configs, mocking same return val for all plugin inputs (!)
+        mock_get_configs.return_value = {"en-us": [en]}
+
+        bus = FakeBus()
+        speech = SpeechService(bus=bus, loop=loop)
+
+        def rcvm(msg):
+            msg = json.loads(msg)
+
+            self.assertEqual(msg["type"], "opm.stt.query.response")
+            en2 = dict(en)
+            en2["engine"] = "my-plugin"
+            self.assertEqual(msg["data"]["langs"], ['en-us'])
+            self.assertEqual(msg["data"]["plugins"], {'en-us': ['my-plugin']})
+            self.assertEqual(msg["data"]["configs"]["my-plugin"]["en-us"], [en2])
+            en2["plugin_name"] = 'My Plugin'
+            self.assertEqual(msg["data"]["options"]["en-us"], [en2])
+
+        bus.on("message", rcvm)
+
+        speech.handle_opm_stt_query(Message("opm.stt.query"))

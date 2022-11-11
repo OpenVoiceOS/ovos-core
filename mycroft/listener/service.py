@@ -45,7 +45,8 @@ def on_error(e='Unknown'):
 
 class SpeechService(Thread):
     def __init__(self, on_ready=on_ready, on_error=on_error,
-                 on_stopping=on_stopping, watchdog=lambda: None):
+                 on_stopping=on_stopping, watchdog=lambda: None,
+                 bus=None, loop=None):
         super(SpeechService, self).__init__()
 
         callbacks = StatusCallbackMap(on_ready=on_ready,
@@ -55,12 +56,12 @@ class SpeechService(Thread):
         self.status.set_started()
 
         self.config = Configuration()
-        self.bus = start_message_bus_client("VOICE")
+        self.bus = bus or start_message_bus_client("VOICE")
 
         self.status.bind(self.bus)
 
         # Register handlers on internal RecognizerLoop bus
-        self.loop = RecognizerLoop(self.bus, watchdog)
+        self.loop = loop or RecognizerLoop(self.bus, watchdog)
         self.connect_loop_events()
         self.connect_bus_events()
 
@@ -309,13 +310,18 @@ class SpeechService(Thread):
 
     def handle_opm_stt_query(self, message):
         plugs = get_stt_supported_langs()
+        configs = {}
+        opts = {}
+        for lang, m in plugs.items():
+            for p in m:
+                configs[p] = get_stt_module_configs(p)
+            opts[lang] = self.get_stt_lang_options(lang)
+
         data = {
-            "plugins": list(plugs.values()),
+            "plugins": plugs,
             "langs": list(plugs.keys()),
-            "configs": {m: get_stt_module_configs(m)
-                        for m in plugs.values()},
-            "options": {lang:  self.get_stt_lang_options(lang)
-                        for lang in plugs.keys()}
+            "configs": configs,
+            "options": opts
         }
         self.bus.emit(message.response(data))
 
@@ -380,15 +386,26 @@ class SpeechService(Thread):
         self.bus.on("opm.vad.query", self.handle_opm_vad_query)
 
     def run(self):
-        self.status.set_started()
+        print(self.status.state)
+        self.status.set_alive()
+        from time import sleep
+        sleep(1)
         try:
             self.status.set_ready()
+            print(self.status.state)
             self.loop.run()
         except Exception as e:
             self.status.set_error(e)
-        self.status.set_stopping()
 
-        
+        print(self.status.state)
+        self.shutdown()
+        self.status.set_stopping()
+        print(self.status.state)
+
+    def shutdown(self):
+        self.loop.stop()
+
+
 class SpeechClient(SpeechService):
     def __init__(self, *args, **kwargs):
         LOG.warning("SpeechClient has been renamed to SpeechService, it will be removed in 0.1.0")
