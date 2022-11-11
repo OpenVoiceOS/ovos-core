@@ -113,10 +113,8 @@ class TestSTT(unittest.TestCase):
         mock_error.assert_called_with("Failed to create fallback STT")
 
 
-@patch('mycroft.listener.service.Configuration')
-@patch('mycroft.listener.stt.STTFactory')
 class TestService(unittest.TestCase):
-    def test_life_cycle(self, tts_factory_mock, config_mock):
+    def test_life_cycle(self):
         """Ensure the init and shutdown behaves as expected."""
         bus = Mock()
         loop = Mock()
@@ -145,8 +143,7 @@ class TestService(unittest.TestCase):
     @patch('mycroft.listener.service.get_stt_supported_langs')
     @patch('mycroft.listener.service.get_stt_module_configs')
     def test_opm_stt(self,
-                     mock_get_configs, mock_get_lang, mock_get_lang_configs,
-                     stt_factory_mock, config_mock):
+                     mock_get_configs, mock_get_lang, mock_get_lang_configs):
         loop = Mock()
 
         en = {'display_name': 'Pretty Name',
@@ -181,3 +178,33 @@ class TestService(unittest.TestCase):
         bus.on("message", rcvm)
 
         speech.handle_opm_stt_query(Message("opm.stt.query"))
+
+    @patch('mycroft.listener.service.get_vad_configs')
+    def test_opm_vad(self,  mock_get_configs):
+        loop = Mock()
+
+        en = {'display_name': 'Pretty Name',
+              'offline': True,
+              'priority': 50}
+
+        # per module configs, mocking same return val for all plugin inputs (!)
+        mock_get_configs.return_value = {"my-vad-plugin": [en]}
+
+        bus = FakeBus()
+        speech = SpeechService(bus=bus, loop=loop)
+
+        def rcvm(msg):
+            msg = json.loads(msg)
+
+            self.assertEqual(msg["type"], "opm.vad.query.response")
+            en2 = dict(en)
+            en2["engine"] = "my-vad-plugin"
+            en2["plugin_name"] = 'My Vad Plugin'
+
+            self.assertEqual(msg["data"]["plugins"], ["my-vad-plugin"])
+            self.assertEqual(msg["data"]["configs"]["my-vad-plugin"], [en2])
+            self.assertEqual(msg["data"]["options"][0], en2)
+
+        bus.on("message", rcvm)
+
+        speech.handle_opm_vad_query(Message("opm.vad.query"))

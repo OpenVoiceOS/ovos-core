@@ -386,21 +386,15 @@ class SpeechService(Thread):
         self.bus.on("opm.vad.query", self.handle_opm_vad_query)
 
     def run(self):
-        print(self.status.state)
         self.status.set_alive()
-        from time import sleep
-        sleep(1)
         try:
             self.status.set_ready()
-            print(self.status.state)
             self.loop.run()
         except Exception as e:
             self.status.set_error(e)
 
-        print(self.status.state)
         self.shutdown()
         self.status.set_stopping()
-        print(self.status.state)
 
     def shutdown(self):
         self.loop.stop()
@@ -410,3 +404,4 @@ class SpeechClient(SpeechService):
     def __init__(self, *args, **kwargs):
         LOG.warning("SpeechClient has been renamed to SpeechService, it will be removed in 0.1.0")
         super().__init__(self, *args, **kwargs)
+
