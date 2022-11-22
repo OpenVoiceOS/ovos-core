@@ -45,6 +45,12 @@ Item {
             settingCall: ""
         }
         ListElement {
+            settingIcon: "images/restart.svg"
+            settingName: QT_TR_NOOP("Factory Settings")
+            settingEvent: "mycroft.device.settings.factory"
+            settingCall: ""
+        }
+        ListElement {
             settingIcon: "images/info.svg"
             settingName: QT_TR_NOOP("About")
             settingEvent: "mycroft.device.settings.about.page"
