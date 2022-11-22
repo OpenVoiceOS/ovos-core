@@ -199,16 +199,14 @@ class AudioConsumer(Thread):
             with self.loop.lock:
                 try:
                     text = self.loop.stt.execute(audio, language=lang)
+                    if text is None:
+                        raise RuntimeError("Primary STT returned nothing")
                 except Exception as e:
                     if self.loop.fallback_stt:
                         LOG.warning(f"Using fallback STT, main plugin failed: {e}")
                         text = self.loop.fallback_stt.execute(audio, language=lang)
                     else:
                         raise e
-            if text is None and self.loop.fallback_stt:
-                LOG.info(f"Primary STT returned nothing, try fallback")
-                text = \
-                    self.loop.fallback_stt.execute(audio, language=lang)
             if text is not None:
                 text = text.lower().strip()
                 LOG.debug("STT: " + text)
