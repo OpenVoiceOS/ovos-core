@@ -26,7 +26,7 @@ from adapt.intent import IntentBuilder
 from copy import deepcopy
 from mycroft.configuration import Configuration
 from mycroft.messagebus.message import Message
-from mycroft.skills.core import MycroftSkill, resting_screen_handler
+from mycroft.skills.core import MycroftSkill, resting_screen_handler, intent_handler
 from mycroft.skills.intent_service import open_intent_envelope
 from mycroft.skills.skill_data import (load_regex_from_file, load_regex,
                                        load_vocabulary, read_vocab_file)
@@ -619,6 +619,23 @@ class TestMycroftSkill(unittest.TestCase):
         s.config_core['secondary_langs'] = secondary
 
 
+class TestIntentCollisions(unittest.TestCase):
+    def test_two_intents_with_same_name(self):
+        emitter = MockEmitter()
+        skill = SameIntentNameSkill()
+        skill.bind(emitter)
+        with self.assertRaises(ValueError):
+            skill.initialize()
+
+    def test_two_anonymous_intent_decorators(self):
+        """Two anonymous intent handlers should be ok."""
+        emitter = MockEmitter()
+        skill = SameAnonymousIntentDecoratorsSkill()
+        skill.bind(emitter)
+        skill._register_decorated()
+        self.assertEqual(len(skill.intent_service.registered_intents), 2)
+
+
 class _TestSkill(MycroftSkill):
     def __init__(self):
         super().__init__()
@@ -695,5 +712,29 @@ class SimpleSkill6(_TestSkill):
         self.register_intent('test.intent', self.handler)
         self.register_entity_file('test_ent.entity')
 
+    def handler(self, message):
+        pass
+
+
+class SameIntentNameSkill(_TestSkill):
+    """Test skill for duplicate intent namesr."""
+    skill_id = 'A'
+
+    def initialize(self):
+        intent = IntentBuilder('TheName').require('Keyword')
+        intent2 = IntentBuilder('TheName').require('Keyword')
+        self.register_intent(intent, self.handler)
+        self.register_intent(intent2, self.handler)
+
+    def handler(self, message):
+        pass
+
+
+class SameAnonymousIntentDecoratorsSkill(_TestSkill):
+    """Test skill for duplicate anonymous intent handlers."""
+    skill_id = 'A'
+
+    @intent_handler(IntentBuilder('').require('Keyword'))
+    @intent_handler(IntentBuilder('').require('OtherKeyword'))
     def handler(self, message):
         pass

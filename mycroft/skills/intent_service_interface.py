@@ -36,6 +36,7 @@ class IntentServiceInterface:
         self.bus = bus
         self.skill_id = self.__class__.__name__
         self.registered_intents = []
+        self.detached_intents = []
 
     def set_bus(self, bus):
         self.bus = bus
@@ -97,9 +98,14 @@ class IntentServiceInterface:
             msg.context["skill_id"] = self.skill_id
         self.bus.emit(msg.forward("register_intent", intent_parser.__dict__))
         self.registered_intents.append((name, intent_parser))
+        self.detached_intents = [detached for detached in self.detached_intents
+                                 if detached[0] != name]
 
     def detach_intent(self, intent_name):
         """Remove an intent from the intent service.
+
+        The intent is saved in the list of detached intents for use when
+        re-enabling an intent.
 
         Args:
             intent_name(str): Intent reference
@@ -109,6 +115,27 @@ class IntentServiceInterface:
             msg.context["skill_id"] = self.skill_id
         self.bus.emit(msg.forward("detach_intent",
                                   {"intent_name": intent_name}))
+
+        name = intent_name.split(':')[1]
+        if name in self.registered_intents:
+            self.detached_intents.append((name, self.get_intent(name)))
+            self.registered_intents = [pair for pair in self.registered_intents
+                                       if pair[0] != name]
+
+    def intent_is_detached(self, intent_name):
+        """Determine if an intent is detached.
+
+        Args:
+            intent_name(str): Intent reference
+
+        Returns:
+            (bool) True if intent is found, else False.
+        """
+        for (name, _) in self.detached_intents:
+            if name == intent_name:
+                return True
+
+        return False
 
     def set_adapt_context(self, context, word, origin):
         """Set an Adapt context.
@@ -191,17 +218,21 @@ class IntentServiceInterface:
     def get_intent(self, intent_name):
         """Get intent from intent_name.
 
+        This will find both enabled and disabled intents.
+
         Args:
             intent_name (str): name to find.
 
         Returns:
             Found intent or None if none were found.
         """
-        for name, intent in self:
+        for name, intent in self.registered_intents:
             if name == intent_name:
                 return intent
-        else:
-            return None
+        for name, intent in self.detached_intents:
+            if name == intent_name:
+                return intent
+        return None
 
 
 class IntentQueryApi:
