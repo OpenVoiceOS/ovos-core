@@ -195,7 +195,7 @@ class Namespace:
                 self.persistent = False
                 self.duration = 30
 
-    def load_pages(self, pages: List[str]):
+    def load_pages(self, pages: List[str], show_index: None):
         """Maintains a list of active pages within the active namespace.
 
         Skills with multiple pages of data can either show all the screens
@@ -218,7 +218,10 @@ class Namespace:
         else:
             page = pages[0]
 
-        self._activate_page(pages[0])
+        if show_index:
+            self._activate_page(pages[show_index])
+        else:
+            self._activate_page(pages[0])
 
     def _add_pages(self, new_pages: List[str]):
         """Adds once or more pages to the active page list.
@@ -510,6 +513,7 @@ class NamespaceManager:
             namespace_name = message.data["__from"]
             pages_to_show = message.data["page"]
             persistence = message.data["__idle"]
+            show_index = message.data.get("index", None)
 
             pages_to_load = list()
             for page in pages_to_show:
@@ -532,7 +536,7 @@ class NamespaceManager:
 
             with namespace_lock:
                 self._activate_namespace(namespace_name)
-                self._load_pages(pages_to_load)
+                self._load_pages(pages_to_load, show_index)
                 self._update_namespace_persistence(persistence)
 
     def _activate_namespace(self, namespace_name: str):
@@ -575,14 +579,14 @@ class NamespaceManager:
 
         return namespace
 
-    def _load_pages(self, pages_to_show: str):
+    def _load_pages(self, pages_to_show: str, show_index: None):
         """Loads the requested pages in the namespace.
 
         Args:
             pages_to_show: the pages requested to be loaded
         """
         active_namespace = self.active_namespaces[0]
-        active_namespace.load_pages(pages_to_show)
+        active_namespace.load_pages(pages_to_show, show_index)
 
     def _update_namespace_persistence(self, persistence: Union[bool, int]):
         """Sets the persistence of the namespace being activated.
