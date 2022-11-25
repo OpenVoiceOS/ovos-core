@@ -100,7 +100,8 @@ class TestNamespace(TestCase):
         )
         patch_function = PATCH_MODULE + ".send_message_to_gui"
         with mock.patch(patch_function) as send_message_mock:
-            self.namespace.load_pages(new_pages)
+            show_index = None
+            self.namespace.load_pages(new_pages, show_index)
             send_message_mock.assert_called_with(load_page_message)
         self.assertListEqual(self.namespace.pages, self.namespace.pages)
 
@@ -115,7 +116,8 @@ class TestNamespace(TestCase):
         )
         patch_function = PATCH_MODULE + ".send_message_to_gui"
         with mock.patch(patch_function) as send_message_mock:
-            self.namespace.load_pages(new_pages)
+            show_index = None
+            self.namespace.load_pages(new_pages, show_index)
             send_message_mock.assert_called_with(load_page_message)
         self.assertListEqual(self.namespace.pages, self.namespace.pages)
 
