@@ -108,6 +108,21 @@ class IntentServiceInterface:
     def detach_intent(self, intent_name):
         """Remove an intent from the intent service.
 
+        DEPRECATED: please use remove_intent instead, all other methods from this class expect intent_name,
+        this was the weird one expecting the internal munged intent_name with skill_id
+
+        The intent is saved in the list of detached intents for use when
+        re-enabling an intent.
+
+        Args:
+            intent_name(str): internal munged intent name (skill_id:name)
+        """
+        name = intent_name.split(':')[1]
+        self.remove_intent(name)
+
+    def remove_intent(self, intent_name):
+        """Remove an intent from the intent service.
+
         The intent is saved in the list of detached intents for use when
         re-enabling an intent.
 
@@ -117,14 +132,12 @@ class IntentServiceInterface:
         msg = dig_for_message() or Message("")
         if "skill_id" not in msg.context:
             msg.context["skill_id"] = self.skill_id
-        self.bus.emit(msg.forward("detach_intent",
-                                  {"intent_name": intent_name}))
-
-        name = intent_name.split(':')[1]
-        if name in self.intent_names:
-            self.detached_intents.append((name, self.get_intent(name)))
+        if intent_name in self.intent_names:
+            self.detached_intents.append((intent_name, self.get_intent(intent_name)))
             self.registered_intents = [pair for pair in self.registered_intents
-                                       if pair[0] != name]
+                                       if pair[0] != intent_name]
+        self.bus.emit(msg.forward("detach_intent",
+                                  {"intent_name": f"{self.skill_id}.{intent_name}"}))
 
     def intent_is_detached(self, intent_name):
         """Determine if an intent is detached.

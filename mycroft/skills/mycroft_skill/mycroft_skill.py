@@ -590,8 +590,7 @@ class MycroftSkill:
     def detach(self):
         with self.intent_service_lock:
             for name in self.intent_service.intent_names:
-                name = f'{self.skill_id}:{name}'
-                self.intent_service.detach_intent(name)
+                self.intent_service.remove_intent(name)
 
     def initialize(self):
         """Perform any final setup needed for the skill.
@@ -1327,13 +1326,7 @@ class MycroftSkill:
         with self.intent_service_lock:
             if intent_name in self.intent_service.intent_names:
                 LOG.info('Disabling intent ' + intent_name)
-                name = f'{self.skill_id}:{intent_name}'
-                self.intent_service.detach_intent(name)
-
-                langs = [self._core_lang] + self._secondary_langs
-                for lang in langs:
-                    lang_intent_name = f'{name}_{lang}'
-                    self.intent_service.detach_intent(lang_intent_name)
+                self.intent_service.remove_intent(intent_name)
                 return True
             else:
                 LOG.error(f'Could not disable {intent_name}, it hasn\'t been registered.')
@@ -1352,6 +1345,7 @@ class MycroftSkill:
             if not self.intent_service.intent_is_detached(intent_name):
                 LOG.error(f'Could not enable {intent_name}, '
                           'it\'s not detached')
+                return False
             else:
                 if ".intent" in intent_name:
                     self.register_intent_file(intent_name, None)
