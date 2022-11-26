@@ -589,7 +589,7 @@ class MycroftSkill:
 
     def detach(self):
         with self.intent_service_lock:
-            for (name, _) in self.intent_service:
+            for name in self.intent_service.intent_names:
                 name = f'{self.skill_id}:{name}'
                 self.intent_service.detach_intent(name)
 
@@ -1198,19 +1198,18 @@ class MycroftSkill:
             # Find a good name
             original_name = name
             nbr = 0
-            while name in self.intent_service:
+            while name in self.intent_service.intent_names:
                 nbr += 1
                 name = f'{original_name}{nbr}'
-        else:
-            if name in self.intent_service:
-                raise ValueError(f'The intent name {name} is already taken')
+        elif name in self.intent_service.intent_names and \
+                not self.intent_service.intent_is_detached(name):
+            raise ValueError(f'The intent name {name} is already taken')
 
         munge_intent_parser(intent_parser, name, self.skill_id)
         self.intent_service.register_adapt_intent(name, intent_parser)
 
         if handler:
-            self.add_event(intent_parser.name, handler,
-                           'mycroft.skill.handler')
+            self.add_event(intent_parser.name, handler, 'mycroft.skill.handler')
 
     def register_intent(self, intent_parser, handler):
         """Register an Intent with the intent service.
@@ -1326,7 +1325,7 @@ class MycroftSkill:
                 bool: True if disabled, False if it wasn't registered
         """
         with self.intent_service_lock:
-            if intent_name in self.intent_service:
+            if intent_name in self.intent_service.intent_names:
                 LOG.info('Disabling intent ' + intent_name)
                 name = f'{self.skill_id}:{intent_name}'
                 self.intent_service.detach_intent(name)
@@ -1349,23 +1348,22 @@ class MycroftSkill:
         Returns:
             bool: True if enabled, False if it wasn't registered
         """
-        intent = self.intent_service.get_intent(intent_name)
-        with self.intent_service_lock:
-            if intent and self.intent_service.intent_is_detached(intent_name):
-                if ".intent" in intent_name:
-                    self.register_intent_file(intent_name, None)
-                else:
-                    intent.name = intent_name
-                    self._register_intent(intent, None)
-                LOG.debug('Enabling intent {}'.format(intent_name))
-                return True
-            elif intent:
+        if intent_name in self.intent_service.intent_names:
+            if not self.intent_service.intent_is_detached(intent_name):
                 LOG.error(f'Could not enable {intent_name}, '
                           'it\'s not detached')
             else:
-                LOG.error('Could not enable '
-                          f'{intent_name}, it hasn\'t been registered.')
-                return False
+                if ".intent" in intent_name:
+                    self.register_intent_file(intent_name, None)
+                else:
+                    intent = self.intent_service.get_intent(intent_name)
+                    intent.name = intent_name
+                    self._register_intent(intent, None)
+                LOG.debug(f'Enabling intent {intent_name}')
+                return True
+        else:
+            LOG.error(f'Could not enable {intent_name}, it hasn\'t been registered.')
+            return False
 
     def set_context(self, context, word='', origin=''):
         """Add context to intent service

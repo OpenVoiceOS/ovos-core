@@ -38,6 +38,10 @@ class IntentServiceInterface:
         self.registered_intents = []
         self.detached_intents = []
 
+    @property
+    def intent_names(self):
+        return [a[0] for a in self.registered_intents + self.detached_intents]
+
     def set_bus(self, bus):
         self.bus = bus
 
@@ -117,7 +121,7 @@ class IntentServiceInterface:
                                   {"intent_name": intent_name}))
 
         name = intent_name.split(':')[1]
-        if name in self.registered_intents:
+        if name in self.intent_names:
             self.detached_intents.append((name, self.get_intent(name)))
             self.registered_intents = [pair for pair in self.registered_intents
                                        if pair[0] != name]
@@ -134,7 +138,6 @@ class IntentServiceInterface:
         for (name, _) in self.detached_intents:
             if name == intent_name:
                 return True
-
         return False
 
     def set_adapt_context(self, context, word, origin):
