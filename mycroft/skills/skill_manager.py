@@ -149,6 +149,9 @@ class SkillManager(Thread):
         # enclosure -> enclosure/HAL reported ready - NOT IMPLEMENTED
         services = {k: False for k in
                     self.config.get("ready_settings", ["skills"])}
+        if self.config.get("enable_offline") and "internet" in services:
+            LOG.debug("Offline mode - Ignoring internet ready setting")
+            services.pop("internet")
         start = monotonic()
         while not is_ready:
             is_ready = self.check_services_ready(services)
@@ -303,7 +306,8 @@ class SkillManager(Thread):
 
         self.status.set_alive()
 
-        if self.skills_config.get("wait_for_internet", True):
+        if self.skills_config.get("wait_for_internet", True) and \
+                not self.config.get("enable_offline", False):
             while not connected() and not self._connected_event.is_set():
                 sleep(1)
             self._connected_event.set()
