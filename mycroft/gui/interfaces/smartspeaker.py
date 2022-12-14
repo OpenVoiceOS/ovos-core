@@ -66,6 +66,8 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
                               self.handle_device_about_page)
         self.register_handler("mycroft.device.settings.display",
                               self.handle_device_display_settings)
+        self.register_handler("mycroft.device.settings.factory",
+                              self.handle_device_display_factory)
         
         # Display settings      
         self.register_handler("speaker.extension.display.set.wallpaper.rotation",
@@ -143,7 +145,11 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
     def handle_device_create_theme(self, message):
         self['state'] = 'settings/customize_theme'
         self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
-        
+
+    def handle_device_display_factory(self, message):
+        self['state'] = 'settings/factory_settings'
+        self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
+
     def handle_device_display_settings(self, message):
         LOG.info("Display settings")
         LOG.info(self.local_display_config)

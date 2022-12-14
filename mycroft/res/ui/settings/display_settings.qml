@@ -49,36 +49,54 @@ Item {
         }
     }
 
-    Item {
+    ScrollBar {
+        id: flickAreaScrollBar
+        anchors.right: parent.right
+        width: Mycroft.Units.gridUnit
+        anchors.top: topArea.bottom
+        anchors.topMargin: Kirigami.Units.largeSpacing
+        anchors.bottom: bottomArea.top
+    }
+
+    Flickable {
         anchors.top: topArea.bottom
         anchors.topMargin: Kirigami.Units.largeSpacing
         anchors.left: parent.left
-        anchors.right: parent.right
+        anchors.right: flickAreaScrollBar.left
         anchors.bottom: bottomArea.top
+        contentWidth: width
+        contentHeight: mainColLayoutDisplaySettings.implicitHeight
+        ScrollBar.vertical: flickAreaScrollBar
+        clip: true
 
         ColumnLayout {
+            id: mainColLayoutDisplaySettings
             anchors.top: parent.top
-            anchors.bottom: parent.bottom
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.margins: Mycroft.Units.gridUnit / 2
 
-            Item {
+            Rectangle {
                 Layout.fillWidth: true
-                Layout.fillHeight: true
+                Layout.preferredHeight: displaySettingItemOneLabel.implicitHeight + Mycroft.Units.gridUnit
+                color: Qt.lighter(Kirigami.Theme.backgroundColor, 2)
+                border.width: 1
+                border.color: Qt.darker(Kirigami.Theme.textColor, 1.5)
+                radius: 6
 
                 ColumnLayout {
                     id: displaySettingItemOneLabel
                     anchors.left: parent.left
                     anchors.right: autoWallpaperRotationSwitch.left
-                    height: parent.height
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.leftMargin: Mycroft.Units.gridUnit / 2
 
                     Label {
                         id: settingOneLabel
                         text: qsTr("Wallpaper Rotation")
-                        font.pixelSize: 25
+                        font.pixelSize: 18
                         fontSizeMode: Text.Fit
-                        minimumPixelSize: 15
+                        minimumPixelSize: 14
                         color: Kirigami.Theme.textColor
                         Layout.fillWidth: true
                         Layout.fillHeight: true
@@ -87,10 +105,11 @@ Item {
 
                     Label {
                         text: qsTr("Changes the wallpaper automatically")
-                        font.pixelSize: settingOneLabel.font.pixelSize / 2
+                        font.pixelSize: settingOneLabel.font.pixelSize / 1.5
                         color: Kirigami.Theme.textColor
                         wrapMode: Text.WordWrap
                         elide: Text.ElideRight
+                        maximumLineCount: 1
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         Layout.alignment: Qt.AlignLeft
@@ -101,7 +120,9 @@ Item {
                     id: autoWallpaperRotationSwitch
                     width: Mycroft.Units.gridUnit * 10
                     anchors.right: parent.right
-                    height: parent.height
+                    anchors.rightMargin: Mycroft.Units.gridUnit / 2
+                    height: parent.height - Mycroft.Units.gridUnit / 2
+                    anchors.verticalCenter: parent.verticalCenter
                     checkable: true
                     checked: displaySettingsView.wallpaper_rotation_enabled
                     text: checked ? qsTr("ON") : qsTr("OFF")
@@ -123,22 +144,27 @@ Item {
                 }
             }
 
-            Item {
+            Rectangle {
                 Layout.fillWidth: true
-                Layout.fillHeight: true
+                Layout.preferredHeight: displaySettingItemTwoLabel.implicitHeight + Mycroft.Units.gridUnit
+                color: Qt.lighter(Kirigami.Theme.backgroundColor, 2)
+                border.width: 1
+                border.color: Qt.darker(Kirigami.Theme.textColor, 1.5)
+                radius: 6
 
                 ColumnLayout {
                     id: displaySettingItemTwoLabel
                     anchors.left: parent.left
                     anchors.right: autoDimSwitch.left
-                    height: parent.height
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.leftMargin: Mycroft.Units.gridUnit / 2
 
                     Label {
                         id: settingTwoLabel
                         text: qsTr("Auto Dim")
-                        font.pixelSize: 25
+                        font.pixelSize: 18
                         fontSizeMode: Text.Fit
-                        minimumPixelSize: 15
+                        minimumPixelSize: 14
                         color: Kirigami.Theme.textColor
                         Layout.fillWidth: true
                         Layout.fillHeight: true
@@ -147,10 +173,11 @@ Item {
 
                     Label {
                         text: qsTr("Dim's the display in 60 seconds")
-                        font.pixelSize: settingTwoLabel.font.pixelSize / 2
+                        font.pixelSize: settingTwoLabel.font.pixelSize / 1.5
                         wrapMode: Text.WordWrap
                         elide: Text.ElideRight
                         color: Kirigami.Theme.textColor
+                        maximumLineCount: 1
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         Layout.alignment: Qt.AlignLeft
@@ -161,7 +188,9 @@ Item {
                     id: autoDimSwitch
                     width: Mycroft.Units.gridUnit * 10
                     anchors.right: parent.right
-                    height: parent.height
+                    anchors.rightMargin: Mycroft.Units.gridUnit / 2
+                    height: parent.height - Mycroft.Units.gridUnit / 2
+                    anchors.verticalCenter: parent.verticalCenter
                     checkable: true
                     checked: displaySettingsView.auto_dim_enabled
                     text: checked ? qsTr("ON") : qsTr("OFF")
@@ -183,22 +212,27 @@ Item {
                 }
             }
 
-            Item {
+            Rectangle {
                 Layout.fillWidth: true
-                Layout.fillHeight: true
+                Layout.preferredHeight: displaySettingItemThreeLabel.implicitHeight + Mycroft.Units.gridUnit
+                color: Qt.lighter(Kirigami.Theme.backgroundColor, 2)
+                border.width: 1
+                border.color: Qt.darker(Kirigami.Theme.textColor, 1.5)
+                radius: 6
 
                 ColumnLayout {
                     id: displaySettingItemThreeLabel
                     anchors.left: parent.left
                     anchors.right: autoNightmodeSwitch.left
-                    height: parent.height
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.leftMargin: Mycroft.Units.gridUnit / 2
 
                     Label {
                         id: settingThreeLabel
                         text: qsTr("Auto Nightmode")
-                        font.pixelSize: 25
+                        font.pixelSize: 18
                         fontSizeMode: Text.Fit
-                        minimumPixelSize: 15
+                        minimumPixelSize: 14
                         color: Kirigami.Theme.textColor
                         Layout.fillWidth: true
                         Layout.fillHeight: true
@@ -207,10 +241,11 @@ Item {
 
                     Label {
                         text: qsTr("Activates nightmode on homescreen, depending on the time of the day")
-                        font.pixelSize: settingThreeLabel.font.pixelSize / 2
+                        font.pixelSize: settingThreeLabel.font.pixelSize / 1.5
                         color: Kirigami.Theme.textColor
                         elide: Text.ElideRight
                         wrapMode: Text.WordWrap
+                        maximumLineCount: 1
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         Layout.alignment: Qt.AlignLeft
@@ -221,7 +256,9 @@ Item {
                     id: autoNightmodeSwitch
                     width: Mycroft.Units.gridUnit * 10
                     anchors.right: parent.right
-                    height: parent.height
+                    anchors.rightMargin: Mycroft.Units.gridUnit / 2
+                    height: parent.height - Mycroft.Units.gridUnit / 2
+                    anchors.verticalCenter: parent.verticalCenter
                     checkable: true
                     checked: displaySettingsView.auto_nightmode_enabled
                     text: checked ? qsTr("ON") : qsTr("OFF")

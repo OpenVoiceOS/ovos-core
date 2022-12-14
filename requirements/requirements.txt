@@ -9,7 +9,7 @@ PyYAML~=5.4
 watchdog
 
 ovos_backend_client~=0.0, >=0.0.5
-ovos-config~=0.0,>=0.0.5a5
+ovos-config~=0.0,>=0.0.5
 ovos-utils~=0.0, >=0.0.26
 ovos-plugin-manager~=0.0, >=0.0.19
 ovos-stt-plugin-server~=0.0, >=0.0.2

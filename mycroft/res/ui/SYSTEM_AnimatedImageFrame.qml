@@ -7,7 +7,7 @@ import Mycroft 1.0 as Mycroft
 
 Mycroft.Delegate {
     id: systemImageFrame
-    skillBackgroundColorOverlay: "#000000"
+    skillBackgroundColorOverlay: sessionData.background_color ? sessionData.background_color : "#000000"
     property bool hasTitle: sessionData.title.length > 0 ? true : false
     property bool hasCaption: sessionData.caption.length > 0 ? true : false
             

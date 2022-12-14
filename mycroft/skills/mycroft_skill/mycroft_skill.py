@@ -21,7 +21,7 @@ from copy import copy
 from inspect import signature
 from itertools import chain
 from os.path import join, abspath, dirname, basename, exists, isfile
-from threading import Event
+from threading import Event, Lock
 from hashlib import md5
 
 from ovos_utils.intents import Intent, IntentBuilder
@@ -151,6 +151,7 @@ class MycroftSkill:
         # Delegator classes
         self.event_scheduler = EventSchedulerInterface()
         self.intent_service = IntentServiceInterface()
+        self.intent_service_lock = Lock()
 
         # Skill Public API
         self.public_api = {}
@@ -587,9 +588,9 @@ class MycroftSkill:
             self._start_filewatcher()
 
     def detach(self):
-        for (name, _) in self.intent_service:
-            name = f'{self.skill_id}:{name}'
-            self.intent_service.detach_intent(name)
+        with self.intent_service_lock:
+            for name in self.intent_service.intent_names:
+                self.intent_service.remove_intent(name)
 
     def initialize(self):
         """Perform any final setup needed for the skill.
@@ -1184,19 +1185,43 @@ class MycroftSkill:
     def _register_adapt_intent(self, intent_parser, handler):
         """Register an adapt intent.
 
+        Will handle registration of anonymous
         Args:
             intent_parser: Intent object to parse utterance for the handler.
             handler (func): function to register with intent
         """
         # Default to the handler's function name if none given
+        is_anonymous = not intent_parser.name
         name = intent_parser.name or handler.__name__
+        if is_anonymous:
+            # Find a good name
+            original_name = name
+            nbr = 0
+            while name in self.intent_service.intent_names:
+                nbr += 1
+                name = f'{original_name}{nbr}'
+        elif name in self.intent_service.intent_names and \
+                not self.intent_service.intent_is_detached(name):
+            raise ValueError(f'The intent name {name} is already taken')
+
         munge_intent_parser(intent_parser, name, self.skill_id)
         self.intent_service.register_adapt_intent(name, intent_parser)
+
         if handler:
-            self.add_event(intent_parser.name, handler,
-                           'mycroft.skill.handler')
+            self.add_event(intent_parser.name, handler, 'mycroft.skill.handler')
 
     def register_intent(self, intent_parser, handler):
+        """Register an Intent with the intent service.
+
+        Args:
+            intent_parser: Intent, IntentBuilder object or padatious intent
+                           file to parse utterance for the handler.
+            handler (func): function to register with intent
+        """
+        with self.intent_service_lock:
+            self._register_intent(intent_parser, handler)
+
+    def _register_intent(self, intent_parser, handler):
         """Register an Intent with the intent service.
 
         Args:
@@ -1274,23 +1299,20 @@ class MycroftSkill:
                 continue
             filename = str(entity.file_path)
             name = f"{self.skill_id}:{basename(entity_file)}_{md5(entity_file.encode('utf-8')).hexdigest()}"
-            self.intent_service.register_padatious_entity(name, filename, lang)
+            with self.intent_service_lock:
+                self.intent_service.register_padatious_entity(name, filename, lang)
 
     def handle_enable_intent(self, message):
         """Listener to enable a registered intent if it belongs to this skill.
         """
         intent_name = message.data['intent_name']
-        for (name, _) in self.intent_service:
-            if name == intent_name:
-                return self.enable_intent(intent_name)
+        return self.enable_intent(intent_name)
 
     def handle_disable_intent(self, message):
         """Listener to disable a registered intent if it belongs to this skill.
         """
         intent_name = message.data['intent_name']
-        for (name, _) in self.intent_service:
-            if name == intent_name:
-                return self.disable_intent(intent_name)
+        return self.disable_intent(intent_name)
 
     def disable_intent(self, intent_name):
         """Disable a registered intent if it belongs to this skill.
@@ -1301,19 +1323,14 @@ class MycroftSkill:
         Returns:
                 bool: True if disabled, False if it wasn't registered
         """
-        if intent_name in self.intent_service:
-            LOG.info('Disabling intent ' + intent_name)
-            name = f'{self.skill_id}:{intent_name}'
-            self.intent_service.detach_intent(name)
-
-            langs = [self._core_lang] + self._secondary_langs
-            for lang in langs:
-                lang_intent_name = f'{name}_{lang}'
-                self.intent_service.detach_intent(lang_intent_name)
-            return True
-        else:
-            LOG.error(f'Could not disable {intent_name}, it hasn\'t been registered.')
-            return False
+        with self.intent_service_lock:
+            if intent_name in self.intent_service.intent_names:
+                LOG.info('Disabling intent ' + intent_name)
+                self.intent_service.remove_intent(intent_name)
+                return True
+            else:
+                LOG.error(f'Could not disable {intent_name}, it hasn\'t been registered.')
+                return False
 
     def enable_intent(self, intent_name):
         """(Re)Enable a registered intent if it belongs to this skill.
@@ -1324,15 +1341,20 @@ class MycroftSkill:
         Returns:
             bool: True if enabled, False if it wasn't registered
         """
-        intent = self.intent_service.get_intent(intent_name)
-        if intent:
-            if ".intent" in intent_name:
-                self.register_intent_file(intent_name, None)
+        if intent_name in self.intent_service.intent_names:
+            if not self.intent_service.intent_is_detached(intent_name):
+                LOG.error(f'Could not enable {intent_name}, '
+                          'it\'s not detached')
+                return False
             else:
-                intent.name = intent_name
-                self.register_intent(intent, None)
-            LOG.debug(f'Enabling intent {intent_name}')
-            return True
+                if ".intent" in intent_name:
+                    self.register_intent_file(intent_name, None)
+                else:
+                    intent = self.intent_service.get_intent(intent_name)
+                    intent.name = intent_name
+                    self._register_intent(intent, None)
+                LOG.debug(f'Enabling intent {intent_name}')
+                return True
         else:
             LOG.error(f'Could not enable {intent_name}, it hasn\'t been registered.')
             return False
@@ -1406,7 +1428,8 @@ class MycroftSkill:
         """
         keyword_type = self._alphanumeric_skill_id + entity_type
         lang = lang or self.lang
-        self.intent_service.register_adapt_keyword(keyword_type, entity, lang=lang)
+        with self.intent_service_lock:
+            self.intent_service.register_adapt_keyword(keyword_type, entity, lang=lang)
 
     def register_regex(self, regex_str, lang=None):
         """Register a new regex.
@@ -1416,7 +1439,8 @@ class MycroftSkill:
         self.log.debug('registering regex string: ' + regex_str)
         regex = munge_regex(regex_str, self.skill_id)
         re.compile(regex)  # validate regex
-        self.intent_service.register_adapt_regex(regex, lang=lang or self.lang)
+        with self.intent_service_lock:
+            self.intent_service.register_adapt_regex(regex, lang=lang or self.lang)
 
     def speak(self, utterance, expect_response=False, wait=False, meta=None):
         """Speak a sentence.
@@ -1517,8 +1541,9 @@ class MycroftSkill:
                     for line in skill_vocabulary[vocab_type]:
                         entity = line[0]
                         aliases = line[1:]
-                        self.intent_service.register_adapt_keyword(
-                            vocab_type, entity, aliases, lang)
+                        with self.intent_service_lock:
+                            self.intent_service.register_adapt_keyword(
+                                vocab_type, entity, aliases, lang)
 
     def load_regex_files(self, root_directory=None):
         """ Load regex files found under the skill directory."""
@@ -1528,7 +1553,8 @@ class MycroftSkill:
             if resources.types.regex.base_directory is not None:
                 regexes = resources.load_skill_regex(self._alphanumeric_skill_id)
                 for regex in regexes:
-                    self.intent_service.register_adapt_regex(regex, lang)
+                    with self.intent_service_lock:
+                        self.intent_service.register_adapt_regex(regex, lang)
 
     def __handle_stop(self, message):
         """Handler for the "mycroft.stop" signal. Runs the user defined
@@ -1571,18 +1597,26 @@ class MycroftSkill:
         if self._settings_watchdog:
             self._settings_watchdog.shutdown()
 
-        # Clear skill from gui
-        self.gui.shutdown()
-
-        # removing events
-        self.event_scheduler.shutdown()
-        self.events.clear()
-
+        # Let the skill stop before shutting down the GUI and event_scheduler
         try:
             self.stop()
         except Exception:
             LOG.error(f'Failed to stop skill: {self.skill_id}', exc_info=True)
 
+        # Clear skill from gui
+        try:
+            self.gui.shutdown()
+        except Exception as e:
+            LOG.exception(f"Gui shutdown failed: {e}")
+
+        # removing events
+        try:
+            self.event_scheduler.shutdown()
+            self.events.clear()
+        except Exception as e:
+            LOG.exception(f"event_scheduler shutdown failed: {e}")
+
+        # Let the skill specify any extra shutdown steps
         try:
             self.shutdown()
         except Exception as e:

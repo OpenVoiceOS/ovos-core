@@ -2,7 +2,80 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.5a37...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.6a6...HEAD)
+
+**Merged pull requests:**
+
+- Reorg shutdown to prevent logged exceptions in skill shutdown [\#240](https://github.com/OpenVoiceOS/ovos-core/pull/240) ([NeonDaniel](https://github.com/NeonDaniel))
+
+## [V0.0.6a6](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.6a6) (2022-12-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.6a5...V0.0.6a6)
+
+**Fixed bugs:**
+
+- port/fix/ intent name colision [\#233](https://github.com/OpenVoiceOS/ovos-core/issues/233)
+- Handle multiple intents with the same name \(\#2921\) [\#235](https://github.com/OpenVoiceOS/ovos-core/pull/235) ([JarbasAl](https://github.com/JarbasAl))
+
+**Closed issues:**
+
+- Install confusion [\#239](https://github.com/OpenVoiceOS/ovos-core/issues/239)
+
+## [V0.0.6a5](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.6a5) (2022-12-08)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.6a4...V0.0.6a5)
+
+**Merged pull requests:**
+
+- Add config option to retry mic init on start \(default True\) [\#238](https://github.com/OpenVoiceOS/ovos-core/pull/238) ([NeonDaniel](https://github.com/NeonDaniel))
+
+## [V0.0.6a4](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.6a4) (2022-12-08)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.6a3...V0.0.6a4)
+
+**Merged pull requests:**
+
+- Fix display settings ui [\#237](https://github.com/OpenVoiceOS/ovos-core/pull/237) ([AIIX](https://github.com/AIIX))
+
+## [V0.0.6a3](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.6a3) (2022-11-30)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.6a2...V0.0.6a3)
+
+**Merged pull requests:**
+
+- page background color support for show image and show animated image [\#236](https://github.com/OpenVoiceOS/ovos-core/pull/236) ([AIIX](https://github.com/AIIX))
+
+## [V0.0.6a2](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.6a2) (2022-11-25)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.6a1...V0.0.6a2)
+
+**Merged pull requests:**
+
+- Fix show\_pages index api [\#234](https://github.com/OpenVoiceOS/ovos-core/pull/234) ([AIIX](https://github.com/AIIX))
+
+## [V0.0.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.6a1) (2022-11-23)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.5...V0.0.6a1)
+
+**Merged pull requests:**
+
+- add factory reset ui [\#231](https://github.com/OpenVoiceOS/ovos-core/pull/231) ([AIIX](https://github.com/AIIX))
+
+## [V0.0.5](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.5) (2022-11-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.5a39...V0.0.5)
+
+## [V0.0.5a39](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.5a39) (2022-11-15)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.5a38...V0.0.5a39)
+
+**Merged pull requests:**
+
+- Update alpha dependencies to stable versions [\#230](https://github.com/OpenVoiceOS/ovos-core/pull/230) ([NeonDaniel](https://github.com/NeonDaniel))
+
+## [V0.0.5a38](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.5a38) (2022-11-11)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.5a37...V0.0.5a38)
 
 **Fixed bugs:**
 
@@ -658,21 +731,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.4a7...V0.0.4a8)
 
-**Implemented enhancements:**
-
-- feat/user resources [\#131](https://github.com/OpenVoiceOS/ovos-core/pull/131) ([NeonJarbas](https://github.com/NeonJarbas))
-
-**Fixed bugs:**
-
-- fix/pairing readiness [\#132](https://github.com/OpenVoiceOS/ovos-core/pull/132) ([NeonJarbas](https://github.com/NeonJarbas))
-
 ## [V0.0.4a7](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.4a7) (2022-06-03)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.4a6...V0.0.4a7)
-
-**Merged pull requests:**
-
-- port of the resource file handling refactor from mk2 [\#130](https://github.com/OpenVoiceOS/ovos-core/pull/130) ([NeonJarbas](https://github.com/NeonJarbas))
 
 ## [V0.0.4a6](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.4a6) (2022-06-03)
 
@@ -682,43 +743,21 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.4a4...V0.0.4a5)
 
-**Merged pull requests:**
-
-- Fix typo in log from \#126 [\#129](https://github.com/OpenVoiceOS/ovos-core/pull/129) ([NeonDaniel](https://github.com/NeonDaniel))
-
 ## [V0.0.4a4](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.4a4) (2022-06-02)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.4a3...V0.0.4a4)
-
-**Implemented enhancements:**
-
-- feat/common\_query service [\#127](https://github.com/OpenVoiceOS/ovos-core/pull/127) ([NeonJarbas](https://github.com/NeonJarbas))
 
 ## [V0.0.4a3](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.4a3) (2022-06-02)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.4a2...V0.0.4a3)
 
-**Fixed bugs:**
-
-- refactor/tts\_mode [\#128](https://github.com/OpenVoiceOS/ovos-core/pull/128) ([NeonJarbas](https://github.com/NeonJarbas))
-
 ## [V0.0.4a2](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.4a2) (2022-06-01)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.4a1...V0.0.4a2)
 
-**Merged pull requests:**
-
-- Update logging so global voc resources don't appear as errors in the log [\#126](https://github.com/OpenVoiceOS/ovos-core/pull/126) ([NeonDaniel](https://github.com/NeonDaniel))
-
 ## [V0.0.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.4a1) (2022-05-22)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.3...V0.0.4a1)
-
-**Fixed bugs:**
-
-- Unsupported LF language prevents intent handling [\#123](https://github.com/OpenVoiceOS/ovos-core/issues/123)
-- fix/LF\_unsupported\_lang [\#125](https://github.com/OpenVoiceOS/ovos-core/pull/125) ([NeonJarbas](https://github.com/NeonJarbas))
-- fix/converse\_get\_response [\#124](https://github.com/OpenVoiceOS/ovos-core/pull/124) ([NeonJarbas](https://github.com/NeonJarbas))
 
 ## [V0.0.3](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.3) (2022-05-09)
 

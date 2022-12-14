@@ -318,13 +318,16 @@ class RecognizerLoop(EventEmitter):
 
         device_index = self.config.get('device_index')
         device_name = self.config.get('device_name')
+        retry_mic = self.config.get('retry_mic_init', True)
+
         if not device_index and device_name:
             device_index = find_input_device(device_name)
 
         LOG.debug('Using microphone (None = default): ' + str(device_index))
 
         self.microphone = MutableMicrophone(device_index, rate,
-                                            mute=self.mute_calls > 0)
+                                            mute=self.mute_calls > 0,
+                                            retry=retry_mic)
         self.create_hotword_engines()
         self.state = RecognizerLoopState()
         self.responsive_recognizer = ResponsiveRecognizer(self)
