@@ -1597,18 +1597,26 @@ class MycroftSkill:
         if self._settings_watchdog:
             self._settings_watchdog.shutdown()
 
-        # Clear skill from gui
-        self.gui.shutdown()
-
-        # removing events
-        self.event_scheduler.shutdown()
-        self.events.clear()
-
+        # Let the skill stop before shutting down the GUI and event_scheduler
         try:
             self.stop()
         except Exception:
             LOG.error(f'Failed to stop skill: {self.skill_id}', exc_info=True)
 
+        # Clear skill from gui
+        try:
+            self.gui.shutdown()
+        except Exception as e:
+            LOG.exception(f"Gui shutdown failed: {e}")
+
+        # removing events
+        try:
+            self.event_scheduler.shutdown()
+            self.events.clear()
+        except Exception as e:
+            LOG.exception(f"event_scheduler shutdown failed: {e}")
+
+        # Let the skill specify any extra shutdown steps
         try:
             self.shutdown()
         except Exception as e:
