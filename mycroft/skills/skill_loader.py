@@ -298,10 +298,11 @@ def get_create_skill_function(skill_module):
 
 
 class SkillLoader:
-    def __init__(self, bus, skill_directory):
+    def __init__(self, bus, skill_directory=None):
         self.bus = bus
-        self.skill_directory = skill_directory
-        self.skill_id = os.path.basename(skill_directory)
+        self._skill_directory = skill_directory
+        self._skill_id = None
+        self._skill_class = None
         self.load_attempted = False
         self.last_modified = 0
         self.last_loaded = 0
@@ -318,12 +319,29 @@ class SkillLoader:
         return self.instance is None
 
     @property
+    def skill_directory(self):
+        skill_dir = self._skill_directory
+        if self.instance and not skill_dir:
+            skill_dir = self.instance.root_dir
+        return skill_dir
+
+    @property
+    def skill_id(self):
+        skill_id = self._skill_id
+        if self.instance and not skill_id:
+            skill_id = self.instance.skill_id
+        if self.skill_directory and not skill_id:
+            skill_id = os.path.basename(self.skill_directory)
+        return skill_id
+
+    @property
     def skill_class(self):
-        if self.instance:
-            return self.instance.__class__
-        elif self.skill_module:
-            return get_skill_class(self.skill_module)
-        return None
+        skill_class = self._skill_class
+        if self.instance and not skill_class:
+            skill_class = self.instance.__class__
+        if self.skill_module and not skill_class:
+            skill_class = get_skill_class(self.skill_module)
+        return skill_class
 
     @property
     def network_requirements(self):
@@ -529,22 +547,15 @@ class SkillLoader:
 
 class PluginSkillLoader(SkillLoader):
     def __init__(self, bus, skill_id):
-        super().__init__(bus, skill_id)
-        self.skill_directory = skill_id
-        self.skill_id = skill_id
+        super().__init__(bus)
+        self._skill_id = skill_id
 
     def reload_needed(self):
         return False
 
-    def _create_skill_instance(self, skill_module=None):
-        if super()._create_skill_instance(skill_module):
-            self.skill_directory = self.instance.root_dir
-            return True
-        return False
-
-    def load(self, skill_module):
+    def load(self, skill_class):
         LOG.info('ATTEMPTING TO LOAD PLUGIN SKILL: ' + self.skill_id)
-        self.skill_module = skill_module
+        self._skill_class = skill_class
         self._prepare_for_load()
         if self.is_blacklisted:
             self._skip_load()

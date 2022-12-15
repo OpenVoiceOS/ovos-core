@@ -279,7 +279,7 @@ class SkillManager(Thread):
         if network is None:
             network = self._network_event.is_set()
         if internet is None:
-            internet = self._internet_event.is_set()
+            internet = self._connected_event.is_set()
         plugins = find_skill_plugins()
         loaded_skill_ids = [basename(p) for p in self.skill_loaders]
         for skill_id, plug in plugins.items():
@@ -401,7 +401,7 @@ class SkillManager(Thread):
         if network is None:
             network = self._network_event.is_set()
         if internet is None:
-            internet = self._internet_event.is_set()
+            internet = self._connected_event.is_set()
 
         for skill_dir in self._get_skill_directories():
             replaced_skills = []
