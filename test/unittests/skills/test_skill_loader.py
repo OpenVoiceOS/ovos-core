@@ -13,13 +13,64 @@
 # limitations under the License.
 #
 """Unit tests for the SkillLoader class."""
+import unittest
 from time import time
-from unittest.mock import call, MagicMock, Mock, patch
+from unittest.mock import call, Mock, patch
 
+from mycroft.skills.mycroft_skill.mycroft_skill import MycroftSkill
 from mycroft.skills.skill_loader import _get_last_modified_time, SkillLoader
+from ovos_workshop.decorators import classproperty
+from ovos_workshop.skills.ovos import SkillNetworkRequirements
 from ..base import MycroftUnitTestBase
 
 ONE_MINUTE = 60
+
+
+class OfflineSkill(MycroftSkill):
+    @classproperty
+    def network_requirements(self):
+        return SkillNetworkRequirements(internet_before_load=False,
+                                        network_before_load=False,
+                                        requires_internet=False,
+                                        requires_network=False,
+                                        no_internet_fallback=True,
+                                        no_network_fallback=True)
+
+
+class LANSkill(MycroftSkill):
+    @classproperty
+    def network_requirements(self):
+        scans_on_init = True
+        return SkillNetworkRequirements(internet_before_load=False,
+                                        network_before_load=scans_on_init,
+                                        requires_internet=False,
+                                        requires_network=True,
+                                        no_internet_fallback=True,
+                                        no_network_fallback=False)
+
+
+class TestSkillNetwork(unittest.TestCase):
+
+    def test_class_property(self):
+        self.assertEqual(OfflineSkill.network_requirements,
+                         SkillNetworkRequirements(internet_before_load=False,
+                                                  network_before_load=False,
+                                                  requires_internet=False,
+                                                  requires_network=False,
+                                                  no_internet_fallback=True,
+                                                  no_network_fallback=True)
+                         )
+        self.assertEqual(LANSkill.network_requirements,
+                         SkillNetworkRequirements(internet_before_load=False,
+                                                  network_before_load=True,
+                                                  requires_internet=False,
+                                                  requires_network=True,
+                                                  no_internet_fallback=True,
+                                                  no_network_fallback=False)
+                         )
+        self.assertEqual(MycroftSkill.network_requirements,
+                         SkillNetworkRequirements()
+                         )
 
 
 class TestSkillLoader(MycroftUnitTestBase):
@@ -68,7 +119,6 @@ class TestSkillLoader(MycroftUnitTestBase):
         """The loader should take to action for an already loaded skill."""
         self.loader.instance = Mock
         self.loader.instance.reload_skill = True
-        self.loader.loaded = True
         self.loader.last_loaded = time() + ONE_MINUTE
 
         self.assertFalse(self.loader.reload_needed())
@@ -78,7 +128,6 @@ class TestSkillLoader(MycroftUnitTestBase):
         self.loader.instance = Mock()
         self.loader.instance.reload_skill = False
         self.loader.active = True
-        self.loader.loaded = True
         self.assertFalse(self.loader.reload_needed())
 
     def test_skill_reloading_deactivated(self):
@@ -86,13 +135,11 @@ class TestSkillLoader(MycroftUnitTestBase):
         self.loader.instance = Mock()
         self.loader.instance.reload_skill = True
         self.loader.active = False
-        self.loader.loaded = False
         self.assertFalse(self.loader.reload_needed())
 
     def test_skill_reload(self):
         """Test reloading a skill that was modified."""
         self.loader.instance = Mock()
-        self.loader.loaded = True
         self.loader.last_loaded = 0
 
         with patch(self.mock_package + 'time') as time_mock:
