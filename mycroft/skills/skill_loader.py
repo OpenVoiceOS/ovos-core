@@ -24,7 +24,7 @@ from time import time
 from ovos_config.locations import get_xdg_data_dirs, get_xdg_data_save_path
 from ovos_config.meta import get_xdg_base
 from ovos_plugin_manager.skills import find_skill_plugins
-
+from ovos_workshop.skills.ovos import SkillNetworkRequirements
 from ovos_config.config import Configuration
 from mycroft.messagebus import Message
 from mycroft.skills.mycroft_skill.mycroft_skill import MycroftSkill
@@ -326,6 +326,12 @@ class SkillLoader:
         return None
 
     @property
+    def network_requirements(self):
+        if not self.skill_class:
+            return SkillNetworkRequirements()
+        return self.skill_class.network_requirements
+
+    @property
     def is_blacklisted(self):
         """Boolean value representing whether or not a skill is blacklisted."""
         blacklist = self.config['skills'].get('blacklisted_skills') or []
@@ -414,7 +420,7 @@ class SkillLoader:
             self._skip_load()
         else:
             self.skill_module = self._load_skill_source()
-            self._create_skill_instance(self.skill_module)
+            self._create_skill_instance()
 
         self.last_loaded = time()
         self._communicate_load_status()
@@ -470,7 +476,7 @@ class SkillLoader:
                 LOG.exception(f'Failed to load skill: {self.skill_id} ({e})')
         return skill_module
 
-    def _create_skill_instance(self, skill_module):
+    def _create_skill_instance(self, skill_module=None):
         """create the skill object.
 
         Arguments:
@@ -479,8 +485,9 @@ class SkillLoader:
         Returns:
             (bool): True if skill was loaded successfully.
         """
+        skill_module = skill_module or self.skill_module
         try:
-            skill_creator = get_create_skill_function(self.skill_module) or \
+            skill_creator = get_create_skill_function(skill_module) or \
                             self.skill_class
 
             # create the skill
@@ -529,7 +536,7 @@ class PluginSkillLoader(SkillLoader):
     def reload_needed(self):
         return False
 
-    def _create_skill_instance(self, skill_module):
+    def _create_skill_instance(self, skill_module=None):
         if super()._create_skill_instance(skill_module):
             self.skill_directory = self.instance.root_dir
             return True
@@ -542,7 +549,7 @@ class PluginSkillLoader(SkillLoader):
         if self.is_blacklisted:
             self._skip_load()
         else:
-            self._create_skill_instance(skill_module)
+            self._create_skill_instance()
 
         self.last_loaded = time()
         self._communicate_load_status()

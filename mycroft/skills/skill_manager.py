@@ -103,6 +103,7 @@ class SkillManager(Thread):
         self._setup_event = Event()
         self._stop_event = Event()
         self._connected_event = Event()
+        self._network_event = Event()
         self.config = Configuration()
         self.manifest_uploader = SeleneSkillManifestUploader()
         self.upload_queue = UploadQueue()  # DEPRECATED
@@ -121,12 +122,6 @@ class SkillManager(Thread):
 
     def _define_message_bus_events(self):
         """Define message bus events with handlers defined in this class."""
-        # Update on initial connection
-        self.bus.once(
-            'mycroft.internet.connected',
-            lambda x: self._connected_event.set()
-        )
-
         # Update upon request
         self.bus.on('skillmanager.list', self.send_skill_list)
         self.bus.on('skillmanager.deactivate', self.deactivate_skill)
@@ -135,6 +130,10 @@ class SkillManager(Thread):
         self.bus.once('mycroft.skills.initialized',
                       self.handle_check_device_readiness)
         self.bus.once('mycroft.skills.trained', self.handle_initial_training)
+
+        # load skills waiting for connectivity
+        self.bus.on("mycroft.network.connected", self.handle_network_connected)
+        self.bus.on("mycroft.internet.connected", self.handle_internet_connected)
 
     def is_device_ready(self):
         is_ready = False
@@ -262,15 +261,52 @@ class SkillManager(Thread):
         upload of settings is done at individual skill level in ovos-core """
         pass
 
-    def load_plugin_skills(self):
+    def handle_internet_connected(self, message):
+        self._network_event.set()
+        self._connected_event.set()
+        self._load_on_internet()
+
+        # Sync backend and skills.
+        # why does selene need to know about skills without settings?
+        if is_paired():
+            self.manifest_uploader.post_manifest()
+
+    def handle_network_connected(self, message):
+        self._network_event.set()
+        self._load_on_network()
+
+    def load_plugin_skills(self, network=None, internet=None):
+        if network is None:
+            network = self._network_event.is_set()
+        if internet is None:
+            internet = self._internet_event.is_set()
         plugins = find_skill_plugins()
         loaded_skill_ids = [basename(p) for p in self.skill_loaders]
         for skill_id, plug in plugins.items():
             if skill_id not in self.plugin_skills and skill_id not in loaded_skill_ids:
+                skill_loader = self._get_plugin_skill_loader(skill_id)
+                requirements = skill_loader.network_requirements
+                if not network and requirements.network_before_load:
+                    continue
+                if not internet and requirements.internet_before_load:
+                    continue
                 self._load_plugin_skill(skill_id, plug)
 
+    def _get_plugin_skill_loader(self, skill_id):
+        if not self.config["websocket"].get("shared_connection", True):
+            # see BusBricker skill to understand why this matters
+            # any skill can manipulate the bus from other skills
+            # this patch ensures each skill gets it's own
+            # connection that can't be manipulated by others
+            # https://github.com/EvilJarbas/BusBrickerSkill
+            bus = MessageBusClient(cache=True)
+            bus.run_in_thread()
+        else:
+            bus = self.bus
+        return PluginSkillLoader(bus, skill_id)
+
     def _load_plugin_skill(self, skill_id, skill_plugin):
-        skill_loader = PluginSkillLoader(self.bus, skill_id)
+        skill_loader = self._get_plugin_skill_loader(skill_id)
         try:
             load_status = skill_loader.load(skill_plugin)
         except Exception:
@@ -303,22 +339,21 @@ class SkillManager(Thread):
 
         self.status.set_alive()
 
-        if self.skills_config.get("wait_for_internet", True):
-            while not connected() and not self._connected_event.is_set():
-                sleep(1)
-            self._connected_event.set()
-
         self._load_on_startup()
 
-        # Sync backend and skills.
-        # why does selene need to know about skills without settings?
-        if is_paired():
-            self.manifest_uploader.post_manifest()
+        if self.skills_config.get("wait_for_internet", False):
+            # NOTE - self._connected_event will never be set
+            # if PHAL plugin is not running to emit the connected events
+            while not self._connected_event.is_set():
+                sleep(1)
 
         # wait for initial intents training
         while not self.initial_load_complete:
             sleep(0.5)
         self.status.set_ready()
+
+        LOG.info("Skills all loaded!")
+        self.bus.emit(Message('mycroft.skills.initialized'))
 
         # Scan the file folder that contains Skills.  If a Skill is updated,
         # unload the existing version from memory and reload from the disk.
@@ -342,20 +377,42 @@ class SkillManager(Thread):
                 LOG.warning('Found and removed git lock file: ' + i)
                 os.remove(i)
 
+    def _load_on_network(self):
+        LOG.info('Loading network plugin skills...')
+        self.load_plugin_skills(network=True, internet=False)
+        LOG.info('Loading network skills...')
+        self._load_new_skills(network=True, internet=False)
+
+    def _load_on_internet(self):
+        LOG.info('Loading internet plugin skills...')
+        self.load_plugin_skills(network=True, internet=True)
+        LOG.info('Loading internet skills...')
+        self._load_new_skills(network=True, internet=True)
+
     def _load_on_startup(self):
         """Handle initial skill load."""
-        self.load_plugin_skills()
-        LOG.info('Loading installed skills...')
-        self._load_new_skills()
-        LOG.info("Skills all loaded!")
-        self.bus.emit(Message('mycroft.skills.initialized'))
+        LOG.info('Loading offline plugin skills...')
+        self.load_plugin_skills(network=False, internet=False)
+        LOG.info('Loading offline skills...')
+        self._load_new_skills(network=False, internet=False)
 
-    def _load_new_skills(self):
+    def _load_new_skills(self, network=None, internet=None):
         """Handle load of skills installed since startup."""
+        if network is None:
+            network = self._network_event.is_set()
+        if internet is None:
+            internet = self._internet_event.is_set()
+
         for skill_dir in self._get_skill_directories():
             replaced_skills = []
             # by definition skill_id == folder name
             skill_id = os.path.basename(skill_dir)
+            skill_loader = self._get_skill_loader(skill_dir)
+            requirements = skill_loader.network_requirements
+            if not network and requirements.network_before_load:
+                continue
+            if not internet and requirements.internet_before_load:
+                continue
 
             # a local source install is replacing this plugin, unload it!
             if skill_id in self.plugin_skills:
@@ -375,7 +432,7 @@ class SkillManager(Thread):
             if skill_dir not in self.skill_loaders:
                 self._load_skill(skill_dir)
 
-    def _load_skill(self, skill_directory):
+    def _get_skill_loader(self, skill_directory):
         if not self.config["websocket"].get("shared_connection", True):
             # see BusBricker skill to understand why this matters
             # any skill can manipulate the bus from other skills
@@ -386,7 +443,10 @@ class SkillManager(Thread):
             bus.run_in_thread()
         else:
             bus = self.bus
-        skill_loader = SkillLoader(bus, skill_directory)
+        return SkillLoader(bus, skill_directory)
+
+    def _load_skill(self, skill_directory):
+        skill_loader = self._get_skill_loader(skill_directory)
         try:
             load_status = skill_loader.load()
         except Exception:
