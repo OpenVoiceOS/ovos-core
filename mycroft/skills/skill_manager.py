@@ -292,10 +292,8 @@ class SkillManager(Thread):
                     continue
                 self._load_plugin_skill(skill_id, plug)
 
-    def _get_plugin_skill_loader(self, skill_id, init_bus=True):
-        if not init_bus:
-            bus = None
-        elif not self.config["websocket"].get("shared_connection", True):
+    def _get_internal_skill_bus(self):
+        if not self.config["websocket"].get("shared_connection", True):
             # see BusBricker skill to understand why this matters
             # any skill can manipulate the bus from other skills
             # this patch ensures each skill gets it's own
@@ -305,6 +303,12 @@ class SkillManager(Thread):
             bus.run_in_thread()
         else:
             bus = self.bus
+        return bus
+
+    def _get_plugin_skill_loader(self, skill_id, init_bus=True):
+        bus = None
+        if init_bus:
+            bus = self._get_internal_skill_bus()
         return PluginSkillLoader(bus, skill_id)
 
     def _load_plugin_skill(self, skill_id, skill_plugin):
@@ -435,18 +439,9 @@ class SkillManager(Thread):
                 self._load_skill(skill_dir)
 
     def _get_skill_loader(self, skill_directory, init_bus=True):
-        if not init_bus:
-            bus = None
-        elif not self.config["websocket"].get("shared_connection", True):
-            # see BusBricker skill to understand why this matters
-            # any skill can manipulate the bus from other skills
-            # this patch ensures each skill gets it's own
-            # connection that can't be manipulated by others
-            # https://github.com/EvilJarbas/BusBrickerSkill
-            bus = MessageBusClient(cache=True)
-            bus.run_in_thread()
-        else:
-            bus = self.bus
+        bus = None
+        if init_bus:
+            bus = self._get_internal_skill_bus()
         return SkillLoader(bus, skill_directory)
 
     def _load_skill(self, skill_directory):
