@@ -284,7 +284,7 @@ class SkillManager(Thread):
         loaded_skill_ids = [basename(p) for p in self.skill_loaders]
         for skill_id, plug in plugins.items():
             if skill_id not in self.plugin_skills and skill_id not in loaded_skill_ids:
-                skill_loader = self._get_plugin_skill_loader(skill_id)
+                skill_loader = self._get_plugin_skill_loader(skill_id, init_bus=False)
                 requirements = skill_loader.network_requirements
                 if not network and requirements.network_before_load:
                     continue
@@ -292,8 +292,10 @@ class SkillManager(Thread):
                     continue
                 self._load_plugin_skill(skill_id, plug)
 
-    def _get_plugin_skill_loader(self, skill_id):
-        if not self.config["websocket"].get("shared_connection", True):
+    def _get_plugin_skill_loader(self, skill_id, init_bus=True):
+        if not init_bus:
+            bus = None
+        elif not self.config["websocket"].get("shared_connection", True):
             # see BusBricker skill to understand why this matters
             # any skill can manipulate the bus from other skills
             # this patch ensures each skill gets it's own
@@ -407,7 +409,7 @@ class SkillManager(Thread):
             replaced_skills = []
             # by definition skill_id == folder name
             skill_id = os.path.basename(skill_dir)
-            skill_loader = self._get_skill_loader(skill_dir)
+            skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
             requirements = skill_loader.network_requirements
             if not network and requirements.network_before_load:
                 continue
@@ -432,8 +434,10 @@ class SkillManager(Thread):
             if skill_dir not in self.skill_loaders:
                 self._load_skill(skill_dir)
 
-    def _get_skill_loader(self, skill_directory):
-        if not self.config["websocket"].get("shared_connection", True):
+    def _get_skill_loader(self, skill_directory, init_bus=True):
+        if not init_bus:
+            bus = None
+        elif not self.config["websocket"].get("shared_connection", True):
             # see BusBricker skill to understand why this matters
             # any skill can manipulate the bus from other skills
             # this patch ensures each skill gets it's own
