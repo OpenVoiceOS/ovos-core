@@ -303,6 +303,7 @@ class SkillLoader:
         self._skill_directory = skill_directory
         self._skill_id = None
         self._skill_class = None
+        self._loaded = None
         self.load_attempted = False
         self.last_modified = 0
         self.last_loaded = 0
@@ -316,7 +317,11 @@ class SkillLoader:
 
     @property
     def loaded(self):
-        return self.instance is None
+        return self._loaded or self.instance is None
+
+    @loaded.setter
+    def loaded(self, val):
+        self._loaded = val
 
     @property
     def skill_directory(self):
@@ -324,6 +329,10 @@ class SkillLoader:
         if self.instance and not skill_dir:
             skill_dir = self.instance.root_dir
         return skill_dir
+
+    @skill_directory.setter
+    def skill_directory(self, val):
+        self._skill_directory = val
 
     @property
     def skill_id(self):
@@ -334,6 +343,10 @@ class SkillLoader:
             skill_id = os.path.basename(self.skill_directory)
         return skill_id
 
+    @skill_id.setter
+    def skill_id(self, val):
+        self._skill_id = val
+
     @property
     def skill_class(self):
         skill_class = self._skill_class
@@ -342,6 +355,10 @@ class SkillLoader:
         if self.skill_module and not skill_class:
             skill_class = get_skill_class(self.skill_module)
         return skill_class
+
+    @skill_class.setter
+    def skill_class(self, val):
+        self._skill_class = val
 
     @property
     def network_requirements(self):

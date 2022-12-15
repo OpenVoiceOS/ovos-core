@@ -119,6 +119,7 @@ class TestSkillLoader(MycroftUnitTestBase):
         """The loader should take to action for an already loaded skill."""
         self.loader.instance = Mock
         self.loader.instance.reload_skill = True
+        self.loader.loaded = True
         self.loader.last_loaded = time() + ONE_MINUTE
 
         self.assertFalse(self.loader.reload_needed())
@@ -128,6 +129,7 @@ class TestSkillLoader(MycroftUnitTestBase):
         self.loader.instance = Mock()
         self.loader.instance.reload_skill = False
         self.loader.active = True
+        self.loader.loaded = True
         self.assertFalse(self.loader.reload_needed())
 
     def test_skill_reloading_deactivated(self):
@@ -135,11 +137,13 @@ class TestSkillLoader(MycroftUnitTestBase):
         self.loader.instance = Mock()
         self.loader.instance.reload_skill = True
         self.loader.active = False
+        self.loader.loaded = False
         self.assertFalse(self.loader.reload_needed())
 
     def test_skill_reload(self):
         """Test reloading a skill that was modified."""
         self.loader.instance = Mock()
+        self.loader.loaded = True
         self.loader.last_loaded = 0
 
         with patch(self.mock_package + 'time') as time_mock:
