@@ -303,7 +303,6 @@ class SkillLoader:
         self.skill_directory = skill_directory
         self.skill_id = os.path.basename(skill_directory)
         self.load_attempted = False
-        self.loaded = False
         self.last_modified = 0
         self.last_loaded = 0
         self.instance = None
@@ -312,6 +311,19 @@ class SkillLoader:
         self.config = Configuration()
 
         self.modtime_error_log_written = False
+        self.skill_module = None
+
+    @property
+    def loaded(self):
+        return self.instance is None
+
+    @property
+    def skill_class(self):
+        if self.instance:
+            return self.instance.__class__
+        elif self.skill_module:
+            return get_skill_class(self.skill_module)
+        return None
 
     @property
     def is_blacklisted(self):
@@ -355,13 +367,11 @@ class SkillLoader:
         self._execute_instance_shutdown()
         if self.config.get("debug", False):
             self._garbage_collect()
-        self.loaded = False
         self._emit_skill_shutdown_event()
 
     def unload(self):
         if self.instance:
             self._execute_instance_shutdown()
-        self.loaded = False
 
     def activate(self):
         self.active = True
@@ -379,6 +389,8 @@ class SkillLoader:
             LOG.exception(f'An error occurred while shutting down {self.skill_id}')
         else:
             LOG.info(f'Skill {self.skill_id} shut down successfully')
+        del self.instance
+        self.instance = None
 
     def _garbage_collect(self):
         """Invoke Python garbage collector to remove false references"""
@@ -401,9 +413,8 @@ class SkillLoader:
         if self.is_blacklisted:
             self._skip_load()
         else:
-            skill_module = self._load_skill_source()
-            if skill_module and self._create_skill_instance(skill_module):
-                self.loaded = True
+            self.skill_module = self._load_skill_source()
+            self._create_skill_instance(self.skill_module)
 
         self.last_loaded = time()
         self._communicate_load_status()
@@ -441,7 +452,6 @@ class SkillLoader:
 
     def _prepare_for_load(self):
         self.load_attempted = True
-        self.loaded = False
         self.instance = None
 
     def _skip_load(self):
@@ -470,8 +480,8 @@ class SkillLoader:
             (bool): True if skill was loaded successfully.
         """
         try:
-            skill_creator = get_create_skill_function(skill_module) or \
-                            get_skill_class(skill_module)
+            skill_creator = get_create_skill_function(self.skill_module) or \
+                            self.skill_class
 
             # create the skill
             self.instance = skill_creator()
@@ -527,11 +537,12 @@ class PluginSkillLoader(SkillLoader):
 
     def load(self, skill_module):
         LOG.info('ATTEMPTING TO LOAD PLUGIN SKILL: ' + self.skill_id)
+        self.skill_module = skill_module
         self._prepare_for_load()
         if self.is_blacklisted:
             self._skip_load()
         else:
-            self.loaded = self._create_skill_instance(skill_module)
+            self._create_skill_instance(skill_module)
 
         self.last_loaded = time()
         self._communicate_load_status()
