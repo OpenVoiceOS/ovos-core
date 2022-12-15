@@ -30,6 +30,20 @@ Item {
     property bool wallpaper_rotation_enabled: sessionData.display_wallpaper_rotation ? sessionData.display_wallpaper_rotation : 0
     property bool auto_dim_enabled: sessionData.display_auto_dim ? sessionData.display_auto_dim : 0
     property bool auto_nightmode_enabled: sessionData.display_auto_nightmode ? sessionData.display_auto_nightmode : 0
+    property bool menuLabelsEnabled: false
+
+    Component.onCompleted: {
+        Mycroft.MycroftController.sendRequest("ovos.shell.get.menuLabels.status", {})
+    }
+
+    Connections {
+        target: Mycroft.MycroftController
+        onIntentRecevied: {
+            if (type == "ovos.shell.get.menuLabels.status.response") {
+                menuLabelsEnabled = data.enabled
+            }
+        }
+    }
 
     Item {
         id: topArea
@@ -276,6 +290,74 @@ Item {
                         console.log(autoNightmodeSwitch.checked)
                         Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
                         triggerGuiEvent("speaker.extension.display.set.auto.nightmode", {"auto_nightmode": autoNightmodeSwitch.checked})
+                    }
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: displaySettingItemFourLabel.implicitHeight + Mycroft.Units.gridUnit
+                color: Qt.lighter(Kirigami.Theme.backgroundColor, 2)
+                border.width: 1
+                border.color: Qt.darker(Kirigami.Theme.textColor, 1.5)
+                radius: 6
+
+                ColumnLayout {
+                    id: displaySettingItemFourLabel
+                    anchors.left: parent.left
+                    anchors.right: displayMenuLabelsSwitch.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.leftMargin: Mycroft.Units.gridUnit / 2
+
+                    Label {
+                        id: settingFourLabel
+                        text: qsTr("Display Menu Labels")
+                        font.pixelSize: 18
+                        fontSizeMode: Text.Fit
+                        minimumPixelSize: 14
+                        color: Kirigami.Theme.textColor
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        Layout.alignment: Qt.AlignLeft
+                    }
+
+                    Label {
+                        text: qsTr("Enable|Disable display of menu labels")
+                        font.pixelSize: settingFourLabel.font.pixelSize / 1.5
+                        color: Kirigami.Theme.textColor
+                        elide: Text.ElideRight
+                        wrapMode: Text.WordWrap
+                        maximumLineCount: 1
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        Layout.alignment: Qt.AlignLeft
+                    }
+                }
+
+                Button {
+                    id: displayMenuLabelsSwitch
+                    width: Mycroft.Units.gridUnit * 10
+                    anchors.right: parent.right
+                    anchors.rightMargin: Mycroft.Units.gridUnit / 2
+                    height: parent.height - Mycroft.Units.gridUnit / 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    checkable: true
+                    checked: displaySettingsView.menuLabelsEnabled
+                    text: checked ? qsTr("ON") : qsTr("OFF")
+
+                    Kirigami.Icon {
+                        source: displayMenuLabelsSwitch.checked ? Qt.resolvedUrl("images/switch-green.svg") : Qt.resolvedUrl("images/switch-red.svg")
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.right: parent.right
+                        anchors.rightMargin: 8
+                        height: Kirigami.Units.iconSizes.medium
+                        width: Kirigami.Units.iconSizes.medium
+                    }
+
+                    onClicked: {
+                        console.log(displayMenuLabelsSwitch.checked)
+                        Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
+                        Mycroft.MycroftController.sendRequest("ovos.shell.set.menuLabels", {"enabled": displayMenuLabelsSwitch.checked})
                     }
                 }
             }
