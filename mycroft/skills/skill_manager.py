@@ -384,21 +384,15 @@ class SkillManager(Thread):
                 os.remove(i)
 
     def _load_on_network(self):
-        LOG.info('Loading network plugin skills...')
-        self.load_plugin_skills(network=True, internet=False)
         LOG.info('Loading network skills...')
         self._load_new_skills(network=True, internet=False)
 
     def _load_on_internet(self):
-        LOG.info('Loading internet plugin skills...')
-        self.load_plugin_skills(network=True, internet=True)
         LOG.info('Loading internet skills...')
         self._load_new_skills(network=True, internet=True)
 
     def _load_on_startup(self):
         """Handle initial skill load."""
-        LOG.info('Loading offline plugin skills...')
-        self.load_plugin_skills(network=False, internet=False)
         LOG.info('Loading offline skills...')
         self._load_new_skills(network=False, internet=False)
 
@@ -408,6 +402,8 @@ class SkillManager(Thread):
             network = self._network_event.is_set()
         if internet is None:
             internet = self._connected_event.is_set()
+
+        self.load_plugin_skills(network=network, internet=internet)
 
         for skill_dir in self._get_skill_directories():
             replaced_skills = []
