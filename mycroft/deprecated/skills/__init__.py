@@ -11,7 +11,6 @@ import csv
 import re
 from os import walk
 from os.path import splitext, join
-import mycroft.skills.skill_data
 from ovos_backend_client.pairing import is_paired
 from mycroft.enclosure.api import EnclosureAPI
 from mycroft.util.format import expand_options
@@ -99,8 +98,7 @@ def load_regex_from_file(path, skill_id):
                 if line.startswith("#"):
                     continue
                 LOG.debug('regex pre-munge: ' + line.strip())
-                regex = mycroft.skills.skill_data.munge_regex(line.strip(),
-                                                              skill_id)
+                regex = munge_regex(line.strip(), skill_id)
                 LOG.debug('regex post-munge: ' + regex)
                 # Raise error if regex can't be compiled
                 try:
