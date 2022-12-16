@@ -23,7 +23,7 @@ class TestPlaySounds(TestCase):
                                                        'insult.ogg'],
                                                       env=Anything())
 
-    @mock.patch('mycroft.util.audio_utils.LOG')
+    @mock.patch('ovos_utils.sound.LOG')
     def test_play_ogg_file_not_found(self, mock_log,
                                      mock_subprocess, mock_conf):
         """Test that simple log is raised when subprocess can't find command.
@@ -36,7 +36,7 @@ class TestPlaySounds(TestCase):
         self.assertEqual(play_ogg('insult.ogg'), None)
         mock_log.error.called_once_with(Anything())
 
-    @mock.patch('mycroft.util.audio_utils.LOG')
+    @mock.patch('ovos_utils.sound.LOG')
     def test_play_ogg_exception(self, mock_log,
                                 mock_subprocess, mock_conf):
         """Test that stack trace is provided when unknown excpetion occurs"""
@@ -50,13 +50,12 @@ class TestPlaySounds(TestCase):
 
     def test_play_mp3(self, mock_subprocess, mock_conf):
         mock_conf.return_value = test_config
-        env = Anything()
-        play_mp3('praise.mp3', environment=env)
+        play_mp3('praise.mp3')
         mock_subprocess.Popen.assert_called_once_with(['mock_mp3',
                                                        'praise.mp3'],
-                                                      env=env)
+                                                      env=Anything())
 
-    @mock.patch('mycroft.util.audio_utils.LOG')
+    @mock.patch('ovos_utils.sound.LOG')
     def test_play_mp3_file_not_found(self, mock_log,
                                      mock_subprocess, mock_conf):
         """Test that simple log is raised when subprocess can't find command.
@@ -69,7 +68,7 @@ class TestPlaySounds(TestCase):
         self.assertEqual(play_mp3('praise.mp3'), None)
         mock_log.error.called_once_with(Anything())
 
-    @mock.patch('mycroft.util.audio_utils.LOG')
+    @mock.patch('ovos_utils.sound.LOG')
     def test_play_mp3_exception(self, mock_log,
                                 mock_subprocess, mock_conf):
         """Test that stack trace is provided when unknown excpetion occurs"""
@@ -88,7 +87,7 @@ class TestPlaySounds(TestCase):
                                                        'indifference.wav'],
                                                       env=Anything())
 
-    @mock.patch('mycroft.util.audio_utils.LOG')
+    @mock.patch('ovos_utils.sound.LOG')
     def test_play_wav_file_not_found(self, mock_log,
                                      mock_subprocess, mock_conf):
         """Test that simple log is raised when subprocess can't find command.
@@ -101,7 +100,7 @@ class TestPlaySounds(TestCase):
         self.assertEqual(play_wav('indifference.wav'), None)
         mock_log.error.called_once_with(Anything())
 
-    @mock.patch('mycroft.util.audio_utils.LOG')
+    @mock.patch('ovos_utils.sound.LOG')
     def test_play_wav_exception(self, mock_log,
                                 mock_subprocess, mock_conf):
         """Test that stack trace is provided when unknown excpetion occurs"""
