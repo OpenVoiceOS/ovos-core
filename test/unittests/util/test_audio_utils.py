@@ -13,8 +13,8 @@ test_config = {
 }
 
 
-@mock.patch('ovos_config.config.Configuration')
-@mock.patch('mycroft.util.audio_utils.subprocess')
+@mock.patch('ovos_utils.sound.Configuration')
+@mock.patch('ovos_utils.sound.subprocess')
 class TestPlaySounds(TestCase):
     def test_play_ogg(self, mock_subprocess, mock_conf):
         mock_conf.return_value = test_config
@@ -50,10 +50,11 @@ class TestPlaySounds(TestCase):
 
     def test_play_mp3(self, mock_subprocess, mock_conf):
         mock_conf.return_value = test_config
-        play_mp3('praise.mp3')
+        env = Anything()
+        play_mp3('praise.mp3', environment=env)
         mock_subprocess.Popen.assert_called_once_with(['mock_mp3',
                                                        'praise.mp3'],
-                                                      env=Anything())
+                                                      env=env)
 
     @mock.patch('mycroft.util.audio_utils.LOG')
     def test_play_mp3_file_not_found(self, mock_log,
@@ -132,7 +133,7 @@ class TestPlaySounds(TestCase):
                                                       env=Anything())
 
 
-@mock.patch('mycroft.util.audio_utils.subprocess')
+@mock.patch('ovos_utils.sound.subprocess')
 class TestRecordSounds(TestCase):
     def test_record_with_duration(self, mock_subprocess):
         mock_proc = mock.Mock()(name='mock process')
