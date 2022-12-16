@@ -15,87 +15,15 @@
 """Contains simple tools for performing audio related tasks such as playback
 of audio, recording and listing devices.
 """
-from copy import deepcopy
-import os
 import re
-import subprocess
-from ovos_config import Configuration
-import ovos_config.config
 from mycroft.util.log import LOG
-from mycroft.util.file_utils import resolve_resource_file
+from ovos_utils.sound import play_acknowledge_sound, play_listening_sound, \
+    play_end_listening_sound, play_error_sound, record, play_audio, \
+    play_ogg as _po, play_wav as _pw, play_mp3 as _pm
 try:
     import pyaudio
 except ImportError:
     pyaudio = None
-
-
-def play_acknowledge_sound():
-    """Acknowledge a successful request.
-
-    This method plays a sound to acknowledge a request that does not
-    require a verbal response. This is intended to provide simple feedback
-    to the user that their request was handled successfully.
-    """
-    audio_file = resolve_resource_file(
-        Configuration().get('sounds', {}).get('acknowledge'))
-
-    if not audio_file:
-        LOG.warning("Could not find 'acknowledge' audio file!")
-        return
-
-    process = play_audio_file(audio_file)
-    if not process:
-        LOG.warning("Unable to play 'acknowledge' audio file!")
-    return process
-
-
-def play_listening_sound():
-    """Audibly indicate speech recording started."""
-    audio_file = resolve_resource_file(
-        Configuration().get('sounds', {}).get('start_listening'))
-
-    if not audio_file:
-        LOG.warning("Could not find 'start_listening' audio file!")
-        return
-
-    process = play_audio_file(audio_file)
-    if not process:
-        LOG.warning("Unable to play 'start_listening' audio file!")
-    return process
-
-
-def play_end_listening_sound():
-    """Audibly indicate speech recording is no longer happening."""
-    audio_file = resolve_resource_file(
-        Configuration().get('sounds', {}).get('end_listening'))
-
-    if not audio_file:
-        LOG.debug("Could not find 'end_listening' audio file!")
-        return
-
-    process = play_audio_file(audio_file)
-    if not process:
-        LOG.warning("Unable to play 'end_listening' audio file!")
-    return process
-
-def play_error_sound():
-    """Audibly indicate a failed request.
-
-    This method plays a error sound to signal an error that does not
-    require a verbal response. This is intended to provide simple feedback
-    to the user that their request was NOT handled successfully.
-    """
-    audio_file = resolve_resource_file(
-        Configuration().get('sounds', {}).get('error'))
-
-    if not audio_file:
-        LOG.warning("Could not find 'error' audio file!")
-        return
-
-    process = play_audio_file(audio_file)
-    if not process:
-        LOG.warning("Unable to play 'error' audio file!")
-    return process
 
 
 def play_audio_file(uri: str, environment=None):
@@ -112,54 +40,7 @@ def play_audio_file(uri: str, environment=None):
     Returns: subprocess.Popen object. None if the format is not supported or
              an error occurs playing the file.
     """
-    extension_to_function = {
-        '.wav': play_wav,
-        '.mp3': play_mp3,
-        '.ogg': play_ogg
-    }
-    _, extension = os.path.splitext(uri)
-    play_function = extension_to_function.get(extension.lower())
-    if play_function:
-        return play_function(uri, environment)
-    else:
-        LOG.error("Could not find a function capable of playing {uri}."
-                  " Supported formats are {keys}."
-                  .format(uri=uri, keys=list(extension_to_function.keys())))
-        return None
-
-
-# Create a custom environment to use that can be ducked by a phone role.
-# This is kept separate from the normal os.environ to ensure that the TTS
-# role isn't affected and that any thirdparty software launched through
-# a mycroft process can select if they wish to honor this.
-_ENVIRONMENT = deepcopy(os.environ)
-_ENVIRONMENT['PULSE_PROP'] = 'media.role=music'
-
-
-def _get_pulse_environment(config):
-    """Return environment for pulse audio depeding on ducking config."""
-    tts_config = config.get('tts', {})
-    if tts_config and tts_config.get('pulse_duck'):
-        return _ENVIRONMENT
-    else:
-        return os.environ
-
-
-def _play_cmd(cmd, uri, config, environment):
-    """Generic function for starting playback from a commandline and uri.
-
-    Args:
-        cmd (str): commandline to execute %1 in the command line will be
-                   replaced with the provided uri.
-        uri (str): uri to play
-        config (dict): config to use
-        environment: environment to execute in, can be used to supply specific
-                     pulseaudio settings.
-    """
-    environment = environment or _get_pulse_environment(config)
-    cmd_elements = str(cmd).split(" ")
-    cmdline = [e if e != '%1' else uri for e in cmd_elements]
-    return subprocess.Popen(cmdline, env=environment)
+    return play_audio(uri, environment=environment)
 
 
 def play_wav(uri, environment=None):
@@ -175,16 +56,7 @@ def play_wav(uri, environment=None):
 
     Returns: subprocess.Popen object or None if operation failed
     """
-    config = ovos_config.config.Configuration()
-    play_wav_cmd = config['play_wav_cmdline']
-    try:
-        return _play_cmd(play_wav_cmd, uri, config, environment)
-    except FileNotFoundError as e:
-        LOG.error("Failed to launch WAV: {} ({})".format(play_wav_cmd,
-                                                         repr(e)))
-    except Exception:
-        LOG.exception("Failed to launch WAV: {}".format(play_wav_cmd))
-    return None
+    return _pw(uri, environment=environment)
 
 
 def play_mp3(uri, environment=None):
@@ -200,16 +72,7 @@ def play_mp3(uri, environment=None):
 
     Returns: subprocess.Popen object or None if operation failed
     """
-    config = ovos_config.config.Configuration()
-    play_mp3_cmd = config.get("play_mp3_cmdline")
-    try:
-        return _play_cmd(play_mp3_cmd, uri, config, environment)
-    except FileNotFoundError as e:
-        LOG.error("Failed to launch MP3: {} ({})".format(play_mp3_cmd,
-                                                         repr(e)))
-    except Exception:
-        LOG.exception("Failed to launch MP3: {}".format(play_mp3_cmd))
-    return None
+    return _pm(uri, environment=environment)
 
 
 def play_ogg(uri, environment=None):
@@ -225,37 +88,7 @@ def play_ogg(uri, environment=None):
 
     Returns: subprocess.Popen object, or None if operation failed
     """
-    config = ovos_config.config.Configuration()
-    play_ogg_cmd = config.get("play_ogg_cmdline")
-    try:
-        return _play_cmd(play_ogg_cmd, uri, config, environment)
-    except FileNotFoundError as e:
-        LOG.error("Failed to launch OGG: {} ({})".format(play_ogg_cmd,
-                                                         repr(e)))
-    except Exception:
-        LOG.exception("Failed to launch OGG: {}".format(play_ogg_cmd))
-    return None
-
-
-def record(file_path, duration, rate, channels):
-    """Simple function to record from the default mic.
-
-    The recording is done in the background by the arecord commandline
-    application.
-
-    Args:
-        file_path: where to store the recorded data
-        duration: how long to record
-        rate: sample rate
-        channels: number of channels
-
-    Returns:
-        process for performing the recording.
-    """
-    command = ['arecord', '-r', str(rate), '-c', str(channels)]
-    command += ['-d', str(duration)] if duration > 0 else []
-    command += [file_path]
-    return subprocess.Popen(command)
+    return _po(uri, environment=environment)
 
 
 def find_input_device(device_name):
