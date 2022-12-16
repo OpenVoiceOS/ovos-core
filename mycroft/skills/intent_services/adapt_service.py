@@ -158,7 +158,7 @@ class ContextManager:
 
 
 class AdaptService:
-    """Intent service wrapping the Apdapt intent Parser."""
+    """Intent service wrapping the Adapt intent Parser."""
 
     def __init__(self, config):
         self.config = config
