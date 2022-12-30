@@ -126,7 +126,7 @@ Item {
 
                 onClicked: {
                     Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
-                    Mycroft.MycroftController.sendRequest("system.factory.reset.register", {"wipe_cache": false, "wipe_data": false, "wipe_logs": false, "wipe_config": true, "reset_hardware": false})
+                    Mycroft.MycroftController.sendRequest("system.factory.reset", {"wipe_cache": false, "wipe_data": false, "wipe_logs": false, "wipe_config": true, "reset_hardware": false})
                 }
 
                 onPressed: {
@@ -161,7 +161,7 @@ Item {
 
                 onClicked: {
                     Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
-                    Mycroft.MycroftController.sendRequest("system.factory.reset.register", {"wipe_cache": false, "wipe_data": true, "wipe_logs": false, "wipe_config": false, "reset_hardware": false})
+                    Mycroft.MycroftController.sendRequest("system.factory.reset", {"wipe_cache": false, "wipe_data": true, "wipe_logs": false, "wipe_config": false, "reset_hardware": false})
                 }
 
                 onPressed: {
@@ -195,7 +195,7 @@ Item {
 
                 onClicked: {
                     Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
-                    Mycroft.MycroftController.sendRequest("system.factory.reset.register", {"wipe_cache": false, "wipe_data": false, "wipe_logs": true, "wipe_config": false, "reset_hardware": false})
+                    Mycroft.MycroftController.sendRequest("system.factory.reset", {"wipe_cache": false, "wipe_data": false, "wipe_logs": true, "wipe_config": false, "reset_hardware": false})
                 }
 
                 onPressed: {
@@ -230,7 +230,7 @@ Item {
 
                 onClicked: {
                     Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
-                    Mycroft.MycroftController.sendRequest("system.factory.reset.register", {"wipe_cache": true, "wipe_data": true, "wipe_logs": true, "wipe_config": true, "reset_hardware": true})
+                    Mycroft.MycroftController.sendRequest("system.factory.reset", {"wipe_cache": true, "wipe_data": true, "wipe_logs": true, "wipe_config": true, "reset_hardware": true})
                 }
 
                 onPressed: {
