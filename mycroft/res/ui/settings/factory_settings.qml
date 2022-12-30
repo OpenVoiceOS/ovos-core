@@ -92,7 +92,7 @@ Item {
                 
                 onClicked: {
                     Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
-                    Mycroft.MycroftController.sendRequest("system.factory.reset.register", {"wipe_cache": true, "wipe_data": false, "wipe_logs": false, "wipe_config": false, "reset_hardware": false})
+                    Mycroft.MycroftController.sendRequest("system.factory.reset", {"wipe_cache": true, "wipe_data": false, "wipe_logs": false, "wipe_config": false, "reset_hardware": false})
                 }
 
                 onPressed: {
