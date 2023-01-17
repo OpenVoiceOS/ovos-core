@@ -476,7 +476,13 @@ class SkillLoader:
             # create the skill
             self.instance = skill_creator()
 
-            if not self.instance.is_fully_initialized:
+            if hasattr(self.instance, "is_fully_initialized"):
+                LOG.warning(f"Deprecated skill signature! Skill class should be"
+                            f"imported from `ovos_workshop.skills`")
+                is_initialized = self.instance.is_fully_initialized
+            else:
+                is_initialized = self.instance._is_fully_initialized
+            if not is_initialized:
                 # finish initialization of skill class
                 self.instance._startup(self.bus, self.skill_id)
         except Exception as e:
