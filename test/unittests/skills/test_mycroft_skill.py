@@ -37,6 +37,8 @@ BASE_CONF = base_config()
 
 class MockEmitter(object):
     def __init__(self):
+        self.types = []
+        self.results = []
         self.reset()
 
     def emit(self, message):
@@ -273,9 +275,11 @@ class TestMycroftSkill(unittest.TestCase):
 
         # Test disable/enable cycle
         msg = Message('test.msg', data={'intent_name': 'a'})
-        s.handle_disable_intent(msg)
+        intent_disabled = s.handle_disable_intent(msg)
+        self.assertTrue(intent_disabled)
         self.check_detach_intent()
-        s.handle_enable_intent(msg)
+        intent_enabled = s.handle_enable_intent(msg)
+        self.assertTrue(intent_enabled)
         self.check_register_intent(expected)
 
     def test_register_vocab(self):
@@ -318,7 +322,7 @@ class TestMycroftSkill(unittest.TestCase):
         self._test_intent_file(SimpleSkill6())
 
     def _test_intent_file(self, s):
-        s.root_dir = abspath(join(dirname(__file__), 'intent_file'))
+        s.res_dir = abspath(join(dirname(__file__), 'intent_file'))
         s._startup(self.emitter, "A")
 
         expected_types = [
@@ -354,7 +358,7 @@ class TestMycroftSkill(unittest.TestCase):
         sys.path.append(abspath(dirname(__file__)))
         SimpleSkill5 = __import__('decorator_test_skill').TestSkill
         s = SimpleSkill5()
-        s.root_dir = abspath(join(dirname(__file__), 'intent_file'))
+        s.res_dir = abspath(join(dirname(__file__), 'intent_file'))
         s._startup(self.emitter, "A")
 
         expected = [{'at_least_one': [],
@@ -562,24 +566,25 @@ class TestMycroftSkill(unittest.TestCase):
         """
         # Check that translatables can be loaded from the dialog directory
         s = SimpleSkill1()
-        s.root_dir = abspath(join(dirname(__file__),
+        s.res_dir = abspath(join(dirname(__file__),
                                   'translate', 'in-dialog/'))
+        self.assertEqual(s.lang, "en-us")
         lst = s.translate_list('good_things')
-        self.assertTrue(isinstance(lst, list))
+        self.assertIsInstance(lst, list)
         vals = s.translate_namedvalues('named_things')
-        self.assertTrue(isinstance(vals, dict))
+        self.assertIsInstance(vals, dict)
         template = s.translate_template('test',
                                         data={'thing': 'test framework'})
         self.assertEqual(template,
                          ['Oh look it\'s my favourite test framework'])
         # Check that translatables can be loaded from locale folder
         s = SimpleSkill1()
-        s.root_dir = abspath(join(dirname(__file__),
+        s.res_dir = abspath(join(dirname(__file__),
                                   'translate', 'in-locale'))
         lst = s.translate_list('good_things')
-        self.assertTrue(isinstance(lst, list))
+        self.assertIsInstance(lst, list)
         vals = s.translate_namedvalues('named_things')
-        self.assertTrue(isinstance(vals, dict))
+        self.assertIsInstance(vals, dict)
         template = s.translate_template('test',
                                         data={'thing': 'test framework'})
         self.assertEqual(template,
@@ -588,7 +593,7 @@ class TestMycroftSkill(unittest.TestCase):
         # Check loading in a non-en-us language
         s = SimpleSkill1()
         s.config_core['lang'] = 'de-de'
-        s.root_dir = abspath(join(dirname(__file__),
+        s.res_dir = abspath(join(dirname(__file__),
                                   'translate', 'in-locale'))
         lst = s.translate_list('good_things')
         self.assertEqual(lst, ['sonne', 'mycroft', 'zahne'])
