@@ -158,7 +158,7 @@ class TestSkillLoader(MycroftUnitTestBase):
             call.info(
                 'Skill test_skill is blacklisted - it will not be loaded'
             ),
-            call.warning('Skill test_skill not loaded')
+            call.info('Skill test_skill not loaded')
         ]
         self.assertListEqual(log_messages, self.log_mock.method_calls)
         self.loader.config['skills']['blacklisted_skills'].remove('test_skill')
