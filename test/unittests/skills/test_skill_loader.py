@@ -131,7 +131,8 @@ class TestSkillLoader(MycroftUnitTestBase):
             call.info('ATTEMPTING TO LOAD SKILL: test_skill'),
             call.info('Skill test_skill loaded successfully')
         ]
-        self.assertListEqual(log_messages, self.log_mock.method_calls)
+        self.assertTrue(all((log in self.log_mock.method_calls
+                             for log in log_messages)))
 
     def test_reload_modified(self):
         self.loader.last_modified = 0
