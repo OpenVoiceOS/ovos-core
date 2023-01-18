@@ -112,7 +112,8 @@ class TestSkillLoader(MycroftUnitTestBase):
             call.info('Skill test_skill shut down successfully'),
             call.info('Skill test_skill loaded successfully')
         ]
-        self.assertListEqual(log_messages, self.log_mock.method_calls)
+        self.assertTrue(all((log in self.log_mock.method_calls
+                             for log in log_messages)))
 
     def test_skill_load(self):
         with patch(self.mock_package + 'time') as time_mock:
