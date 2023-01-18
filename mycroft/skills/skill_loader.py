@@ -498,7 +498,10 @@ class SkillLoader:
             message = Message('mycroft.skills.loading_failure',
                               {"path": self.skill_directory, "id": self.skill_id})
             self.bus.emit(message)
-            LOG.error(f'Skill {self.skill_id} failed to load')
+            if not self.is_blacklisted:
+                LOG.error(f'Skill {self.skill_id} failed to load')
+            else:
+                LOG.info(f'Skill {self.skill_id} not loaded')
 
 
 class PluginSkillLoader(SkillLoader):
