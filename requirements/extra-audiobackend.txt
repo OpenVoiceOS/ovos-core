@@ -1,1 +1,1 @@
-ovos_plugin_common_play~=0.0, >=0.0.2
+ovos_plugin_common_play~=0.0, >=0.0.3a13
