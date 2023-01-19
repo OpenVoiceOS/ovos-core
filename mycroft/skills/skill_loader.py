@@ -478,7 +478,7 @@ class SkillLoader:
 
             if hasattr(self.instance, "is_fully_initialized"):
                 LOG.warning(f"Deprecated skill signature! Skill class should be"
-                            f"imported from `ovos_workshop.skills`")
+                            f" imported from `ovos_workshop.skills`")
                 is_initialized = self.instance.is_fully_initialized
             else:
                 is_initialized = self.instance._is_fully_initialized
