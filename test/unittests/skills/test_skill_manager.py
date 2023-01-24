@@ -108,7 +108,9 @@ class TestSkillManager(MycroftUnitTestBase):
             'mycroft.skills.trained',
             'mycroft.skills.is_alive',
             'mycroft.skills.is_ready',
-            'mycroft.skills.all_loaded'
+            'mycroft.skills.all_loaded',
+            'mycroft.network.connected',
+            'mycroft.internet.connected'
         ]
         self.assertListEqual(
             expected_result,

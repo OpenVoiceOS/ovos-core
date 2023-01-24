@@ -387,7 +387,7 @@ class SkillLoader:
         return self.instance is None
 
     def reload(self):
-        LOG.info('ATTEMPTING TO RELOAD SKILL: ' + self.skill_id)
+        LOG.info(f'ATTEMPTING TO RELOAD SKILL: {self.skill_id}')
         if self.instance:
             if not self.instance.reload_skill:
                 LOG.info("skill does not allow reloading!")
@@ -396,7 +396,7 @@ class SkillLoader:
         return self._load()
 
     def load(self):
-        LOG.info('ATTEMPTING TO LOAD SKILL: ' + self.skill_id)
+        LOG.info(f'ATTEMPTING TO LOAD SKILL: {self.skill_id}')
         return self._load()
 
     def _unload(self):
@@ -455,7 +455,7 @@ class SkillLoader:
             self._skip_load()
         else:
             self.skill_module = self._load_skill_source()
-            self._create_skill_instance()
+            self.loaded = self._create_skill_instance()
 
         self.last_loaded = time()
         self._communicate_load_status()
