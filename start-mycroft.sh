@@ -36,16 +36,12 @@ function help() {
     echo "  gui                      gui protocol service"
     echo "  enclosure                mark_1 enclosure service"
     echo
-    echo "Tool COMMANDs:"
-    echo "  cli                      the Command Line Interface"
-
     echo "Options:"
     echo "  restart                  (optional) Force the service to restart if running"
     echo
     echo "Examples:"
     echo "  ${script} all"
     echo "  ${script} all restart"
-    echo "  ${script} cli"
 
     exit 1
 }
@@ -57,7 +53,6 @@ function name-to-script-path() {
         "skills")            _module="mycroft.skills" ;;
         "audio")             _module="mycroft.audio" ;;
         "voice")             _module="mycroft.client.speech" ;;
-        "cli")               _module="mycroft.client.text" ;;
         "gui")               _module="mycroft.gui" ;;
         "enclosure")         _module="mycroft.client.enclosure" ;;
         *)
@@ -142,9 +137,6 @@ case ${_opt} in
         ;;
     "voice")
         launch-background ${_opt}
-        ;;
-    "cli")
-        launch-process ${_opt}
         ;;
     "enclosure")
         launch-background ${_opt}
