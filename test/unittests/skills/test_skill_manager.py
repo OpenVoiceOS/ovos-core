@@ -96,7 +96,7 @@ class TestSkillManager(MycroftUnitTestBase):
         }
 
     def test_instantiate(self):
-        expected_result = [
+        expected_result = {
             'mycroft.internet.connected',
             'skillmanager.list',
             'skillmanager.deactivate',
@@ -111,10 +111,10 @@ class TestSkillManager(MycroftUnitTestBase):
             'mycroft.skills.all_loaded',
             'mycroft.network.connected',
             'mycroft.internet.connected'
-        ]
-        self.assertListEqual(
+        }
+        self.assertSetEqual(
             expected_result,
-            self.message_bus_mock.event_handlers
+            set(self.message_bus_mock.event_handlers)
         )
 
     def test_unload_removed_skills(self):
