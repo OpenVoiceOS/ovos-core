@@ -24,7 +24,7 @@ from time import time
 from ovos_config.locations import get_xdg_data_dirs, get_xdg_data_save_path
 from ovos_config.meta import get_xdg_base
 from ovos_plugin_manager.skills import find_skill_plugins
-from ovos_workshop.skills.ovos import SkillNetworkRequirements
+from ovos_workshop.skills.base import SkillNetworkRequirements
 from ovos_config.config import Configuration
 from mycroft.messagebus import Message
 from mycroft.skills.mycroft_skill.mycroft_skill import MycroftSkill
