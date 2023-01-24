@@ -24,7 +24,7 @@ from time import time
 from ovos_config.locations import get_xdg_data_dirs, get_xdg_data_save_path
 from ovos_config.meta import get_xdg_base
 from ovos_plugin_manager.skills import find_skill_plugins
-from ovos_workshop.skills.base import SkillNetworkRequirements
+from ovos_workshop.skills.base import SkillNetworkRequirements, BaseSkill
 from ovos_config.config import Configuration
 from mycroft.messagebus import Message
 from mycroft.skills.mycroft_skill.mycroft_skill import MycroftSkill
@@ -307,7 +307,7 @@ class SkillLoader:
         self.load_attempted = False
         self.last_modified = 0
         self.last_loaded = 0
-        self.instance = None
+        self.instance: BaseSkill = None
         self.active = True
         self._watchdog = None
         self.config = Configuration()
@@ -317,7 +317,7 @@ class SkillLoader:
 
     @property
     def loaded(self):
-        return self._loaded or self.instance is None
+        return self._loaded  # or self.instance is None
 
     @loaded.setter
     def loaded(self, val):
@@ -338,8 +338,10 @@ class SkillLoader:
     def skill_id(self):
         skill_id = self._skill_id
         if self.instance and not skill_id:
+            LOG.debug(f"skill_id from instance")
             skill_id = self.instance.skill_id
         if self.skill_directory and not skill_id:
+            LOG.debug(f"skill_id from directory")
             skill_id = os.path.basename(self.skill_directory)
         return skill_id
 
