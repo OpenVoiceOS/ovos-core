@@ -20,7 +20,7 @@ from unittest.mock import call, Mock, patch
 from mycroft.skills.mycroft_skill.mycroft_skill import MycroftSkill
 from mycroft.skills.skill_loader import _get_last_modified_time, SkillLoader
 from ovos_workshop.decorators import classproperty
-from ovos_workshop.skills.ovos import SkillNetworkRequirements
+from ovos_workshop.skills.base import SkillNetworkRequirements
 from ..base import MycroftUnitTestBase
 
 ONE_MINUTE = 60
