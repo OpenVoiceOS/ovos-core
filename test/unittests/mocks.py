@@ -74,3 +74,6 @@ class MessageBusMock:
 
     def once(self, event, _):
         self.event_handlers.append(event)
+
+    def wait_for_response(self, message):
+        self.emit(message)

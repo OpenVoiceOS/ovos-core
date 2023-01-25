@@ -125,10 +125,11 @@ class TestSkillManager(MycroftUnitTestBase):
         self.skill_manager.send_skill_list(None)
 
         self.assertListEqual(
-            ['mycroft.skills.list'],
+            ['ovos.PHAL.internet_check',
+             'mycroft.skills.list'],
             self.message_bus_mock.message_types
         )
-        message_data = self.message_bus_mock.message_data[0]
+        message_data = self.message_bus_mock.message_data[-1]
         self.assertIn('test_skill', message_data.keys())
         skill_data = message_data['test_skill']
         self.assertDictEqual(dict(active=True, id='test_skill'), skill_data)
