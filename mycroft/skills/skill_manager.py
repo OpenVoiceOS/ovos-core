@@ -120,6 +120,9 @@ class SkillManager(Thread):
 
         self.status.bind(self.bus)
 
+        # If PHAL loaded first, make sure we get network events
+        self.bus.emit(Message("ovos.PHAL.internet_check"))
+
     def _define_message_bus_events(self):
         """Define message bus events with handlers defined in this class."""
         # Update upon request
@@ -262,6 +265,7 @@ class SkillManager(Thread):
         pass
 
     def handle_internet_connected(self, message):
+        LOG.debug("Internet Connected")
         self._network_event.set()
         self._connected_event.set()
         self._load_on_internet()
@@ -272,6 +276,7 @@ class SkillManager(Thread):
             self.manifest_uploader.post_manifest()
 
     def handle_network_connected(self, message):
+        LOG.debug("Network Connected")
         self._network_event.set()
         self._load_on_network()
 
