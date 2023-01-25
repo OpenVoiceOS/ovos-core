@@ -103,6 +103,7 @@ class TestSkillLoader(MycroftUnitTestBase):
         """Mock the skill instance, we are not testing skill functionality."""
         skill_instance = Mock()
         skill_instance.name = 'test_skill'
+        skill_instance.skill_id = None
         skill_instance.reload_skill = True
         skill_instance.default_shutdown = Mock()
         self.skill_instance_mock = skill_instance
@@ -145,6 +146,7 @@ class TestSkillLoader(MycroftUnitTestBase):
         self.loader.instance = Mock()
         self.loader.loaded = True
         self.loader.last_loaded = 0
+        self.loader.skill_id = 'test_skill'
 
         with patch(self.mock_package + 'time') as time_mock:
             time_mock.return_value = 100
@@ -167,10 +169,19 @@ class TestSkillLoader(MycroftUnitTestBase):
                              for log in log_messages)))
 
     def test_skill_load(self):
-        with patch(self.mock_package + 'time') as time_mock:
+        # Mock to return a known (Mock) skill instance
+        real_create_skill_instance = self.loader._create_skill_instance
+
+        def _update_skill_instance(*args, **kwargs):
+            self.loader.instance = self.skill_instance_mock
+            return True
+
+        self.loader._create_skill_instance = _update_skill_instance
+
+        with patch(self.mock_package + 'time') as time_mock:  # mycroft.skills.skill_loader.
             time_mock.return_value = 100
             with patch(self.mock_package + 'SettingsMetaUploader'):
-                self.loader.load()
+                self.loader.load()  # Correct skill ID
 
         self.assertTrue(self.loader.load_attempted)
         self.assertTrue(self.loader.loaded)
@@ -186,6 +197,8 @@ class TestSkillLoader(MycroftUnitTestBase):
         self.assertTrue(all((log in self.log_mock.method_calls
                              for log in log_messages)))
 
+        self.loader._create_skill_instance = real_create_skill_instance
+
     def test_reload_modified(self):
         self.loader.last_modified = 0
         self.loader.reload = Mock()
@@ -196,7 +209,12 @@ class TestSkillLoader(MycroftUnitTestBase):
 
     def test_skill_load_blacklisted(self):
         """Skill should not be loaded if it is blacklisted"""
-        self.loader.config['skills']['blacklisted_skills'] = ['test_skill']
+        config = dict(self.loader.config)
+        config['skills']['blacklisted_skills'] = ['test_skill']
+        self.loader.config = config
+        self.assertEqual(self.loader.config['skills']['blacklisted_skills'],
+                         ['test_skill'])
+        self.loader.skill_id = 'test_skill'
         with patch(self.mock_package + 'SettingsMetaUploader'):
             self.loader.load()
 
