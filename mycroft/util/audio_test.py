@@ -99,7 +99,7 @@ def main():
         for device_index in range(pa.get_device_count()):
             dev = pa.get_device_info_by_index(device_index)
             if dev['maxInputChannels'] > 0:
-                print('   {}:       {}'.format(device_index, dev['name']))
+                print(f'   {device_index}:       {dev["name"]}')
         print()
 
     config = Configuration()
@@ -108,10 +108,10 @@ def main():
         dev = config["listener"]["device_name"]
         device_index = find_input_device(dev)
         if not device_index:
-            raise ValueError("Device with name {} not found, check your configuration".format(dev))
-        dev += " (index {})".format(device_index)
+            raise ValueError(f"Device with name {dev} not found, check your configuration")
+        dev += f" (index {device_index})"
     elif "device_index" in config["listener"]:
-        dev = "Device at index {}".format(config["listener"]["device_index"])
+        dev = f"Device at index {config['listener']['device_index']}"
         device_index = int(config["listener"]["device_index"])
     else:
         dev = "Default device"
@@ -119,8 +119,8 @@ def main():
     play_cmd = config["play_wav_cmdline"].replace("%1", "WAV_FILE")
 
     print(" ========================== Info ===========================")
-    print(" Input device: {} @ Sample rate: {} Hz".format(dev, sample_rate))
-    print(" Playback commandline: {}".format(play_cmd))
+    print(f" Input device: {dev} @ Sample rate: {sample_rate} Hz")
+    print(f" Playback commandline: {play_cmd}")
     print()
     print(" ===========================================================")
     print(" ==         STARTING TO RECORD, MAKE SOME NOISE!          ==")
@@ -137,7 +137,7 @@ def main():
     print(" ===========================================================")
     status = play_wav(args.filename).wait()
     if status:
-        print('An error occured while playing back audio ({})'.format(status))
+        print(f'An error occured while playing back audio ({status})')
 
 
 if __name__ == "__main__":
