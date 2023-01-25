@@ -61,8 +61,8 @@ def mute_output():
             os.close(fd)
 
 
-def record(filename, duration, device_index=None):
-    mic = MutableMicrophone(device_index)
+def record(filename, duration, device_index=None, sample_rate=16000):
+    mic = MutableMicrophone(device_index, sample_rate)
     recognizer = Recognizer()
     with mic as source:
         audio = recognizer.record(source, duration=duration)
@@ -115,11 +115,11 @@ def main():
         device_index = int(config["listener"]["device_index"])
     else:
         dev = "Default device"
-    samplerate = config["listener"]["sample_rate"]
+    sample_rate = config["listener"]["sample_rate"]
     play_cmd = config["play_wav_cmdline"].replace("%1", "WAV_FILE")
 
     print(" ========================== Info ===========================")
-    print(" Input device: {} @ Sample rate: {} Hz".format(dev, samplerate))
+    print(" Input device: {} @ Sample rate: {} Hz".format(dev, sample_rate))
     print(" Playback commandline: {}".format(play_cmd))
     print()
     print(" ===========================================================")
@@ -128,9 +128,9 @@ def main():
 
     if not args.verbose:
         with mute_output():
-            record(args.filename, args.duration, device_index=device_index)
+            record(args.filename, args.duration, device_index=device_index, sample_rate=sample_rate)
     else:
-        record(args.filename, args.duration, device_index=device_index)
+        record(args.filename, args.duration, device_index=device_index, sample_rate=sample_rate)
 
     print(" ===========================================================")
     print(" ==           DONE RECORDING, PLAYING BACK...             ==")
