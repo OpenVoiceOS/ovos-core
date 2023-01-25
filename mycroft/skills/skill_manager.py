@@ -358,18 +358,22 @@ class SkillManager(Thread):
         self._load_on_startup()
 
         if self.skills_config.get("wait_for_internet", False):
+            LOG.debug("Waiting for internet")
             # NOTE - self._connected_event will never be set
             # if PHAL plugin is not running to emit the connected events
             while not self._connected_event.is_set():
                 sleep(1)
+            LOG.debug("Internet Connected")
+
+        self.bus.emit(Message('mycroft.skills.initialized'))
 
         # wait for initial intents training
+        LOG.debug("Waiting for initial training")
         while not self.initial_load_complete:
             sleep(0.5)
         self.status.set_ready()
 
         LOG.info("Skills all loaded!")
-        self.bus.emit(Message('mycroft.skills.initialized'))
 
         # Scan the file folder that contains Skills.  If a Skill is updated,
         # unload the existing version from memory and reload from the disk.
