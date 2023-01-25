@@ -104,6 +104,8 @@ class SkillManager(Thread):
         self._stop_event = Event()
         self._connected_event = Event()
         self._network_event = Event()
+        self._network_loaded = Event()
+        self._internet_loaded = Event()
         self.config = Configuration()
         self.manifest_uploader = SeleneSkillManifestUploader()
         self.upload_queue = UploadQueue()  # DEPRECATED
@@ -364,6 +366,10 @@ class SkillManager(Thread):
             while not self._connected_event.is_set():
                 sleep(1)
             LOG.debug("Internet Connected")
+            if self._network_loaded.wait(60):
+                LOG.debug("Network skills loaded")
+            if self._internet_loaded.wait(60):
+                LOG.debug("Internet skills loaded")
 
         self.bus.emit(Message('mycroft.skills.initialized'))
 
@@ -400,10 +406,12 @@ class SkillManager(Thread):
     def _load_on_network(self):
         LOG.info('Loading network skills...')
         self._load_new_skills(network=True, internet=False)
+        self._network_loaded.set()
 
     def _load_on_internet(self):
         LOG.info('Loading internet skills...')
         self._load_new_skills(network=True, internet=True)
+        self._internet_loaded.set()
 
     def _load_on_startup(self):
         """Handle initial skill load."""
