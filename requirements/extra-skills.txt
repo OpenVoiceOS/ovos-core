@@ -3,3 +3,4 @@ padacioso~=0.1.2
 ovos-lingua-franca~=0.4, >=0.4.2
 PyYAML~=5.4
 ovos_workshop~=0.0, >=0.0.10a4
+ovos-phal-plugin-connectivity-events@git+https://github.com/openvoiceos/ovos-phal-plugin-connectivity-events@FIX_FixThreadInit

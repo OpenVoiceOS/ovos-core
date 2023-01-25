@@ -120,8 +120,13 @@ class SkillManager(Thread):
 
         self.status.bind(self.bus)
 
-        # If PHAL loaded first, make sure we get network events
-        self.bus.emit(Message("ovos.PHAL.internet_check"))
+        # If PHAL loaded first, make sure we get network state
+        resp = self.bus.wait_for_response(Message("ovos.PHAL.internet_check"))
+        if resp:
+            if resp.data.get('internet_connected'):
+                self.handle_internet_connected(resp)
+            elif resp.data.get('network_connected'):
+                self.handle_network_connected(resp)
 
     def _define_message_bus_events(self):
         """Define message bus events with handlers defined in this class."""
