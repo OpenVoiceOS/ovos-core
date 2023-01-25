@@ -21,7 +21,7 @@ from speech_recognition import Recognizer
 
 from mycroft.listener.mic import MutableMicrophone
 from ovos_config.config import Configuration
-from mycroft.util.audio_utils import play_wav
+from mycroft.util.audio_utils import play_wav, find_input_device
 from mycroft.util.log import LOG
 import logging
 from mycroft.util.file_utils import get_temp_path
@@ -61,8 +61,8 @@ def mute_output():
             os.close(fd)
 
 
-def record(filename, duration):
-    mic = MutableMicrophone()
+def record(filename, duration, device_index=None):
+    mic = MutableMicrophone(device_index)
     recognizer = Recognizer()
     with mic as source:
         audio = recognizer.record(source, duration=duration)
@@ -103,14 +103,21 @@ def main():
         print()
 
     config = Configuration()
+    device_index = None
     if "device_name" in config["listener"]:
         dev = config["listener"]["device_name"]
+        device_index = find_input_device(dev)
+        if not device_index:
+            raise ValueError("Device with name {} not found, check your configuration".format(dev))
+        dev += " (index {})".format(device_index)
     elif "device_index" in config["listener"]:
         dev = "Device at index {}".format(config["listener"]["device_index"])
+        device_index = int(config["listener"]["device_index"])
     else:
         dev = "Default device"
     samplerate = config["listener"]["sample_rate"]
     play_cmd = config["play_wav_cmdline"].replace("%1", "WAV_FILE")
+
     print(" ========================== Info ===========================")
     print(" Input device: {} @ Sample rate: {} Hz".format(dev, samplerate))
     print(" Playback commandline: {}".format(play_cmd))
@@ -121,9 +128,9 @@ def main():
 
     if not args.verbose:
         with mute_output():
-            record(args.filename, args.duration)
+            record(args.filename, args.duration, device_index=device_index)
     else:
-        record(args.filename, args.duration)
+        record(args.filename, args.duration, device_index=device_index)
 
     print(" ===========================================================")
     print(" ==           DONE RECORDING, PLAYING BACK...             ==")
