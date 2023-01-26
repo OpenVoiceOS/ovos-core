@@ -382,6 +382,12 @@ class SkillManager(Thread):
                 LOG.debug("Internet skills loaded")
             else:
                 LOG.error("Gave up waiting for internet skills to load")
+        if not all((self._network_loaded.is_set(),
+                    self._internet_loaded.is_set())):
+            self.bus.emit(Message(
+                'mycroft.skills.error',
+                {'internet_loaded': self._internet_loaded.is_set(),
+                 'network_loaded': self._network_loaded.is_set()}))
         self.bus.emit(Message('mycroft.skills.initialized'))
 
         # wait for initial intents training
