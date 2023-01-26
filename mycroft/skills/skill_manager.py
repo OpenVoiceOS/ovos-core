@@ -106,6 +106,7 @@ class SkillManager(Thread):
         self._network_event = Event()
         self._network_loaded = Event()
         self._internet_loaded = Event()
+        self._network_skill_timeout = 300
         self.config = Configuration()
         self.manifest_uploader = SeleneSkillManifestUploader()
         self.upload_queue = UploadQueue()  # DEPRECATED
@@ -206,9 +207,11 @@ class SkillManager(Thread):
                 # in offline mode (default) is_paired always returns True
                 # but setup skill may enable backend
                 # wait for backend selection event
-                response = self.bus.wait_for_response(Message('ovos.setup.state.get',
-                                                              context={"source": "skills",
-                                                                       "destination": "ovos-setup"}), 'ovos.setup.state')
+                response = self.bus.wait_for_response(
+                    Message('ovos.setup.state.get',
+                            context={"source": "skills",
+                                     "destination": "ovos-setup"}),
+                    'ovos.setup.state')
                 if response:
                     state = response.data['state']
                     LOG.debug(f"Setup state: {state}")
@@ -373,12 +376,14 @@ class SkillManager(Thread):
                 sleep(1)
             LOG.debug("Internet Connected")
         if "network_skills" in self.config.get("ready_settings"):
-            if self._network_loaded.wait(300):
+            self._connected_event.wait()  # Wait for user to connect to network
+            if self._network_loaded.wait(self._network_skill_timeout):
                 LOG.debug("Network skills loaded")
             else:
                 LOG.error("Gave up waiting for network skills to load")
         if "internet_skills" in self.config.get("ready_settings"):
-            if self._internet_loaded.wait(300):
+            self._connected_event.wait()  # Wait for user to connect to network
+            if self._internet_loaded.wait(self._network_skill_timeout):
                 LOG.debug("Internet skills loaded")
             else:
                 LOG.error("Gave up waiting for internet skills to load")
