@@ -221,6 +221,10 @@ class SkillManager(Thread):
                 # not implemented
                 services[ser] = True
                 continue
+            elif ser in ["network_skills", "internet_skills"]:
+                # Implemented in skill manager
+                services[ser] = True
+                continue
             response = self.bus.wait_for_response(
                 Message(f'mycroft.{ser}.is_ready',
                         context={"source": "skills", "destination": ser}))
@@ -360,17 +364,24 @@ class SkillManager(Thread):
         self._load_on_startup()
 
         if self.skills_config.get("wait_for_internet", False):
-            LOG.debug("Waiting for internet")
+            LOG.warning("`wait_for_internet` is a deprecated option, update to "
+                        "specify `network_skills` and `internet_skills` in "
+                        "`ready_settings`")
             # NOTE - self._connected_event will never be set
             # if PHAL plugin is not running to emit the connected events
             while not self._connected_event.is_set():
                 sleep(1)
             LOG.debug("Internet Connected")
-            if self._network_loaded.wait(60):
+        if "network_skills" in self.config.get("ready_settings"):
+            if self._network_loaded.wait(300):
                 LOG.debug("Network skills loaded")
-            if self._internet_loaded.wait(60):
+            else:
+                LOG.error("Gave up waiting for network skills to load")
+        if "internet_skills" in self.config.get("ready_settings"):
+            if self._internet_loaded.wait(300):
                 LOG.debug("Internet skills loaded")
-
+            else:
+                LOG.error("Gave up waiting for internet skills to load")
         self.bus.emit(Message('mycroft.skills.initialized'))
 
         # wait for initial intents training
