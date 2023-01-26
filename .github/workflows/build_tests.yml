@@ -39,7 +39,7 @@ jobs:
           python setup.py bdist_wheel
       - name: Install package
         run: |
-          pip install .[all]
+          pip install .[all,skills-essential]
       - uses: pypa/gh-action-pip-audit@v1.0.0
         with:
           # Ignore setuptools vulnerability we can't do much about
