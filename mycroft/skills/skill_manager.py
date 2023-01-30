@@ -224,9 +224,14 @@ class SkillManager(Thread):
                 # not implemented
                 services[ser] = True
                 continue
-            elif ser in ["network_skills", "internet_skills"]:
-                # Implemented in skill manager
-                services[ser] = True
+            elif ser in ["skills"]:
+                services[ser] = self.status.check_ready()
+                continue
+            elif ser in ["network_skills"]:
+                services[ser] = self._network_loaded.is_set()
+                continue
+            elif ser in ["internet_skills"]:
+                services[ser] = self._internet_loaded.is_set()
                 continue
             response = self.bus.wait_for_response(
                 Message(f'mycroft.{ser}.is_ready',
@@ -368,7 +373,7 @@ class SkillManager(Thread):
 
         if self.skills_config.get("wait_for_internet", False):
             LOG.warning("`wait_for_internet` is a deprecated option, update to "
-                        "specify `network_skills` and `internet_skills` in "
+                        "specify `network_skills`or `internet_skills` in "
                         "`ready_settings`")
             # NOTE - self._connected_event will never be set
             # if PHAL plugin is not running to emit the connected events
