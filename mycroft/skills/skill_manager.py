@@ -26,6 +26,7 @@ from ovos_config.config import Configuration
 from mycroft.messagebus.message import Message
 from mycroft.util.log import LOG
 from mycroft.util import connected
+from ovos_utils.network_utils import is_connected
 from mycroft.skills.skill_loader import get_skill_directories, SkillLoader, PluginSkillLoader, find_skill_plugins
 from mycroft.skills.skill_updater import SeleneSkillManifestUploader
 from mycroft.messagebus import MessageBusClient
@@ -124,12 +125,25 @@ class SkillManager(Thread):
         self.status.bind(self.bus)
 
         # If PHAL loaded first, make sure we get network state
+        self._sync_network_status(fallback=False)
+
+    def _sync_network_status(self, fallback=True):
         resp = self.bus.wait_for_response(Message("ovos.PHAL.internet_check"))
+        network = False
+        internet = False
         if resp:
             if resp.data.get('internet_connected'):
-                self.handle_internet_connected(resp)
+                network = internet = True
             elif resp.data.get('network_connected'):
-                self.handle_network_connected(resp)
+                network = True
+        elif fallback:
+            LOG.info("ovos-phal-plugin-connectivity-events not detected, performing direct network checks")
+            network = internet = is_connected()
+
+        if internet and not self._connected_event.is_set():
+            self.bus.emit(Message("mycroft.internet.connected"))
+        elif network and not self._network_event.is_set():
+            self.bus.emit(Message("mycroft.network.connected"))
 
     def _define_message_bus_events(self):
         """Define message bus events with handlers defined in this class."""
@@ -378,10 +392,11 @@ class SkillManager(Thread):
             # NOTE - self._connected_event will never be set
             # if PHAL plugin is not running to emit the connected events
             while not self._connected_event.is_set():
+                self._sync_network_status()
                 sleep(1)
             LOG.debug("Internet Connected")
         if "network_skills" in self.config.get("ready_settings"):
-            self._connected_event.wait()  # Wait for user to connect to network
+            self._network_event.wait()  # Wait for user to connect to network
             if self._network_loaded.wait(self._network_skill_timeout):
                 LOG.debug("Network skills loaded")
             else:
