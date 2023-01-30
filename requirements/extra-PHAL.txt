@@ -1,2 +1,2 @@
 ovos_PHAL~=0.0, >=0.0.2
-ovos-phal-plugin-connectivity-events
+ovos-phal-plugin-connectivity-events~=0.0, >=0.0.1

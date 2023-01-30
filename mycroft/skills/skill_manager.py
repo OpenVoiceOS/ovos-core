@@ -392,9 +392,14 @@ class SkillManager(Thread):
             # NOTE - self._connected_event will never be set
             # if PHAL plugin is not running to emit the connected events
             while not self._connected_event.is_set():
+                # ensure we dont block here forever if plugin not installed
                 self._sync_network_status()
                 sleep(1)
             LOG.debug("Internet Connected")
+        else:
+            # trigger a sync so we dont need to wait for the plugin to volunteer info
+            self._sync_network_status()
+
         if "network_skills" in self.config.get("ready_settings"):
             self._network_event.wait()  # Wait for user to connect to network
             if self._network_loaded.wait(self._network_skill_timeout):
