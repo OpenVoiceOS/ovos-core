@@ -124,10 +124,7 @@ class SkillManager(Thread):
 
         self.status.bind(self.bus)
 
-        # If PHAL loaded first, make sure we get network state
-        self._sync_network_status(fallback=False)
-
-    def _sync_network_status(self, fallback=True):
+    def _sync_network_status(self):
         resp = self.bus.wait_for_response(Message("ovos.PHAL.internet_check"))
         network = False
         internet = False
@@ -136,7 +133,7 @@ class SkillManager(Thread):
                 network = internet = True
             elif resp.data.get('network_connected'):
                 network = True
-        elif fallback:
+        else:
             LOG.info("ovos-phal-plugin-connectivity-events not detected, performing direct network checks")
             network = internet = is_connected()
 
