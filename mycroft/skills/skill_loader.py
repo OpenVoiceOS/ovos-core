@@ -338,10 +338,8 @@ class SkillLoader:
     def skill_id(self):
         skill_id = self._skill_id
         if self.instance and not skill_id:
-            LOG.debug(f"skill_id from instance")
             skill_id = self.instance.skill_id
         if self.skill_directory and not skill_id:
-            LOG.debug(f"skill_id from directory")
             skill_id = os.path.basename(self.skill_directory)
         return skill_id
 
