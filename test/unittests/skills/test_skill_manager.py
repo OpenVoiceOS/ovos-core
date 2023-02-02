@@ -125,8 +125,7 @@ class TestSkillManager(MycroftUnitTestBase):
         self.skill_manager.send_skill_list(None)
 
         self.assertListEqual(
-            ['ovos.PHAL.internet_check',
-             'mycroft.skills.list'],
+            ['mycroft.skills.list'],
             self.message_bus_mock.message_types
         )
         message_data = self.message_bus_mock.message_data[-1]
