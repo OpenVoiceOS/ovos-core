@@ -1,5 +1,5 @@
 ovos-skill-homescreen~=0.0.1
-ovos-skill-date-time
+ovos-skill-date-time~=0.0.1
 ovos-skill-weather
 ovos-skill-volume~=0.0.1
 ovos-skill-fallback-unknown~=0.0.2
