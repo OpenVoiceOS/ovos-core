@@ -382,12 +382,13 @@ class SkillManager(Thread):
             update_code = """priority skills have been deprecated and support will be removed in a future release
             Update skills with the following:
             
-            from ovos_workshop.skills.base import SkillNetworkRequirements, classproperty
+            from ovos_utils.process_utils import RuntimeRequirements
+            from ovos_utils import classproperty
 
             class MyPrioritySkill(OVOSSkill):
                 @classproperty
                 def network_requirements(self):
-                    return SkillNetworkRequirements(internet_before_load=False,
+                    return RuntimeRequirements(internet_before_load=False,
                                                  network_before_load=False,
                                                  requires_internet=False,
                                                  requires_network=False)
@@ -618,7 +619,7 @@ class SkillManager(Thread):
 
         # If skills were removed make sure to update the manifest on the
         # mycroft backend.
-        if removed_skills:
+        if removed_skills and self._connected_event.is_set():
             self.manifest_uploader.post_manifest(reload_skills_manifest=True)
 
     def _unload_plugin_skill(self, skill_id):
