@@ -37,7 +37,8 @@ class SkillGUI(GUIInterface):
 
     @property
     def bus(self):
-        return self.skill.bus
+        if self.skill:
+            return self.skill.bus
 
     @property
     def skill_id(self):

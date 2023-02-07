@@ -27,6 +27,7 @@ from mycroft.messagebus.message import Message
 from mycroft.util.log import LOG
 from mycroft.util import connected
 from ovos_utils.network_utils import is_connected
+from ovos_utils.gui import is_gui_connected
 from mycroft.skills.skill_loader import get_skill_directories, SkillLoader, PluginSkillLoader, find_skill_plugins
 from mycroft.skills.skill_updater import SeleneSkillManifestUploader
 from mycroft.messagebus import MessageBusClient
@@ -105,6 +106,8 @@ class SkillManager(Thread):
         self._stop_event = Event()
         self._connected_event = Event()
         self._network_event = Event()
+        self._gui_event = Event()
+        self._gui_loaded = Event()
         self._network_loaded = Event()
         self._internet_loaded = Event()
         self._network_skill_timeout = 300
@@ -124,17 +127,20 @@ class SkillManager(Thread):
 
         self.status.bind(self.bus)
 
-    def _sync_network_status(self):
+    def _sync_skill_loading_state(self):
         resp = self.bus.wait_for_response(Message("ovos.PHAL.internet_check"))
         network = False
         internet = False
+        if not self._gui_event.is_set() and is_gui_connected(self.bus):
+            self._gui_event.set()
+
         if resp:
             if resp.data.get('internet_connected'):
                 network = internet = True
             elif resp.data.get('network_connected'):
                 network = True
         else:
-            LOG.info("ovos-phal-plugin-connectivity-events not detected, performing direct network checks")
+            LOG.debug("ovos-phal-plugin-connectivity-events not detected, performing direct network checks")
             network = internet = is_connected()
 
         if internet and not self._connected_event.is_set():
@@ -156,6 +162,7 @@ class SkillManager(Thread):
         # load skills waiting for connectivity
         self.bus.once("mycroft.network.connected", self.handle_network_connected)
         self.bus.once("mycroft.internet.connected", self.handle_internet_connected)
+        self.bus.once("mycroft.gui.connected", self.handle_gui_connected)
 
     def is_device_ready(self):
         is_ready = False
@@ -294,21 +301,28 @@ class SkillManager(Thread):
         upload of settings is done at individual skill level in ovos-core """
         pass
 
-    def handle_internet_connected(self, message):
-        LOG.debug("Internet Connected")
-        self._network_event.set()
-        self._connected_event.set()
-        self._load_on_internet()
+    def handle_gui_connected(self, message):
+        if not self._gui_event.is_set():
+            LOG.debug("GUI Connected")
+            self._gui_event.set()
 
-        # Sync backend and skills.
-        # why does selene need to know about skills without settings?
-        if is_paired():
-            self.manifest_uploader.post_manifest()
+    def handle_internet_connected(self, message):
+        if not self._connected_event.is_set():
+            LOG.debug("Internet Connected")
+            self._network_event.set()
+            self._connected_event.set()
+            self._load_on_internet()
+
+            # Sync backend and skills.
+            # why does selene need to know about skills without settings?
+            if is_paired():
+                self.manifest_uploader.post_manifest()
 
     def handle_network_connected(self, message):
-        LOG.debug("Network Connected")
-        self._network_event.set()
-        self._load_on_network()
+        if not self._network_event.is_set():
+            LOG.debug("Network Connected")
+            self._network_event.set()
+            self._load_on_network()
 
     def load_plugin_skills(self, network=None, internet=None):
         if network is None:
@@ -406,12 +420,12 @@ class SkillManager(Thread):
             # if PHAL plugin is not running to emit the connected events
             while not self._connected_event.is_set():
                 # ensure we dont block here forever if plugin not installed
-                self._sync_network_status()
+                self._sync_skill_loading_state()
                 sleep(1)
             LOG.debug("Internet Connected")
         else:
             # trigger a sync so we dont need to wait for the plugin to volunteer info
-            self._sync_network_status()
+            self._sync_skill_loading_state()
 
         if "network_skills" in self.config.get("ready_settings"):
             self._network_event.wait()  # Wait for user to connect to network
@@ -439,7 +453,12 @@ class SkillManager(Thread):
             sleep(0.5)
         self.status.set_ready()
 
-        LOG.info("Skills all loaded!")
+        if self._gui_event.is_set() and self._connected_event.is_set():
+            LOG.info("Skills all loaded!")
+        elif not self._connected_event.is_set():
+            LOG.info("Offline Skills loaded, waiting for Internet to load more!")
+        elif not self._gui_event.is_set():
+            LOG.info("Skills loaded, waiting for GUI to load more!")
 
         # Scan the file folder that contains Skills.  If a Skill is updated,
         # unload the existing version from memory and reload from the disk.
@@ -464,26 +483,33 @@ class SkillManager(Thread):
                 os.remove(i)
 
     def _load_on_network(self):
-        LOG.info('Loading network skills...')
+        LOG.info('Loading skills that require network...')
         self._load_new_skills(network=True, internet=False)
         self._network_loaded.set()
 
     def _load_on_internet(self):
-        LOG.info('Loading internet skills...')
+        LOG.info('Loading skills that require internet...')
         self._load_new_skills(network=True, internet=True)
         self._internet_loaded.set()
+
+    def _load_on_gui(self):
+        LOG.info('Loading skills that require GUI...')
+        self._load_new_skills(gui=True)
+        self._gui_loaded.set()
 
     def _load_on_startup(self):
         """Handle initial skill load."""
         LOG.info('Loading offline skills...')
         self._load_new_skills(network=False, internet=False)
 
-    def _load_new_skills(self, network=None, internet=None):
+    def _load_new_skills(self, network=None, internet=None, gui=None):
         """Handle load of skills installed since startup."""
         if network is None:
             network = self._network_event.is_set()
         if internet is None:
             internet = self._connected_event.is_set()
+        if gui is None:
+            gui = self._gui_event.is_set() or is_gui_connected(self.bus)
 
         self.load_plugin_skills(network=network, internet=internet)
 
@@ -496,6 +522,8 @@ class SkillManager(Thread):
             if not network and requirements.network_before_load:
                 continue
             if not internet and requirements.internet_before_load:
+                continue
+            if not gui and requirements.gui_before_load:
                 continue
 
             # a local source install is replacing this plugin, unload it!
