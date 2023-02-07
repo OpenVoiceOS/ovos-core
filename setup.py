@@ -60,7 +60,6 @@ setup(
     license='Apache-2.0',
     url='https://github.com/OpenVoiceOS/ovos-core',
     description='mycroft-core packaged as a library',
-    obsoletes=["mycroft-core"],
     install_requires=required('requirements/minimal.txt'),
     extras_require={
         'audio': required('requirements/extra-audiobackend.txt'),
