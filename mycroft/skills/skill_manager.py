@@ -315,10 +315,10 @@ class SkillManager(Thread):
             self._connected_event.set()
             self._load_on_internet()
 
-            # Sync backend and skills.
-            # why does selene need to know about skills without settings?
-            if is_paired():
-                self.manifest_uploader.post_manifest()
+        # Sync backend and skills.
+        # why does selene need to know about skills without settings?
+        if is_paired():
+            self.manifest_uploader.post_manifest()
 
     def handle_network_connected(self, message):
         if not self._network_event.is_set():
