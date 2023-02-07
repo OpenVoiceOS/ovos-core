@@ -102,6 +102,7 @@ class SkillManager(Thread):
         self.status = ProcessStatus('skills', callback_map=callbacks)
         self.status.set_started()
 
+        self._lock = Lock()
         self._setup_event = Event()
         self._stop_event = Event()
         self._connected_event = Event()
@@ -305,6 +306,7 @@ class SkillManager(Thread):
         if not self._gui_event.is_set():
             LOG.debug("GUI Connected")
             self._gui_event.set()
+            self._load_new_skills()
 
     def handle_internet_connected(self, message):
         if not self._connected_event.is_set():
@@ -511,38 +513,43 @@ class SkillManager(Thread):
         if gui is None:
             gui = self._gui_event.is_set() or is_gui_connected(self.bus)
 
-        self.load_plugin_skills(network=network, internet=internet)
+        # a lock is used because this can be called via state events or as part of the main loop
+        # there is a possible race condition where this handler would be executing several times otherwise
+        with self._lock:
 
-        for skill_dir in self._get_skill_directories():
-            replaced_skills = []
-            # by definition skill_id == folder name
-            skill_id = os.path.basename(skill_dir)
-            skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
-            requirements = skill_loader.network_requirements
-            if not network and requirements.network_before_load:
-                continue
-            if not internet and requirements.internet_before_load:
-                continue
-            if not gui and requirements.gui_before_load:
-                continue
+            self.load_plugin_skills(network=network, internet=internet)
 
-            # a local source install is replacing this plugin, unload it!
-            if skill_id in self.plugin_skills:
-                LOG.info(f"{skill_id} plugin will be replaced by a local version: {skill_dir}")
-                self._unload_plugin_skill(skill_id)
+            for skill_dir in self._get_skill_directories():
+                replaced_skills = []
+                # by definition skill_id == folder name
+                skill_id = os.path.basename(skill_dir)
+                skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
+                requirements = skill_loader.network_requirements
+                if not network and requirements.network_before_load:
+                    continue
+                if not internet and requirements.internet_before_load:
+                    continue
+                if not gui and requirements.gui_before_load:
+                    # TODO - companion PR adding this one
+                    continue
 
-            for old_skill_dir, skill_loader in self.skill_loaders.items():
-                if old_skill_dir != skill_dir and \
-                        skill_loader.skill_id == skill_id:
-                    # a higher priority equivalent has been detected!
-                    replaced_skills.append(old_skill_dir)
+                # a local source install is replacing this plugin, unload it!
+                if skill_id in self.plugin_skills:
+                    LOG.info(f"{skill_id} plugin will be replaced by a local version: {skill_dir}")
+                    self._unload_plugin_skill(skill_id)
 
-            for old_skill_dir in replaced_skills:
-                # unload the old skill
-                self._unload_skill(old_skill_dir)
+                for old_skill_dir, skill_loader in self.skill_loaders.items():
+                    if old_skill_dir != skill_dir and \
+                            skill_loader.skill_id == skill_id:
+                        # a higher priority equivalent has been detected!
+                        replaced_skills.append(old_skill_dir)
 
-            if skill_dir not in self.skill_loaders:
-                self._load_skill(skill_dir)
+                for old_skill_dir in replaced_skills:
+                    # unload the old skill
+                    self._unload_skill(old_skill_dir)
+
+                if skill_dir not in self.skill_loaders:
+                    self._load_skill(skill_dir)
 
     def _get_skill_loader(self, skill_directory, init_bus=True):
         bus = None
