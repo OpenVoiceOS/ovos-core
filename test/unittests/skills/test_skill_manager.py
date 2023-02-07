@@ -105,6 +105,7 @@ class TestSkillManager(MycroftUnitTestBase):
             'mycroft.skills.trained',
             'mycroft.network.connected',
             'mycroft.internet.connected',
+            'mycroft.gui.connected',
             'mycroft.skills.is_alive',
             'mycroft.skills.is_ready',
             'mycroft.skills.all_loaded'
