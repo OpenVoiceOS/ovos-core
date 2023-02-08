@@ -111,6 +111,8 @@ class SkillManager(Thread):
         self._network_loaded = Event()
         self._internet_loaded = Event()
         self._network_skill_timeout = 300
+        self._allow_gui_reloads = True
+
         self.config = Configuration()
         self.manifest_uploader = SeleneSkillManifestUploader()
         self.upload_queue = UploadQueue()  # DEPRECATED
@@ -305,15 +307,15 @@ class SkillManager(Thread):
         pass
 
     def handle_gui_connected(self, message):
+        # some gui extensions such as mobile may request that gui skills never unload
+        self._allow_gui_reloads = not message.data.get("permanent", False)
         if not self._gui_event.is_set():
             LOG.debug("GUI Connected")
             self._gui_event.set()
             self._load_new_skills()
 
     def handle_gui_disconnected(self, message):
-        # TODO: if gui extension did not send 'permanent' flag
-        permanent = False
-        if not permanent:
+        if self._allow_gui_reloads:
             self._gui_event.clear()
             self._unload_on_gui_disconnect()
 
