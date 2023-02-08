@@ -108,7 +108,6 @@ class SkillManager(Thread):
         self._connected_event = Event()
         self._network_event = Event()
         self._gui_event = Event()
-        self._gui_loaded = Event()
         self._network_loaded = Event()
         self._internet_loaded = Event()
         self._network_skill_timeout = 300
@@ -472,7 +471,7 @@ class SkillManager(Thread):
                 self._watchdog()
                 sleep(2)  # Pause briefly before beginning next scan
             except Exception:
-                LOG.exception('Something really unexpected has occured '
+                LOG.exception('Something really unexpected has occurred '
                               'and the skill manager loop safety harness was '
                               'hit.')
                 sleep(30)
@@ -494,11 +493,6 @@ class SkillManager(Thread):
         LOG.info('Loading skills that require internet...')
         self._load_new_skills(network=True, internet=True)
         self._internet_loaded.set()
-
-    def _load_on_gui(self):
-        LOG.info('Loading skills that require GUI...')
-        self._load_new_skills(gui=True)
-        self._gui_loaded.set()
 
     def _load_on_startup(self):
         """Handle initial skill load."""
