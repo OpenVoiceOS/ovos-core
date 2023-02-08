@@ -106,6 +106,9 @@ class TestSkillManager(MycroftUnitTestBase):
             'mycroft.network.connected',
             'mycroft.internet.connected',
             'mycroft.gui.available',
+            'mycroft.network.disconnected',
+            'mycroft.internet.disconnected',
+            'mycroft.gui.unavailable',
             'mycroft.skills.is_alive',
             'mycroft.skills.is_ready',
             'mycroft.skills.all_loaded'
