@@ -163,7 +163,7 @@ class SkillManager(Thread):
         # load skills waiting for connectivity
         self.bus.once("mycroft.network.connected", self.handle_network_connected)
         self.bus.once("mycroft.internet.connected", self.handle_internet_connected)
-        self.bus.once("mycroft.gui.connected", self.handle_gui_connected)
+        self.bus.once("mycroft.gui.available", self.handle_gui_connected)
 
     def is_device_ready(self):
         is_ready = False

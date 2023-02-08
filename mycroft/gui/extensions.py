@@ -1,13 +1,14 @@
 import threading
+
 from ovos_config.config import Configuration
+
+from mycroft.gui.homescreen import HomescreenManager
+from mycroft.gui.interfaces.mobile import MobileExtensionGuiInterface
+from mycroft.gui.interfaces.smartspeaker import SmartSpeakerExtensionGuiInterface
 from mycroft.messagebus import Message
 from mycroft.util.log import LOG
 from ovos_backend_client.pairing import is_paired
-from ovos_utils.system import ssh_enable, ssh_disable
 
-from mycroft.gui.homescreen import HomescreenManager
-from mycroft.gui.interfaces.smartspeaker import SmartSpeakerExtensionGuiInterface
-from mycroft.gui.interfaces.mobile import MobileExtensionGuiInterface
 
 class ExtensionsManager:
     def __init__(self, name, bus, gui):
@@ -54,6 +55,15 @@ class ExtensionsManager:
         self.bus.emit(
             Message("extension.manager.activated", {"id": extension_id}))
 
+        def signal_available(message=None):
+            message = message or Message("")
+            self.bus.emit(message.forward("mycroft.gui.available"))
+
+        if self.extension.preload_gui:
+            signal_available()
+        else:
+            self.bus.on("mycroft.gui.connected", signal_available)
+
 
 class SmartSpeakerExtension:
     """ Smart Speaker Extension: This extension is responsible for managing the Smart Speaker
@@ -65,11 +75,12 @@ class SmartSpeakerExtension:
         gui: GUI instance
     """
 
-    def __init__(self, bus, gui):
+    def __init__(self, bus, gui, preload_gui=False):
         LOG.info("SmartSpeaker: Initializing")
 
         self.bus = bus
         self.gui = gui
+        self.preload_gui = preload_gui
         self.homescreen_manager = HomescreenManager(self.bus, self.gui)
 
         self.homescreen_thread = threading.Thread(
@@ -140,11 +151,12 @@ class BigscreenExtension:
         gui: GUI instance
     """
 
-    def __init__(self, bus, gui):
+    def __init__(self, bus, gui, preload_gui=False):
         LOG.info("Bigscreen: Initializing")
 
         self.bus = bus
         self.gui = gui
+        self.preload_gui = preload_gui
         self.interaction_without_idle = True
         self.interaction_skill_id = None
 
@@ -251,11 +263,12 @@ class MobileExtension:
         gui: GUI instance
     """
 
-    def __init__(self, bus, gui):
+    def __init__(self, bus, gui, preload_gui=True):
         LOG.info("Mobile: Initializing")
 
         self.bus = bus
         self.gui = gui
+        self.preload_gui = preload_gui
         self.homescreen_manager = HomescreenManager(self.bus, self.gui)
 
         self.homescreen_thread = threading.Thread(
