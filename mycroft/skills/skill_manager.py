@@ -160,9 +160,12 @@ class SkillManager(Thread):
         self.bus.once('mycroft.skills.trained', self.handle_initial_training)
 
         # load skills waiting for connectivity
-        self.bus.once("mycroft.network.connected", self.handle_network_connected)
-        self.bus.once("mycroft.internet.connected", self.handle_internet_connected)
-        self.bus.once("mycroft.gui.available", self.handle_gui_connected)
+        self.bus.on("mycroft.network.connected", self.handle_network_connected)
+        self.bus.on("mycroft.internet.connected", self.handle_internet_connected)
+        self.bus.on("mycroft.gui.available", self.handle_gui_connected)
+        self.bus.on("mycroft.network.disconnected", self.handle_network_disconnected)
+        self.bus.on("mycroft.internet.disconnected", self.handle_internet_disconnected)
+        self.bus.on("mycroft.gui.unavailable", self.handle_gui_disconnected)
 
     def is_device_ready(self):
         is_ready = False
@@ -306,6 +309,21 @@ class SkillManager(Thread):
             LOG.debug("GUI Connected")
             self._gui_event.set()
             self._load_new_skills()
+
+    def handle_gui_disconnected(self, message):
+        # TODO: if gui extension did not send 'permanent' flag
+        permanent = False
+        if not permanent:
+            self._gui_event.clear()
+            self._unload_on_gui_disconnect()
+
+    def handle_internet_disconnected(self, message):
+        self._connected_event.clear()
+        self._unload_on_internet_disconnect()
+
+    def handle_network_disconnected(self, message):
+        self._network_event.clear()
+        self._unload_on_network_disconnect()
 
     def handle_internet_connected(self, message):
         if not self._connected_event.is_set():
@@ -493,6 +511,42 @@ class SkillManager(Thread):
         LOG.info('Loading skills that require internet...')
         self._load_new_skills(network=True, internet=True)
         self._internet_loaded.set()
+
+    def _unload_on_network_disconnect(self):
+        """ unload skills that require network to work """
+        for skill_dir in self._get_skill_directories():
+            # by definition skill_id == folder name
+            skill_id = os.path.basename(skill_dir)
+            skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
+            requirements = skill_loader.network_requirements
+            if requirements.requires_network and \
+                    not requirements.no_network_fallback:
+                # unload until network is back
+                self._unload_skill(skill_dir)
+
+    def _unload_on_internet_disconnect(self):
+        """ unload skills that require internet to work """
+        for skill_dir in self._get_skill_directories():
+            # by definition skill_id == folder name
+            skill_id = os.path.basename(skill_dir)
+            skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
+            requirements = skill_loader.network_requirements
+            if requirements.requires_internet and \
+                    not requirements.no_internet_fallback:
+                # unload until internet is back
+                self._unload_skill(skill_dir)
+
+    def _unload_on_gui_disconnect(self):
+        """ unload skills that require gui to work """
+        for skill_dir in self._get_skill_directories():
+            # by definition skill_id == folder name
+            skill_id = os.path.basename(skill_dir)
+            skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
+            requirements = skill_loader.network_requirements
+            if requirements.requires_gui and \
+                    not requirements.no_gui_fallback:
+                # unload until gui is back
+                self._unload_skill(skill_dir)
 
     def _load_on_startup(self):
         """Handle initial skill load."""

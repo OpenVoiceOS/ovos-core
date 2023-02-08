@@ -93,6 +93,9 @@ class GUIWebsocketHandler(WebSocketHandler):
     def on_close(self):
         LOG.info('Closing {}'.format(id(self)))
         GUIWebsocketHandler.clients.remove(self)
+        if len(GUIWebsocketHandler.clients) == 0:
+            message = Message("mycroft.gui.unavailable")
+            self.application.enclosure.core_bus.emit(message)
 
     def synchronize(self):
         """ Upload namespaces, pages and data to the last connected. """

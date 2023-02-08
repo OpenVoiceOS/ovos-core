@@ -57,7 +57,8 @@ class ExtensionsManager:
 
         def signal_available(message=None):
             message = message or Message("")
-            self.bus.emit(message.forward("mycroft.gui.available"))
+            self.bus.emit(message.forward("mycroft.gui.available",
+                                          {"permanent": self.extension.permanent}))
 
         if self.extension.preload_gui:
             signal_available()
@@ -75,12 +76,13 @@ class SmartSpeakerExtension:
         gui: GUI instance
     """
 
-    def __init__(self, bus, gui, preload_gui=False):
+    def __init__(self, bus, gui, preload_gui=False, permanent=False):
         LOG.info("SmartSpeaker: Initializing")
 
         self.bus = bus
         self.gui = gui
         self.preload_gui = preload_gui
+        self.permanent=permanent
         self.homescreen_manager = HomescreenManager(self.bus, self.gui)
 
         self.homescreen_thread = threading.Thread(
@@ -151,11 +153,12 @@ class BigscreenExtension:
         gui: GUI instance
     """
 
-    def __init__(self, bus, gui, preload_gui=False):
+    def __init__(self, bus, gui, preload_gui=False, permanent=True):
         LOG.info("Bigscreen: Initializing")
 
         self.bus = bus
         self.gui = gui
+        self.permanent=permanent
         self.preload_gui = preload_gui
         self.interaction_without_idle = True
         self.interaction_skill_id = None
@@ -222,12 +225,13 @@ class GenericExtension:
         gui: GUI instance
     """
 
-    def __init__(self, bus, gui, preload_gui=False):
+    def __init__(self, bus, gui, preload_gui=False, permanent=False):
         LOG.info("Generic: Initializing")
 
         self.bus = bus
         self.gui = gui
         self.preload_gui = preload_gui
+        self.permanent = permanent
         core_config = Configuration()
         gui_config = core_config.get("gui") or {}
         generic_config = gui_config.get("generic", {})
@@ -264,12 +268,13 @@ class MobileExtension:
         gui: GUI instance
     """
 
-    def __init__(self, bus, gui, preload_gui=True):
+    def __init__(self, bus, gui, preload_gui=True, permanent=True):
         LOG.info("Mobile: Initializing")
 
         self.bus = bus
         self.gui = gui
         self.preload_gui = preload_gui
+        self.permanent = permanent
         self.homescreen_manager = HomescreenManager(self.bus, self.gui)
 
         self.homescreen_thread = threading.Thread(
