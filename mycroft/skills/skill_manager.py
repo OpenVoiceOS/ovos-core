@@ -111,7 +111,7 @@ class SkillManager(Thread):
         self._network_loaded = Event()
         self._internet_loaded = Event()
         self._network_skill_timeout = 300
-        self._allow_gui_reloads = True
+        self._allow_state_reloads = True
 
         self.config = Configuration()
         self.manifest_uploader = SeleneSkillManifestUploader()
@@ -307,25 +307,27 @@ class SkillManager(Thread):
         pass
 
     def handle_gui_connected(self, message):
-        # some gui extensions such as mobile may request that gui skills never unload
-        self._allow_gui_reloads = not message.data.get("permanent", False)
+        # some gui extensions such as mobile may request that skills never unload
+        self._allow_state_reloads = not message.data.get("permanent", False)
         if not self._gui_event.is_set():
             LOG.debug("GUI Connected")
             self._gui_event.set()
             self._load_new_skills()
 
     def handle_gui_disconnected(self, message):
-        if self._allow_gui_reloads:
+        if self._allow_state_reloads:
             self._gui_event.clear()
             self._unload_on_gui_disconnect()
 
     def handle_internet_disconnected(self, message):
-        self._connected_event.clear()
-        self._unload_on_internet_disconnect()
+        if self._allow_state_reloads:
+            self._connected_event.clear()
+            self._unload_on_internet_disconnect()
 
     def handle_network_disconnected(self, message):
-        self._network_event.clear()
-        self._unload_on_network_disconnect()
+        if self._allow_state_reloads:
+            self._network_event.clear()
+            self._unload_on_network_disconnect()
 
     def handle_internet_connected(self, message):
         if not self._connected_event.is_set():
@@ -355,7 +357,7 @@ class SkillManager(Thread):
         for skill_id, plug in plugins.items():
             if skill_id not in self.plugin_skills and skill_id not in loaded_skill_ids:
                 skill_loader = self._get_plugin_skill_loader(skill_id, init_bus=False)
-                requirements = skill_loader.network_requirements
+                requirements = skill_loader.runtime_requirements
                 if not network and requirements.network_before_load:
                     continue
                 if not internet and requirements.internet_before_load:
@@ -520,7 +522,7 @@ class SkillManager(Thread):
             # by definition skill_id == folder name
             skill_id = os.path.basename(skill_dir)
             skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
-            requirements = skill_loader.network_requirements
+            requirements = skill_loader.runtime_requirements
             if requirements.requires_network and \
                     not requirements.no_network_fallback:
                 # unload until network is back
@@ -532,7 +534,7 @@ class SkillManager(Thread):
             # by definition skill_id == folder name
             skill_id = os.path.basename(skill_dir)
             skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
-            requirements = skill_loader.network_requirements
+            requirements = skill_loader.runtime_requirements
             if requirements.requires_internet and \
                     not requirements.no_internet_fallback:
                 # unload until internet is back
@@ -544,7 +546,7 @@ class SkillManager(Thread):
             # by definition skill_id == folder name
             skill_id = os.path.basename(skill_dir)
             skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
-            requirements = skill_loader.network_requirements
+            requirements = skill_loader.runtime_requirements
             if requirements.requires_gui and \
                     not requirements.no_gui_fallback:
                 # unload until gui is back
@@ -575,7 +577,7 @@ class SkillManager(Thread):
                 # by definition skill_id == folder name
                 skill_id = os.path.basename(skill_dir)
                 skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
-                requirements = skill_loader.network_requirements
+                requirements = skill_loader.runtime_requirements
                 if not network and requirements.network_before_load:
                     continue
                 if not internet and requirements.internet_before_load:

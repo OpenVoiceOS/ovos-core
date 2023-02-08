@@ -17,12 +17,11 @@ import gc
 import importlib
 import os
 import sys
-from inspect import isclass, signature
+from inspect import isclass
 from os import path, makedirs
 from time import time
 
 from ovos_config.locations import get_xdg_data_dirs, get_xdg_data_save_path
-from ovos_config.meta import get_xdg_base
 from ovos_plugin_manager.skills import find_skill_plugins
 from ovos_workshop.skills.base import BaseSkill
 from ovos_utils.process_utils import RuntimeRequirements
@@ -362,10 +361,10 @@ class SkillLoader:
         self._skill_class = val
 
     @property
-    def network_requirements(self):
+    def runtime_requirements(self):
         if not self.skill_class:
             return RuntimeRequirements()
-        return self.skill_class.network_requirements
+        return self.skill_class.runtime_requirements
 
     @property
     def is_blacklisted(self):
