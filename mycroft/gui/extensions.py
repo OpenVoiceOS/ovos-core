@@ -153,7 +153,7 @@ class BigscreenExtension:
         gui: GUI instance
     """
 
-    def __init__(self, bus, gui, preload_gui=False, permanent=True):
+    def __init__(self, bus, gui, preload_gui=False, permanent=False):
         LOG.info("Bigscreen: Initializing")
 
         self.bus = bus
