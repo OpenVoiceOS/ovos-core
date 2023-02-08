@@ -222,11 +222,12 @@ class GenericExtension:
         gui: GUI instance
     """
 
-    def __init__(self, bus, gui):
+    def __init__(self, bus, gui, preload_gui=False):
         LOG.info("Generic: Initializing")
 
         self.bus = bus
         self.gui = gui
+        self.preload_gui = preload_gui
         core_config = Configuration()
         gui_config = core_config.get("gui") or {}
         generic_config = gui_config.get("generic", {})
