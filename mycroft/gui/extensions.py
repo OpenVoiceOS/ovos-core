@@ -77,7 +77,7 @@ class SmartSpeakerExtension:
         gui: GUI instance
     """
 
-    def __init__(self, bus, gui, preload_gui=False, permanent=False):
+    def __init__(self, bus, gui, preload_gui=False, permanent=True):
         LOG.info("SmartSpeaker: Initializing")
 
         self.bus = bus
@@ -153,7 +153,7 @@ class BigscreenExtension:
         gui: GUI instance
     """
 
-    def __init__(self, bus, gui, preload_gui=False, permanent=False):
+    def __init__(self, bus, gui, preload_gui=False, permanent=True):
         LOG.info("Bigscreen: Initializing")
 
         self.bus = bus
