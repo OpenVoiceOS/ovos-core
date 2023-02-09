@@ -452,16 +452,22 @@ Item {
         }
     }
 
-    Popup  {
+    ItemDelegate  {
         id: previewPopUpBox
         width: parent.width * 0.9
         height: parent.height * 0.9
         x: (parent.width - width) / 2
         y: (parent.height - height) / 2
-        dim: true
+        property bool opened: false
+        visible: previewPopUpBox.opened
+        enabled: previewPopUpBox.opened
 
-        Overlay.modeless: Rectangle {
-            color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.5)
+        function open() {
+            previewPopUpBox.opened = true
+        }
+
+        function close() {
+            previewPopUpBox.opened = false
         }
 
         background: Rectangle {

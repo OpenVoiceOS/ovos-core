@@ -323,7 +323,7 @@ Item {
         }
     }
 
-    Popup  {
+    ItemDelegate  {
         id: styleViewPopUp
         width: parent.width * 0.9
         height: parent.height * 0.9
@@ -334,10 +334,16 @@ Item {
         property color primaryColor
         property color secondaryColor
         property color textColor
-        dim: true
+        property bool opened: false
+        visible: opened
+        enabled: opened
 
-        Overlay.modeless: Rectangle {
-            color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.5)
+        function open(){
+            styleViewPopUp.opened = true
+        }
+
+        function close(){
+            styleViewPopUp.opened = false
         }
 
         function showView(modelDataName, modelDataPath, primaryColor, secondaryColor, textColor) {
