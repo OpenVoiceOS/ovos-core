@@ -518,39 +518,42 @@ class SkillManager(Thread):
 
     def _unload_on_network_disconnect(self):
         """ unload skills that require network to work """
-        for skill_dir in self._get_skill_directories():
-            # by definition skill_id == folder name
-            skill_id = os.path.basename(skill_dir)
-            skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
-            requirements = skill_loader.runtime_requirements
-            if requirements.requires_network and \
-                    not requirements.no_network_fallback:
-                # unload until network is back
-                self._unload_skill(skill_dir)
+        with self._lock:
+            for skill_dir in self._get_skill_directories():
+                # by definition skill_id == folder name
+                skill_id = os.path.basename(skill_dir)
+                skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
+                requirements = skill_loader.runtime_requirements
+                if requirements.requires_network and \
+                        not requirements.no_network_fallback:
+                    # unload until network is back
+                    self._unload_skill(skill_dir)
 
     def _unload_on_internet_disconnect(self):
         """ unload skills that require internet to work """
-        for skill_dir in self._get_skill_directories():
-            # by definition skill_id == folder name
-            skill_id = os.path.basename(skill_dir)
-            skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
-            requirements = skill_loader.runtime_requirements
-            if requirements.requires_internet and \
-                    not requirements.no_internet_fallback:
-                # unload until internet is back
-                self._unload_skill(skill_dir)
+        with self._lock:
+            for skill_dir in self._get_skill_directories():
+                # by definition skill_id == folder name
+                skill_id = os.path.basename(skill_dir)
+                skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
+                requirements = skill_loader.runtime_requirements
+                if requirements.requires_internet and \
+                        not requirements.no_internet_fallback:
+                    # unload until internet is back
+                    self._unload_skill(skill_dir)
 
     def _unload_on_gui_disconnect(self):
         """ unload skills that require gui to work """
-        for skill_dir in self._get_skill_directories():
-            # by definition skill_id == folder name
-            skill_id = os.path.basename(skill_dir)
-            skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
-            requirements = skill_loader.runtime_requirements
-            if requirements.requires_gui and \
-                    not requirements.no_gui_fallback:
-                # unload until gui is back
-                self._unload_skill(skill_dir)
+        with self._lock:
+            for skill_dir in self._get_skill_directories():
+                # by definition skill_id == folder name
+                skill_id = os.path.basename(skill_dir)
+                skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
+                requirements = skill_loader.runtime_requirements
+                if requirements.requires_gui and \
+                        not requirements.no_gui_fallback:
+                    # unload until gui is back
+                    self._unload_skill(skill_dir)
 
     def _load_on_startup(self):
         """Handle initial skill load."""
