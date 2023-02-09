@@ -75,6 +75,8 @@ class SmartSpeakerExtension:
     Args:
         bus: MessageBus instance
         gui: GUI instance
+        preload_gui (bool): load GUI skills even if gui client not connected
+        permanent (bool): disable unloading of GUI skills on gui client disconnections
     """
 
     def __init__(self, bus, gui, preload_gui=False, permanent=True):
@@ -151,6 +153,8 @@ class BigscreenExtension:
     Args:
         bus: MessageBus instance
         gui: GUI instance
+        preload_gui (bool): load GUI skills even if gui client not connected
+        permanent (bool): disable unloading of GUI skills on gui client disconnections
     """
 
     def __init__(self, bus, gui, preload_gui=False, permanent=True):
@@ -222,6 +226,8 @@ class GenericExtension:
     Args:
         bus: MessageBus instance
         gui: GUI instance
+        preload_gui (bool): load GUI skills even if gui client not connected
+        permanent (bool): disable unloading of GUI skills on gui client disconnections
     """
 
     def __init__(self, bus, gui, preload_gui=False, permanent=False):
@@ -264,6 +270,8 @@ class MobileExtension:
     Args:
         bus: MessageBus instance
         gui: GUI instance
+        preload_gui (bool): load GUI skills even if gui client not connected
+        permanent (bool): disable unloading of GUI skills on gui client disconnections
     """
 
     def __init__(self, bus, gui, preload_gui=True, permanent=True):
@@ -307,6 +315,8 @@ class PlasmoidExtension:
     Args:
         bus: MessageBus instance
         gui: GUI instance
+        preload_gui (bool): load GUI skills even if gui client not connected
+        permanent (bool): disable unloading of GUI skills on gui client disconnections
     """
 
     def __init__(self, bus, gui, preload_gui=False, permanent=True):
