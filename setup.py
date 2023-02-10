@@ -80,7 +80,7 @@ setup(
     classifiers=[
         "Development Status :: 4 - Beta",
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: Apache-2.0",
+        "License :: OSI Approved :: Apache Software License",
     ],
     entry_points={
         'console_scripts': [
