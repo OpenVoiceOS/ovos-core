@@ -73,7 +73,8 @@ setup(
         'bus': required('requirements/extra-bus.txt'),
         'deprecated': required('requirements/extra-deprecated.txt'),
         'all': required('requirements/requirements.txt'),
-        'skills-essential': required('requirements/skills-essential.txt')
+        'skills-essential': required('requirements/skills-essential.txt'),
+        "platform": required('requirements/platform-requirements.txt')
     },
     packages=find_packages(include=['mycroft*']),
     include_package_data=True,
