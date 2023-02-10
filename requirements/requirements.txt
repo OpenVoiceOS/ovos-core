@@ -33,5 +33,4 @@ ovos-vad-plugin-webrtcvad
 
 ovos-skill-volume~=0.0.1
 ovos-skill-fallback-unknown~=0.0.2
-ovos-skill-setup~=0.0.1
 ovos-skill-stop~=0.2
