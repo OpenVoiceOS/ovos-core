@@ -146,8 +146,10 @@ class SkillManager(Thread):
             network = internet = is_connected()
 
         if internet and not self._connected_event.is_set():
+            LOG.debug("notify internet connected")
             self.bus.emit(Message("mycroft.internet.connected"))
         elif network and not self._network_event.is_set():
+            LOG.debug("notify network connected")
             self.bus.emit(Message("mycroft.network.connected"))
 
     def _define_message_bus_events(self):
@@ -512,9 +514,10 @@ class SkillManager(Thread):
         self._network_loaded.set()
 
     def _load_on_internet(self):
-        LOG.info('Loading skills that require internet...')
+        LOG.info('Loading skills that require internet (and network)...')
         self._load_new_skills(network=True, internet=True)
         self._internet_loaded.set()
+        self._network_loaded.set()
 
     def _unload_on_network_disconnect(self):
         """ unload skills that require network to work """
