@@ -1,3 +1,9 @@
 ovos-skill-volume~=0.0.1
 ovos-skill-fallback-unknown~=0.0.2
 ovos-skill-stop~=0.2
+neon-skill-alerts>=1.1.1a0
+# TODO: Personal skill
+# TODO: Naptime skill
+# TODO: date-time skill
+# TODO: hello world
+# TODO: filebrowser
