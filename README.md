@@ -30,6 +30,15 @@ We suggest you do this in a virtualenv:
 
 `pip install ovos-core[all]`
 
+***Raspbian***
+- `cd`
+- `sudo apt install python3-venv liblapack-dev libopenblas-dev`
+- `git clone https://github.com/OpenVoiceOS/ovos-core.git`
+- `python -m venv ovos-core`
+- `source ovos-core/bin/activate`
+- `python -m pip install wheel`
+- `python -m pip install --pre ovos-core[all]`
+
 ---
 
 As always, the OpenVoiceOS team thanks the following entities (in addition to MycroftAI) for making certain code and/or
