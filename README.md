@@ -32,7 +32,7 @@ We suggest you do this in a virtualenv:
 
 ***Raspbian***
 - `cd`
-- `sudo apt install python3-venv liblapack-dev libopenblas-dev`
+- `sudo apt install python3-venv liblapack-dev libopenblas-dev libpulse-dev`
 - `git clone https://github.com/OpenVoiceOS/ovos-core.git`
 - `python -m venv ovos-core`
 - `source ovos-core/bin/activate`
