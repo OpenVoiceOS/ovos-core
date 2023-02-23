@@ -17,7 +17,7 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
             skill_id="SmartSpeakerExtension.GuiInterface")
         self.bus = bus
         self.homescreen_manager = homescreen_manager
-        
+
         # Paths to find the local display config
         self.display_config_path_local = join(xdg_config_home(), "OvosDisplay.conf")
         self.display_config_path_system = "/etc/xdg/OvosDisplay.conf"
@@ -32,7 +32,7 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
 
     def bind(self):
         super().set_bus(self.bus)
-        
+
         self.bus.on("mycroft.device.settings", self.handle_device_settings)
         self.bus.on("ovos.PHAL.dashboard.status.response",
                     self.update_device_dashboard_status)
@@ -68,15 +68,17 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
                               self.handle_device_display_settings)
         self.register_handler("mycroft.device.settings.factory",
                               self.handle_device_display_factory)
-        
-        # Display settings      
+        self.register_handler("mycroft.device.settings.wallpapers",
+                              self.handle_device_wallpaper_settings)
+
+        # Display settings
         self.register_handler("speaker.extension.display.set.wallpaper.rotation",
                               self.handle_display_wallpaper_rotation_config_set)
         self.register_handler("speaker.extension.display.set.auto.dim",
                               self.handle_display_auto_dim_config_set)
         self.register_handler("speaker.extension.display.set.auto.nightmode",
                               self.handle_display_auto_nightmode_config_set)
-        
+
         self.build_initial_about_page_data()
 
     def handle_device_settings(self, message):
@@ -153,7 +155,7 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
     def handle_device_display_settings(self, message):
         LOG.info("Display settings")
         LOG.info(self.local_display_config)
-          
+
         self['state'] = 'settings/display_settings'
         self['display_wallpaper_rotation'] = self.local_display_config.get("wallpaper_rotation", False)
         self['display_auto_dim'] = self.local_display_config.get("auto_dim", False)
@@ -170,9 +172,10 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
 
     def handle_display_wallpaper_rotation_config_set(self, message):
         wallpaper_rotation = message.data.get("wallpaper_rotation", False)
-        self.local_display_config["wallpaper_rotation"] = wallpaper_rotation
-        self.local_display_config.store()
-        self.bus.emit(Message("speaker.extension.display.wallpaper.rotation.changed"))
+        if wallpaper_rotation:
+            self.bus.emit(Message("ovos.wallpaper.manager.enable.auto.rotation", {"rotation_time": 30}))
+        else:
+            self.bus.emit(Message("ovos.wallpaper.manager.disable.auto.rotation"))
 
     def handle_display_auto_dim_config_set(self, message):
         auto_dim = message.data.get("auto_dim", False)
@@ -210,22 +213,27 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
         self['state'] = 'settings/configuration_groups_display'
         self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
 
+    def handle_device_wallpaper_settings(self, message=None):
+        LOG.info("GOT WALLPAPER REQUEST HERE")
+        self['state'] = 'settings/wallpaper_settings'
+        self.show_page("SYSTEM_AdditionalSettings.qml", override_idle=True)
+
     def handle_get_dash_status(self):
         self.bus.emit(Message("ovos.PHAL.dashboard.get.status"))
-    
+
     def build_initial_about_page_data(self):
         uname_info = platform.uname()
         self.about_page_data.append({"display_key": "Kernel Version", "display_value": uname_info[2]})
         self.about_page_data.append({"display_key": "Core Version", "display_value": OVOS_VERSION_STR})
         self.about_page_data.append({"display_key": "Python Version", "display_value": platform.python_version()})
         self.about_page_data.append({"display_key": "Local Address", "display_value": network_utils.get_ip()})
-        
+
     def check_about_page_data_contains_key(self, key):
         for item in self.about_page_data:
             if item["display_key"] == key:
                 return True
         return False
-    
+
     def add_about_page_data(self, key, value):
         if not self.check_about_page_data_contains_key(key):
             self.about_page_data.append({"display_key": key, "display_value": value})
@@ -234,7 +242,7 @@ class SmartSpeakerExtensionGuiInterface(GUIInterface):
                 if item["display_key"] == key:
                     item["display_value"] = value
                     break
-    
+
     def extend_about_page_data_from_event(self, message=None):
         extended_list = message.data.get("display_list")
         for item in extended_list:

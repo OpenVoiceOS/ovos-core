@@ -27,12 +27,17 @@ import QtGraphicalEffects 1.12
 Item {
     id: displaySettingsView
     anchors.fill: parent
-    property bool wallpaper_rotation_enabled: sessionData.display_wallpaper_rotation ? sessionData.display_wallpaper_rotation : 0
+    property bool wallpaper_rotation_enabled: false
     property bool auto_dim_enabled: sessionData.display_auto_dim ? sessionData.display_auto_dim : 0
     property bool auto_nightmode_enabled: sessionData.display_auto_nightmode ? sessionData.display_auto_nightmode : 0
     property bool menuLabelsEnabled: false
 
+    function getAutoRotation() {
+        Mycroft.MycroftController.sendRequest("ovos.wallpaper.manager.get.auto.rotation", {})
+    }
+
     Component.onCompleted: {
+        getAutoRotation()
         Mycroft.MycroftController.sendRequest("ovos.shell.get.menuLabels.status", {})
     }
 
@@ -41,6 +46,9 @@ Item {
         onIntentRecevied: {
             if (type == "ovos.shell.get.menuLabels.status.response") {
                 menuLabelsEnabled = data.enabled
+            }
+            if (type == "ovos.wallpaper.manager.get.auto.rotation.response") {
+                wallpaper_rotation_enabled = data.auto_rotation
             }
         }
     }
@@ -77,7 +85,7 @@ Item {
         anchors.topMargin: Kirigami.Units.largeSpacing
         anchors.left: parent.left
         anchors.right: flickAreaScrollBar.left
-        anchors.bottom: bottomArea.top
+        anchors.bottom: midBottomArea.top
         contentWidth: width
         contentHeight: mainColLayoutDisplaySettings.implicitHeight
         ScrollBar.vertical: flickAreaScrollBar
@@ -360,6 +368,76 @@ Item {
                         Mycroft.MycroftController.sendRequest("ovos.shell.set.menuLabels", {"enabled": displayMenuLabelsSwitch.checked})
                     }
                 }
+            }
+        }
+    }
+
+    Item {
+        id: midBottomArea
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: bottomArea.top
+        height: Math.max(Mycroft.Units.gridUnit * 5, Kirigami.Units.iconSizes.large)
+
+        Kirigami.Separator {
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 1
+        }
+
+        Button {
+            id: wallpaperSettingButton
+            width: parent.width
+            height: Math.max(Mycroft.Units.gridUnit * 5, Kirigami.Units.iconSizes.large)
+
+            background: Rectangle {
+                id: wallpaperSettingButtonBg
+                color: "transparent"
+            }
+
+            contentItem: RowLayout {
+                Image {
+                    id: iconWallpaperSettingHolder
+                    Layout.alignment: Qt.AlignVCenter | Qt.AlignLeft
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.medium
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.medium
+                    source: "images/settings.png"
+
+                    ColorOverlay {
+                        anchors.fill: parent
+                        source: iconWallpaperSettingHolder
+                        color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.7)
+                    }
+                }
+
+
+                Kirigami.Heading {
+                    id: connectionNameLabel
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    height: paintedHeight
+                    elide: Text.ElideRight
+                    font.weight: Font.DemiBold
+                    text: "Wallpaper Settings"
+                    textFormat: Text.PlainText
+                    color: Kirigami.Theme.textColor
+                    level: 2
+                }
+            }
+
+            onClicked: {
+                Mycroft.SoundEffects.playClickedSound(Qt.resolvedUrl("../../snd/clicked.wav"))
+                console.log("Sending Show Wallpaper Page Here")
+                triggerGuiEvent("mycroft.device.settings.wallpapers", {})
+            }
+
+            onPressed: {
+                wallpaperSettingButtonBg.color = Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.4)
+            }
+            onReleased: {
+                wallpaperSettingButtonBg.color = "transparent"
             }
         }
     }
