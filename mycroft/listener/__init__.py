@@ -106,6 +106,7 @@ class AudioProducer(Thread):
                 finally:
                     if self.stream_handler is not None:
                         self.stream_handler.stream_stop()
+            LOG.info("Loop stopped running")
 
     def stop(self):
         """Stop producer thread."""
