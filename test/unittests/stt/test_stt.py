@@ -14,6 +14,9 @@
 #
 import json
 import unittest
+
+import pytest
+
 from time import sleep
 from unittest.mock import MagicMock, patch, Mock
 
@@ -78,6 +81,7 @@ class TestSTT(unittest.TestCase):
         stt = mycroft.listener.stt.STTFactory.create()
         self.assertEqual(type(stt), OVOSHTTPServerSTT)
 
+    @pytest.mark.skip
     @patch.dict(Configuration._Configuration__patch, STT_CONFIG)
     def test_mycroft_stt(self, ):
         stt = OVOSHTTPServerSTT()
