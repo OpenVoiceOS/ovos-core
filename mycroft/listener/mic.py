@@ -802,6 +802,10 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
                                         self._stop_signaled, ww_frames), \
                            self.config.get("lang", "en-us")
 
+                if self._stop_signaled:
+                    LOG.info("Stopping")
+                    break
+
                 audio_buffer.append(chunk)
                 ww_frames.append(chunk)
 
@@ -855,7 +859,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
                             self.write_mic_level(energy, source)
                         mic_write_counter += 1
         LOG.info("Stopping...")
-        return WakeWordData(None, False, True, None), stt_lang
+        return WakeWordData(None, False, True, None), ""
 
     @staticmethod
     def _create_audio_data(raw_data, source):
@@ -907,7 +911,7 @@ class ResponsiveRecognizer(speech_recognition.Recognizer):
         if self.listen_state == ListenerState.WAKEWORD:
             LOG.debug("Waiting for wake word...")
             ww_data, lang = self._wait_until_wake_word(source, sec_per_buffer)
-
+            LOG.debug("Done waiting for WW")
             if ww_data.stopped or self.loop.state.sleeping:
                 LOG.debug(f"No data: stopped={ww_data.stopped}")
                 # If the waiting returned from a stop signal or sleep mode is active

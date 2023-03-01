@@ -110,6 +110,7 @@ class AudioProducer(Thread):
 
     def stop(self):
         """Stop producer thread."""
+        LOG.debug("stopping producer")
         self.loop.state.running = False
         self.loop.responsive_recognizer.stop()
 
