@@ -17,7 +17,7 @@ import unittest
 from time import sleep
 from unittest.mock import MagicMock, patch, Mock
 
-from ovos_stt_plugin_selene import SeleneSTT
+from ovos_stt_plugin_server import OVOSHTTPServerSTT
 from ovos_stt_plugin_vosk import VoskKaldiSTT
 
 import mycroft.configuration
@@ -33,9 +33,8 @@ from test.util import base_config
 STT_CONFIG = base_config()
 STT_CONFIG.merge({
     'stt': {
-        'module': 'mycroft',
-        "fallback_module": "ovos-stt-plugin-vosk",
-        'mycroft': {'uri': 'https://test.com'}
+        'module': 'ovos-stt-plugin-server',
+        "fallback_module": "ovos-stt-plugin-vosk"
     },
     'lang': 'en-US'
 })
@@ -43,9 +42,8 @@ STT_CONFIG.merge({
 STT_NO_FB_CONFIG = base_config()
 STT_NO_FB_CONFIG.merge({
     'stt': {
-        'module': 'mycroft',
-        'fallback_module': None,
-        'mycroft': {'uri': 'https://test.com'}
+        'module': 'ovos-stt-plugin-server',
+        'fallback_module': None
     },
     'lang': 'en-US'
 })
@@ -53,9 +51,9 @@ STT_NO_FB_CONFIG.merge({
 STT_INVALID_FB_CONFIG = base_config()
 STT_INVALID_FB_CONFIG.merge({
     'stt': {
-        'module': 'mycroft',
+        'module': 'ovos-stt-plugin-server',
         'fallback_module': 'invalid',
-        'mycroft': {'uri': 'https://test.com'}
+        'ovos-stt-plugin-server': {'uri': 'https://test.com'}
     },
     'lang': 'en-US'
 })
@@ -63,26 +61,26 @@ STT_INVALID_FB_CONFIG.merge({
 
 class TestSTT(unittest.TestCase):
     def test_factory(self):
-        config = {'module': 'mycroft'}
+        config = {'module': 'ovos-stt-plugin-server'}
         stt = mycroft.listener.stt.STTFactory.create(config)
-        self.assertEqual(type(stt), SeleneSTT)
+        self.assertEqual(type(stt), OVOSHTTPServerSTT)
 
-        config = {'module': 'ovos-stt-plugin-selene'}
+        config = {'module': 'ovos-stt-plugin-server'}
         stt = mycroft.listener.stt.STTFactory.create(config)
-        self.assertEqual(type(stt), SeleneSTT)
+        self.assertEqual(type(stt), OVOSHTTPServerSTT)
 
         config = {'stt': config}
         stt = mycroft.listener.stt.STTFactory.create(config)
-        self.assertEqual(type(stt), SeleneSTT)
+        self.assertEqual(type(stt), OVOSHTTPServerSTT)
 
     @patch.dict(Configuration._Configuration__patch, STT_CONFIG)
     def test_factory_from_config(self):
         stt = mycroft.listener.stt.STTFactory.create()
-        self.assertEqual(type(stt), SeleneSTT)
+        self.assertEqual(type(stt), OVOSHTTPServerSTT)
 
     @patch.dict(Configuration._Configuration__patch, STT_CONFIG)
     def test_mycroft_stt(self, ):
-        stt = SeleneSTT()
+        stt = OVOSHTTPServerSTT()
         stt.api = MagicMock()
         audio = MagicMock()
         stt.execute(audio, 'en-us')
