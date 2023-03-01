@@ -4,5 +4,6 @@ from ovos_plugin_manager.templates.stt import STT, TokenSTT, GoogleJsonSTT, \
     StreamingSTT, StreamThread, BasicSTT, KeySTT
 
 # for compat in case its being imported elsewhere
-from ovos_stt_plugin_selene import SeleneSTT as MycroftSTT
+# TODO: This should really be deprecated as Selene STT is derecated by Mycroft
+from ovos_stt_plugin_server import OVOSHTTPServerSTT as MycroftSTT
 
