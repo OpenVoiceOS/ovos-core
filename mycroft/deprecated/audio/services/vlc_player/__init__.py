@@ -15,7 +15,7 @@
 import vlc
 
 from mycroft.audio.services import AudioBackend
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 
 
 class VlcService(AudioBackend):

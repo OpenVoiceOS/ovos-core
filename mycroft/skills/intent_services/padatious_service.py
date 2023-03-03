@@ -22,7 +22,7 @@ from os.path import expanduser, isfile
 
 from ovos_config.config import Configuration
 from mycroft.messagebus.message import Message
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 from mycroft.skills.intent_services.base import IntentMatch
 
 from padacioso import IntentContainer as FallbackIntentContainer
@@ -84,7 +84,7 @@ class PadatiousMatcher:
         if not self.has_result:
             lang = lang or self.service.lang
             padatious_intent = None
-            LOG.debug('Padatious Matching confidence > {}'.format(limit))
+            LOG.debug(f'Padatious Matching confidence > {limit}')
             for utt in utterances:
                 for variant in utt:
                     intent = self.service.calc_intent(variant, lang)

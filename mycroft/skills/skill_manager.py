@@ -18,13 +18,13 @@ from os.path import basename
 from glob import glob
 from threading import Thread, Event, Lock
 from time import sleep, monotonic
-from mycroft.util.process_utils import ProcessStatus, StatusCallbackMap, ProcessState
+from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap, ProcessState
 
 from ovos_backend_client.pairing import is_paired
 from mycroft.enclosure.api import EnclosureAPI
 from ovos_config.config import Configuration
 from mycroft.messagebus.message import Message
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 from mycroft.util import connected
 from ovos_utils.network_utils import is_connected
 from ovos_utils.gui import is_gui_connected

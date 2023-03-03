@@ -28,7 +28,7 @@ use in Mycroft Skills.
 """
 from warnings import warn
 from mycroft.util.time import now_local
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 from ovos_config.locale import get_default_lang
 
 # backwards compat import for mycroft-core

@@ -16,7 +16,7 @@ import importlib
 import sys
 from os import listdir
 from os.path import abspath, dirname, basename, isdir, join
-from mycroft.util import LOG
+from ovos_utils.log import LOG
 from ovos_plugin_manager.audio import setup_audio_service as setup_service, load_audio_service_plugins as load_plugins
 
 MAINMODULE = '__init__'

@@ -7,8 +7,9 @@ from mycroft.audio.tts import TTSFactory, TTS
 from ovos_config.config import Configuration
 from mycroft.metrics import report_timing, Stopwatch
 from mycroft.audio.audioservice import AudioService
-from mycroft.util import check_for_signal, start_message_bus_client
-from mycroft.util.log import LOG
+from mycroft.util import start_message_bus_client
+from ovos_utils.signal import check_for_signal
+from ovos_utils.log import LOG
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
 from ovos_plugin_manager.tts import get_tts_supported_langs, get_tts_lang_configs, get_tts_module_configs
 from ovos_plugin_manager.audio import get_audio_service_configs

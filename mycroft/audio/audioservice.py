@@ -18,8 +18,8 @@ from threading import Lock
 from mycroft.audio.services import RemoteAudioBackend
 from ovos_config.config import Configuration
 from mycroft.messagebus.message import Message
-from mycroft.util.log import LOG
-from mycroft.util.monotonic_event import MonotonicEvent
+from ovos_utils.log import LOG
+from ovos_utils.process_utils import MonotonicEvent
 from mycroft.util.plugins import find_plugins
 from ovos_plugin_manager.audio import setup_audio_service as setup_service, load_audio_service_plugins as load_plugins
 try:

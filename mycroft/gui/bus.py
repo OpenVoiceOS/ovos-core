@@ -34,8 +34,8 @@ from tornado.websocket import WebSocketHandler
 
 from ovos_config.config import Configuration
 from mycroft.messagebus import Message
-from mycroft.util.log import LOG
-from mycroft.util.process_utils import create_daemon
+from ovos_utils.log import LOG
+from ovos_utils import create_daemon
 
 write_lock = Lock()
 

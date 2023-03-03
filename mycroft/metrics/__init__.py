@@ -22,7 +22,7 @@ import requests
 from ovos_backend_client.api import MetricsApi
 from ovos_config.config import Configuration
 from mycroft.session import SessionManager
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 from mycroft.version import CORE_VERSION_STR
 from copy import copy
 # backwards compat import

@@ -1,5 +1,5 @@
 from ovos_config.config import Configuration
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 
 from ovos_plugin_manager.stt import OVOSSTTFactory, load_stt_plugin
 

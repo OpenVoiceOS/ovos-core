@@ -23,7 +23,7 @@ to be a drop in replacement for mycroft-core
 
 from threading import Lock
 from mycroft_bus_client import MessageBusClient, Message
-from mycroft.util import LOG
+from ovos_utils.log import LOG
 
 bus: MessageBusClient = None
 tts = None

@@ -1,6 +1,6 @@
 from ovos_backend_client.api import DeviceApi
 from ovos_backend_client.pairing import is_paired
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 from ovos_backend_client.settings import SeleneSkillsManifest
 from ovos_config import Configuration
 # backwards compat import - do not delete

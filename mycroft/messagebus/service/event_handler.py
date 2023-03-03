@@ -21,7 +21,7 @@ from tornado.websocket import WebSocketHandler
 from pyee import EventEmitter
 
 from mycroft.messagebus.message import Message
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 
 client_connections = []
 

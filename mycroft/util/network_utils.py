@@ -3,7 +3,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 import ovos_config.config
 import requests
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 
 
 def _get_network_tests_config():

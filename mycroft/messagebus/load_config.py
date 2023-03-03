@@ -20,7 +20,7 @@ This code is re-used in both to load config values.
 from collections import namedtuple
 
 from ovos_config.config import Configuration
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 
 MessageBusConfig = namedtuple(
     'MessageBusConfig',

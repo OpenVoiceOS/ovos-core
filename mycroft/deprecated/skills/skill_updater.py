@@ -16,8 +16,8 @@
 
 from combo_lock import ComboLock
 
-from mycroft.util.file_utils import get_temp_path
-from mycroft.util.log import LOG
+from ovos_utils.file_utils import get_temp_path
+from ovos_utils.log import LOG
 from ovos_config.config import Configuration
 
 ONE_HOUR = 3600

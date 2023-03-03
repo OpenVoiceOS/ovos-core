@@ -25,8 +25,8 @@ from collections import namedtuple
 from os import path, makedirs
 
 from combo_lock import ComboLock
-from mycroft.util.log import LOG
-from mycroft.util.file_utils import get_temp_path
+from ovos_utils.log import LOG
+from ovos_utils.file_utils import get_temp_path
 from mycroft.skills.skill_loader import get_default_skills_directory
 
 from mock_msm import \

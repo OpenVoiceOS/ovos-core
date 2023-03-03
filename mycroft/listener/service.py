@@ -24,8 +24,8 @@ from mycroft.messagebus.message import Message
 from mycroft.util import (
     start_message_bus_client
 )
-from mycroft.util.log import LOG
-from mycroft.util.process_utils import ProcessStatus, StatusCallbackMap
+from ovos_utils.log import LOG
+from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
 from ovos_plugin_manager.stt import get_stt_lang_configs, get_stt_supported_langs, get_stt_module_configs
 from ovos_plugin_manager.wakewords import get_ww_lang_configs, get_ww_supported_langs, get_ww_module_configs
 from ovos_plugin_manager.vad import get_vad_configs

@@ -17,7 +17,7 @@ from threading import Lock
 from uuid import uuid4
 
 from ovos_config.config import Configuration
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 
 
 class Session:

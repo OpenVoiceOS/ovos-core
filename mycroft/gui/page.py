@@ -1,4 +1,4 @@
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 
 class GuiPage:
     """ A representation of a GUI Page

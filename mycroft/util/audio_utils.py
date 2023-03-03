@@ -16,7 +16,7 @@
 of audio, recording and listing devices.
 """
 import re
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 from ovos_utils.sound import play_acknowledge_sound, play_listening_sound, \
     play_end_listening_sound, play_error_sound, record, play_audio, \
     play_ogg as _po, play_wav as _pw, play_mp3 as _pm

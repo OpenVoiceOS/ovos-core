@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 from mycroft.deprecated.audio.speech import *
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 
 LOG.warning("This module is deprecated")
 

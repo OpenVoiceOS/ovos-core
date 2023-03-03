@@ -26,12 +26,11 @@ from mycroft.skills.core import FallbackSkill
 from mycroft.skills.event_scheduler import EventScheduler
 from mycroft.skills.intent_service import IntentService
 from mycroft.skills.skill_manager import SkillManager, on_error, on_stopping, on_ready, on_alive, on_started
-from mycroft.util import (
-    reset_sigint_handler,
-    start_message_bus_client,
-    wait_for_exit_signal, init_service_logger
-)
-from mycroft.util.log import LOG
+from mycroft.util import start_message_bus_client
+
+from ovos_utils import wait_for_exit_signal
+from ovos_utils.process_utils import reset_sigint_handler
+from ovos_utils.log import LOG, init_service_logger
 
 # keep these imports for backwards compat!
 from mycroft.deprecated.skills import DevicePrimer, RASPBERRY_PI_PLATFORMS

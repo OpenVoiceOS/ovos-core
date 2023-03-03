@@ -29,7 +29,7 @@ from ovos_config.config import Configuration
 from mycroft.messagebus import Message
 from mycroft.skills.mycroft_skill.mycroft_skill import MycroftSkill
 from mycroft.skills.settings import SettingsMetaUploader
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 from mycroft.util.file_utils import FileWatcher
 
 SKILL_MAIN_MODULE = '__init__.py'

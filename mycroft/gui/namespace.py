@@ -45,7 +45,7 @@ from typing import List, Union
 
 from ovos_config.config import Configuration
 from mycroft.messagebus import Message, MessageBusClient
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 from mycroft.gui.bus import (
     create_gui_service,
     determine_if_gui_connected,

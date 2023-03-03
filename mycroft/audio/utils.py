@@ -14,7 +14,7 @@
 #
 import time
 
-from mycroft.util.signal import check_for_signal
+from ovos_utils.signal import check_for_signal
 
 
 def is_speaking():

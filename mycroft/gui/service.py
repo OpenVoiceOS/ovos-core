@@ -1,9 +1,9 @@
 from mycroft.messagebus.client import MessageBusClient
 from mycroft.util import start_message_bus_client
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 from mycroft.gui.namespace import NamespaceManager
 from mycroft.gui.extensions import ExtensionsManager
-from mycroft.util.process_utils import ProcessStatus, StatusCallbackMap, ProcessState
+from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap, ProcessState
 
 def on_started():
     LOG.info('Gui Service is starting up.')

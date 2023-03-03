@@ -40,11 +40,12 @@ from mycroft.deprecated.enclosure.mark1.mouth import EnclosureMouth
 from ovos_config.config import LocalConf
 from ovos_config.locations import USER_CONFIG
 from mycroft.messagebus.message import Message
-from mycroft.util import play_wav, create_signal, connected, check_for_signal
+from mycroft.util import play_wav, connected
+from ovos_utils.signal import check_for_signal, create_signal
 from mycroft.util.audio_test import record
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 from queue import Queue
-from mycroft.util.file_utils import get_temp_path
+from ovos_utils.file_utils import get_temp_path
 
 
 # The Mark 1 hardware consists of a Raspberry Pi main CPU which is connected

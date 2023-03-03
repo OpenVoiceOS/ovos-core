@@ -6,7 +6,7 @@ from mycroft.skills.intent_services import (
     IntentMatch
 )
 from mycroft.skills.permissions import ConverseMode, ConverseActivationMode
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 
 
 class ConverseService:

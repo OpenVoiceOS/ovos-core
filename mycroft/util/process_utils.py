@@ -2,12 +2,11 @@ import json
 import logging
 import signal as sig
 from threading import Event
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 from ovos_config.config import Configuration
 from ovos_utils import create_daemon, wait_for_exit_signal
 import mycroft.messagebus.client
 
-# backwards compat imports, DO NOT DELETE, careful with autopep8
 from ovos_utils.process_utils import ProcessState, ProcessStatus, StatusCallbackMap
 
 

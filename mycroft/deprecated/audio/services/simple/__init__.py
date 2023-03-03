@@ -18,7 +18,7 @@ from time import sleep
 
 from mycroft.audio.services import AudioBackend
 from mycroft.messagebus.message import Message
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 from mycroft.util import play_mp3, play_ogg, play_wav
 import mimetypes
 import re

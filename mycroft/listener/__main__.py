@@ -14,11 +14,9 @@
 #
 from mycroft.listener.service import SpeechService, on_error, on_stopping, on_ready
 from ovos_config.locale import setup_locale
-from mycroft.lock import Lock as PIDLock  # Create/Support PID locking file
-from mycroft.util import (
-    reset_sigint_handler,
-    wait_for_exit_signal, init_service_logger
-)
+from ovos_utils.log import init_service_logger
+from ovos_utils.process_utils import reset_sigint_handler, PIDLock
+from ovos_utils import wait_for_exit_signal
 
 
 def main(ready_hook=on_ready, error_hook=on_error, stopping_hook=on_stopping,

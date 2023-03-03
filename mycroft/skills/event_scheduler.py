@@ -25,7 +25,7 @@ from os.path import isfile, join, expanduser
 from ovos_config.config import Configuration
 from ovos_config.locations import get_xdg_data_save_path, get_xdg_config_save_path
 from mycroft.messagebus.message import Message
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 from ovos_utils.events import create_basic_wrapper, EventContainer, EventSchedulerInterface
 
 

@@ -17,8 +17,8 @@ import yaml
 from ovos_backend_client.pairing import is_paired
 from ovos_backend_client.api import DeviceApi
 from mycroft.messagebus.message import Message
-from mycroft.util.file_utils import ensure_directory_exists
-from mycroft.util.log import LOG
+from ovos_utils.file_utils import ensure_directory_exists
+from ovos_utils.log import LOG
 from ovos_config.config import Configuration
 from ovos_config.locations import get_xdg_cache_save_path
 from ovos_backend_client.settings import get_display_name

@@ -27,7 +27,7 @@ from mycroft.metrics import Stopwatch, report_timing
 from mycroft.session import SessionManager
 from mycroft.listener.stt import STTFactory
 from mycroft.util import find_input_device
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
 
 MAX_MIC_RESTARTS = 20
 

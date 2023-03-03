@@ -41,13 +41,12 @@ from mycroft.listener.data_structures import RollingMean, CyclicAudioBuffer
 from mycroft.listener.silence import SilenceDetector, SilenceResultType, SilenceMethod
 from mycroft.session import SessionManager
 from mycroft.util import (
-    check_for_signal,
-    get_ipc_directory,
     resolve_resource_file,
     play_wav, play_ogg, play_mp3
 )
 from mycroft.util.audio_utils import play_listening_sound, play_end_listening_sound
-from mycroft.util.log import LOG
+from ovos_utils.log import LOG
+from ovos_utils.signal import check_for_signal, get_ipc_directory
 from ovos_config.locations import get_xdg_data_save_path
 from mycroft.util.audio_utils import play_audio_file
 from ovos_plugin_manager.vad import OVOSVADFactory
