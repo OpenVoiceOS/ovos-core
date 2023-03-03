@@ -26,8 +26,9 @@ to be a drop in replacement for mycroft-core
 from ovos_config.locale import setup_locale
 from ovos_config.config import Configuration
 from mycroft.gui.service import GUIService
-from mycroft.util.log import LOG
-from mycroft.util import wait_for_exit_signal, reset_sigint_handler
+from ovos_utils.log import LOG
+from ovos_utils import wait_for_exit_signal
+from ovos_utils.process_utils import reset_sigint_handler
 
 
 def on_ready():
@@ -108,6 +109,7 @@ def main(ready_hook=on_ready, error_hook=on_error, stopping_hook=on_stopping):
             from ovos_PHAL import PHAL
             phal = PHAL()
             phal.start()
+            wait_for_exit_signal()
         except Exception as e:
             LOG.exception("PHAL failed to launch!")
             error_hook(e)
