@@ -14,9 +14,11 @@
 #
 from mycroft.audio.service import PlaybackService, on_ready, on_error, on_stopping
 from ovos_config.locale import setup_locale
-from mycroft.lock import Lock as PIDLock  # Create/Support PID locking file
-from mycroft.util import reset_sigint_handler, wait_for_exit_signal, \
-    check_for_signal, init_service_logger
+from ovos_utils import wait_for_exit_signal
+from ovos_utils.process_utils import reset_sigint_handler, PIDLock
+from ovos_utils.signal import check_for_signal
+from ovos_utils.log import init_service_logger
+
 service = None  # Added for backwards-compat.
 
 

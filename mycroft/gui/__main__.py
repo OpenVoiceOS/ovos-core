@@ -1,7 +1,9 @@
 from ovos_config.locale import setup_locale
 from mycroft.gui.service import GUIService
-from mycroft.util import wait_for_exit_signal, reset_sigint_handler, init_service_logger
-from mycroft.util.log import LOG
+
+from ovos_utils import wait_for_exit_signal
+from ovos_utils.process_utils import reset_sigint_handler
+from ovos_utils.log import LOG, init_service_logger
 
 
 def on_ready():
