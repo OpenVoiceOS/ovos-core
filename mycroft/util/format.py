@@ -30,7 +30,7 @@ from ovos_config.locale import get_default_lang
 from calendar import leapdays
 from enum import Enum
 
-from mycroft.util.bracket_expansion import expand_parentheses, expand_options
+from ovos_utils.bracket_expansion import expand_parentheses, expand_options
 
 # lingua_franca is optional, individual skills may install it if they need
 # to use it
@@ -49,7 +49,7 @@ except ImportError:
         raise ImportError("lingua_franca is not installed")
 
 
-    from mycroft.util.bracket_expansion import expand_options
+    from ovos_utils.bracket_expansion import expand_options
 
     NUMBER_TUPLE, DateTimeFormat = None, None
 

@@ -1,1 +1,2 @@
-tornado~=6.0, >=6.0.3
+# gui service
+ovos-gui~=0.0, >=0.0.2

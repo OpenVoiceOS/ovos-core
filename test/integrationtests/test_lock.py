@@ -20,8 +20,8 @@ from unittest.mock import patch
 import os
 from os.path import exists, isfile
 
-from mycroft.lock import Lock
-from mycroft.util.file_utils import get_temp_path
+from ovos_utils.process_utils import PIDLock as Lock
+from ovos_utils.file_utils import get_temp_path
 from ovos_config.meta import get_xdg_base
 
 

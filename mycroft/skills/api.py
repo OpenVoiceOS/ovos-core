@@ -19,7 +19,7 @@ just like interacting with any other object.
 from ovos_bus_client.message import Message
 
 
-class SkillApi():
+class SkillApi:
     """SkillApi providing a simple interface to exported methods from skills
 
     Methods are built from a method_dict provided when initializing the skill.

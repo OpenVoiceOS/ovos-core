@@ -21,7 +21,7 @@ from time import sleep, monotonic
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap, ProcessState
 
 from ovos_backend_client.pairing import is_paired
-from mycroft.enclosure.api import EnclosureAPI
+from ovos_utils.enclosure.api import EnclosureAPI
 from ovos_config.config import Configuration
 from ovos_bus_client.message import Message
 from ovos_utils.log import LOG
@@ -33,7 +33,7 @@ from ovos_plugin_manager.skills import find_skill_plugins
 from mycroft.skills.skill_updater import SeleneSkillManifestUploader
 from ovos_bus_client.client import MessageBusClient
 
-# do not delete - bacwards compat imports
+# do not delete - backwards compat imports
 from ovos_workshop.skill_launcher import SKILL_MAIN_MODULE
 from mycroft.deprecated.skills.settings import UploadQueue, SkillSettingsDownloader
 from mycroft.deprecated.skills.skill_updater import SkillUpdater

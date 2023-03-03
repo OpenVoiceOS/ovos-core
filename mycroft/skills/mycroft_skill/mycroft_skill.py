@@ -17,7 +17,7 @@
 # backwards compat imports, do not delete!
 from ovos_utils.intents import Intent, IntentBuilder
 from ovos_utils.skills import get_non_properties
-from mycroft.gui import SkillGUI
+from ovos_workshop.skills.base import SkillGUI
 from ovos_bus_client.message import Message, dig_for_message
 from mycroft.metrics import report_metric
 from ovos_bus_client.util.scheduler import EventScheduler, EventSchedulerInterface

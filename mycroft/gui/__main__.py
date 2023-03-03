@@ -1,5 +1,5 @@
 from ovos_config.locale import setup_locale
-from mycroft.gui.service import GUIService
+from ovos_gui.service import GUIService
 
 from ovos_utils import wait_for_exit_signal
 from ovos_utils.process_utils import reset_sigint_handler

@@ -19,12 +19,10 @@ import sys
 import unittest
 from datetime import datetime
 from os.path import join, dirname, abspath
-from re import error
 from unittest.mock import MagicMock, patch
 
 from adapt.intent import IntentBuilder
-from copy import deepcopy
-from mycroft.configuration import Configuration
+from ovos_config import Configuration
 from ovos_bus_client.message import Message
 from mycroft.skills.core import MycroftSkill, resting_screen_handler, intent_handler
 from mycroft.skills.intent_service import open_intent_envelope

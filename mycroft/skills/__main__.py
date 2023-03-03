@@ -22,7 +22,7 @@ directory.  The executable gets added to the bin directory when installed
 import mycroft.lock
 from ovos_config.locale import setup_locale
 from mycroft.skills.api import SkillApi
-from mycroft.skills.core import FallbackSkill
+from ovos_workshop.skills.fallback import FallbackSkill
 from ovos_bus_client.util.scheduler import EventScheduler
 from mycroft.skills.intent_service import IntentService
 from mycroft.skills.skill_manager import SkillManager, on_error, on_stopping, on_ready, on_alive, on_started

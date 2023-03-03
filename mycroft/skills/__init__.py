@@ -17,11 +17,12 @@
 These classes, decorators and functions are used to build skills for Mycroft.
 """
 
-from mycroft.skills.mycroft_skill import (MycroftSkill, intent_handler,
+from mycroft.skills.mycroft_skill import (intent_handler,
                                           intent_file_handler,
                                           resting_screen_handler,
                                           skill_api_method)
-from mycroft.skills.fallback_skill import FallbackSkill
+from ovos_workshop.skills.fallback import FallbackSkill
+from ovos_workshop.skills.mycroft_skill import MycroftSkill
 from mycroft.skills.common_iot_skill import CommonIoTSkill
 from mycroft.skills.common_play_skill import CommonPlaySkill, CPSMatchLevel
 from mycroft.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel

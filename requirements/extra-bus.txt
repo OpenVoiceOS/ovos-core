@@ -1,1 +1,2 @@
-tornado~=6.0, >=6.0.3
+# messagebus service
+ovos-messagebus~=0.0, >=0.0.2

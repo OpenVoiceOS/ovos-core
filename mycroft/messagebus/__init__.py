@@ -16,6 +16,6 @@ from ovos_bus_client.message import Message
 from ovos_bus_client.send_func import send
 
 try:
-    from mycroft.messagebus.service.event_handler import MessageBusEventHandler
+    from ovos_messagebus.event_handler import MessageBusEventHandler
 except ImportError:
     pass  # do not require tornado installed, only needed to open websocket!

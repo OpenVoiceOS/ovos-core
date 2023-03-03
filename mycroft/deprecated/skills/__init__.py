@@ -12,7 +12,7 @@ import re
 from os import walk
 from os.path import splitext, join
 from ovos_backend_client.pairing import is_paired
-from mycroft.enclosure.api import EnclosureAPI
+from ovos_utils.enclosure.api import EnclosureAPI
 from mycroft.util.format import expand_options
 from ovos_utils.log import LOG
 from ovos_utils.intents.intent_service_interface import munge_regex, to_alnum

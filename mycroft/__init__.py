@@ -17,9 +17,9 @@ from ovos_config.config import Configuration
 from ovos_bus_client.message import Message
 
 from ovos_utils.intents import AdaptIntent, IntentBuilder, Intent
-from mycroft.skills.context import adds_context, removes_context
-from mycroft.skills import (MycroftSkill, FallbackSkill,
-                            intent_handler, intent_file_handler)
+from ovos_workshop.decorators import intent_handler, intent_file_handler, adds_context, removes_context
+from ovos_workshop.skills import MycroftSkill
+from ovos_workshop.skills.fallback import FallbackSkill
 from ovos_utils.log import LOG
 
 

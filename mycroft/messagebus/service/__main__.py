@@ -19,8 +19,7 @@ processes. It implements a websocket server so can also be used by external
 systems to integrate with the Mycroft system.
 """
 from ovos_bus_client.conf import load_message_bus_config
-from mycroft.messagebus.service.event_handler import MessageBusEventHandler
-
+from ovos_messagebus.event_handler import MessageBusEventHandler
 from ovos_utils.process_utils import reset_sigint_handler
 from ovos_utils import create_daemon, wait_for_exit_signal
 from ovos_utils.log import LOG, init_service_logger

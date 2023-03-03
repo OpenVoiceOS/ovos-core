@@ -8,4 +8,4 @@ This is only meant for 3rd party code expecting ovos-core
 to be a drop in replacement for mycroft-core
 
 """
-from mycroft.gui import SkillGUI
+from ovos_workshop.skills.base import SkillGUI

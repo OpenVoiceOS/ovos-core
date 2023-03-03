@@ -9,4 +9,4 @@ to be a drop in replacement for mycroft-core
 
 """
 
-from mycroft.deprecated.enclosure.base import *
+from mycroft.deprecated.enclosure.base import Enclosure

@@ -25,7 +25,7 @@ to be a drop in replacement for mycroft-core
 
 from ovos_config.locale import setup_locale
 from ovos_config.config import Configuration
-from mycroft.gui.service import GUIService
+from ovos_gui.service import GUIService
 from ovos_utils.log import LOG
 from ovos_utils import wait_for_exit_signal
 from ovos_utils.process_utils import reset_sigint_handler
