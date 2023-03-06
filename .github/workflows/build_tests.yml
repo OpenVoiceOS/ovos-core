@@ -43,5 +43,7 @@ jobs:
       - uses: pypa/gh-action-pip-audit@v1.0.0
         with:
           # Ignore setuptools vulnerability we can't do much about
+          # Ignore numpy vulnerability affecting latest version for Py3.7
           ignore-vulns: |
             GHSA-r9hx-vwmv-q579
+            GHSA-fpfv-jqm9-f5jm
