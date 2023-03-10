@@ -17,9 +17,9 @@ padaos~=0.1
 
 ovos_backend_client~=0.0, >=0.0.5
 ovos-config~=0.0,>=0.0.5
-ovos-utils~=0.0, >=0.0.30a3
+ovos-utils~=0.0, >=0.0.30
 ovos-plugin-manager~=0.0, >=0.0.19
-ovos_workshop~=0.0, >=0.0.11a4
+ovos_workshop~=0.0, >=0.0.11
 ovos_PHAL~=0.0, >=0.0.2
 ovos-lingua-franca>=0.4.6
 
@@ -29,14 +29,14 @@ ovos-tts-plugin-mimic2~=0.1, >=0.1.5
 ovos-tts-plugin-google-tx~=0.0, >=0.0.3
 ovos-ww-plugin-pocketsphinx~=0.1
 ovos-ww-plugin-precise~=0.1
-ovos-vad-plugin-webrtcvad
+ovos-vad-plugin-webrtcvad~=0.0.1
 
 ovos_plugin_common_play~=0.0.3
 # ovos-ocp-youtube-plugin
-ovos-ocp-m3u-plugin
-ovos-ocp-rss-plugin
-ovos-ocp-files-plugin
-ovos-ocp-news-plugin
+ovos-ocp-m3u-plugin~=0.0.1
+ovos-ocp-rss-plugin~=0.0.2
+ovos-ocp-files-plugin~=0.13
+ovos-ocp-news-plugin~=0.0.3
 
 ovos-skill-volume~=0.0.1
 ovos-skill-fallback-unknown~=0.0.2
