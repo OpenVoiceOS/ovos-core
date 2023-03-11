@@ -29,7 +29,8 @@ ovos-tts-plugin-mimic2~=0.1, >=0.1.5
 ovos-tts-plugin-mimic3-server
 
 ovos-ww-plugin-pocketsphinx~=0.1
-ovos-ww-plugin-precise-lite~=0.1
+ovos-ww-plugin-openwakeword
+# ovos-ww-plugin-precise-lite~=0.1
 ovos-vad-plugin-webrtcvad~=0.0.1
 
 ovos_plugin_common_play~=0.0.3
