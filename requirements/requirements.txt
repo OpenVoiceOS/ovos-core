@@ -25,7 +25,6 @@ ovos-lingua-franca>=0.4.6
 
 ovos-stt-plugin-server~=0.0, >=0.0.2
 ovos-tts-plugin-mimic~=0.2, >=0.2.6
-ovos-tts-plugin-mimic2~=0.1, >=0.1.5
 ovos-tts-plugin-mimic3-server
 
 ovos-ww-plugin-pocketsphinx~=0.1
