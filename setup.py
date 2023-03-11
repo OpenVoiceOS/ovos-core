@@ -84,6 +84,8 @@ setup(
     ],
     entry_points={
         'console_scripts': [
+            'ovos-core=mycroft.skills.__main__:main',
+            # TODO - remove below console_scripts in 0.1.0 (backwards compat)
             'mycroft-speech-client=mycroft.listener.__main__:main',
             'mycroft-messagebus=mycroft.messagebus.service.__main__:main',
             'mycroft-skills=mycroft.skills.__main__:main',
