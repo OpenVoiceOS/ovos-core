@@ -30,7 +30,6 @@ ovos-tts-plugin-mimic3-server
 
 ovos-ww-plugin-pocketsphinx~=0.1
 ovos-ww-plugin-openwakeword
-# ovos-ww-plugin-precise-lite~=0.1
 ovos-vad-plugin-webrtcvad~=0.0.1
 
 ovos_plugin_common_play~=0.0.3
@@ -43,3 +42,9 @@ ovos-ocp-news-plugin~=0.0.3
 ovos-skill-volume~=0.0.1
 ovos-skill-fallback-unknown~=0.0.2
 ovos-skill-stop~=0.2
+neon-skill-alerts~=1.2
+ovos-skill-personal
+ovos-skill-naptime
+ovos-skill-date-time>=0.2.2a1
+ovos-skill-hello-world
+ovos-skill-filebrowser
