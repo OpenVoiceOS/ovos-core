@@ -1,3 +1,4 @@
 ovos-tts-plugin-mimic~=0.2, >=0.2.6
 ovos-tts-plugin-mimic2~=0.1, >=0.1.5
 ovos-tts-plugin-mimic3-server
+# TODO: Add version spec to above dependency
