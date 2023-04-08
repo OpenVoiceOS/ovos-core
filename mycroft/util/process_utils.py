@@ -5,7 +5,7 @@ from threading import Event
 from ovos_utils.log import LOG
 from ovos_config.config import Configuration
 from ovos_utils import create_daemon, wait_for_exit_signal
-import mycroft.messagebus.client
+from ovos_bus_client import MessageBusClient
 
 from ovos_utils.process_utils import ProcessState, ProcessStatus, StatusCallbackMap
 
@@ -121,7 +121,7 @@ def start_message_bus_client(service, bus=None, whitelist=None):
     """
     # Create a client if one was not provided
     if bus is None:
-        bus = mycroft.messagebus.client.MessageBusClient()
+        bus = MessageBusClient()
     Configuration.set_config_update_handlers(bus)
     bus_connected = Event()
     bus.on('message', create_echo_function(service, whitelist))

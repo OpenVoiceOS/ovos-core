@@ -25,7 +25,7 @@ from functools import total_ordering, wraps
 from itertools import count
 
 from mycroft.skills.mycroft_skill import MycroftSkill
-from mycroft.messagebus.message import Message, dig_for_message
+from ovos_bus_client.message import Message, dig_for_message
 
 ENTITY = "ENTITY"
 SCENE = "SCENE"

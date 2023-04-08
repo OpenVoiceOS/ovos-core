@@ -33,7 +33,7 @@ from tornado.web import Application
 from tornado.websocket import WebSocketHandler
 
 from ovos_config.config import Configuration
-from mycroft.messagebus import Message
+from ovos_bus_client.message import Message
 from ovos_utils.log import LOG
 from ovos_utils import create_daemon
 

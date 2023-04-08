@@ -50,7 +50,7 @@ from threading import Thread, Timer
 
 import os
 
-from mycroft.messagebus.client import MessageBusClient
+from ovos_bus_client.client import MessageBusClient
 from ovos_utils import get_ipc_directory
 from ovos_utils.log import LOG
 

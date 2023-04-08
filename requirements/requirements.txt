@@ -8,18 +8,18 @@ combo-lock~=0.2
 PyYAML~=5.4
 watchdog~=2.1
 
-mycroft-messagebus-client~=0.9,!=0.9.2,!=0.9.3
 adapt-parser~=0.5
 padatious~=0.4.8
 padacioso~=0.1.2
 fann2==1.0.7
 padaos~=0.1
 
+ovos_bus_client~=0.0, >=0.0.3a13
 ovos_backend_client~=0.0, >=0.0.5
-ovos-config~=0.0,>=0.0.5
-ovos-utils~=0.0, >=0.0.31a1
-ovos-plugin-manager~=0.0, >=0.0.22
-ovos_workshop~=0.0, >=0.0.11
+ovos-config~=0.0,>=0.0.8a3
+ovos-utils~=0.0, >=0.0.31a6
+ovos-plugin-manager~=0.0, >=0.0.23a6
+ovos_workshop~=0.0, >=0.0.12a3
 ovos_PHAL~=0.0, >=0.0.2
 ovos-lingua-franca>=0.4.6
 
@@ -31,12 +31,13 @@ ovos-ww-plugin-pocketsphinx~=0.1
 ovos-ww-plugin-precise~=0.1
 ovos-vad-plugin-webrtcvad~=0.0.1
 
-ovos_plugin_common_play~=0.0.3
-# ovos-ocp-youtube-plugin
-ovos-ocp-m3u-plugin~=0.0.1
-ovos-ocp-rss-plugin~=0.0.2
+ovos_plugin_common_play~=0.0, >=0.0.5a5
+# ovos-ocp-youtube-plugin~=0.0, >=0.0.1
+ovos-ocp-m3u-plugin~=0.0, >=0.0.1
+ovos-ocp-rss-plugin~=0.0, >=0.0.2
 ovos-ocp-files-plugin~=0.13
-ovos-ocp-news-plugin~=0.0.3
+ovos-ocp-news-plugin~=0.0, >=0.0.3
+
 
 ovos-skill-volume~=0.0.1
 ovos-skill-fallback-unknown~=0.0.2

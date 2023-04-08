@@ -1,7 +1,7 @@
 import time
 from threading import Thread, Lock
 from os.path import exists, expanduser
-from mycroft_bus_client import Message
+from ovos_bus_client import Message
 
 from mycroft.audio.tts import TTSFactory, TTS
 from ovos_config.config import Configuration

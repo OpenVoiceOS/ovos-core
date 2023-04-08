@@ -25,7 +25,7 @@ from unittest.mock import MagicMock, patch
 from adapt.intent import IntentBuilder
 from copy import deepcopy
 from mycroft.configuration import Configuration
-from mycroft.messagebus.message import Message
+from ovos_bus_client.message import Message
 from mycroft.skills.core import MycroftSkill, resting_screen_handler, intent_handler
 from mycroft.skills.intent_service import open_intent_envelope
 from mycroft.skills.skill_data import (load_regex_from_file, load_regex,

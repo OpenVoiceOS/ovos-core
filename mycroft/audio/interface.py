@@ -15,7 +15,7 @@
 from os.path import abspath
 from datetime import timedelta
 
-from mycroft.messagebus.message import Message, dig_for_message
+from ovos_bus_client.message import Message, dig_for_message
 
 
 def ensure_uri(s):

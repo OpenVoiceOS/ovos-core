@@ -44,7 +44,7 @@ def stop_speaking():
     TODO: Skills should only be able to stop speech they've initiated
     """
     if is_speaking():
-        from mycroft.messagebus.send import send
+        from ovos_bus_client.send_func import send
         send('mycroft.audio.speech.stop')
 
         # Block until stopped

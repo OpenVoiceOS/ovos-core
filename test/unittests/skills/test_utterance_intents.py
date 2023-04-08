@@ -1,6 +1,6 @@
 import unittest
 from mycroft.skills.intent_services.padatious_service import PadatiousService, FallbackIntentContainer
-from mycroft_bus_client.message import Message
+from ovos_bus_client.message import Message
 from ovos_utils.messagebus import FakeBus
 
 

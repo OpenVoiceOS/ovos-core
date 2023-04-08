@@ -18,7 +18,7 @@
 from ovos_utils.intents import Intent, IntentBuilder
 from ovos_utils.skills import get_non_properties
 from mycroft.gui import SkillGUI
-from mycroft.messagebus.message import Message, dig_for_message
+from ovos_bus_client.message import Message, dig_for_message
 from mycroft.metrics import report_metric
 from mycroft.skills.event_scheduler import EventSchedulerInterface
 from mycroft.skills.intent_service_interface import IntentServiceInterface

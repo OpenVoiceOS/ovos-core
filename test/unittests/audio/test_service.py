@@ -17,7 +17,7 @@ import unittest
 import unittest.mock as mock
 
 import mycroft.audio.audioservice as audio_service
-from mycroft.messagebus import Message
+from ovos_bus_client.message import Message
 
 from .services.working import WorkingBackend
 """Tests for Audioservice class"""

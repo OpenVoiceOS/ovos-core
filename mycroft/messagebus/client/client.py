@@ -13,26 +13,11 @@
 # limitations under the License.
 #
 
-from mycroft_bus_client import MessageBusClient as _MessageBusClient
-from mycroft_bus_client.client import MessageWaiter
+from ovos_bus_client import MessageBusClient
+from ovos_bus_client.client import MessageWaiter
 
-from mycroft.messagebus.load_config import load_message_bus_config
+from ovos_bus_client.conf import load_message_bus_config
 import mycroft.util.process_utils
-
-
-class MessageBusClient(_MessageBusClient):
-    # minimize reading of the .conf
-    _config_cache = None
-
-    def __init__(self, host=None, port=None, route=None, ssl=None, cache=False):
-        config_overrides = dict(host=host, port=port, route=route, ssl=ssl)
-        if cache and self._config_cache:
-            config = self._config_cache
-        else:
-            config = load_message_bus_config(**config_overrides)
-            if cache:
-                MessageBusClient._config_cache = config
-        super().__init__(config.host, config.port, config.route, config.ssl)
 
 
 def echo():

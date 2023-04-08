@@ -24,7 +24,7 @@ to be a drop in replacement for mycroft-core
 """
 
 from ovos_config.config import Configuration
-from mycroft.messagebus.client import MessageBusClient
+from ovos_bus_client.client import MessageBusClient
 from mycroft.util import start_message_bus_client
 
 

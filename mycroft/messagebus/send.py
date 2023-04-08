@@ -15,7 +15,7 @@
 import sys
 import json
 
-from mycroft.messagebus.send_func import send
+from ovos_bus_client.send_func import send
 
 
 def main():

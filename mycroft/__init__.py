@@ -15,7 +15,7 @@
 from os.path import abspath, dirname, join
 from ovos_config.config import Configuration
 from mycroft.api import Api  # TODO - why is this here? nothing should be using it, can it be removed safely?
-from mycroft.messagebus.message import Message
+from ovos_bus_client.message import Message
 
 from ovos_utils.intents import AdaptIntent, IntentBuilder, Intent
 from mycroft.skills.context import adds_context, removes_context

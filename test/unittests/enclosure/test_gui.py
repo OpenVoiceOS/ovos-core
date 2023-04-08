@@ -17,7 +17,7 @@
 from unittest import TestCase, mock
 
 from mycroft.gui import SkillGUI
-from mycroft.messagebus import Message
+from ovos_bus_client.message import Message
 from mycroft.util.file_utils import resolve_resource_file
 
 

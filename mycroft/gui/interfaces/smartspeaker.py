@@ -3,7 +3,7 @@ import platform
 from os.path import exists, join
 
 from json_database import JsonStorage
-from mycroft.messagebus import Message
+from ovos_bus_client.message import Message
 from ovos_utils.log import LOG
 from mycroft.version import OVOS_VERSION_STR
 from ovos_utils import network_utils

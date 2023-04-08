@@ -16,7 +16,7 @@
 The skill api allows skills interact with eachother over the message bus
 just like interacting with any other object.
 """
-from mycroft.messagebus.message import Message
+from ovos_bus_client.message import Message
 
 
 class SkillApi():

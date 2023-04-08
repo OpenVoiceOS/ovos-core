@@ -3,7 +3,7 @@ import time
 from itertools import chain
 from threading import Lock, Event
 
-from mycroft_bus_client.message import Message, dig_for_message
+from ovos_bus_client.message import Message, dig_for_message
 
 from mycroft.skills.intent_services.base import IntentMatch
 from mycroft.skills.skill_data import CoreResources

@@ -4,7 +4,7 @@ from mycroft.gui.extensions import SmartSpeakerExtension
 from ..mocks import MessageBusMock
 from mycroft.configuration import Configuration
 from test.util import base_config
-from mycroft.messagebus import Message
+from ovos_bus_client.message import Message
 
 PATCH_MODULE = "mycroft.gui.extensions"
 

@@ -5,7 +5,7 @@ from ovos_config.config import Configuration
 from mycroft.gui.homescreen import HomescreenManager
 from mycroft.gui.interfaces.mobile import MobileExtensionGuiInterface
 from mycroft.gui.interfaces.smartspeaker import SmartSpeakerExtensionGuiInterface
-from mycroft.messagebus import Message
+from ovos_bus_client.message import Message
 from ovos_utils.log import LOG
 from ovos_backend_client.pairing import is_paired
 

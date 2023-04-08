@@ -1,6 +1,6 @@
 from unittest import TestCase, mock
 
-from mycroft.messagebus import Message
+from ovos_bus_client.message import Message
 from mycroft.skills.common_query_skill import (CommonQuerySkill, CQSMatchLevel,
                                                CQSVisualMatchLevel,
                                                handles_visuals)

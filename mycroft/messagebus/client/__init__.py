@@ -12,5 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """TODO: 21.08 simplify structure (move client.py up one level)."""
-from mycroft.messagebus.client.client import MessageBusClient
-from mycroft_bus_client.client import MessageWaiter
+from ovos_bus_client.client import MessageBusClient
+from ovos_bus_client.client import MessageWaiter

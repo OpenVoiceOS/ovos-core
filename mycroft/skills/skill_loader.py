@@ -26,7 +26,7 @@ from ovos_plugin_manager.skills import find_skill_plugins
 from ovos_workshop.skills.base import BaseSkill
 from ovos_utils.process_utils import RuntimeRequirements
 from ovos_config.config import Configuration
-from mycroft.messagebus import Message
+from ovos_bus_client.message import Message
 from mycroft.skills.mycroft_skill.mycroft_skill import MycroftSkill
 from mycroft.skills.settings import SettingsMetaUploader
 from ovos_utils.log import LOG

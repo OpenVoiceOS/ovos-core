@@ -18,7 +18,7 @@ from unittest import TestCase, mock
 
 from mycroft.gui.namespace import Namespace, NamespaceManager
 from mycroft.gui.page import GuiPage
-from mycroft.messagebus import Message
+from ovos_bus_client.message import Message
 from ..mocks import MessageBusMock
 
 PATCH_MODULE = "mycroft.gui.namespace"

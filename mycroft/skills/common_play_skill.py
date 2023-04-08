@@ -15,7 +15,7 @@
 import re
 from enum import Enum, IntEnum
 from abc import ABC, abstractmethod
-from mycroft.messagebus.message import Message
+from ovos_bus_client.message import Message
 from mycroft.skills.mycroft_skill import MycroftSkill
 from mycroft.skills.audioservice import AudioService
 

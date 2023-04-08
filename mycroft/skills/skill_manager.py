@@ -23,14 +23,14 @@ from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap, ProcessSt
 from ovos_backend_client.pairing import is_paired
 from mycroft.enclosure.api import EnclosureAPI
 from ovos_config.config import Configuration
-from mycroft.messagebus.message import Message
+from ovos_bus_client.message import Message
 from ovos_utils.log import LOG
 from mycroft.util import connected
 from ovos_utils.network_utils import is_connected
 from ovos_utils.gui import is_gui_connected
 from mycroft.skills.skill_loader import get_skill_directories, SkillLoader, PluginSkillLoader, find_skill_plugins
 from mycroft.skills.skill_updater import SeleneSkillManifestUploader
-from mycroft.messagebus import MessageBusClient
+from ovos_bus_client.message import MessageBusClient
 
 # do not delete - bacwards compat imports
 from mycroft.deprecated.skills.settings import UploadQueue, SkillSettingsDownloader

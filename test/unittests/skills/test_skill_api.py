@@ -1,7 +1,7 @@
 from unittest import TestCase, mock
 
 from mycroft import MycroftSkill
-from mycroft.messagebus import Message
+from ovos_bus_client.message import Message
 from mycroft.skills import skill_api_method
 from mycroft.skills.api import SkillApi
 

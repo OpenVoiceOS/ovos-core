@@ -5,7 +5,7 @@ import unittest
 import unittest.mock as mock
 
 import mycroft.deprecated.audio.services.simple as simple
-from mycroft.messagebus import Message
+from ovos_bus_client.message import Message
 
 """Tests for the simple audio service backend."""
 

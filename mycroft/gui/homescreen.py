@@ -1,4 +1,4 @@
-from mycroft.messagebus import Message
+from ovos_bus_client.message import Message
 from ovos_config.config import Configuration, LocalConf
 from ovos_config.locations import USER_CONFIG
 from ovos_utils.log import LOG

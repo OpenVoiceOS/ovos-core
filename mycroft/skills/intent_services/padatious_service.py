@@ -21,7 +21,7 @@ from os import path
 from os.path import expanduser, isfile
 
 from ovos_config.config import Configuration
-from mycroft.messagebus.message import Message
+from ovos_bus_client.message import Message
 from ovos_utils.log import LOG
 from mycroft.skills.intent_services.base import IntentMatch
 

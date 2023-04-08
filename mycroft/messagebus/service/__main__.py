@@ -18,7 +18,7 @@ The message bus facilitates inter-process communication between mycroft-core
 processes. It implements a websocket server so can also be used by external
 systems to integrate with the Mycroft system.
 """
-from mycroft.messagebus.load_config import load_message_bus_config
+from ovos_bus_client.conf import load_message_bus_config
 from mycroft.messagebus.service.event_handler import MessageBusEventHandler
 
 from ovos_utils.process_utils import reset_sigint_handler

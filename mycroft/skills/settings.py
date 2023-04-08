@@ -64,7 +64,7 @@ from ovos_backend_client.api import DeviceApi
 from ovos_backend_client.pairing import is_paired, requires_backend
 from ovos_utils.log import LOG
 from ovos_backend_client.settings import RemoteSkillSettings, get_display_name
-from mycroft_bus_client.message import Message, dig_for_message
+from ovos_bus_client.message import Message, dig_for_message
 
 # backwards compat imports
 from mycroft.deprecated.skills.settings import SkillSettingsDownloader, SettingsMetaUploader, load_remote_settings_cache, \
