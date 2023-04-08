@@ -30,7 +30,7 @@ from ovos_utils.network_utils import is_connected
 from ovos_utils.gui import is_gui_connected
 from mycroft.skills.skill_loader import get_skill_directories, SkillLoader, PluginSkillLoader, find_skill_plugins
 from mycroft.skills.skill_updater import SeleneSkillManifestUploader
-from ovos_bus_client.message import MessageBusClient
+from ovos_bus_client.client import MessageBusClient
 
 # do not delete - bacwards compat imports
 from mycroft.deprecated.skills.settings import UploadQueue, SkillSettingsDownloader
