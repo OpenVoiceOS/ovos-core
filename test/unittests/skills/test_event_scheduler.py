@@ -8,8 +8,7 @@ from pyee import ExecutorEventEmitter
 
 from unittest.mock import MagicMock, patch
 from ovos_utils.messagebus import FakeBus
-from mycroft.skills.event_scheduler import (EventScheduler,
-                                            EventSchedulerInterface)
+from ovos_bus_client.util.scheduler import EventScheduler, EventSchedulerInterface
 
 
 class TestEventScheduler(unittest.TestCase):

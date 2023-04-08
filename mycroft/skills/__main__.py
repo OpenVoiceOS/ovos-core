@@ -23,7 +23,7 @@ import mycroft.lock
 from ovos_config.locale import setup_locale
 from mycroft.skills.api import SkillApi
 from mycroft.skills.core import FallbackSkill
-from mycroft.skills.event_scheduler import EventScheduler
+from ovos_bus_client.util.scheduler import EventScheduler
 from mycroft.skills.intent_service import IntentService
 from mycroft.skills.skill_manager import SkillManager, on_error, on_stopping, on_ready, on_alive, on_started
 from mycroft.util import start_message_bus_client

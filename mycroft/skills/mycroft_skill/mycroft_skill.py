@@ -20,7 +20,7 @@ from ovos_utils.skills import get_non_properties
 from mycroft.gui import SkillGUI
 from ovos_bus_client.message import Message, dig_for_message
 from mycroft.metrics import report_metric
-from mycroft.skills.event_scheduler import EventSchedulerInterface
+from ovos_bus_client.util.scheduler import EventScheduler, EventSchedulerInterface
 from mycroft.skills.intent_service_interface import IntentServiceInterface
 from ovos_utils.messagebus import get_handler_name, create_wrapper, EventContainer
 from ovos_utils.enclosure.api import EnclosureAPI
