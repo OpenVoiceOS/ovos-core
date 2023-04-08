@@ -7,6 +7,7 @@ import time
 from pyee import ExecutorEventEmitter
 
 from unittest.mock import MagicMock, patch
+from ovos_utils.messagebus import FakeBus
 from mycroft.skills.event_scheduler import (EventScheduler,
                                             EventSchedulerInterface)
 
@@ -110,12 +111,12 @@ class TestEventSchedulerInterface(unittest.TestCase):
         bus = ExecutorEventEmitter()
 
         es = EventSchedulerInterface('tester')
-        es.set_bus(bus)
+        es.set_bus(FakeBus())
         es.set_id('id')
 
         # Schedule a repeating event
         es.schedule_repeating_event(f, None, 10, name='f')
-        self.assertTrue(len(bus._events['id:f']) == 1)
+        self.assertTrue(len(es.bus.ee._events['id:f']) == 1)
 
         es.shutdown()
         # Check that the reference to the function has been removed from the
