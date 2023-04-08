@@ -44,7 +44,7 @@ from time import time, sleep
 from typing import List, Union
 
 from ovos_config.config import Configuration
-from ovos_bus_client.message import Message, MessageBusClient
+from ovos_bus_client import Message, MessageBusClient
 from ovos_utils.log import LOG
 from mycroft.gui.bus import (
     create_gui_service,
