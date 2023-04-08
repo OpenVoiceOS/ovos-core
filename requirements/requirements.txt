@@ -14,7 +14,7 @@ padacioso~=0.1.2
 fann2==1.0.7
 padaos~=0.1
 
-ovos_bus_client~=0.0, >=0.0.3a13
+ovos_bus_client~=0.0, >=0.0.3a15
 ovos_backend_client~=0.0, >=0.0.5
 ovos-config~=0.0,>=0.0.8a3
 ovos-utils~=0.0, >=0.0.31a6
