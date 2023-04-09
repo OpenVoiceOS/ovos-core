@@ -5,7 +5,7 @@ watchdog~=2.1
 combo-lock~=0.2
 padacioso~=0.1.2
 
-ovos_bus_client~=0.0, >=0.0.3a15
+ovos_bus_client~=0.0, >=0.0.3a16
 ovos-utils~=0.0, >=0.0.31a6
 ovos-plugin-manager~=0.0, >=0.0.23a6
 ovos-config~=0.0,>=0.0.8a3
