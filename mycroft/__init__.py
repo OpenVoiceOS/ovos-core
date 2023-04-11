@@ -14,7 +14,6 @@
 #
 from os.path import abspath, dirname, join
 from ovos_config.config import Configuration
-from mycroft.api import Api  # TODO - why is this here? nothing should be using it, can it be removed safely?
 from ovos_bus_client.message import Message
 
 from ovos_utils.intents import AdaptIntent, IntentBuilder, Intent
@@ -23,11 +22,10 @@ from mycroft.skills import (MycroftSkill, FallbackSkill,
                             intent_handler, intent_file_handler)
 from ovos_utils.log import LOG
 
+
 MYCROFT_ROOT_PATH = abspath(join(dirname(__file__), '..'))
 
-__all__ = ['MYCROFT_ROOT_PATH',
-           'Api',
-           'Message']
+__all__ = ['MYCROFT_ROOT_PATH']
 
 _cfg = Configuration()
 _log_level = _cfg.get("log_level", "INFO")

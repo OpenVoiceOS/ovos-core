@@ -14,7 +14,7 @@
 #
 from unittest import TestCase
 from unittest.mock import patch, Mock
-from mycroft.configuration import Configuration
+from ovos_config import Configuration
 from ovos_bus_client.client import MessageBusClient, MessageWaiter
 
 WS_CONF = {
