@@ -17,7 +17,8 @@ padaos~=0.1
 
 ovos_backend_client~=0.0, >=0.0.5
 ovos-config~=0.0,>=0.0.5
-ovos-utils~=0.0, >=0.0.31a1
+# TODO - accidental breaking change 0.0.31a7 (maybe only unittest mocks)
+ovos-utils==0.0.31a6
 ovos-plugin-manager~=0.0, >=0.0.22
 ovos_workshop~=0.0, >=0.0.11
 ovos_PHAL~=0.0, >=0.0.2
