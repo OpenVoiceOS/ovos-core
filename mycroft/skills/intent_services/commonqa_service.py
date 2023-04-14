@@ -180,12 +180,8 @@ class CommonQAService:
             # Find response(s) with the highest confidence
             best = None
             ties = []
-            print(search_phrase)
-            print(777, self.query_replies)
             if search_phrase in self.query_replies:
-                print(888)
                 for handler in self.query_replies[search_phrase]:
-                    print(handler)
                     if not best or handler['conf'] > best['conf']:
                         best = handler
                         ties = []
