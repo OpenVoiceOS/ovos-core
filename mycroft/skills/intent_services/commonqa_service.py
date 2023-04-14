@@ -158,7 +158,8 @@ class CommonQAService:
 
             # not waiting for any more skills
             if not self.query_extensions[search_phrase]:
-                self._query_timeout(message.reply('question:query.timeout'))
+                self._query_timeout(message.reply('question:query.timeout',
+                                                  message.data))
         else:
             LOG.warning(f'{skill_id} Answered too slowly, will be ignored.')
 
@@ -179,8 +180,12 @@ class CommonQAService:
             # Find response(s) with the highest confidence
             best = None
             ties = []
+            print(search_phrase)
+            print(777, self.query_replies)
             if search_phrase in self.query_replies:
+                print(888)
                 for handler in self.query_replies[search_phrase]:
+                    print(handler)
                     if not best or handler['conf'] > best['conf']:
                         best = handler
                         ties = []
