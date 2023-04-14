@@ -138,7 +138,6 @@ class CommonQAService:
         skill_id = message.data['skill_id']
         searching = message.data.get('searching')
         answer = message.data.get('answer')
-
         # Manage requests for time to complete searches
         if searching:
             # extend the timeout by 5 seconds
@@ -159,7 +158,7 @@ class CommonQAService:
 
             # not waiting for any more skills
             if not self.query_extensions[search_phrase]:
-                self._query_timeout(message)
+                self._query_timeout(message.reply('question:query.timeout'))
         else:
             LOG.warning(f'{skill_id} Answered too slowly, will be ignored.')
 
@@ -195,6 +194,7 @@ class CommonQAService:
 
                 # invoke best match
                 self.speak(best['answer'])
+
                 LOG.info('Handling with: ' + str(best['skill_id']))
                 cb = best.get('callback_data') or {}
                 self.bus.emit(message.forward('question:action',
