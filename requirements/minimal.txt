@@ -11,4 +11,4 @@ ovos-plugin-manager~=0.0, >=0.0.23a6
 ovos-config~=0.0,>=0.0.8a3
 ovos-lingua-franca~=0.4, >=0.4.6
 ovos_backend_client~=0.0, >=0.0.5
-ovos_workshop~=0.0, >=0.0.12a3
+ovos_workshop~=0.0, >=0.0.12a4

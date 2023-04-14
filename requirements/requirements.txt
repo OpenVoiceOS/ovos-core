@@ -19,7 +19,7 @@ ovos_backend_client~=0.0, >=0.0.5
 ovos-config~=0.0,>=0.0.8a3
 ovos-utils~=0.0, >=0.0.31a6
 ovos-plugin-manager~=0.0, >=0.0.23a6
-ovos_workshop~=0.0, >=0.0.12a3
+ovos_workshop~=0.0, >=0.0.12a4
 ovos_PHAL~=0.0, >=0.0.2
 ovos-lingua-franca>=0.4.6
 
