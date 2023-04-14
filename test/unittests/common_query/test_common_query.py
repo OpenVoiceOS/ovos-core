@@ -25,12 +25,18 @@ class TestCommonQuery(unittest.TestCase):
         self.bus.emitted_msgs = []
         self.assertEqual(self.cc.skill_id, "common_query.openvoiceos")
 
+        qq_ctxt = {"source": "audio", "destination": "skills", 'skill_id': self.cc.skill_id}
+        qq_ans_ctxt = {"source": "skills", "destination": "audio", 'skill_id': self.cc.skill_id}
         self.bus.emit(Message("common_query.question",
-                              {"utterance": "what is the speed of light"}))
+                              {"utterance": "what is the speed of light"},
+                              qq_ctxt))
+
+        skill_ctxt = {"source": "audio", "destination": "skills", 'skill_id': 'wiki.test'}
+        skill_ans_ctxt = {"source": "skills", "destination": "audio", 'skill_id': 'wiki.test'}
 
         expected = [
             # original query
-            {'context': {},
+            {'context': qq_ctxt,
              'data': {'utterance': 'what is the speed of light'},
              'type': 'common_query.question'},
             # thinking animation
@@ -41,19 +47,19 @@ class TestCommonQuery(unittest.TestCase):
             # send query
             {'type': 'question:query',
              'data': {'phrase': 'what is the speed of light'},
-             'context': {'skill_id': self.cc.skill_id}},
+             'context': qq_ans_ctxt},
             # skill announces its searching
             {'type': 'question:query.response',
              'data': {'phrase': 'what is the speed of light',
                       'skill_id': 'wiki.test',
                       'searching': True},
-             'context': {'skill_id': 'wiki.test'}},
+             'context': skill_ctxt},
             # skill context set by skill for continuous dialog
             {'type': 'add_context',
              'data': {'context': 'wiki_testFakeWikiKnows',
                       'word': 'what is the speed of light',
                       'origin': ''},
-             'context': {'skill_id': 'wiki.test'}},
+             'context': skill_ans_ctxt},
             # final response
             {'type': 'question:query.response',
              'data': {'phrase': 'what is the speed of light',
@@ -62,7 +68,7 @@ class TestCommonQuery(unittest.TestCase):
                       'callback_data': {'query': 'what is the speed of light',
                                         'answer': "answer 1"},
                       'conf': 0.74},
-             'context': {'skill_id': 'wiki.test'}},
+             'context': skill_ctxt},
             # stop thinking animation
             {'type': 'enclosure.mouth.reset',
              'data': {},
@@ -80,14 +86,14 @@ class TestCommonQuery(unittest.TestCase):
                       'expect_response': False,
                       'meta': {'skill': self.cc.skill_id},
                       'lang': 'en-us'},
-             'context': {'skill_id': self.cc.skill_id}},
+             'context': qq_ans_ctxt},
             # skill callback event
             {'type': 'question:action',
              'data': {'skill_id': 'wiki.test',
                       'phrase': 'what is the speed of light',
                       'callback_data': {'query': 'what is the speed of light',
                                         'answer': 'answer 1'}},
-             'context': {'skill_id': self.cc.skill_id}}
+             'context': qq_ans_ctxt}
         ]
 
         for ctr, msg in enumerate(expected):
