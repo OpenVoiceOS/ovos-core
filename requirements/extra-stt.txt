@@ -1,5 +1,5 @@
 # speech client + default stt plugins
-ovos-listener~=0.0, >=0.2a9
+ovos-listener~=0.0, >=0.0.2a9
 
 # ensure plugins below even if removed from ovos-listener dep list
 ovos-vad-plugin-webrtcvad~=0.0.1
