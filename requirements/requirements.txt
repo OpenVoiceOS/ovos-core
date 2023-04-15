@@ -21,7 +21,7 @@ ovos_workshop~=0.0, >=0.0.12a4
 ovos_PHAL~=0.0, >=0.0.2
 ovos-lingua-franca>=0.4.6
 
-ovos-listener~=0.0, >=0.0.2a4
+ovos-listener~=0.0, >=.0.2a9
 
 ovos-tts-plugin-mimic~=0.2, >=0.2.6
 ovos-tts-plugin-mimic3-server~=0.0
