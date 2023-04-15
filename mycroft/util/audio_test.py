@@ -21,7 +21,8 @@ from speech_recognition import Recognizer
 
 from mycroft.listener.mic import MutableMicrophone
 from ovos_config.config import Configuration
-from mycroft.util.audio_utils import play_wav, find_input_device
+from ovos_utils.sound import play_wav
+from mycroft.util.audio_utils import find_input_device
 from ovos_utils.log import LOG
 import logging
 from ovos_utils.file_utils import get_temp_path

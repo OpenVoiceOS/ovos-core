@@ -26,7 +26,7 @@ from mycroft.skills.intent_services import (
 )
 from mycroft.skills.permissions import ConverseMode, ConverseActivationMode
 from ovos_utils.log import LOG
-from mycroft.util.audio_utils import play_error_sound
+from ovos_utils.sound import play_error_sound
 from mycroft.util.parse import normalize
 from ovos_utils.messagebus import get_message_lang
 

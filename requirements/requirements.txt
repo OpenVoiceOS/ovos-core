@@ -24,20 +24,11 @@ ovos_PHAL~=0.0, >=0.0.2
 ovos-lingua-franca>=0.4.6
 
 ovos-stt-plugin-server~=0.0, >=0.0.2
-ovos-tts-plugin-mimic~=0.2, >=0.2.6
-ovos-tts-plugin-mimic3-server~=0.0
-
 ovos-ww-plugin-pocketsphinx~=0.1
 ovos-ww-plugin-precise~=0.1
 ovos-vad-plugin-webrtcvad~=0.0.1
 
-ovos_plugin_common_play~=0.0, >=0.0.5a5
-# ovos-ocp-youtube-plugin~=0.0, >=0.0.1
-ovos-ocp-m3u-plugin~=0.0, >=0.0.1
-ovos-ocp-rss-plugin~=0.0, >=0.0.2
-ovos-ocp-files-plugin~=0.13
-ovos-ocp-news-plugin~=0.0, >=0.0.3
-
+ovos-audio~=0.0, >=0.0.2a10
 
 ovos-skill-volume~=0.0.1
 ovos-skill-fallback-unknown~=0.0.2

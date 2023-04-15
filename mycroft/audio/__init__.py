@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from mycroft.audio.utils import wait_while_speaking, is_speaking, stop_speaking
+from ovos_audio.utils import wait_while_speaking, is_speaking, stop_speaking

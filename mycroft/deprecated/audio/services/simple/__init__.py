@@ -16,10 +16,10 @@ import signal
 from threading import Lock
 from time import sleep
 
-from mycroft.audio.services import AudioBackend
+from ovos_plugin_manager.templates.audio import AudioBackend
 from ovos_bus_client.message import Message
 from ovos_utils.log import LOG
-from mycroft.util import play_mp3, play_ogg, play_wav
+from ovos_utils.sound import play_wav, play_ogg, play_mp3
 import mimetypes
 import re
 from requests import Session
