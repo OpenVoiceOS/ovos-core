@@ -21,10 +21,10 @@ from ovos_stt_plugin_selene import SeleneSTT
 from ovos_stt_plugin_vosk import VoskKaldiSTT
 
 import mycroft.configuration
-import mycroft.listener.stt
+import ovos_listener.stt
 from mycroft.configuration import Configuration
-from mycroft.listener import RecognizerLoop
-from mycroft.listener.service import SpeechService
+from ovos_listener.listener import RecognizerLoop
+from ovos_listener.service import SpeechService
 from mycroft.util.log import LOG
 from ovos_utils.messagebus import Message, FakeBus
 from ovos_utils.process_utils import ProcessState
@@ -64,20 +64,20 @@ STT_INVALID_FB_CONFIG.merge({
 class TestSTT(unittest.TestCase):
     def test_factory(self):
         config = {'module': 'mycroft'}
-        stt = mycroft.listener.stt.STTFactory.create(config)
+        stt = ovos_listener.stt.STTFactory.create(config)
         self.assertEqual(type(stt), SeleneSTT)
 
         config = {'module': 'ovos-stt-plugin-selene'}
-        stt = mycroft.listener.stt.STTFactory.create(config)
+        stt = ovos_listener.stt.STTFactory.create(config)
         self.assertEqual(type(stt), SeleneSTT)
 
         config = {'stt': config}
-        stt = mycroft.listener.stt.STTFactory.create(config)
+        stt = ovos_listener.stt.STTFactory.create(config)
         self.assertEqual(type(stt), SeleneSTT)
 
     @patch.dict(Configuration._Configuration__patch, STT_CONFIG)
     def test_factory_from_config(self):
-        stt = mycroft.listener.stt.STTFactory.create()
+        stt = ovos_listener.stt.STTFactory.create()
         self.assertEqual(type(stt), SeleneSTT)
 
     @patch.dict(Configuration._Configuration__patch, STT_CONFIG)
@@ -140,9 +140,9 @@ class TestService(unittest.TestCase):
         self.assertTrue(speech.status.state <= ProcessState.STOPPING)
         self.assertFalse(speech.is_alive())
 
-    @patch('mycroft.listener.service.get_stt_lang_configs')
-    @patch('mycroft.listener.service.get_stt_supported_langs')
-    @patch('mycroft.listener.service.get_stt_module_configs')
+    @patch('ovos_listener.service.get_stt_lang_configs')
+    @patch('ovos_listener.service.get_stt_supported_langs')
+    @patch('ovos_listener.service.get_stt_module_configs')
     def test_opm_stt(self,
                      mock_get_configs, mock_get_lang, mock_get_lang_configs):
         loop = Mock()
@@ -180,7 +180,7 @@ class TestService(unittest.TestCase):
 
         speech.handle_opm_stt_query(Message("opm.stt.query"))
 
-    @patch('mycroft.listener.service.get_vad_configs')
+    @patch('ovos_listener.service.get_vad_configs')
     def test_opm_vad(self,  mock_get_configs):
         loop = Mock()
 
@@ -210,9 +210,9 @@ class TestService(unittest.TestCase):
 
         speech.handle_opm_vad_query(Message("opm.vad.query"))
 
-    @patch('mycroft.listener.service.get_ww_lang_configs')
-    @patch('mycroft.listener.service.get_ww_supported_langs')
-    @patch('mycroft.listener.service.get_ww_module_configs')
+    @patch('ovos_listener.service.get_ww_lang_configs')
+    @patch('ovos_listener.service.get_ww_supported_langs')
+    @patch('ovos_listener.service.get_ww_module_configs')
     def test_opm_ww(self,
                      mock_get_configs, mock_get_lang, mock_get_lang_configs):
         loop = Mock()
