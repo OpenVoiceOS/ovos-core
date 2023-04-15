@@ -13,7 +13,7 @@ test_config = {
 }
 
 
-@mock.patch('ovos_utils.sound.Configuration')
+@mock.patch('ovos_utils.sound.read_mycroft_config')
 @mock.patch('ovos_utils.sound.subprocess')
 class TestPlaySounds(TestCase):
     def test_play_ogg(self, mock_subprocess, mock_conf):
