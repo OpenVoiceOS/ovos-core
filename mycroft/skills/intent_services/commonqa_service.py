@@ -165,6 +165,7 @@ class CommonQAService:
 
     def _query_timeout(self, message):
         if not self.searching.is_set():
+            LOG.warning("got a common query response outside search window")
             return  # not searching, ignore timeout event
         self.searching.clear()
 
@@ -194,7 +195,11 @@ class CommonQAService:
                     pass
 
                 # invoke best match
-                self.speak(best['answer'])
+                # TODO verify version before PR merge
+                from ovos_workshop.version import VERSION_MAJOR, VERSION_ALPHA, VERSION_BUILD, VERSION_MINOR
+                if VERSION_MAJOR == 0 and VERSION_MINOR == 0 and VERSION_BUILD < 12:
+                    # ovos workshop speaks this itself since 0.0.12a6
+                    self.speak(best['answer'])
 
                 LOG.info('Handling with: ' + str(best['skill_id']))
                 cb = best.get('callback_data') or {}
