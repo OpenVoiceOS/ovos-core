@@ -13,8 +13,16 @@
 # limitations under the License.
 #
 """Intent service for Mycroft's fallback system."""
+import operator
+import time
 from collections import namedtuple
+
+from ovos_config import Configuration
+
 from mycroft.skills.intent_services.base import IntentMatch
+from ovos_bus_client.message import Message
+from ovos_utils.log import LOG
+from ovos_workshop.permissions import FallbackMode
 
 FallbackRange = namedtuple('FallbackRange', ['start', 'stop'])
 
@@ -24,6 +32,102 @@ class FallbackService:
 
     def __init__(self, bus):
         self.bus = bus
+        self.fallback_config = Configuration()["skills"].get("fallbacks", {})
+        self.registered_fallbacks = {}  # skill_id: priority
+        self.bus.on("ovos.skills.fallback.register", self.handle_register_fallback)
+        self.bus.on("ovos.skills.fallback.deregister", self.handle_deregister_fallback)
+
+    def handle_register_fallback(self, message):
+        skill_id = message.data.get("skill_id")
+        priority = message.data.get("priority") or 101
+
+        # check if .conf is overriding the priority for this skill
+        priority_overrides = self.fallback_config.get("fallback_priorities", {})
+        if skill_id in priority_overrides:
+            new_priority = priority_overrides.get(skill_id)
+            LOG.info(f"forcing {skill_id} fallback priority from {priority} to {new_priority}")
+            self.registered_fallbacks[skill_id] = new_priority
+        else:
+            self.registered_fallbacks[skill_id] = priority
+
+    def handle_deregister_fallback(self, message):
+        skill_id = message.data.get("skill_id")
+        if skill_id in self.registered_fallbacks:
+            self.registered_fallbacks.pop(skill_id)
+
+    def _fallback_allowed(self, skill_id):
+        """Checks if a skill_id is allowed to fallback
+
+        - is the skill blacklisted from fallback
+        - is fallback configured to only allow specific skills
+
+        Args:
+            skill_id (str): identifier of skill that wants to fallback.
+
+        Returns:
+            permitted (bool): True if skill can fallback
+        """
+        opmode = self.fallback_config.get("fallback_mode", FallbackMode.ACCEPT_ALL)
+        if opmode == FallbackMode.BLACKLIST and skill_id in \
+                self.fallback_config.get("fallback_blacklist", []):
+            return False
+        elif opmode == FallbackMode.WHITELIST and skill_id not in \
+                self.fallback_config.get("fallback_whitelist", []):
+            return False
+        return True
+
+    def _collect_fallback_skills(self):
+        """use the messagebus api to determine which skills want to fallback
+        This includes all skills and external applications"""
+        skill_ids = []
+        fallback_skills = []  # skill_ids that have fallback handlers
+
+        def handle_ack(message):
+            skill_id = message.data["skill_id"]
+            if message.data.get("can_handle", True):
+                if skill_id in self.registered_fallbacks:
+                    fallback_skills.append(skill_id)
+            skill_ids.append(skill_id)
+
+        self.bus.on("ovos.skills.fallback.pong", handle_ack)
+
+        # wait for all skills to acknowledge they want to answer fallback queries
+        self.bus.emit(Message("ovos.skills.fallback.ping"))
+        start = time.time()
+        while not all(s in skill_ids for s in self.registered_fallbacks) \
+                and time.time() - start <= 0.5:
+            time.sleep(0.02)
+
+        self.bus.remove("ovos.skills.fallback.pong", handle_ack)
+        return fallback_skills
+
+    def attempt_fallback(self, utterances, skill_id, lang, message):
+        """Call skill and ask if they want to process the utterance.
+
+        Args:
+            utterances (list of tuples): utterances paired with normalized
+                                         versions.
+            skill_id: skill to query.
+            lang (str): current language
+            message (Message): message containing interaction info.
+
+        Returns:
+            handled (bool): True if handled otherwise False.
+        """
+        if self._fallback_allowed(skill_id):
+            fb_msg = message.reply(f"ovos.skills.fallback.{skill_id}.request",
+                                   {"skill_id": skill_id,
+                                    "utterances": utterances,
+                                    "lang": lang})
+            result = self.bus.wait_for_response(fb_msg,
+                                                f"ovos.skills.fallback.{skill_id}.response")
+            if result and 'error' in result.data:
+                error_msg = result.data['error']
+                LOG.error(f"{skill_id}: {error_msg}")
+                return False
+            elif result is not None:
+                return result.data.get('result', False)
+        return False
 
     def _fallback_range(self, utterances, lang, message, fb_range):
         """Send fallback request for a specified priority range.
@@ -38,6 +142,15 @@ class FallbackService:
         Returns:
             IntentMatch or None
         """
+        # new style bus api
+        sorted_handlers = sorted(self.registered_fallbacks.items(),
+                                 key=operator.itemgetter(1))
+        for skill_id, prio in sorted_handlers:
+            result = self.attempt_fallback(utterances, skill_id, lang, message)
+            if result:
+                return IntentMatch('Fallback', None, {}, None)
+
+        # old style deprecated fallback skill singleton class
         msg = message.reply(
             'mycroft.skills.fallback',
             data={'utterance': utterances[0][0],
@@ -45,11 +158,10 @@ class FallbackService:
                   'fallback_range': (fb_range.start, fb_range.stop)}
         )
         response = self.bus.wait_for_response(msg, timeout=10)
+
         if response and response.data['handled']:
-            ret = IntentMatch('Fallback', None, {}, None)
-        else:
-            ret = None
-        return ret
+            return IntentMatch('Fallback', None, {}, None)
+        return None
 
     def high_prio(self, utterances, lang, message):
         """Pre-padatious fallbacks."""
