@@ -28,15 +28,15 @@ from ovos_utils.log import LOG
 from mycroft.util import connected
 from ovos_utils.network_utils import is_connected
 from ovos_utils.gui import is_gui_connected
-from mycroft.skills.skill_loader import get_skill_directories, SkillLoader, PluginSkillLoader, find_skill_plugins
+from ovos_workshop.skill_launcher import get_skill_directories, SkillLoader, PluginSkillLoader
+from ovos_plugin_manager.skills import find_skill_plugins
 from mycroft.skills.skill_updater import SeleneSkillManifestUploader
 from ovos_bus_client.client import MessageBusClient
 
 # do not delete - bacwards compat imports
+from ovos_workshop.skill_launcher import SKILL_MAIN_MODULE
 from mycroft.deprecated.skills.settings import UploadQueue, SkillSettingsDownloader
 from mycroft.deprecated.skills.skill_updater import SkillUpdater
-
-SKILL_MAIN_MODULE = '__init__.py'
 
 
 def _shutdown_skill(instance):
