@@ -77,10 +77,10 @@ class FallbackService:
         return True
 
     def _collect_fallback_skills(self):
-        """use the messagebus api to determine which skills want to fallback
+        """use the messagebus api to determine which skills have registered fallback handlers
         This includes all skills and external applications"""
         skill_ids = []
-        fallback_skills = []  # skill_ids that have fallback handlers
+        fallback_skills = []  # skill_ids that want to handle fallback
 
         def handle_ack(message):
             skill_id = message.data["skill_id"]
@@ -143,8 +143,9 @@ class FallbackService:
             IntentMatch or None
         """
         # new style bus api
-        sorted_handlers = sorted(self.registered_fallbacks.items(),
-                                 key=operator.itemgetter(1))
+        fallbacks = [(k, v) for k, v in self.registered_fallbacks.items()
+                     if k in self._collect_fallback_skills()]
+        sorted_handlers = sorted(fallbacks, key=operator.itemgetter(1))
         for skill_id, prio in sorted_handlers:
             result = self.attempt_fallback(utterances, skill_id, lang, message)
             if result:
