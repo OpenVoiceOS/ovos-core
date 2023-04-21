@@ -76,15 +76,15 @@ class FallbackService:
             return False
         return True
 
-    def _collect_fallback_skills(self):
+    def _collect_fallback_skills(self, message):
         """use the messagebus api to determine which skills have registered fallback handlers
         This includes all skills and external applications"""
         skill_ids = []
         fallback_skills = []  # skill_ids that want to handle fallback
 
-        def handle_ack(message):
-            skill_id = message.data["skill_id"]
-            if message.data.get("can_handle", True):
+        def handle_ack(msg):
+            skill_id = msg.data["skill_id"]
+            if msg.data.get("can_handle", True):
                 if skill_id in self.registered_fallbacks:
                     fallback_skills.append(skill_id)
             skill_ids.append(skill_id)
@@ -92,7 +92,8 @@ class FallbackService:
         self.bus.on("ovos.skills.fallback.pong", handle_ack)
 
         # wait for all skills to acknowledge they want to answer fallback queries
-        self.bus.emit(Message("ovos.skills.fallback.ping"))
+        self.bus.emit(message.forward("ovos.skills.fallback.ping",
+                                      message.data))
         start = time.time()
         while not all(s in skill_ids for s in self.registered_fallbacks) \
                 and time.time() - start <= 0.5:
@@ -142,9 +143,12 @@ class FallbackService:
         Returns:
             IntentMatch or None
         """
+        message.data["utterances"] = utterances
+        message.data["lang"] = lang
+
         # new style bus api
         fallbacks = [(k, v) for k, v in self.registered_fallbacks.items()
-                     if k in self._collect_fallback_skills()]
+                     if k in self._collect_fallback_skills(message)]
         sorted_handlers = sorted(fallbacks, key=operator.itemgetter(1))
         for skill_id, prio in sorted_handlers:
             result = self.attempt_fallback(utterances, skill_id, lang, message)
