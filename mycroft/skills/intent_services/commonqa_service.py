@@ -195,13 +195,9 @@ class CommonQAService:
                     pass
 
                 # invoke best match
-                # TODO verify version before PR merge
-                from ovos_workshop.version import VERSION_MAJOR, VERSION_ALPHA, VERSION_BUILD, VERSION_MINOR
-                if VERSION_MAJOR == 0 and VERSION_MINOR == 0 and VERSION_BUILD < 12:
-                    # ovos workshop speaks this itself since 0.0.12a6
-                    self.speak(best['answer'])
-
                 LOG.info('Handling with: ' + str(best['skill_id']))
+                if not message.data.get("handles_speech", False):
+                    self.speak(best['answer'])
                 cb = best.get('callback_data') or {}
                 self.bus.emit(message.forward('question:action',
                                               data={'skill_id': best['skill_id'],
