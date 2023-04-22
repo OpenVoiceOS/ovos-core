@@ -115,6 +115,8 @@ class CommonQAService(IntentService):
             if answered:
                 match = IntentMatch(intent_service='CommonQuery',
                                     intent_type="common_qa",
+                                    utterance=utterance,
+                                    utterance_remainder="",
                                     intent_data={},  # TODO get this from CommonQA
                                     confidence=100,  # TODO get this from CommonQA
                                     skill_id=self.skill_id)

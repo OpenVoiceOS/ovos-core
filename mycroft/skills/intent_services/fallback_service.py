@@ -44,6 +44,8 @@ class FallbackService(IntentService):
         Returns:
             IntentMatch or None
         """
+        if not utterances:
+            return None
         msg = message.reply(
             'mycroft.skills.fallback',
             data={'utterance': utterances[0][0],
@@ -58,6 +60,8 @@ class FallbackService(IntentService):
                               intent_type="fallback",
                               intent_data={},
                               confidence=(100 - fb_range.stop) / 100,
+                              utterance=utterances[0],
+                              utterance_remainder="",
                               skill_id=skill_id)
         else:
             ret = None

@@ -264,6 +264,8 @@ class ConverseService(IntentService):
             IntentMatch if handled otherwise None.
         """
         utterances = [item for tup in utterances or [] for item in tup]
+        if not utterances:
+            return None
         # filter allowed skills
         self._check_converse_timeout()
         # check if any skill wants to handle utterance
@@ -273,6 +275,8 @@ class ConverseService(IntentService):
                                     intent_type="converse",
                                     intent_data={},
                                     confidence=100,
+                                    utterance=utterances[0],
+                                    utterance_remainder="",
                                     skill_id=skill_id)
                 return match
         return None
