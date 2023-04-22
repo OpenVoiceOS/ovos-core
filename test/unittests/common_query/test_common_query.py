@@ -76,27 +76,29 @@ class TestCommonQuery(unittest.TestCase):
              'context': {'destination': ['enclosure'],
                          'skill_id': self.cc.skill_id}
              },
-            # tell enclosure about active skill (speak method)
-            {'type': 'enclosure.active_skill',
-             'data': {'skill_id': self.cc.skill_id},
-             'context': {'destination': ['enclosure'],
-                         'skill_id': self.cc.skill_id}},
-            # execution of speak method
-            {'type': 'speak',
-             'data': {'utterance': 'answer 1',
-                      'expect_response': False,
-                      'meta': {'skill': self.cc.skill_id},
-                      'lang': 'en-us'},
-             'context': qq_ans_ctxt},
             # skill callback event
             {'type': 'question:action',
              'data': {'skill_id': 'wiki.test',
                       'phrase': 'what is the speed of light',
                       'callback_data': {'query': 'what is the speed of light',
                                         'answer': 'answer 1'}},
-             'context': qq_ans_ctxt}
+             'context': skill_ans_ctxt},
+            # tell enclosure about active skill (speak method)
+            {'type': 'enclosure.active_skill',
+             'data': {'skill_id': 'wiki.test'},
+             'context': {'destination': ['enclosure'],
+                         'skill_id': 'wiki.test'}},
+            # execution of speak method
+            {'type': 'speak',
+             'data': {'utterance': 'answer 1',
+                      'expect_response': False,
+                      'meta': {'skill': 'wiki.test'},
+                      'lang': 'en-us'},
+             'context': skill_ans_ctxt},
         ]
 
         for ctr, msg in enumerate(expected):
             m = self.bus.emitted_msgs[ctr]
+            print("#", msg)
+            print(m)
             self.assertEqual(msg, m)
