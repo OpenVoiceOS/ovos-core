@@ -4,7 +4,7 @@ from ovos_config.locale import setup_locale
 from ovos_bus_client.message import Message
 from ovos_bus_client.util import get_message_lang
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
-from ovos_plugin_manager.intents import IntentMatch, IntentPriority
+from ovos_plugin_manager.templates.intents import IntentMatch
 from mycroft.skills.intent_services.base import IntentService
 from ovos_utils.log import LOG
 

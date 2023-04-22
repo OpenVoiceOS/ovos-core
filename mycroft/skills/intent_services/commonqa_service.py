@@ -5,7 +5,7 @@ from threading import Lock, Event
 
 from ovos_bus_client.message import Message, dig_for_message
 
-from ovos_plugin_manager.intents import IntentMatch
+from ovos_plugin_manager.templates.intents import IntentMatch
 from ovos_workshop.resource_files import CoreResources
 from ovos_utils.enclosure.api import EnclosureAPI
 from ovos_utils.log import LOG

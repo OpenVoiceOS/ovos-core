@@ -19,7 +19,7 @@ from ovos_bus_client.util import get_message_lang
 from ovos_config import Configuration
 
 from mycroft.skills.intent_services.base import IntentService
-from ovos_plugin_manager.intents import IntentMatch
+from ovos_plugin_manager.templates.intents import IntentMatch
 
 FallbackRange = namedtuple('FallbackRange', ['start', 'stop'])
 

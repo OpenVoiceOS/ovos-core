@@ -1,17 +1,15 @@
 from ovos_bus_client.util import get_message_lang
-from ovos_plugin_manager.intents import IntentBox
+
 from mycroft.skills.intent_services.base import IntentService
+from ovos_plugin_manager.intents import IntentBox, IntentRange
 
 
-class IntentBoxService(IntentService):
-    """ A IntentExtractor bound to the messagebus"""
+class IntentBoxService:
 
-    def __init__(self, bus=None, config=None):
-        super().__init__(bus, config)
+    def __init__(self, bus, config=None):
+        self.config = config or {}
         self.engine = IntentBox(self.config)
-
-    def bind(self, bus=None):
-        self.bus = bus or self.bus
+        self.bus = bus
         self.register_bus_handlers()
         self.register_compat_bus_handlers()
 
@@ -38,19 +36,31 @@ class IntentBoxService(IntentService):
     def train(self):
         self.engine.train()
 
-    # bus handlers
-    def handle_utterance_message(self, message):
-        utterances = message.data["utterances"]
-        lang = get_message_lang(message)
+    def _intent_range(self, utterances, lang, intent_range: IntentRange):
         good_utterance = False
-        if self.engine:
-            for utterance in utterances:
-                for intent in self.engine.calc(utterance, lang=lang):
-                    yield intent
-                    good_utterance = True
-                if good_utterance:
-                    break
+        for utterance in utterances:
+            for intent in self.engine.calc(utterance, lang=lang):
+                if intent.confidence < intent_range.start or \
+                        intent.confidence > intent_range.stop:
+                    continue
+                yield intent
+                good_utterance = True
+            if good_utterance:
+                break
 
+    def high_prio(self, utterances, lang, message):
+        """Pre-padatious fallbacks."""
+        return self._intent_range(utterances, lang, IntentRange(0, 5))
+
+    def medium_prio(self, utterances, lang, message):
+        """General fallbacks."""
+        return self._intent_range(utterances, lang, IntentRange(5, 90))
+
+    def low_prio(self, utterances, lang, message):
+        """Low prio fallbacks with general matching such as chat-bot."""
+        return self._intent_range(utterances, lang, IntentRange(90, 101))
+
+    # bus handlers
     @staticmethod
     def _parse_message(message):
         name = message.data.get("name") or message.data.get("intent_name")
@@ -87,11 +97,11 @@ class IntentBoxService(IntentService):
 
     def handle_register_keyword_intent(self, message):
         intent_name, samples, lang, skill_id = self._parse_message(message)
-        self.engine.register_keyword_intent(skill_id,  intent_name,
-            [_[0] for _ in message.data['requires']],
-            [_[0] for _ in message.data.get('optional', [])],
-            [_[0] for _ in message.data.get('at_least_one', [])],
-            [_[0] for _ in message.data.get('excludes', [])])
+        self.engine.register_keyword_intent(skill_id, intent_name,
+                                            [_[0] for _ in message.data['requires']],
+                                            [_[0] for _ in message.data.get('optional', [])],
+                                            [_[0] for _ in message.data.get('at_least_one', [])],
+                                            [_[0] for _ in message.data.get('excludes', [])])
 
     def handle_detach_intent(self, message):
         intent_name, samples, lang, skill_id = self._parse_message(message)
@@ -133,3 +143,41 @@ class IntentBoxService(IntentService):
                 message.data["name"] = ent
                 message.data["samples"] = [entity_value]
                 self.handle_register_entity(message)
+
+
+class HighPrioIntentBoxService(IntentService):
+    """Intent Service handling conversational skills."""
+
+    def __init__(self, intentbox):
+        super().__init__(bus=intentbox.bus)
+        self.engine = intentbox
+
+    def handle_utterance_message(self, message):
+        utterances = message.data["utterances"]
+        lang = get_message_lang(message)
+        match = self.engine.high_prio(utterances, lang, message)
+        return [match] if match else []
+
+
+class MediumPrioIntentBoxService(IntentService):
+    def __init__(self, intentbox):
+        super().__init__(bus=intentbox.bus)
+        self.engine = intentbox
+
+    def handle_utterance_message(self, message):
+        utterances = message.data["utterances"]
+        lang = get_message_lang(message)
+        match = self.engine.medium_prio(utterances, lang, message)
+        return [match] if match else []
+
+
+class LowPrioIntentBoxService(IntentService):
+    def __init__(self, intentbox):
+        super().__init__(bus=intentbox.bus)
+        self.engine = intentbox
+
+    def handle_utterance_message(self, message):
+        utterances = message.data["utterances"]
+        lang = get_message_lang(message)
+        match = self.engine.low_prio(utterances, lang, message)
+        return [match] if match else []

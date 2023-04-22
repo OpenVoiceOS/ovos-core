@@ -19,7 +19,7 @@ from ovos_plugin_manager.utils.intent_context import ContextManagerFrame, Contex
 from adapt.intent import IntentBuilder
 
 from mycroft.configuration import Configuration
-from mycroft.skills.intent_services.base import IntentMatch
+from ovos_plugin_manager.templates.intents import IntentMatch
 
 
 def _entity_skill_id(skill_id):

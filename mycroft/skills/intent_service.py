@@ -24,9 +24,10 @@ from mycroft.skills.intent_services import (
     AdaptService, FallbackService,
     PadatiousService, PadatiousMatcher,
     ConverseService, CommonQAService,
-    IntentBoxService
+    IntentBoxService, HighPrioIntentBoxService,\
+    MediumPrioIntentBoxService, LowPrioIntentBoxService
 )
-from ovos_plugin_manager.intents import IntentMatch
+from ovos_plugin_manager.templates.intents import IntentMatch
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
 from ovos_utils.log import LOG
 from ovos_utils.sound import play_error_sound
@@ -98,9 +99,11 @@ class IntentService:
     def load_intent_services(self):
         self.services = [
             self.converse,
-            self.intentBox,
+            HighPrioIntentBoxService(self.intentBox),
             HighPrioFallbackService(self.bus, self.fallback),
+            MediumPrioIntentBoxService(self.intentBox),
             self.common_qa,
+            LowPrioIntentBoxService(self.intentBox),
             MediumPrioFallbackService(self.bus, self.fallback),
             LowPrioFallbackService(self.bus, self.fallback)
         ]
@@ -143,8 +146,7 @@ class IntentService:
                 pass
             LOG.info(f"Matching {utterances} with {engine}")
             try:
-                match = engine.handle_utterance_message(message)
-                if match:
+                for match in engine.handle_utterance_message(message):
                     yield match
             except GeneratorExit:
                 return
