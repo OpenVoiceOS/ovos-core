@@ -94,142 +94,143 @@ class TestSkillLoader(unittest.TestCase):
     for file_name in ('__init__.py', 'bar.py', '.foobar', 'bar.pyc'):
         skill_directory.joinpath(file_name).touch()
 
-    loader = SkillLoader(bus, str(skill_directory))
-
-    # TODO: un-mock these when they are more testable
-    loader._load_skill_source = Mock(
-        return_value=Mock()
-    )
-    loader._check_for_first_run = Mock()
-
     def test_skill_already_loaded(self):
         """The loader should take to action for an already loaded skill."""
         bus.msgs = []
-        self.loader.instance = Mock
-        self.loader.instance.reload_skill = True
-        self.loader.loaded = True
-        self.loader.last_loaded = time() + ONE_MINUTE
+        loader = SkillLoader(bus, str(self.skill_directory))
+        loader.instance = Mock
+        loader.instance.reload_skill = True
+        loader.loaded = True
+        loader.last_loaded = time() + ONE_MINUTE
 
-        self.assertFalse(self.loader.reload_needed())
+        self.assertFalse(loader.reload_needed())
 
     def test_skill_reloading_blocked(self):
         """The loader should skip reloads for skill that doesn't allow it."""
         bus.msgs = []
-        self.loader.instance = Mock()
-        self.loader.instance.reload_skill = False
-        self.loader.active = True
-        self.loader.loaded = True
-        self.assertFalse(self.loader.reload_needed())
+        loader = SkillLoader(bus, str(self.skill_directory))
+        loader.instance = Mock()
+        loader.instance.reload_skill = False
+        loader.active = True
+        loader.loaded = True
+
+        self.assertFalse(loader.reload_needed())
 
     def test_skill_reloading_deactivated(self):
         """The loader should skip reloads for skill that aren't active."""
         bus.msgs = []
-        self.loader.instance = Mock()
-        self.loader.name = "MySkill"
-        self.loader.instance.reload_skill = True
-        self.loader.active = False
-        self.loader.loaded = False
-        self.assertFalse(self.loader.reload_needed())
+        loader = SkillLoader(bus, str(self.skill_directory))
+        loader.instance = Mock()
+        loader.name = "MySkill"
+        loader.instance.reload_skill = True
+        loader.active = False
+        loader.loaded = False
+
+        self.assertFalse(loader.reload_needed())
 
     def test_skill_reload(self):
-        bus.msgs = []
         """Test reloading a skill that was modified."""
-        self.loader.instance = Mock()
-        self.loader.loaded = True
-        self.loader.load_attempted = False
-        self.loader.last_loaded = 10
-        self.loader.instance.reload_skill = True
-        self.loader.instance.name = "MySkill"
-        self.loader.skill_id = 'test_skill'
+        bus.msgs = []
+        loader = SkillLoader(bus, str(self.skill_directory))
+        loader.instance = Mock()
+        loader.loaded = True
+        loader.load_attempted = False
+        loader.last_loaded = 10
+        loader.instance.reload_skill = True
+        loader.instance.name = "MySkill"
+        loader.skill_id = 'test_skill'
 
         # Mock to return a known (Mock) skill instance
-        real_create_skill_instance = self.loader._create_skill_instance
+        real_create_skill_instance = loader._create_skill_instance
 
         def _update_skill_instance(*args, **kwargs):
-            self.loader.instance = Mock()
-            self.loader.loaded = True
-            self.loader.load_attempted = True
-            self.loader.last_loaded = 100
-            self.loader.skill_id = 'test_skill'
-            self.loader.instance.name = "MySkill"
+            loader.instance = Mock()
+            loader.loaded = True
+            loader.load_attempted = True
+            loader.last_loaded = 100
+            loader.skill_id = 'test_skill'
+            loader.instance.name = "MySkill"
             return True
 
-        self.loader._create_skill_instance = _update_skill_instance
+        loader._create_skill_instance = _update_skill_instance
 
-        self.loader.reload()
+        loader.reload()
 
-        self.assertTrue(self.loader.load_attempted)
-        self.assertTrue(self.loader.loaded)
+        self.assertTrue(loader.load_attempted)
+        self.assertTrue(loader.loaded)
 
         self.assertListEqual(
             ['mycroft.skills.shutdown', 'mycroft.skills.loaded'],
             [m["type"] for m in bus.msgs]
         )
-        self.loader._create_skill_instance = real_create_skill_instance
+        loader._create_skill_instance = real_create_skill_instance
 
     def test_skill_load(self):
+        loader = SkillLoader(bus, str(self.skill_directory))
         bus.msgs = []
-
-        self.loader.instance = None
-        self.loader.loaded = False
-        self.loader.last_loaded = 0
+        loader.instance = None
+        loader.loaded = False
+        loader.last_loaded = 0
 
         # Mock to return a known (Mock) skill instance
-        real_create_skill_instance = self.loader._create_skill_instance
+        real_create_skill_instance = loader._create_skill_instance
 
         def _update_skill_instance(*args, **kwargs):
-            self.loader.instance = Mock()
-            self.loader.loaded = True
-            self.loader.last_loaded = 100
-            self.loader.skill_id = 'test_skill'
-            self.loader.instance.name = "MySkill"
+            loader.instance = Mock()
+            loader.loaded = True
+            loader.last_loaded = 100
+            loader.skill_id = 'test_skill'
+            loader.instance.name = "MySkill"
             return True
 
-        self.loader._create_skill_instance = _update_skill_instance
+        loader._create_skill_instance = _update_skill_instance
 
-        self.loader.load()
+        loader.load()
 
-        self.assertTrue(self.loader.load_attempted)
-        self.assertTrue(self.loader.loaded)
+        self.assertTrue(loader.load_attempted)
+        self.assertTrue(loader.loaded)
 
         self.assertListEqual(
             ['mycroft.skills.loaded'],
             [m["type"] for m in bus.msgs]
         )
-        self.loader._create_skill_instance = real_create_skill_instance
+        loader._create_skill_instance = real_create_skill_instance
 
     def test_reload_modified(self):
+        loader = SkillLoader(bus, str(self.skill_directory))
         bus.msgs = []
-        self.loader.last_modified = 0
-        self.loader.reload = Mock()
+        loader.last_modified = 0
+        loader.reload = Mock()
 
-        self.loader._handle_filechange()
-        self.loader.reload.assert_called_once_with()
-        self.assertNotEqual(self.loader.last_modified, 0)
+        loader._handle_filechange()
+        loader.reload.assert_called_once_with()
+        self.assertNotEqual(loader.last_modified, 0)
 
     def test_skill_load_blacklisted(self):
         """Skill should not be loaded if it is blacklisted"""
-        self.loader.instance = Mock()
-        self.loader.loaded = False
-        self.loader.last_loaded = 0
-        self.loader.skill_id = 'test_skill'
-        self.loader.name = "MySkill"
+        loader = SkillLoader(bus, str(self.skill_directory))
+        loader.instance = Mock()
+        loader.loaded = False
+        loader.last_loaded = 0
+        loader.skill_id = 'test_skill'
+        loader.name = "MySkill"
         bus.msgs = []
-        config = dict(self.loader.config)
+
+        config = dict(loader.config)
         config['skills']['blacklisted_skills'] = ['test_skill']
-        self.loader.config = config
-        self.assertEqual(self.loader.config['skills']['blacklisted_skills'],
+        loader.config = config
+        self.assertEqual(loader.config['skills']['blacklisted_skills'],
                          ['test_skill'])
-        self.loader.skill_id = 'test_skill'
+        loader.skill_id = 'test_skill'
 
-        self.loader.load()
+        loader.load()
 
-        self.assertTrue(self.loader.load_attempted)
-        self.assertFalse(self.loader.loaded)
+        self.assertTrue(loader.load_attempted)
+        self.assertFalse(loader.loaded)
 
         self.assertListEqual(
             ['mycroft.skills.loading_failure'],
             [m["type"] for m in bus.msgs]
         )
 
-        self.loader.config['skills']['blacklisted_skills'].remove('test_skill')
+        loader.config['skills']['blacklisted_skills'].remove('test_skill')
