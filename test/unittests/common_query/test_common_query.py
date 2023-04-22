@@ -65,6 +65,7 @@ class TestCommonQuery(unittest.TestCase):
              'data': {'phrase': 'what is the speed of light',
                       'skill_id': 'wiki.test',
                       'answer': "answer 1",
+                      'handles_speech': True,
                       'callback_data': {'query': 'what is the speed of light',
                                         'answer': "answer 1"},
                       'conf': 0.74},

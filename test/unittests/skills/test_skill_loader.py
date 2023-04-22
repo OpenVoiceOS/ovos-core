@@ -148,6 +148,7 @@ class TestSkillLoader(unittest.TestCase):
         def _update_skill_instance(*args, **kwargs):
             self.loader.instance = Mock()
             self.loader.loaded = True
+            self.loader.load_attempted = True
             self.loader.last_loaded = 100
             self.loader.skill_id = 'test_skill'
             self.loader.instance.name = "MySkill"
