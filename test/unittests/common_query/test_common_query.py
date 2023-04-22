@@ -99,6 +99,4 @@ class TestCommonQuery(unittest.TestCase):
 
         for ctr, msg in enumerate(expected):
             m = self.bus.emitted_msgs[ctr]
-            print("#", msg)
-            print(m)
             self.assertEqual(msg, m)
