@@ -15,23 +15,18 @@
 """Mycroft's intent service, providing intent parsing since forever!"""
 import threading
 
-from ovos_plugin_manager.coreference import OVOSCoreferenceSolverFactory
-from ovos_plugin_manager.intents import find_intent_plugins, IntentMatch, IntentEngine
 from mycroft.skills.intent_services.fallback_service import HighPrioFallbackService, \
     MediumPrioFallbackService, LowPrioFallbackService
-from mycroft.deprecated.intent_services.adapt_service import AdaptService, AdaptIntent
-from mycroft.deprecated.intent_services.padatious_service import PadatiousService, PadatiousMatcher
-from ovos_config.config import Configuration
 from ovos_config.locale import setup_locale
 from ovos_bus_client.message import Message, dig_for_message
 from ovos_bus_client.util import get_message_lang
-from mycroft.skills.intent_service_interface import open_intent_envelope
 from mycroft.skills.intent_services import (
     AdaptService, FallbackService,
     PadatiousService, PadatiousMatcher,
     ConverseService, CommonQAService,
-    IntentMatch
+    IntentBoxService
 )
+from ovos_plugin_manager.intents import IntentMatch
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
 from ovos_utils.log import LOG
 from ovos_utils.sound import play_error_sound
@@ -86,8 +81,8 @@ class IntentService:
 
         self.converse = ConverseService(self.bus)
         self.fallback = FallbackService(self.bus)
+        self.intentBox = IntentBoxService(self.bus)
         self.common_qa = CommonQAService(self.bus)
-        self.coref = OVOSCoreferenceSolverFactory.create()
         self.services = []
         self.load_intent_services()
 
@@ -101,31 +96,14 @@ class IntentService:
         self.bus.remove('mycroft.skills.initialized', self.handle_train)
 
     def load_intent_services(self):
-        config = Configuration.get().get("intentBox", {})
-
-        engines = [
+        self.services = [
             self.converse,
+            self.intentBox,
             HighPrioFallbackService(self.bus, self.fallback),
+            self.common_qa,
             MediumPrioFallbackService(self.bus, self.fallback),
             LowPrioFallbackService(self.bus, self.fallback)
         ]
-
-        for engine_id, engine_class in find_intent_plugins().items():
-            engine_config = config.get(engine_id, {})
-            if engine_config.get("disabled"):
-                continue
-            try:
-                plugin = engine_class(engine_config)
-                engine = IntentEngine(engine_id, config=engine_config,
-                                      bus=self.bus, engine=plugin)
-                engines.append(engine)
-            except Exception as e:
-                LOG.exception(f"Failed to load intent plugin: {engine_id}")
-
-        engines.sort(key=lambda k: k.priority)
-        self.services = engines
-        for e in engines:
-            LOG.info(f"Loaded intent engine: {e} with priority: {e.priority}")
 
     def update_skill_name_dict(self, message):
         """Messagebus handler, updates dict of id to skill name conversions."""
@@ -144,8 +122,7 @@ class IntentService:
 
     # intent matching
     def handle_train(self, message):
-        for engine in self.services:
-            engine.train()
+        self.intentBox.train()
         self.bus.emit(message.reply('mycroft.skills.trained'))
 
     def _match_intents(self, utterances, lang, message, converse=False, fallback=False, commonqa=False):
@@ -213,7 +190,8 @@ class IntentService:
         try:
             # iterate over intent engines (ordered by priority)
             # matches is a list or generator with all intents found by a intent engine
-            for matches in self._match_intents(combined, lang, message, converse=True, fallback=True):
+            for matches in self._match_intents(combined, lang, message,
+                                               converse=True, fallback=True, commonqa=True):
                 # iterate over found intents, the utterance may contain more than 1 command
                 for match in matches:
                     # If the service didn't report back the skill_id it
@@ -273,22 +251,19 @@ class IntentService:
         lang = get_message_lang(message)
         combined = _normalize_all_utterances([utterance])
 
-        match = self._match_intents(combined, lang, message)
-
-        if match:
-            if match.intent_type:
-                intent_data = match.intent_data
-                intent_data["intent_name"] = match.intent_type
-                intent_data["intent_service"] = match.intent_service
-                intent_data["skill_id"] = match.skill_id
-                # intent_data["handler"] = match_func.__name__
-                self.bus.emit(message.reply("intent.service.intent.reply",
-                                            {"intent": intent_data}))
-            return
-
-        # signal intent failure
-        self.bus.emit(message.reply("intent.service.intent.reply",
-                                    {"intent": None}))
+        for match in self._match_intents(combined, lang, message):
+            intent_data = match.intent_data
+            intent_data["intent_name"] = match.intent_type
+            intent_data["intent_service"] = match.intent_service
+            intent_data["skill_id"] = match.skill_id
+            # intent_data["handler"] = match_func.__name__
+            self.bus.emit(message.reply("intent.service.intent.reply",
+                                        {"intent": intent_data}))
+            break
+        else:
+            # signal intent failure
+            self.bus.emit(message.reply("intent.service.intent.reply",
+                                        {"intent": None}))
 
     def handle_get_skills(self, message):
         """Send registered skills to caller.

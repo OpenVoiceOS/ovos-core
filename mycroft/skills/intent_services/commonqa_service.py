@@ -5,23 +5,26 @@ from threading import Lock, Event
 
 from ovos_bus_client.message import Message, dig_for_message
 
-from mycroft.skills.intent_services.base import IntentMatch
-from mycroft.skills.skill_data import CoreResources
+from ovos_plugin_manager.intents import IntentMatch
+from ovos_workshop.resource_files import CoreResources
 from ovos_utils.enclosure.api import EnclosureAPI
 from ovos_utils.log import LOG
 from ovos_utils.messagebus import get_message_lang
 
+from mycroft.skills.intent_services.base import IntentService
+
+
 EXTENSION_TIME = 10
 
 
-class CommonQAService:
+class CommonQAService(IntentService):
     """Intent Service handling common query skills.
     All common query skills answer and the best answer is selected
     This is in contrast to triggering best intent directly.
     """
 
     def __init__(self, bus):
-        self.bus = bus
+        super().__init__(bus)
         self.skill_id = "common_query.openvoiceos"  # fake skill
         self.query_replies = {}  # cache of received replies
         self.query_extensions = {}  # maintains query timeout extensions
@@ -31,6 +34,8 @@ class CommonQAService:
         self.answered = False
         self.enclosure = EnclosureAPI(self.bus, self.skill_id)
         self._vocabs = {}
+
+    def register_bus_handlers(self):
         self.bus.on('question:query.response', self.handle_query_response)
         self.bus.on('common_query.question', self.handle_question)
 
@@ -83,6 +88,13 @@ class CommonQAService:
             return False
         return True
 
+    # event handlers
+    def handle_utterance_message(self, message):
+        utterances = message.data["utterances"]
+        lang = get_message_lang(message)
+        match = self.match(utterances, lang, message)
+        return [match] if match else []
+
     def match(self, utterances, lang, message):
         """Send common query request and select best response
 
@@ -101,7 +113,11 @@ class CommonQAService:
             message.data["utterance"] = utterance
             answered = self.handle_question(message)
             if answered:
-                match = IntentMatch('CommonQuery', None, {}, None)
+                match = IntentMatch(intent_service='CommonQuery',
+                                    intent_type="common_qa",
+                                    intent_data={},  # TODO get this from CommonQA
+                                    confidence=100,  # TODO get this from CommonQA
+                                    skill_id=self.skill_id)
         return match
 
     def handle_question(self, message):

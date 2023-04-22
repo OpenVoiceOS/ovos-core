@@ -6,3 +6,5 @@ from mycroft.deprecated.intent_services.adapt_service \
 from mycroft.deprecated.intent_services.padatious_service \
     import PadatiousService, PadatiousMatcher
 from mycroft.skills.intent_services.commonqa_service import CommonQAService
+from mycroft.skills.intent_services.intentBox import IntentBoxService
+

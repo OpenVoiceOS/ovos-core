@@ -4,20 +4,21 @@ from ovos_config.locale import setup_locale
 from ovos_bus_client.message import Message
 from ovos_bus_client.util import get_message_lang
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
-from ovos_plugin_manager.intents import IntentMatch, IntentPriority, IntentEngine
+from ovos_plugin_manager.intents import IntentMatch, IntentPriority
+from mycroft.skills.intent_services.base import IntentService
 from ovos_utils.log import LOG
 
 
-class ConverseService(IntentEngine):
+class ConverseService(IntentService):
     """Intent Service handling conversational skills."""
 
     def __init__(self, bus):
         config = Configuration.get().get("skills", {}).get("converse") or {}
-        super().__init__("ovos.intentbox.converse", bus=bus, config=config)
+        super().__init__(bus=bus, config=config)
         self._consecutive_activations = {}
         self.active_skills = []  # [skill_id , timestamp]
 
-    def bind(self, bus, engine=None):
+    def bind(self, bus):
         self.bus = bus
         self.register_bus_handlers()
         self.register_compat_bus_handlers()
@@ -33,10 +34,6 @@ class ConverseService(IntentEngine):
     def register_compat_bus_handlers(self):
         self.bus.on('active_skill_request', self.handle_activate_skill_request)
         self.bus.on("intent.service.active_skills.get", self.handle_get_active_skills)
-
-    @property
-    def priority(self):
-        return IntentPriority.CONVERSE
 
     def get_active_skills(self):
         """Active skill ids ordered by converse priority
@@ -272,7 +269,12 @@ class ConverseService(IntentEngine):
         # check if any skill wants to handle utterance
         for skill_id in self._collect_converse_skills():
             if self.converse(utterances, skill_id, lang, message):
-                return IntentMatch('Converse', None, None, skill_id)
+                match = IntentMatch(intent_service='Converse',
+                                    intent_type="converse",
+                                    intent_data={},
+                                    confidence=100,
+                                    skill_id=skill_id)
+                return match
         return None
 
     # event handlers

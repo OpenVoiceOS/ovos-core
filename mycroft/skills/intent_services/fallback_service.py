@@ -14,21 +14,22 @@
 #
 """Intent service for Mycroft's fallback system."""
 from collections import namedtuple
-from mycroft.configuration import Configuration
-from ovos_plugin_manager.intents import IntentMatch, IntentPriority, IntentEngine
-from mycroft.messagebus.message import get_message_lang
-from ovos_plugin_manager.intents import IntentMatch, IntentPriority, IntentEngine
+
+from ovos_bus_client.util import get_message_lang
+from ovos_config import Configuration
+
+from mycroft.skills.intent_services.base import IntentService
+from ovos_plugin_manager.intents import IntentMatch
 
 FallbackRange = namedtuple('FallbackRange', ['start', 'stop'])
 
 
-class FallbackService(IntentEngine):
+class FallbackService(IntentService):
     """Intent Service handling fallback skills."""
 
     def __init__(self, bus):
         config = Configuration.get().get("skills", {}).get("fallback") or {}
-        super().__init__("ovos.intentbox.fallback", bus=bus, config=config)
-        self.bus = bus
+        super().__init__(bus=bus, config=config)
 
     def _fallback_range(self, utterances, lang, message, fb_range):
         """Send fallback request for a specified priority range.
@@ -52,7 +53,12 @@ class FallbackService(IntentEngine):
         response = self.bus.wait_for_response(msg, timeout=10)
         if response and response.data['handled']:
             skill_id = response.data.get("skill_id") or response.context.get("skill_id")
-            ret = IntentMatch('Fallback', None, {}, skill_id)
+
+            ret = IntentMatch(intent_service='Fallback',
+                              intent_type="fallback",
+                              intent_data={},
+                              confidence=(100 - fb_range.stop) / 100,
+                              skill_id=skill_id)
         else:
             ret = None
         return ret
@@ -73,21 +79,13 @@ class FallbackService(IntentEngine):
                                     FallbackRange(90, 101))
 
 
-class HighPrioFallbackService(IntentEngine):
+class HighPrioFallbackService(IntentService):
     """Intent Service handling conversational skills."""
 
-    def __init__(self, bus, service=None):
-        super().__init__("ovos.intentbox.fallback.high", bus=bus, engine=service)
+    def __init__(self, bus, engine=None):
+        super().__init__(bus=bus)
         self.config = Configuration.get()["skills"].get("fallbacks", {})
-
-    def bind(self, bus, engine=None):
-        self.bus = bus
-        engine = engine or FallbackService(self.bus)
-        self.engine = engine
-
-    @property
-    def priority(self):
-        return IntentPriority.FALLBACK_HIGH
+        self.engine = engine or FallbackService(self.bus)
 
     def handle_utterance_message(self, message):
         utterances = message.data["utterances"]
@@ -96,19 +94,11 @@ class HighPrioFallbackService(IntentEngine):
         return [match] if match else []
 
 
-class MediumPrioFallbackService(IntentEngine):
-    def __init__(self, bus, service=None):
-        super().__init__("ovos.intentbox.fallback.medium", bus=bus, engine=service)
+class MediumPrioFallbackService(IntentService):
+    def __init__(self, bus, engine=None):
+        super().__init__(bus=bus)
         self.config = Configuration.get()["skills"].get("fallbacks", {})
-
-    def bind(self, bus, engine=None):
-        self.bus = bus
-        engine = engine or FallbackService(self.bus)
-        self.engine = engine
-
-    @property
-    def priority(self):
-        return IntentPriority.FALLBACK_MEDIUM
+        self.engine = engine or FallbackService(self.bus)
 
     def handle_utterance_message(self, message):
         utterances = message.data["utterances"]
@@ -117,23 +107,14 @@ class MediumPrioFallbackService(IntentEngine):
         return [match] if match else []
 
 
-class LowPrioFallbackService(IntentEngine):
-    def __init__(self, bus, service=None):
-        super().__init__("ovos.intentbox.fallback.low", bus=bus, engine=service)
+class LowPrioFallbackService(IntentService):
+    def __init__(self, bus, engine=None):
+        super().__init__(bus=bus)
         self.config = Configuration.get()["skills"].get("fallbacks", {})
-
-    def bind(self, bus, engine=None):
-        self.bus = bus
-        engine = engine or FallbackService(self.bus)
-        self.engine = engine
-
-    @property
-    def priority(self):
-        return IntentPriority.FALLBACK_LOW
+        self.engine = engine or FallbackService(self.bus)
 
     def handle_utterance_message(self, message):
         utterances = message.data["utterances"]
         lang = get_message_lang(message)
         match = self.engine.low_prio(utterances, lang, message)
         return [match] if match else []
-
