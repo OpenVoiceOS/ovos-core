@@ -335,13 +335,15 @@ class TestMycroftSkill(unittest.TestCase):
                 'file_name': join(dirname(__file__), 'intent_file',
                                   'vocab', 'en-us', 'test.intent'),
                 'lang': 'en-us',
-                'name': str(s.skill_id) + ':test.intent'
+                'name': str(s.skill_id) + ':test.intent',
+                'samples': []
             },
             {
                 'file_name': join(dirname(__file__), 'intent_file',
                                   'vocab', 'en-us', 'test_ent.entity'),
                 'lang': 'en-us',
-                'name': str(s.skill_id) + ':test_ent_87af9db6c8402bcfaa8ebc719ae4427c'
+                'name': str(s.skill_id) + ':test_ent_87af9db6c8402bcfaa8ebc719ae4427c',
+                'samples': []
             }
         ]
         self.check_register_object_file(expected_types, expected_results)
@@ -369,6 +371,7 @@ class TestMycroftSkill(unittest.TestCase):
                         'file_name': join(dirname(__file__), 'intent_file',
                                           'vocab', 'en-us', 'test.intent'),
                         'lang': 'en-us',
+                        'samples': [],
                         'name': str(s.skill_id) + ':test.intent'}]
 
         self.check_register_decorators(expected)
