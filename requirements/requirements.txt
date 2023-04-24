@@ -4,7 +4,7 @@ SpeechRecognition~=3.8
 tornado~=6.0, >=6.0.3
 psutil~=5.6.6
 python-dateutil~=2.6
-combo-lock~=0.2
+combo-lock>=0.2.2, <0.3
 PyYAML~=5.4
 watchdog~=2.1
 
@@ -14,37 +14,37 @@ padacioso~=0.1.2
 fann2==1.0.7
 padaos~=0.1
 
-ovos_bus_client~=0.0, >=0.0.3a17
-ovos_backend_client~=0.0, >=0.0.5
-ovos-config~=0.0,>=0.0.8a3
-ovos-utils~=0.0, >=0.0.31a6
-ovos-plugin-manager~=0.0, >=0.0.23a6
-ovos_workshop~=0.0, >=0.0.12a15
-ovos_PHAL~=0.0, >=0.0.2
-ovos-lingua-franca>=0.4.6
+ovos_bus_client<0.1.0, >=0.0.4a3
+ovos_backend_client<0.1.0, >=0.0.6
+ovos-config~=0.0,>=0.0.8
+ovos-utils<0.1.0, >=0.0.33a1
+ovos-plugin-manager<0.1.0, >=0.0.23a9
+ovos_workshop<0.1.0, >=0.0.12a17
+ovos_PHAL<0.1.0, >=0.0.2
+ovos-lingua-franca>=0.4.7
 
-ovos-stt-plugin-server~=0.0, >=0.0.2
-ovos-tts-plugin-mimic~=0.2, >=0.2.6
-ovos-tts-plugin-mimic3-server~=0.0
+ovos-stt-plugin-server>=0.0.2, <0.1.0
+ovos-tts-plugin-mimic>=0.2.8, <0.3.0
+ovos-tts-plugin-mimic3-server<0.1.0
 
 ovos-ww-plugin-pocketsphinx~=0.1
 ovos-ww-plugin-precise~=0.1
-ovos-vad-plugin-webrtcvad~=0.0.1
+ovos-vad-plugin-webrtcvad>=0.0.1, <0.1.0
 
-ovos_plugin_common_play~=0.0, >=0.0.5a5
+ovos_plugin_common_play>=0.0.5a5, <0.1.0
 # ovos-ocp-youtube-plugin~=0.0, >=0.0.1
-ovos-ocp-m3u-plugin~=0.0, >=0.0.1
-ovos-ocp-rss-plugin~=0.0, >=0.0.2
+ovos-ocp-m3u-plugin>=0.0.1,<0.1.0
+ovos-ocp-rss-plugin>=0.0.2,<0.1.0
 ovos-ocp-files-plugin~=0.13
-ovos-ocp-news-plugin~=0.0, >=0.0.3
+ovos-ocp-news-plugin>=0.0.3,<0.1.0
 
 
-ovos-skill-volume~=0.0.1
-ovos-skill-fallback-unknown~=0.0.2
-ovos-skill-stop~=0.2
+ovos-skill-volume>=0.0.1,<0.1.0
+ovos-skill-fallback-unknown>=0.0.2,<0.1.0
+ovos-skill-stop>=0.2,<0.3.0
 # neon-skill-alerts~=1.2
-ovos-skill-personal~=0.0, >=0.0.3
-ovos-skill-naptime~=0.2, >=0.2.2
-ovos-skill-date-time~=0.2, >=0.2.2
-ovos-skill-hello-world~=0.0, >=0.0.3
-ovos-skill-filebrowser~=0.0, >=0.0.2
+ovos-skill-personal>=0.0.3,<0.1.0
+ovos-skill-naptime>=0.2.2,<0.3.0
+ovos-skill-date-time>=0.2.2,<0.3.0
+ovos-skill-hello-world>=0.0.3,<0.1.0
+ovos-skill-filebrowser>=0.0.2,<0.1.0
