@@ -1,4 +1,0 @@
-# extra plugins for TTS
-ovos-tts-plugin-mimic<0.3.0
-ovos-tts-plugin-mimic2<0.2.0
-ovos-tts-plugin-mimic3-server<0.1.0

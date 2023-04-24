@@ -1,4 +1,4 @@
-# Copyright 2020 Mycroft AI Inc.
+# Copyright 2017 Mycroft AI Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""Intent service wrapping padatious."""
-from ovos_core.intent_services.padatious_service import PadatiousMatcher, PadatiousService, PadatiousIntent, FallbackIntentContainer
+from ovos_config.config import Configuration
 
+from ovos_utils.log import LOG
+
+_cfg = Configuration()
+_log_level = _cfg.get("log_level", "INFO")
+_logs_conf = _cfg.get("logs") or {}
+_logs_conf["level"] = _log_level
+LOG.init(_logs_conf)  # read log level from config

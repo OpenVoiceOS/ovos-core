@@ -21,7 +21,7 @@ BASEDIR = os.path.abspath(os.path.dirname(__file__))
 def get_version():
     """ Find the version of ovos-core"""
     version = None
-    version_file = os.path.join(BASEDIR, 'mycroft', 'version.py')
+    version_file = os.path.join(BASEDIR, 'ovos_core', 'version.py')
     major, minor, build, alpha = (None, None, None, None)
     with open(version_file) as f:
         for line in f:
@@ -60,22 +60,14 @@ setup(
     license='Apache-2.0',
     url='https://github.com/OpenVoiceOS/ovos-core',
     description='mycroft-core packaged as a library',
-    install_requires=required('requirements/minimal.txt'),
+    install_requires=required('requirements/requirements.txt'),
     extras_require={
-        'audio': required('requirements/extra-audiobackend.txt'),
-        'mark1': required('requirements/extra-mark1.txt'),
-        'PHAL': required('requirements/extra-PHAL.txt'),
-        'stt': required('requirements/extra-stt.txt'),
-        'tts': required('requirements/extra-tts.txt'),
-        "skills_lgpl": required('requirements/extra-skills-lgpl.txt'),
-        'skills': required('requirements/extra-skills.txt'),
-        'gui': required('requirements/extra-gui.txt'),
-        'bus': required('requirements/extra-bus.txt'),
+        'mycroft': required('requirements/mycroft.txt'),
+        'lgpl': required('requirements/lgpl.txt'),
         'deprecated': required('requirements/extra-deprecated.txt'),
-        'all': required('requirements/requirements.txt'),
         'skills-essential': required('requirements/skills-essential.txt')
     },
-    packages=find_packages(include=['mycroft*']),
+    packages=find_packages(include=['mycroft*']) + find_packages(include=['ovos_core*']),
     include_package_data=True,
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -84,7 +76,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'ovos-core=mycroft.skills.__main__:main',
+            'ovos-core=ovos_core.__main__:main',
             # TODO - remove below console_scripts in 0.1.0 (backwards compat)
             'mycroft-speech-client=mycroft.listener.__main__:main',
             'mycroft-messagebus=mycroft.messagebus.service.__main__:main',

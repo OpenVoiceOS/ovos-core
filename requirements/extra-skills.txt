@@ -1,6 +1,0 @@
-adapt-parser~=0.5
-padacioso~=0.1.2
-ovos-lingua-franca>=0.4.6
-PyYAML~=5.4
-ovos_workshop<0.1.0, >=0.0.12a20
-ovos-phal-plugin-connectivity-events~=0.0.1

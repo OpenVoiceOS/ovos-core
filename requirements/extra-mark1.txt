@@ -1,4 +1,0 @@
-# todo - replace with mk1 PHAL plugin dependency
-pyalsaaudio>=0.8
-pyserial>=3.0
-pillow>=8.3

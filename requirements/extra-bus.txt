@@ -1,2 +1,0 @@
-# messagebus service
-ovos-messagebus~=0.0, >=0.0.2

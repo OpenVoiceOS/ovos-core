@@ -2,7 +2,7 @@ import fileinput
 from os.path import join, dirname
 
 
-version_file = join(dirname(dirname(__file__)), "mycroft", "version.py")
+version_file = join(dirname(dirname(__file__)), "ovos_core", "version.py")
 version_var_name = "OVOS_VERSION_MINOR"
 build_var_name = "OVOS_VERSION_BUILD"
 alpha_var_name = "OVOS_VERSION_ALPHA"

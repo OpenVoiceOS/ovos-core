@@ -11,3 +11,10 @@ mycroft-messagebus-client
 ovos-stt-plugin-selene>=0.0.3a3
 ovos-stt-plugin-vosk>=0.1.3
 python-vlc==1.1.2
+
+# ovos modules for compat with mycroft namespace
+ovos_PHAL<0.1.0, >=0.0.2
+ovos-audio~=0.0, >=0.0.2a10
+ovos-listener~=0.0, >=0.0.2a9
+ovos-gui~=0.0, >=0.0.2
+ovos-messagebus~=0.0, >=0.0.2
