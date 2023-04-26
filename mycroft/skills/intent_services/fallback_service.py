@@ -76,21 +76,30 @@ class FallbackService:
             return False
         return True
 
-    def _collect_fallback_skills(self, message):
+    def _collect_fallback_skills(self, message, fb_range=FallbackRange(0, 100)):
         """use the messagebus api to determine which skills have registered fallback handlers
         This includes all skills and external applications"""
-        skill_ids = []
+        skill_ids = []  # skill_ids that already answered to ping
         fallback_skills = []  # skill_ids that want to handle fallback
+
+        # filter skills outside the fallback_range
+        in_range = [s for s, p in self.registered_fallbacks.items()
+                     if fb_range.start < p <= fb_range.stop]
+        skill_ids += [s for s in self.registered_fallbacks if s not in in_range]
 
         def handle_ack(msg):
             skill_id = msg.data["skill_id"]
             if msg.data.get("can_handle", True):
                 if skill_id in self.registered_fallbacks:
                     fallback_skills.append(skill_id)
+                LOG.info(f"{skill_id} will try to handle fallback")
+            else:
+                LOG.info(f"{skill_id} will NOT try to handle fallback")
             skill_ids.append(skill_id)
 
         self.bus.on("ovos.skills.fallback.pong", handle_ack)
 
+        LOG.info("checking for FallbackSkillsV2 candidates")
         # wait for all skills to acknowledge they want to answer fallback queries
         self.bus.emit(message.forward("ovos.skills.fallback.ping",
                                       message.data))
@@ -119,6 +128,7 @@ class FallbackService:
             fb_msg = message.reply(f"ovos.skills.fallback.{skill_id}.request",
                                    {"skill_id": skill_id,
                                     "utterances": utterances,
+                                    "utterance": utterances[0],  # backwards compat, we send all transcripts now
                                     "lang": lang})
             result = self.bus.wait_for_response(fb_msg,
                                                 f"ovos.skills.fallback.{skill_id}.response")
@@ -143,12 +153,15 @@ class FallbackService:
         Returns:
             IntentMatch or None
         """
-        message.data["utterances"] = utterances
+        # NOTE - utterances here is a list of tuple of [(ut, norm)]
+        # they have been munged along the way... TODO undo the munging
+        utterances = [u[0] for u in utterances]
+        message.data["utterances"] = utterances  # all transcripts
         message.data["lang"] = lang
 
         # new style bus api
         fallbacks = [(k, v) for k, v in self.registered_fallbacks.items()
-                     if k in self._collect_fallback_skills(message)]
+                     if k in self._collect_fallback_skills(message, fb_range)]
         sorted_handlers = sorted(fallbacks, key=operator.itemgetter(1))
         for skill_id, prio in sorted_handlers:
             result = self.attempt_fallback(utterances, skill_id, lang, message)
@@ -156,6 +169,7 @@ class FallbackService:
                 return IntentMatch('Fallback', None, {}, None)
 
         # old style deprecated fallback skill singleton class
+        LOG.debug("checking for FallbackSkillsV1")
         msg = message.reply(
             'mycroft.skills.fallback',
             data={'utterance': utterances[0][0],
