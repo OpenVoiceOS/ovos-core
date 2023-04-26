@@ -12,4 +12,4 @@ ovos-plugin-manager<0.1.0, >=0.0.23a9
 ovos-config~=0.0,>=0.0.8
 ovos-lingua-franca>=0.4.7
 ovos_backend_client<0.1.0, >=0.0.6
-ovos_workshop<0.1.0, >=0.0.12a17
+ovos_workshop<0.1.0, >=0.0.12a20
