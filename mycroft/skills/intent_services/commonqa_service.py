@@ -165,6 +165,7 @@ class CommonQAService:
 
     def _query_timeout(self, message):
         if not self.searching.is_set():
+            LOG.warning("got a common query response outside search window")
             return  # not searching, ignore timeout event
         self.searching.clear()
 
@@ -194,9 +195,9 @@ class CommonQAService:
                     pass
 
                 # invoke best match
-                self.speak(best['answer'])
-
                 LOG.info('Handling with: ' + str(best['skill_id']))
+                if not message.data.get("handles_speech", False):
+                    self.speak(best['answer'])
                 cb = best.get('callback_data') or {}
                 self.bus.emit(message.forward('question:action',
                                               data={'skill_id': best['skill_id'],

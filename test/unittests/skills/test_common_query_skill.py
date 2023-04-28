@@ -39,7 +39,7 @@ class TestCommonQuerySkill(TestCase):
             'phrase': 'What\'s the meaning of life',
             'skill_id': 'CQSTest'}))
         self.skill.CQS_action.assert_called_once_with(
-            'What\'s the meaning of life', None)
+            'What\'s the meaning of life', {})
 
 
 class TestCommonQueryMatching(TestCase):

@@ -1,12 +1,12 @@
-SpeechRecognition~=3.8
-PyAudio~=0.2
+# speech client + default stt plugins
+ovos-listener~=0.0, >=0.0.2a9
 
+# ensure plugins below even if removed from ovos-listener dep list
 ovos-vad-plugin-webrtcvad~=0.0.1
-
 ovos-ww-plugin-pocketsphinx~=0.1, >=0.1.3
+# TODO - remove classic precise
 ovos-ww-plugin-precise~=0.1
-ovos-ww-plugin-precise-lite~=0.1, >=0.1.1
-ovos-ww-plugin-vosk~=0.1, >=0.1.1
+# NOTE - either tflite or tensorflow must be installed manually in addition to precise-lite
+ovos-ww-plugin-precise-lite~=0.1, >=0.1.2a3
 
 ovos-stt-plugin-server~=0.0, >=0.0.2
-ovos-stt-plugin-vosk~=0.1
