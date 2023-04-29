@@ -15,7 +15,7 @@ padaos~=0.1
 ovos_bus_client<0.1.0, >=0.0.4a3
 ovos_backend_client<0.1.0, >=0.0.6
 ovos-config~=0.0,>=0.0.8
-ovos-utils<0.1.0, >=0.0.33a1
+ovos-utils<0.1.0, >=0.0.33a3
 ovos-plugin-manager<0.1.0, >=0.0.23a9
 ovos_workshop<0.1.0, >=0.0.12a20
 ovos_PHAL<0.1.0, >=0.0.2
