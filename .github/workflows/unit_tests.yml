@@ -57,7 +57,7 @@ jobs:
           pip install ./test/unittests/common_query/ovos_tskill_fakewiki
       - name: Run unittests
         run: |
-          pytest --cov=mycroft --cov-report xml test/unittests
+          pytest --cov=ovos_core --cov-report xml test/unittests
           # NOTE: additional pytest invocations should also add the --cov-append flag
           #       or they will overwrite previous invocations' coverage reports
           #       (for an example, see OVOS Skill Manager's workflow)
