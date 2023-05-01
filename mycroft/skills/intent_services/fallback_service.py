@@ -154,7 +154,7 @@ class FallbackService:
             IntentMatch or None
         """
         # NOTE - utterances here is a list of tuple of [(ut, norm)]
-        # they have been munged along the way... TODO undo the munging
+        # they have been munged along the way... TODO undo the munging at the source
         utterances = [u[0] for u in utterances]
         message.data["utterances"] = utterances  # all transcripts
         message.data["lang"] = lang
@@ -172,7 +172,7 @@ class FallbackService:
         LOG.debug("checking for FallbackSkillsV1")
         msg = message.reply(
             'mycroft.skills.fallback',
-            data={'utterance': utterances[0][0],
+            data={'utterance': utterances[0],
                   'lang': lang,
                   'fallback_range': (fb_range.start, fb_range.stop)}
         )
