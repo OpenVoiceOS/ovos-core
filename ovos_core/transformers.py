@@ -16,7 +16,7 @@ class UtteranceTransformersService:
         self.has_loaded = False
         self.bus = bus
         self.config = self.config_core.get("utterance_transformers") or {
-            "ovos-utterance-normalizer": {}
+            "ovos-lf-utterance-normalizer": {}
         }
         self.load_plugins()
 
@@ -123,7 +123,7 @@ class MetadataTransformersService:
 
 class UtteranceNormalizer(UtteranceTransformer):
 
-    def __init__(self, name="ovos-utterance-normalizer", priority=1):
+    def __init__(self, name="ovos-lf-utterance-normalizer", priority=1):
         super().__init__(name, priority)
 
     @staticmethod
