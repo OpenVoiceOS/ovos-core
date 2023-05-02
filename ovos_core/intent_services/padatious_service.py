@@ -256,22 +256,23 @@ class PadatiousService:
             object_name (str): type of entry to register
             register_func (callable): function to call for registration
         """
-        file_name = message.data['file_name']
+        file_name = message.data.get('file_name')
+        samples = message.data.get("samples")
         name = message.data['name']
 
         LOG.debug('Registering Padatious ' + object_name + ': ' + name)
 
-        if not isfile(file_name):
-            LOG.warning('Could not find file ' + file_name)
+        if (not file_name or not isfile(file_name)) and not samples:
+            LOG.error('Could not find file ' + file_name)
             return
 
-        if self.is_regex_only:
-            # padaos does not accept a file path like padatious
+        if not samples and isfile(file_name):
             with open(file_name) as f:
                 samples = [l.strip() for l in f.readlines()]
-            register_func(name, samples)
-        else:
-            register_func(name, file_name)
+
+        register_func(name, samples)
+
+        if not self.is_regex_only:
             self.train_time = get_time() + self.train_delay
             self.wait_and_train()
 
@@ -285,12 +286,7 @@ class PadatiousService:
         lang = lang.lower()
         if lang in self.containers:
             self.registered_intents.append(message.data['name'])
-            if self.is_regex_only:
-                self._register_object(
-                    message, 'intent', self.containers[lang].add_intent)
-            else:
-                self._register_object(
-                    message, 'intent', self.containers[lang].load_intent)
+            self._register_object(message, 'intent', self.containers[lang].add_intent)
 
     def register_entity(self, message):
         """Messagebus handler for registering entities.
@@ -302,12 +298,7 @@ class PadatiousService:
         lang = lang.lower()
         if lang in self.containers:
             self.registered_entities.append(message.data)
-            if self.is_regex_only:
-                self._register_object(
-                    message, 'intent', self.containers[lang].add_entity)
-            else:
-                self._register_object(
-                    message, 'entity', self.containers[lang].load_entity)
+            self._register_object(message, 'entity', self.containers[lang].add_entity)
 
     def calc_intent(self, utt, lang=None):
         """Cached version of container calc_intent.
