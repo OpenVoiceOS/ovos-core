@@ -19,7 +19,6 @@ import time
 from adapt.context import ContextManagerFrame
 from adapt.engine import IntentDeterminationEngine
 from ovos_config.config import Configuration
-
 import ovos_core.intent_services
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
