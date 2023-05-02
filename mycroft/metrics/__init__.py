@@ -23,7 +23,7 @@ from ovos_backend_client.api import MetricsApi
 from ovos_config.config import Configuration
 from ovos_bus_client.session import SessionManager
 from ovos_utils.log import LOG
-from mycroft.version import CORE_VERSION_STR
+from ovos_core.version import OVOS_VERSION_STR
 from copy import copy
 # backwards compat import
 from ovos_utils.metrics import Stopwatch
@@ -100,7 +100,7 @@ class MetricsAggregator:
         self._timers = {}
         self._levels = {}
         self._attributes = {}
-        self.attr("version", CORE_VERSION_STR)
+        self.attr("version", OVOS_VERSION_STR)
 
     def increment(self, name, value=1):
         cur = self._counters.get(name, 0)
@@ -121,7 +121,7 @@ class MetricsAggregator:
         self._timers = {}
         self._levels = {}
         self._attributes = {}
-        self.attr("version", CORE_VERSION_STR)
+        self.attr("version", OVOS_VERSION_STR)
 
     def attr(self, name, value):
         self._attributes[name] = value
