@@ -1,10 +1,12 @@
 import re
-import time
-from itertools import chain
 from threading import Lock, Event
 
-import ovos_core.intent_services
+import time
+from itertools import chain
 from ovos_bus_client.message import Message, dig_for_message
+
+import ovos_core.intent_services
+from ovos_utils import flatten_list
 from ovos_utils.enclosure.api import EnclosureAPI
 from ovos_utils.log import LOG
 from ovos_utils.messagebus import get_message_lang
@@ -93,14 +95,17 @@ class CommonQAService:
         Returns:
             IntentMatch or None
         """
+        # we call flatten in case someone is sending the old style list of tuples
+        utterances = flatten_list(utterances)
         match = None
-        utterance = utterances[0][0]
-        if self.is_question_like(utterance, lang):
-            message.data["lang"] = lang  # only used for speak
-            message.data["utterance"] = utterance
-            answered = self.handle_question(message)
-            if answered:
-                match = ovos_core.intent_services.IntentMatch('CommonQuery', None, {}, None)
+        for utterance in utterances:
+            if self.is_question_like(utterance, lang):
+                message.data["lang"] = lang  # only used for speak
+                message.data["utterance"] = utterance
+                answered = self.handle_question(message)
+                if answered:
+                    match = ovos_core.intent_services.IntentMatch('CommonQuery', None, {}, None)
+                break
         return match
 
     def handle_question(self, message):

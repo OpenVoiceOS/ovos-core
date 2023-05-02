@@ -87,6 +87,8 @@ setup(
             'mycroft-enclosure-client=ovos_PHAL.__main__:main',
             'mycroft-cli-client=mycroft.client.text.__main__:main',
             'mycroft-gui-service=mycroft.gui.__main__:main'
-        ]
+        ],
+        # default plugins
+        'neon.plugin.text': 'ovos-utterance-normalizer=ovos_core.transformers:UtteranceNormalizer'
     }
 )

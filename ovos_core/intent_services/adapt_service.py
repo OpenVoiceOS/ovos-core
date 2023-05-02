@@ -13,14 +13,15 @@
 # limitations under the License.
 #
 """An intent parsing service using the Adapt parser."""
-import time
 from threading import Lock
 
+import time
 from adapt.context import ContextManagerFrame
 from adapt.engine import IntentDeterminationEngine
 from ovos_config.config import Configuration
 
 import ovos_core.intent_services
+from ovos_utils import flatten_list
 from ovos_utils.log import LOG
 
 
@@ -211,6 +212,8 @@ class AdaptService:
         Returns:
             Intent structure, or None if no match was found.
         """
+        # we call flatten in case someone is sending the old style list of tuples
+        utterances = flatten_list(utterances)
         lang = lang or self.lang
         if lang not in self.engines:
             return None
@@ -226,21 +229,20 @@ class AdaptService:
                 # TODO - Shouldn't Adapt do this?
                 best_intent['utterance'] = utt
 
-        for utt_tup in utterances:
-            for utt in utt_tup:
-                try:
-                    intents = [i for i in self.engines[lang].determine_intent(
-                        utt, 100,
-                        include_tags=True,
-                        context_manager=self.context_manager)]
-                    if intents:
-                        utt_best = max(
-                            intents, key=lambda x: x.get('confidence', 0.0)
-                        )
-                        take_best(utt_best, utt_tup[0])
+        for utt in utterances:
+            try:
+                intents = [i for i in self.engines[lang].determine_intent(
+                    utt, 100,
+                    include_tags=True,
+                    context_manager=self.context_manager)]
+                if intents:
+                    utt_best = max(
+                        intents, key=lambda x: x.get('confidence', 0.0)
+                    )
+                    take_best(utt_best, utt)
 
-                except Exception as err:
-                    LOG.exception(err)
+            except Exception as err:
+                LOG.exception(err)
 
         if best_intent:
             self.update_context(best_intent)

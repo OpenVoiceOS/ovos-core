@@ -17,13 +17,14 @@ from os import path
 from os.path import expanduser, isfile
 from subprocess import call
 from threading import Event
-from time import time as get_time, sleep
 
+from ovos_bus_client.message import Message
 from ovos_config.config import Configuration
 from padacioso import IntentContainer as FallbackIntentContainer
+from time import time as get_time, sleep
 
 import ovos_core.intent_services
-from ovos_bus_client.message import Message
+from ovos_utils import flatten_list
 from ovos_utils.log import LOG
 
 try:
@@ -81,18 +82,19 @@ class PadatiousMatcher:
                                          with optional normalized version.
             limit (float): required confidence level.
         """
+        # we call flatten in case someone is sending the old style list of tuples
+        utterances = flatten_list(utterances)
         if not self.has_result:
             lang = lang or self.service.lang
             padatious_intent = None
             LOG.debug(f'Padatious Matching confidence > {limit}')
             for utt in utterances:
-                for variant in utt:
-                    intent = self.service.calc_intent(variant, lang)
-                    if intent:
-                        best = padatious_intent.conf if padatious_intent else 0.0
-                        if best < intent.conf:
-                            padatious_intent = intent
-                            padatious_intent.matches['utterance'] = utt[0]
+                intent = self.service.calc_intent(utt, lang)
+                if intent:
+                    best = padatious_intent.conf if padatious_intent else 0.0
+                    if best < intent.conf:
+                        padatious_intent = intent
+                        padatious_intent.matches['utterance'] = utt[0]
             if padatious_intent:
                 skill_id = padatious_intent.name.split(':')[0]
                 self.ret = ovos_core.intent_services.IntentMatch(

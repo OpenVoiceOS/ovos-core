@@ -13,12 +13,15 @@
 # limitations under the License.
 #
 """Intent service for Mycroft's fallback system."""
-from collections import namedtuple
-from ovos_config import Configuration
 import operator
+from collections import namedtuple
+
 import time
-from ovos_utils.log import LOG
+from ovos_config import Configuration
+
 import ovos_core.intent_services
+from ovos_utils import flatten_list
+from ovos_utils.log import LOG
 from ovos_workshop.skills.fallback import FallbackMode
 
 FallbackRange = namedtuple('FallbackRange', ['start', 'stop'])
@@ -81,7 +84,7 @@ class FallbackService:
 
         # filter skills outside the fallback_range
         in_range = [s for s, p in self.registered_fallbacks.items()
-                     if fb_range.start < p <= fb_range.stop]
+                    if fb_range.start < p <= fb_range.stop]
         skill_ids += [s for s in self.registered_fallbacks if s not in in_range]
 
         def handle_ack(msg):
@@ -150,9 +153,8 @@ class FallbackService:
         Returns:
             IntentMatch or None
         """
-        # NOTE - utterances here is a list of tuple of [(ut, norm)]
-        # they have been munged along the way... TODO undo the munging at the source
-        utterances = [u[0] for u in utterances]
+        # we call flatten in case someone is sending the old style list of tuples
+        utterances = flatten_list(utterances)
         message.data["utterances"] = utterances  # all transcripts
         message.data["lang"] = lang
 

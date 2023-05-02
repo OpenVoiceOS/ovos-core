@@ -12,14 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
-
 from collections import namedtuple
 
 from ovos_config.config import Configuration
 from ovos_config.locale import setup_locale
 
-from ovos_bus_client.message import Message
+from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
 from ovos_core.intent_services.adapt_service import AdaptService
 from ovos_core.intent_services.commonqa_service import CommonQAService
 from ovos_core.intent_services.converse_service import ConverseService
@@ -40,41 +38,6 @@ IntentMatch = namedtuple('IntentMatch',
                          ['intent_service', 'intent_type',
                           'intent_data', 'skill_id']
                          )
-
-
-def _normalize_all_utterances(utterances):
-    """Create normalized versions and pair them with the original utterance.
-
-    This will create a list of tuples with the original utterance as the
-    first item and if normalizing changes the utterance the normalized version
-    will be set as the second item in the tuple, if normalization doesn't
-    change anything the tuple will only have the "raw" original utterance.
-
-    Args:
-        utterances (list): list of utterances to normalize
-
-    Returns:
-        list of tuples, [(original utterance, normalized) ... ]
-    """
-    try:
-        from lingua_franca.parse import normalize
-        # normalize() changes "it's a boy" to "it is a boy", etc.
-        norm_utterances = [normalize(u.lower(), remove_articles=False)
-                           for u in utterances]
-    except:
-        norm_utterances = utterances
-
-    # Create pairs of original and normalized counterparts for each entry
-    # in the input list.
-    combined = []
-    for utt, norm in zip(utterances, norm_utterances):
-        if utt == norm:
-            combined.append((utt,))
-        else:
-            combined.append((utt, norm))
-
-    LOG.debug(f"Utterances: {combined}")
-    return combined
 
 
 class IntentService:
@@ -100,6 +63,8 @@ class IntentService:
         self.fallback = FallbackService(bus)
         self.converse = ConverseService(bus)
         self.common_qa = CommonQAService(bus)
+        self.utterance_plugins = UtteranceTransformersService(bus, config=config)
+        self.metadata_plugins = MetadataTransformersService(bus, config=config)
 
         self.bus.on('register_vocab', self.handle_register_vocab)
         self.bus.on('register_intent', self.handle_register_intent)
@@ -193,39 +158,87 @@ class IntentService:
             LOG.exception(f"Failed to set lingua_franca default lang to {lang}")
         self.converse.converse_with_skills([], lang, message)
 
+    def _handle_transformers(self, message):
+        """
+        Pipe utterance through transformer plugins to get more metadata.
+        Utterances may be modified by any parser and context overwritten
+        """
+        lang = get_message_lang(message)  # per query lang or default Configuration lang
+        original = utterances = message.data.get('utterances', [])
+        message.context["lang"] = lang
+        utterances, message.context = self.utterance_plugins.transform(utterances, message.context)
+        if original != utterances:
+            message.data["utterances"] = utterances
+            LOG.debug(f"utterances transformed: {original} -> {utterances}")
+        message.context = self.metadata_plugins.transform(message.context)
+        return message
+
+    @staticmethod
+    def disambiguate_lang(message):
+        """ disambiguate language of the query via pre-defined context keys
+        1 - stt_lang -> tagged in stt stage  (STT used this lang to transcribe speech)
+        2 - request_lang -> tagged in source message (wake word/request volunteered lang info)
+        3 - detected_lang -> tagged by transformers  (text classification, free form chat)
+        4 - config lang (or from message.data)
+        """
+        cfg = Configuration()
+        default_lang = get_message_lang(message)
+        valid_langs = set([cfg.get("lang", "en-us")] + cfg.get("secondary_langs'", []))
+        lang_keys = ["stt_lang",
+                     "request_lang",
+                     "detected_lang"]
+        for k in lang_keys:
+            if k in message.context:
+                v = message.context[k]
+                if v in valid_langs:
+                    if v != default_lang:
+                        LOG.info(f"replaced {default_lang} with {k}: {v}")
+                    return v
+                else:
+                    LOG.warning(f"ignoring {k}, {v} is not in enabled languages: {valid_langs}")
+
+        return default_lang
+
     def handle_utterance(self, message):
-        """Main entrypoint for handling user utterances with Mycroft skills
+        """Main entrypoint for handling user utterances
 
         Monitor the messagebus for 'recognizer_loop:utterance', typically
         generated by a spoken interaction but potentially also from a CLI
         or other method of injecting a 'user utterance' into the system.
 
         Utterances then work through this sequence to be handled:
-        1) Active skills attempt to handle using converse()
-        2) Padatious high match intents (conf > 0.95)
-        3) Adapt intent handlers
-        5) CommonQuery Skills
-        6) High Priority Fallbacks
-        7) Padatious near match intents (conf > 0.8)
-        8) General Fallbacks
-        9) Padatious loose match intents (conf > 0.5)
-        10) Catch all fallbacks including Unknown intent handler
+        1) UtteranceTransformers can modify the utterance and metadata in message.context
+        2) MetadataTransformers can modify the metadata in message.context
+        3) Language is extracted from message
+        4) Active skills attempt to handle using converse()
+        5) Padatious high match intents (conf > 0.95)
+        6) Adapt intent handlers
+        7) CommonQuery Skills
+        8) High Priority Fallbacks
+        9) Padatious near match intents (conf > 0.8)
+        10) General Fallbacks
+        11) Padatious loose match intents (conf > 0.5)
+        12) Catch all fallbacks including Unknown intent handler
 
         If all these fail the complete_intent_failure message will be sent
-        and a generic info of the failure will be spoken.
+        and a generic error sound played.
 
         Args:
             message (Message): The messagebus data
         """
         try:
-            lang = get_message_lang(message)
+
+            # Get utterance utterance_plugins additional context
+            message = self._handle_transformers(message)
+
+            # tag language of this utterance
+            lang = self.disambiguate_lang(message)
             try:
                 setup_locale(lang)
             except Exception as e:
                 LOG.exception(f"Failed to set lingua_franca default lang to {lang}")
 
             utterances = message.data.get('utterances', [])
-            combined = _normalize_all_utterances(utterances)
 
             stopwatch = Stopwatch()
 
@@ -242,11 +255,12 @@ class IntentService:
                 self.fallback.low_prio
             ]
 
+            # match
             match = None
             with stopwatch:
                 # Loop through the matching functions until a match is found.
                 for match_func in match_funcs:
-                    match = match_func(combined, lang, message)
+                    match = match_func(utterances, lang, message)
                     if match:
                         break
             if match:
@@ -374,7 +388,6 @@ class IntentService:
         """
         utterance = message.data["utterance"]
         lang = get_message_lang(message)
-        combined = _normalize_all_utterances([utterance])
 
         # Create matchers
         padatious_matcher = PadatiousMatcher(self.padatious_service)
@@ -394,7 +407,7 @@ class IntentService:
         ]
         # Loop through the matching functions until a match is found.
         for match_func in match_funcs:
-            match = match_func(combined, lang, message)
+            match = match_func([utterance], lang, message)
             if match:
                 if match.intent_type:
                     intent_data = match.intent_data
@@ -436,8 +449,7 @@ class IntentService:
         """
         utterance = message.data["utterance"]
         lang = get_message_lang(message)
-        combined = _normalize_all_utterances([utterance])
-        intent = self.adapt_service.match_intent(combined, lang)
+        intent = self.adapt_service.match_intent([utterance], lang)
         intent_data = intent.intent_data if intent else None
         self.bus.emit(message.reply("intent.service.adapt.reply",
                                     {"intent": intent_data}))

@@ -1,9 +1,9 @@
 import time
-
+from ovos_bus_client.message import Message
 from ovos_config.config import Configuration
 
 import ovos_core.intent_services
-from ovos_bus_client.message import Message
+from ovos_utils import flatten_list
 from ovos_utils.log import LOG
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
 
@@ -252,7 +252,8 @@ class ConverseService:
         Returns:
             IntentMatch if handled otherwise None.
         """
-        utterances = [item for tup in utterances or [] for item in tup]
+        # we call flatten in case someone is sending the old style list of tuples
+        utterances = flatten_list(utterances)
         # filter allowed skills
         self._check_converse_timeout()
         # check if any skill wants to handle utterance
