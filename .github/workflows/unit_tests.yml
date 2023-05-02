@@ -4,7 +4,7 @@ on:
     branches:
       - dev
     paths-ignore:
-      - 'mycroft/version.py'
+      - 'ovos_core/version.py'
       - 'examples/**'
       - '.github/**'
       - '.gitignore'
@@ -17,7 +17,7 @@ on:
     branches:
       - master
     paths-ignore:
-      - 'mycroft/version.py'
+      - 'ovos_core/version.py'
       - 'requirements/**'
       - 'examples/**'
       - '.github/**'

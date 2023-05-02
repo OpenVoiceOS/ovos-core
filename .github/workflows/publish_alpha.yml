@@ -6,7 +6,7 @@ on:
     branches:
       - dev
     paths-ignore:
-      - 'mycroft/version.py'
+      - 'ovos_core/version.py'
       - 'test/**'
       - 'examples/**'
       - '.github/**'
