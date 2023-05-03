@@ -1,14 +1,9 @@
-name: Run Build Tests
+name: Run PipAudit
 on:
   push:
     branches:
       - master
-  pull_request:
-    branches:
       - dev
-    paths:
-      - 'requirements/**'
-      - 'setup.py'
   workflow_dispatch:
 
 jobs:
@@ -30,13 +25,14 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt install python3-dev swig libssl-dev libfann-dev portaudio19-dev libpulse-dev
-      - name: Build Source Packages
-        run: |
-          python setup.py sdist
-      - name: Build Distribution Packages
-        run: |
-          python setup.py bdist_wheel
+          sudo apt install python3-dev swig libssl-dev
       - name: Install package
         run: |
-          pip install .[mycroft,lgpl,deprecated,skills-essential]
+          pip install .[skills-essential]
+      - uses: pypa/gh-action-pip-audit@v1.0.0
+        with:
+          # Ignore setuptools vulnerability we can't do much about
+          # Ignore numpy vulnerability affecting latest version for Py3.7
+          ignore-vulns: |
+            GHSA-r9hx-vwmv-q579
+            GHSA-fpfv-jqm9-f5jm
