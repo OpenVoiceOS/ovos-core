@@ -71,6 +71,7 @@ class PadatiousMatcher:
 
     def __init__(self, service):
         self.service = service
+
         self.has_result = False
         self.ret = None
         self.conf = None
@@ -112,7 +113,7 @@ class PadatiousMatcher:
             utterances (list of tuples): Utterances to parse, originals paired
                                          with optional normalized version.
         """
-        return self._match_level(utterances, 0.95, lang)
+        return self._match_level(utterances, self.service.conf_high, lang)
 
     def match_medium(self, utterances, lang=None, __=None):
         """Intent matcher for medium confidence.
@@ -121,7 +122,7 @@ class PadatiousMatcher:
             utterances (list of tuples): Utterances to parse, originals paired
                                          with optional normalized version.
         """
-        return self._match_level(utterances, 0.8, lang)
+        return self._match_level(utterances, self.service.conf_med, lang)
 
     def match_low(self, utterances, lang=None, __=None):
         """Intent matcher for low confidence.
@@ -130,7 +131,7 @@ class PadatiousMatcher:
             utterances (list of tuples): Utterances to parse, originals paired
                                          with optional normalized version.
         """
-        return self._match_level(utterances, 0.5, lang)
+        return self._match_level(utterances, self.service.conf_low, lang)
 
     def _legacy_padatious_match(self, utterances: List[str],
                                 lang: str) -> Optional[PadatiousIntent]:
@@ -164,6 +165,10 @@ class PadatiousService:
         langs = core_config.get('secondary_langs') or []
         if self.lang not in langs:
             langs.append(self.lang)
+
+        self.conf_high = self.padatious_config.get("conf_high") or 0.95
+        self.conf_med = self.padatious_config.get("conf_med") or 0.8
+        self.conf_low = self.padatious_config.get("conf_low") or 0.5
 
         if self.is_regex_only:
             if not _pd:
