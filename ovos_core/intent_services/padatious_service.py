@@ -94,7 +94,7 @@ class PadatiousMatcher:
                     best = padatious_intent.conf if padatious_intent else 0.0
                     if best < intent.conf:
                         padatious_intent = intent
-                        padatious_intent.matches['utterance'] = utt[0]
+                        padatious_intent.matches['utterance'] = utt
             if padatious_intent:
                 skill_id = padatious_intent.name.split(':')[0]
                 self.ret = ovos_core.intent_services.IntentMatch(
