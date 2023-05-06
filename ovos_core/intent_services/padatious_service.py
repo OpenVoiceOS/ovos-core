@@ -13,10 +13,12 @@
 # limitations under the License.
 #
 """Intent service wrapping padatious."""
+from multiprocessing import Pool
 from os import path
 from os.path import expanduser, isfile
 from subprocess import call
 from threading import Event
+from typing import List, Optional
 
 from ovos_bus_client.message import Message
 from ovos_config.config import Configuration
@@ -86,15 +88,9 @@ class PadatiousMatcher:
         utterances = flatten_list(utterances)
         if not self.has_result:
             lang = lang or self.service.lang
-            padatious_intent = None
             LOG.debug(f'Padatious Matching confidence > {limit}')
-            for utt in utterances:
-                intent = self.service.calc_intent(utt, lang)
-                if intent:
-                    best = padatious_intent.conf if padatious_intent else 0.0
-                    if best < intent.conf:
-                        padatious_intent = intent
-                        padatious_intent.matches['utterance'] = utt
+            padatious_intent = self.service.threaded_calc_intent(utterances,
+                                                                 lang)
             if padatious_intent:
                 skill_id = padatious_intent.name.split(':')[0]
                 self.ret = ovos_core.intent_services.IntentMatch(
@@ -314,10 +310,54 @@ class PadatiousService:
         lang = lang or self.lang
         lang = lang.lower()
         if lang in self.containers:
-            intent = self.containers[lang].calc_intent(utt)
-            if isinstance(intent, dict):
-                if "entities" in intent:
-                    intent["matches"] = intent.pop("entities")
-                intent["sent"] = utt
-                intent = PadatiousIntent(**intent)
-            return intent
+            return calc_intent(utt, self.containers[lang])
+
+    def threaded_calc_intent(self, utterances: List[str],
+                             lang: str = None) -> Optional[PadatiousIntent]:
+        """
+        Get the best intent match for the given list of utterances. Utilizes a
+        thread pool for overall faster execution.
+        @param utterances: list of string utterances to get an intent for
+        @param lang: language of utterances
+        @return:
+        """
+        lang = lang or self.lang
+        lang = lang.lower()
+        if lang in self.containers:
+            intent_container = self.containers.get(lang)
+            with Pool(16) as pool:
+                idx = 0
+                padatious_intent = None
+                for intent in pool.starmap(calc_intent,
+                                           ((utt, intent_container)
+                                            for utt in utterances)):
+                    if intent:
+                        best = \
+                            padatious_intent.conf if padatious_intent else 0.0
+                        if best < intent.conf:
+                            padatious_intent = intent
+                            padatious_intent.matches['utterance'] = \
+                                utterances[idx]
+                            # TODO: Should this just return the first result?
+                            if intent.conf == 1.0:
+                                LOG.debug(f"Returning perfect match")
+                                return intent
+                    idx += 1
+            return padatious_intent
+
+
+def calc_intent(args) -> Optional[PadatiousIntent]:
+    """
+    Try to match `utt` to an intent in `intent_container`
+    @param args: tuple of (utterance, IntentContainer)
+    @return: matched PadatiousIntent
+    """
+    utt = args[0]
+    intent_container = args[1]
+    intent = intent_container.calc_intent(utt)
+    if isinstance(intent, dict):
+        if "entities" in intent:
+            intent["matches"] = intent.pop("entities")
+        intent["sent"] = utt
+        intent = PadatiousIntent(**intent)
+    return intent
