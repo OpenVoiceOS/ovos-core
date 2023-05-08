@@ -18,7 +18,7 @@ from os import path
 from os.path import expanduser, isfile
 from subprocess import call
 from threading import Event
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from ovos_bus_client.message import Message
 from ovos_config.config import Configuration
@@ -310,13 +310,14 @@ class PadatiousService:
         lang = lang or self.lang
         lang = lang.lower()
         if lang in self.containers:
-            return calc_intent(utt, self.containers[lang])
+            return calc_intent((utt, self.containers[lang]))
 
     def threaded_calc_intent(self, utterances: List[str],
                              lang: str = None) -> Optional[PadatiousIntent]:
         """
         Get the best intent match for the given list of utterances. Utilizes a
-        thread pool for overall faster execution.
+        thread pool for overall faster execution. Note that this method is NOT
+        compatible with Padatious, but is compatible with Padacioso.
         @param utterances: list of string utterances to get an intent for
         @param lang: language of utterances
         @return:
@@ -346,7 +347,8 @@ class PadatiousService:
             return padatious_intent
 
 
-def calc_intent(args) -> Optional[PadatiousIntent]:
+def calc_intent(args: Tuple[str, FallbackIntentContainer]) -> \
+        Optional[PadatiousIntent]:
     """
     Try to match `utt` to an intent in `intent_container`
     @param args: tuple of (utterance, IntentContainer)
