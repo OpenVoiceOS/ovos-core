@@ -35,10 +35,12 @@ class UtteranceIntentMatchingTest(unittest.TestCase):
         try:
             import padatious
             self.assertFalse(intent_service.is_regex_only)
+            for container in intent_service.containers.values():
+                self.assertNotIsInstance(container, FallbackIntentContainer)
         except ImportError:
             self.assertTrue(intent_service.is_regex_only)
-        for container in intent_service.containers.values():
-            self.assertFalse(isinstance(container, FallbackIntentContainer))
+            for container in intent_service.containers.values():
+                self.assertIsInstance(container, FallbackIntentContainer)
 
         # exact match
         intent = intent_service.calc_intent("this is a test", "en-US")

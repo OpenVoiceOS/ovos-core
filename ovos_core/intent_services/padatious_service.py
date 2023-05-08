@@ -142,7 +142,7 @@ class PadatiousMatcher:
         """
         padatious_intent = None
         for utt in utterances:
-            intent = self.service.calc_intent(utt, lang)
+            intent = self.service.calc_padatious_intent(utt, lang)
             if intent:
                 best = padatious_intent.conf if padatious_intent else 0.0
                 if best < intent.conf:
@@ -336,7 +336,7 @@ class PadatiousService:
         lang = lang or self.lang
         lang = lang.lower()
         if lang in self.containers:
-            return calc_intent((utt, self.containers[lang]))
+            return calc_padatious_intent((utt, self.containers[lang]))
 
     def threaded_calc_intent(self, utterances: List[str],
                              lang: str = None) -> Optional[PadatiousIntent]:
@@ -355,7 +355,7 @@ class PadatiousService:
             with Pool(16) as pool:
                 idx = 0
                 padatious_intent = None
-                for intent in pool.starmap(calc_intent,
+                for intent in pool.starmap(calc_padatious_intent,
                                            ((utt, intent_container)
                                             for utt in utterances)):
                     if intent:
@@ -373,7 +373,7 @@ class PadatiousService:
             return padatious_intent
 
 
-def calc_intent(args: Tuple[str, FallbackIntentContainer]) -> \
+def calc_padatious_intent(args: Tuple[str, FallbackIntentContainer]) -> \
         Optional[PadatiousIntent]:
     """
     Try to match `utt` to an intent in `intent_container`
