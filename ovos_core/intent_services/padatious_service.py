@@ -142,7 +142,7 @@ class PadatiousMatcher:
         """
         padatious_intent = None
         for utt in utterances:
-            intent = self.service.calc_padatious_intent(utt, lang)
+            intent = self.service.calc_intent(utt, lang)
             if intent:
                 best = padatious_intent.conf if padatious_intent else 0.0
                 if best < intent.conf:

@@ -57,13 +57,17 @@ class UtteranceIntentMatchingTest(unittest.TestCase):
         self.assertEqual(intent.matches, {'thing': 'Mycroft'})
 
         # fuzzy regex match - success
-        intent = intent_service.calc_intent("tell me everything about Mycroft", "en-US")
+        intent = intent_service.calc_intent("tell me everything about Mycroft",
+                                            "en-US")
         self.assertEqual(intent.name, "test2")
-        # TODO - why are extracted entities lower case ???
-        # i think case depends on padaos vs padatious matching internally
+
+        # case depends on padaos vs padatious matching internally
         # padaos (exact matches only) -> keep case
         # padatious -> lower case
-        self.assertEqual(intent.matches, {'thing': 'mycroft'})
+        if intent_service.is_regex_only:
+            self.assertEqual(intent.matches, {'thing': 'Mycroft'})
+        else:
+            self.assertEqual(intent.matches, {'thing': 'mycroft'})
         self.assertTrue(intent.conf <= 0.9)
 
     def test_regex_intent(self):
