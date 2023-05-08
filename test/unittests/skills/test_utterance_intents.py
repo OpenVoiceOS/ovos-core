@@ -32,7 +32,11 @@ class UtteranceIntentMatchingTest(unittest.TestCase):
         intent_service = self.get_service()
 
         # assert padatious is loaded not padacioso
-        self.assertFalse(intent_service.is_regex_only)
+        try:
+            import padatious
+            self.assertFalse(intent_service.is_regex_only)
+        except ImportError:
+            self.assertTrue(intent_service.is_regex_only)
         for container in intent_service.containers.values():
             self.assertFalse(isinstance(container, FallbackIntentContainer))
 
