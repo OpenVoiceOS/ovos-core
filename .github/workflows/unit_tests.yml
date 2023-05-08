@@ -46,11 +46,11 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt install python3-dev swig libssl-dev libfann-dev portaudio19-dev libpulse-dev
+          sudo apt install python3-dev swig libssl-dev portaudio19-dev libpulse-dev
           python -m pip install build wheel
       - name: Install core repo
         run: |
-          pip install .[mycroft,lgpl,deprecated]
+          pip install .[mycroft,deprecated]
       - name: Install test dependencies
         run: |
           pip install -r requirements/tests.txt
@@ -71,3 +71,30 @@ jobs:
         env:
           CODECOV_TOKEN: ${{secrets.CODECOV_TOKEN}}
         uses: codecov/codecov-action@v2
+  backwards_compat_tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt install python3-dev swig libssl-dev portaudio19-dev libpulse-dev
+          python -m pip install build wheel
+      - name: Install core repo
+        run: |
+          pip install .[mycroft,lgpl,deprecated]
+      - name: Install test dependencies
+        run: |
+          pip install -r requirements/tests.txt
+          pip install ./test/unittests/common_query/ovos_tskill_fakewiki
+      - name: Run unittests
+        run: |
+          pytest test/unittests
+      - name: Run integration tests
+        run: |
+          pytest test/integrationtests

@@ -3,7 +3,7 @@ python-dateutil>=2.6, <3.0
 watchdog>=2.1, <3.0
 combo-lock>=0.2.2, <0.3
 
-padacioso>=0.1.2, <0.2.0
+padacioso~=0.2
 adapt-parser>=1.0.0, <2.0.0
 
 ovos_bus_client<0.1.0, >=0.0.4a3
