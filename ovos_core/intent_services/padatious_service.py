@@ -34,9 +34,8 @@ try:
     from padatious.match_data import MatchData as PadatiousIntent
 except ImportError:
     _pd = None
-
-
     # padatious is optional, this class is just for compat
+
     class PadatiousIntent:
         """
         A set of data describing how a query fits into an intent
@@ -84,13 +83,18 @@ class PadatiousMatcher:
                                          with optional normalized version.
             limit (float): required confidence level.
         """
-        # we call flatten in case someone is sending the old style list of tuples
+        # call flatten in case someone is sending the old style list of tuples
         utterances = flatten_list(utterances)
         if not self.has_result:
             lang = lang or self.service.lang
             LOG.debug(f'Padatious Matching confidence > {limit}')
-            padatious_intent = self.service.threaded_calc_intent(utterances,
-                                                                 lang)
+            if _pd:
+                LOG.info(f"Using legacy Padatious module")
+                padatious_intent = self._legacy_padatious_match(utterances,
+                                                                lang)
+            else:
+                padatious_intent = self.service.threaded_calc_intent(utterances,
+                                                                     lang)
             if padatious_intent:
                 skill_id = padatious_intent.name.split(':')[0]
                 self.ret = ovos_core.intent_services.IntentMatch(
@@ -128,6 +132,24 @@ class PadatiousMatcher:
         """
         return self._match_level(utterances, 0.5, lang)
 
+    def _legacy_padatious_match(self, utterances: List[str],
+                                lang: str) -> Optional[PadatiousIntent]:
+        """
+        Handle intent match with the Padatious intent parser.
+        @param utterances: List of string utterances to evaluate
+        @param lang: BCP-47 language of utterances
+        @return: PadatiousIntent if matched, else None
+        """
+        padatious_intent = None
+        for utt in utterances:
+            intent = self.service.calc_intent(utt, lang)
+            if intent:
+                best = padatious_intent.conf if padatious_intent else 0.0
+                if best < intent.conf:
+                    padatious_intent = intent
+                    padatious_intent.matches['utterance'] = utt
+        return padatious_intent
+
 
 class PadatiousService:
     """Service class for padatious intent matching."""
@@ -145,7 +167,8 @@ class PadatiousService:
 
         if self.is_regex_only:
             if not _pd:
-                LOG.error('Padatious not installed. Falling back to pure regex alternative')
+                LOG.info('Padatious not installed. '
+                         'Falling back to pure regex alternative')
                 try:
                     call(['notify-send', 'Padatious not installed',
                           'Falling back to pure regex alternative'])
@@ -153,7 +176,8 @@ class PadatiousService:
                     pass
             LOG.warning('using pure regex intent parser. '
                         'Some intents may be hard to trigger')
-            self.containers = {lang: FallbackIntentContainer(self.padatious_config.get("fuzz"))
+            self.containers = {lang: FallbackIntentContainer(
+                self.padatious_config.get("fuzz"))
                                for lang in langs}
         else:
             self.containers = {
@@ -284,7 +308,8 @@ class PadatiousService:
         lang = lang.lower()
         if lang in self.containers:
             self.registered_intents.append(message.data['name'])
-            self._register_object(message, 'intent', self.containers[lang].add_intent)
+            self._register_object(message, 'intent',
+                                  self.containers[lang].add_intent)
 
     def register_entity(self, message):
         """Messagebus handler for registering entities.
@@ -296,7 +321,8 @@ class PadatiousService:
         lang = lang.lower()
         if lang in self.containers:
             self.registered_entities.append(message.data)
-            self._register_object(message, 'entity', self.containers[lang].add_entity)
+            self._register_object(message, 'entity',
+                                  self.containers[lang].add_entity)
 
     def calc_intent(self, utt, lang=None):
         """Cached version of container calc_intent.
