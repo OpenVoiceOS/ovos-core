@@ -336,7 +336,7 @@ class PadatiousService:
         lang = lang or self.lang
         lang = lang.lower()
         if lang in self.containers:
-            return calc_padatious_intent((utt, self.containers[lang]))
+            return _calc_padatious_intent((utt, self.containers[lang]))
 
     def threaded_calc_intent(self, utterances: List[str],
                              lang: str = None) -> Optional[PadatiousIntent]:
@@ -355,7 +355,7 @@ class PadatiousService:
             with Pool(16) as pool:
                 idx = 0
                 padatious_intent = None
-                for intent in pool.starmap(calc_padatious_intent,
+                for intent in pool.starmap(_calc_padatious_intent,
                                            ((utt, intent_container)
                                             for utt in utterances)):
                     if intent:
@@ -373,13 +373,16 @@ class PadatiousService:
             return padatious_intent
 
 
-def calc_padatious_intent(args: Tuple[str, FallbackIntentContainer]) -> \
+def _calc_padatious_intent(*args) -> \
         Optional[PadatiousIntent]:
     """
     Try to match `utt` to an intent in `intent_container`
     @param args: tuple of (utterance, IntentContainer)
     @return: matched PadatiousIntent
     """
+    LOG.info(args)
+    if len(args) == 1:
+        args = args[0]
     utt = args[0]
     intent_container = args[1]
     intent = intent_container.calc_intent(utt)
