@@ -405,6 +405,9 @@ def _calc_padatious_intent(*args) -> \
                 intent["matches"] = intent.pop("entities")
             intent["sent"] = utt
             intent = PadatiousIntent(**intent)
+        else:
+            LOG.info(f"Overriding `intent.sent` with matched utterance")
+            intent.sent = utt
         return intent
     except Exception as e:
         LOG.error(e)
