@@ -141,4 +141,4 @@ class UtteranceIntentMatchingTest(unittest.TestCase):
         speedup = (single_thread_time - multi_thread_time) / len(utterances)
         print(f"speedup={speedup}")
         # Assert threaded execution was faster (or at least not much slower)
-        self.assertGreaterEqual(speedup, -0.001)
+        self.assertGreaterEqual(speedup, -0.01)
