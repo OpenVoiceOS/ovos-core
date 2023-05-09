@@ -90,8 +90,7 @@ class UtteranceIntentMatchingTest(unittest.TestCase):
         utterance = "tell me about Mycroft"
         intent = intent_service.calc_intent(utterance, "en-US")
         self.assertEqual(intent.name, "test2")
-        self.assertEqual(intent.matches, {'thing': 'Mycroft',
-                                          'utterance': utterance})
+        self.assertEqual(intent.matches, {'thing': 'Mycroft'})
 
         # fuzzy match - failure case (no fuzz)
         intent = intent_service.calc_intent("this is test", "en-US")
@@ -114,15 +113,15 @@ class UtteranceIntentMatchingTest(unittest.TestCase):
         utterance = "tell me everything about Mycroft"
         intent = intent_service.calc_intent(utterance, "en-US")
         self.assertEqual(intent.name, "test2")
-        self.assertEqual(intent.matches, {'thing': 'Mycroft',
-                                          'utterance': utterance})
+        self.assertEqual(intent.matches, {'thing': 'Mycroft'})
+        self.assertEqual(intent.sent, utterance)
         self.assertTrue(intent.conf <= 0.8)
 
     def test_threaded_intent(self):
         from time import time
         intent_service = self.get_service(regex_only=True, fuzz=False)
         utterances = []
-        for i in range(50):
+        for i in range(100):
             utterances.append("tell me about Mycroft")
         intent_service.padatious_config['threaded_inference'] = False
         start = time()
