@@ -35,10 +35,12 @@ class UtteranceIntentMatchingTest(unittest.TestCase):
         try:
             import padatious
             self.assertFalse(intent_service.is_regex_only)
+            self.assertFalse(intent_service.threaded_inference)
             for container in intent_service.containers.values():
                 self.assertNotIsInstance(container, FallbackIntentContainer)
         except ImportError:
             self.assertTrue(intent_service.is_regex_only)
+            self.assertFalse(intent_service.threaded_inference)
             for container in intent_service.containers.values():
                 self.assertIsInstance(container, FallbackIntentContainer)
 
@@ -57,8 +59,8 @@ class UtteranceIntentMatchingTest(unittest.TestCase):
         self.assertEqual(intent.matches, {'thing': 'Mycroft'})
 
         # fuzzy regex match - success
-        intent = intent_service.calc_intent("tell me everything about Mycroft",
-                                            "en-US")
+        utterance = "tell me everything about Mycroft"
+        intent = intent_service.calc_intent(utterance, "en-US")
         self.assertEqual(intent.name, "test2")
 
         # case depends on padaos vs padatious matching internally
@@ -66,8 +68,10 @@ class UtteranceIntentMatchingTest(unittest.TestCase):
         # padatious -> lower case
         if intent_service.is_regex_only:
             self.assertEqual(intent.matches, {'thing': 'Mycroft'})
+            self.assertEqual(intent.sent, utterance)
         else:
             self.assertEqual(intent.matches, {'thing': 'mycroft'})
+            self.assertEqual(intent.sent, utterance)
         self.assertTrue(intent.conf <= 0.9)
 
     def test_regex_intent(self):
@@ -83,16 +87,19 @@ class UtteranceIntentMatchingTest(unittest.TestCase):
         self.assertEqual(intent.name, "test")
 
         # regex match
-        intent = intent_service.calc_intent("tell me about Mycroft", "en-US")
+        utterance = "tell me about Mycroft"
+        intent = intent_service.calc_intent(utterance, "en-US")
         self.assertEqual(intent.name, "test2")
-        self.assertEqual(intent.matches, {'thing': 'Mycroft'})
+        self.assertEqual(intent.matches, {'thing': 'Mycroft',
+                                          'utterance': utterance})
 
         # fuzzy match - failure case (no fuzz)
         intent = intent_service.calc_intent("this is test", "en-US")
         self.assertTrue(intent.name is None)
 
         # fuzzy regex match - failure case (no fuzz)
-        intent = intent_service.calc_intent("tell me everything about Mycroft", "en-US")
+        intent = intent_service.calc_intent("tell me everything about Mycroft",
+                                            "en-US")
         self.assertTrue(intent.name is None)
 
     def test_regex_fuzz_intent(self):
@@ -104,9 +111,35 @@ class UtteranceIntentMatchingTest(unittest.TestCase):
         self.assertTrue(intent.conf <= 0.8)
 
         # fuzzy regex match - success
-        intent = intent_service.calc_intent("tell me everything about Mycroft", "en-US")
+        utterance = "tell me everything about Mycroft"
+        intent = intent_service.calc_intent(utterance, "en-US")
         self.assertEqual(intent.name, "test2")
-        self.assertEqual(intent.matches, {'thing': 'Mycroft'})
+        self.assertEqual(intent.matches, {'thing': 'Mycroft',
+                                          'utterance': utterance})
         self.assertTrue(intent.conf <= 0.8)
 
+    def test_threaded_intent(self):
+        from time import time
+        intent_service = self.get_service(regex_only=True, fuzz=False)
+        utterances = []
+        for i in range(50):
+            utterances.append("tell me about Mycroft")
+        intent_service.padatious_config['threaded_inference'] = False
+        start = time()
+        intent = intent_service.threaded_calc_intent(utterances, "en-US")
+        single_thread_time = time() - start
+        self.assertEqual(intent.name, "test2")
+        self.assertEqual(intent.matches, {'thing': 'Mycroft',
+                                          'utterance': utterances[0]})
+        self.assertEqual(intent.sent, utterances[0])
 
+        intent_service.padatious_config['threaded_inference'] = True
+        start = time()
+        intent2 = intent_service.threaded_calc_intent(utterances, "en-US")
+        multi_thread_time = time() - start
+        self.assertEqual(intent.__dict__, intent2.__dict__)
+
+        speedup = (single_thread_time - multi_thread_time) / len(utterances)
+        print(f"speedup={speedup}")
+        # Assert threaded execution was faster
+        self.assertLess(multi_thread_time, single_thread_time)

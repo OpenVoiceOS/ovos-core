@@ -41,7 +41,7 @@ except ImportError:
         A set of data describing how a query fits into an intent
         Attributes:
             name (str): Name of matched intent
-            sent (str): The query after entity extraction
+            sent (str): The input utterance associated with the intent
             conf (float): Confidence (from 0.0 to 1.0)
             matches (dict of str -> str): Key is the name of the entity and
                 value is the extracted part of the sentence
@@ -205,6 +205,13 @@ class PadatiousService:
             return True
         return self.padatious_config.get("regex_only") or False
 
+    @property
+    def threaded_inference(self):
+        if not self.is_regex_only:
+            # Padatious isn't thread-safe, so don't even try
+            return False
+        return self.padatious_config.get("threaded_inference", False)
+
     def train(self, message=None):
         """Perform padatious training.
 
@@ -352,43 +359,52 @@ class PadatiousService:
         lang = lang.lower()
         if lang in self.containers:
             intent_container = self.containers.get(lang)
-            with Pool(16) as pool:
-                idx = 0
-                padatious_intent = None
-                for intent in pool.starmap(_calc_padatious_intent,
-                                           ((utt, intent_container)
-                                            for utt in utterances)):
-                    if intent:
-                        best = \
-                            padatious_intent.conf if padatious_intent else 0.0
-                        if best < intent.conf:
-                            padatious_intent = intent
-                            padatious_intent.matches['utterance'] = \
-                                utterances[idx]
-                            # TODO: Should this just return the first result?
-                            if intent.conf == 1.0:
-                                LOG.debug(f"Returning perfect match")
-                                return intent
-                    idx += 1
+            if self.threaded_inference:
+                with Pool() as pool:
+                    intents = (intent for intent in
+                               pool.imap_unordered(_calc_padatious_intent,
+                                                   ((utt, intent_container)
+                                                    for utt in utterances)))
+                    pool.close()
+                    pool.join()
+            else:
+                intents = (self.calc_intent(utt, lang) for utt in utterances)
+            padatious_intent = None
+            for intent in intents:
+                if intent:
+                    best = \
+                        padatious_intent.conf if padatious_intent else 0.0
+                    if intent.conf > best:  # this intent is the best so far
+                        padatious_intent = intent
+                        # TODO: This is for backwards-compat. but means that an
+                        #   entity "utterance" will be overridden
+                        padatious_intent.matches['utterance'] = \
+                            padatious_intent.sent
+                        if intent.conf == 1.0:
+                            LOG.debug(f"Returning perfect match")
+                            return intent
             return padatious_intent
 
 
 def _calc_padatious_intent(*args) -> \
         Optional[PadatiousIntent]:
     """
-    Try to match `utt` to an intent in `intent_container`
+    Try to match an utterance to an intent in an intent_container
     @param args: tuple of (utterance, IntentContainer)
     @return: matched PadatiousIntent
     """
-    LOG.info(args)
-    if len(args) == 1:
-        args = args[0]
-    utt = args[0]
-    intent_container = args[1]
-    intent = intent_container.calc_intent(utt)
-    if isinstance(intent, dict):
-        if "entities" in intent:
-            intent["matches"] = intent.pop("entities")
-        intent["sent"] = utt
-        intent = PadatiousIntent(**intent)
-    return intent
+    try:
+        LOG.info(args)
+        if len(args) == 1:
+            args = args[0]
+        utt = args[0]
+        intent_container = args[1]
+        intent = intent_container.calc_intent(utt)
+        if isinstance(intent, dict):
+            if "entities" in intent:
+                intent["matches"] = intent.pop("entities")
+            intent["sent"] = utt
+            intent = PadatiousIntent(**intent)
+        return intent
+    except Exception as e:
+        LOG.error(e)
