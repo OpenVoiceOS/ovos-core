@@ -5,7 +5,7 @@ ovos_PHAL<0.1.0, >=0.0.2
 ovos-audio~=0.0, >=0.0.2a10
 ovos-listener~=0.0, >=0.0.2a9
 ovos-gui~=0.0, >=0.0.2
-ovos-messagebus~=0.0, >=0.0.2
+ovos-messagebus~=0.0, >=0.0.3a1
 
 # default plugins
 ovos-stt-plugin-server>=0.0.2, <0.1.0
