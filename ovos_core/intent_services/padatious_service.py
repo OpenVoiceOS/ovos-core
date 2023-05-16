@@ -168,14 +168,13 @@ class PadatiousService:
         if self.is_regex_only:
             if not _pd:
                 LOG.info('Padatious not installed. '
-                         'Falling back to pure regex alternative')
+                         'Falling back to Padacioso')
                 try:
                     call(['notify-send', 'Padatious not installed',
-                          'Falling back to pure regex alternative'])
+                          'Falling back to Padacioso'])
                 except OSError:
                     pass
-            LOG.warning('using pure regex intent parser. '
-                        'Some intents may be hard to trigger')
+            LOG.debug('Using Padacioso intent parser.')
             self.containers = {lang: FallbackIntentContainer(
                 self.padatious_config.get("fuzz"))
                                for lang in langs}
