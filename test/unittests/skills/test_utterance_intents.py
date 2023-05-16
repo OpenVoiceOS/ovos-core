@@ -65,6 +65,7 @@ class UtteranceIntentMatchingTest(unittest.TestCase):
 
         # case depends on padaos vs padatious matching internally
         # padaos (exact matches only) -> keep case
+        # padacioso -> keep case
         # padatious -> lower case
         if intent_service.is_regex_only:
             self.assertEqual(intent.matches, {'thing': 'Mycroft'})
