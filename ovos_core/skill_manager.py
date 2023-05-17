@@ -30,8 +30,9 @@ from ovos_utils.gui import is_gui_connected
 from ovos_utils.log import LOG
 from ovos_utils.network_utils import is_connected
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap, ProcessState
+from ovos_utils.skills.locations import get_skill_directories
 from ovos_workshop.skill_launcher import SKILL_MAIN_MODULE
-from ovos_workshop.skill_launcher import get_skill_directories, SkillLoader, PluginSkillLoader
+from ovos_workshop.skill_launcher import SkillLoader, PluginSkillLoader
 
 
 def _shutdown_skill(instance):
