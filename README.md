@@ -28,7 +28,7 @@ question mark.)
 
 We suggest you do this in a virtualenv:
 
-`pip install ovos-core[all]`
+`pip install ovos-core[mycroft]`
 
 ---
 
@@ -46,27 +46,7 @@ manpower resources available to us which may not have been compatible with our p
 - [Getting Involved](#getting-involved)
 - [Links](#links)
 
-You can find detailed documentation over at the [community-docs](https://openvoiceos.github.io/community-docs)
-
-## Running Mycroft
-
-`start-mycroft.sh` is available to perform common tasks.
-
-**Note**: MycroftAI's `dev_setup.sh` does not exist in OVOS-core.
-
-Assuming you installed mycroft-core in your home directory, run:
-
-- `cd ~/ovos-core`
-- `./start-mycroft.sh debug`
-
-The "debug" command will start the background services (microphone listener, skill, messagebus, and audio subsystems) as
-well as bringing up a text-based Command Line Interface (CLI) you can use to interact with Mycroft and see the contents
-of the various logs. Alternatively you can run `./start-mycroft.sh all` to begin the services without the command line
-interface. Later you can bring up the CLI using `./start-mycroft.sh cli`.
-
-The background services can be stopped as a group with:
-
-- `./stop-mycroft.sh`
+You can find detailed documentation over at the [community-docs](https://openvoiceos.github.io/community-docs) or [ovos-technical-manual](https://openvoiceos.github.io/ovos-technical-manual)
 
 ## Skills
 
@@ -86,7 +66,8 @@ Join the [Discussions](https://github.com/OpenVoiceOS/OpenVoiceOS/discussions) f
 
 ## Links
 
-* [Documentation](https://openvoiceos.github.io/community-docs)
+* [Community Documentation](https://openvoiceos.github.io/community-docs)
+* [ovos-technical-manual](https://openvoiceos.github.io/ovos-technical-manual)
 * [Release Notes](https://github.com/OpenVoiceOS/ovos-core/releases)
 * [Mycroft Documentation](https://docs.mycroft.ai)
 * [Mycroft API Docs](https://mycroft-core.readthedocs.io/en/master/)
