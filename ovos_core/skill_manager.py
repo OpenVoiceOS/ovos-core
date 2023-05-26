@@ -20,12 +20,13 @@ from threading import Thread, Event, Lock
 from time import sleep, monotonic
 
 from ovos_backend_client.pairing import is_paired
-from ovos_config.config import Configuration
-
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
+from ovos_config.config import Configuration
+from ovos_config.locations import get_xdg_config_save_path
 from ovos_plugin_manager.skills import find_skill_plugins
 from ovos_utils.enclosure.api import EnclosureAPI
+from ovos_utils.file_utils import FileWatcher
 from ovos_utils.gui import is_gui_connected
 from ovos_utils.log import LOG
 from ovos_utils.network_utils import is_connected
@@ -87,6 +88,7 @@ class SkillManager(Thread):
         """
         super(SkillManager, self).__init__()
         self.bus = bus
+        self._settings_watchdog = None
         # Set watchdog to argument or function returning None
         self._watchdog = watchdog or (lambda: None)
         callbacks = StatusCallbackMap(on_started=started_hook,
@@ -121,6 +123,22 @@ class SkillManager(Thread):
         self.daemon = True
 
         self.status.bind(self.bus)
+        self._init_filewatcher()
+
+    def _init_filewatcher(self):
+        # monitor skill settings files for changes
+        sspath = f"{get_xdg_config_save_path()}/skills/"
+        self._settings_watchdog = FileWatcher([sspath],
+                                              callback=self._handle_settings_file_change,
+                                              recursive=True,
+                                              ignore_creation=True)
+
+    def _handle_settings_file_change(self, path: str):
+        if path.endswith("/settings.json"):
+            skill_id = path.split("/")[-2]
+            LOG.info(f"skill settings.json change detected for {skill_id}")
+            self.bus.emit(Message("ovos.skills.settings_changed",
+                                  {"skill_id": skill_id}))
 
     def _sync_skill_loading_state(self):
         resp = self.bus.wait_for_response(Message("ovos.PHAL.internet_check"))
@@ -711,3 +729,6 @@ class SkillManager(Thread):
         # Do a clean shutdown of all plugin skills
         for skill_id in list(self.plugin_skills.keys()):
             self._unload_plugin_skill(skill_id)
+
+        if self._settings_watchdog:
+            self._settings_watchdog.shutdown()
