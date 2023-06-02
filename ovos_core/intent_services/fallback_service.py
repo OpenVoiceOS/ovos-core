@@ -165,7 +165,7 @@ class FallbackService:
         for skill_id, prio in sorted_handlers:
             result = self.attempt_fallback(utterances, skill_id, lang, message)
             if result:
-                return ovos_core.intent_services.IntentMatch('Fallback', None, {}, None)
+                return ovos_core.intent_services.IntentMatch('Fallback', None, {}, None, utterances[0])
 
         # old style deprecated fallback skill singleton class
         LOG.debug("checking for FallbackSkillsV1")
@@ -178,7 +178,7 @@ class FallbackService:
         response = self.bus.wait_for_response(msg, timeout=10)
 
         if response and response.data['handled']:
-            return ovos_core.intent_services.IntentMatch('Fallback', None, {}, None)
+            return ovos_core.intent_services.IntentMatch('Fallback', None, {}, None, utterances[0])
         return None
 
     def high_prio(self, utterances, lang, message):

@@ -13,59 +13,58 @@
 # limitations under the License.
 #
 """Intent service wrapping padatious."""
+from functools import lru_cache
 from multiprocessing import Pool
 from os import path
 from os.path import expanduser, isfile
-from subprocess import call
 from threading import Event
-from typing import List, Optional, Tuple
-
-from ovos_bus_client.message import Message
-from ovos_config.config import Configuration
-from ovos_utils.xdg_utils import xdg_data_home
-from ovos_config.meta import get_xdg_base
-from padacioso import IntentContainer as FallbackIntentContainer
 from time import time as get_time, sleep
+from typing import List, Optional
 
-import ovos_core.intent_services
+from ovos_config.config import Configuration
+from ovos_config.meta import get_xdg_base
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
+from ovos_utils.xdg_utils import xdg_data_home
+from padacioso import IntentContainer as FallbackIntentContainer
+
+import ovos_core.intent_services
+from ovos_bus_client.message import Message
 
 try:
     import padatious as _pd
-    from padatious.match_data import MatchData as PadatiousIntent
 except ImportError:
     _pd = None
-    # padatious is optional, this class is just for compat
 
-    class PadatiousIntent:
-        """
-        A set of data describing how a query fits into an intent
-        Attributes:
-            name (str): Name of matched intent
-            sent (str): The input utterance associated with the intent
-            conf (float): Confidence (from 0.0 to 1.0)
-            matches (dict of str -> str): Key is the name of the entity and
-                value is the extracted part of the sentence
-        """
 
-        def __init__(self, name, sent, matches=None, conf=0.0):
-            self.name = name
-            self.sent = sent
-            self.matches = matches or {}
-            self.conf = conf
+class PadatiousIntent:
+    """
+    A set of data describing how a query fits into an intent
+    Attributes:
+        name (str): Name of matched intent
+        sent (str): The input utterance associated with the intent
+        conf (float): Confidence (from 0.0 to 1.0)
+        matches (dict of str -> str): Key is the name of the entity and
+            value is the extracted part of the sentence
+    """
 
-        def __getitem__(self, item):
-            return self.matches.__getitem__(item)
+    def __init__(self, name, sent, matches=None, conf=0.0):
+        self.name = name
+        self.sent = sent
+        self.matches = matches or {}
+        self.conf = conf
 
-        def __contains__(self, item):
-            return self.matches.__contains__(item)
+    def __getitem__(self, item):
+        return self.matches.__getitem__(item)
 
-        def get(self, key, default=None):
-            return self.matches.get(key, default)
+    def __contains__(self, item):
+        return self.matches.__contains__(item)
 
-        def __repr__(self):
-            return repr(self.__dict__)
+    def get(self, key, default=None):
+        return self.matches.get(key, default)
+
+    def __repr__(self):
+        return repr(self.__dict__)
 
 
 class PadatiousMatcher:
@@ -73,10 +72,6 @@ class PadatiousMatcher:
 
     def __init__(self, service):
         self.service = service
-
-        self.has_result = False
-        self.ret = None
-        self.conf = None
 
     def _match_level(self, utterances, limit, lang=None):
         """Match intent and make sure a certain level of confidence is reached.
@@ -86,29 +81,21 @@ class PadatiousMatcher:
                                          with optional normalized version.
             limit (float): required confidence level.
         """
+        if self.service.is_regex_only:
+            LOG.debug(f'Padacioso Matching confidence > {limit}')
+        else:
+            LOG.debug(f'Padatious Matching confidence > {limit}')
         # call flatten in case someone is sending the old style list of tuples
         utterances = flatten_list(utterances)
-        if not self.has_result:
-            lang = lang or self.service.lang
-            LOG.debug(f'Padatious Matching confidence > {limit}')
-            if _pd:
-                LOG.info(f"Using legacy Padatious module")
-                padatious_intent = self._legacy_padatious_match(utterances,
-                                                                lang)
-            else:
-                padatious_intent = self.service.threaded_calc_intent(utterances,
-                                                                     lang)
-            if padatious_intent:
-                skill_id = padatious_intent.name.split(':')[0]
-                self.ret = ovos_core.intent_services.IntentMatch(
-                    'Padatious', padatious_intent.name,
-                    padatious_intent.matches, skill_id)
-                self.conf = padatious_intent.conf
-            self.has_result = True
-        if self.conf and self.conf > limit:
-            return self.ret
+        lang = lang or self.service.lang
+        padatious_intent = self.service.calc_intent(utterances, lang)
+        if padatious_intent is not None and padatious_intent.conf > limit:
+            skill_id = padatious_intent.name.split(':')[0]
+            return ovos_core.intent_services.IntentMatch(
+                'Padatious', padatious_intent.name,
+                padatious_intent.matches, skill_id, padatious_intent.sent)
 
-    def match_high(self, utterances, lang=None, __=None):
+    def match_high(self, utterances, lang=None, message=None):
         """Intent matcher for high confidence.
 
         Args:
@@ -117,7 +104,7 @@ class PadatiousMatcher:
         """
         return self._match_level(utterances, self.service.conf_high, lang)
 
-    def match_medium(self, utterances, lang=None, __=None):
+    def match_medium(self, utterances, lang=None, message=None):
         """Intent matcher for medium confidence.
 
         Args:
@@ -126,7 +113,7 @@ class PadatiousMatcher:
         """
         return self._match_level(utterances, self.service.conf_med, lang)
 
-    def match_low(self, utterances, lang=None, __=None):
+    def match_low(self, utterances, lang=None, message=None):
         """Intent matcher for low confidence.
 
         Args:
@@ -134,24 +121,6 @@ class PadatiousMatcher:
                                          with optional normalized version.
         """
         return self._match_level(utterances, self.service.conf_low, lang)
-
-    def _legacy_padatious_match(self, utterances: List[str],
-                                lang: str) -> Optional[PadatiousIntent]:
-        """
-        Handle intent match with the Padatious intent parser.
-        @param utterances: List of string utterances to evaluate
-        @param lang: BCP-47 language of utterances
-        @return: PadatiousIntent if matched, else None
-        """
-        padatious_intent = None
-        for utt in utterances:
-            intent = self.service.calc_intent(utt, lang)
-            if intent:
-                best = padatious_intent.conf if padatious_intent else 0.0
-                if best < intent.conf:
-                    padatious_intent = intent
-                    padatious_intent.matches['utterance'] = utt
-        return padatious_intent
 
 
 class PadatiousService:
@@ -172,20 +141,14 @@ class PadatiousService:
         self.conf_low = self.padatious_config.get("conf_low") or 0.5
 
         if self.is_regex_only:
-            if not _pd:
-                LOG.info('Padatious not installed. '
-                         'Falling back to Padacioso')
-                try:
-                    call(['notify-send', 'Padatious not installed',
-                          'Falling back to Padacioso'])
-                except OSError:
-                    pass
             LOG.debug('Using Padacioso intent parser.')
             self.containers = {lang: FallbackIntentContainer(
                 self.padatious_config.get("fuzz"))
-                               for lang in langs}
+                for lang in langs}
         else:
-            intent_cache = self.padatious_config.get('intent_cache') or f"{xdg_data_home()}/{get_xdg_base()}/intent_cache"
+            LOG.debug('Using Padatious intent parser.')
+            intent_cache = self.padatious_config.get(
+                'intent_cache') or f"{xdg_data_home()}/{get_xdg_base()}/intent_cache"
             self.containers = {
                 lang: _pd.IntentContainer(path.join(expanduser(intent_cache), lang))
                 for lang in langs}
@@ -337,22 +300,7 @@ class PadatiousService:
             self._register_object(message, 'entity',
                                   self.containers[lang].add_entity)
 
-    def calc_intent(self, utt, lang=None):
-        """Cached version of container calc_intent.
-
-        This improves speed when called multiple times for different confidence
-        levels.
-
-        Args:
-            utt (str): utterance to calculate best intent for
-        """
-        lang = lang or self.lang
-        lang = lang.lower()
-        if lang in self.containers:
-            return _calc_padatious_intent((utt, self.containers[lang]))
-
-    def threaded_calc_intent(self, utterances: List[str],
-                             lang: str = None) -> Optional[PadatiousIntent]:
+    def calc_intent(self, utterances: List[str], lang: str = None) -> Optional[PadatiousIntent]:
         """
         Get the best intent match for the given list of utterances. Utilizes a
         thread pool for overall faster execution. Note that this method is NOT
@@ -361,6 +309,8 @@ class PadatiousService:
         @param lang: language of utterances
         @return:
         """
+        if isinstance(utterances, str):
+            utterances = [utterances]  # backwards compat when arg was a single string
         lang = lang or self.lang
         lang = lang.lower()
         if lang in self.containers:
@@ -374,24 +324,15 @@ class PadatiousService:
                     pool.close()
                     pool.join()
             else:
-                intents = (self.calc_intent(utt, lang) for utt in utterances)
-            padatious_intent = None
-            for intent in intents:
-                if intent:
-                    best = \
-                        padatious_intent.conf if padatious_intent else 0.0
-                    if intent.conf > best:  # this intent is the best so far
-                        padatious_intent = intent
-                        # TODO: This is for backwards-compat. but means that an
-                        #   entity "utterance" will be overridden
-                        padatious_intent.matches['utterance'] = \
-                            padatious_intent.sent
-                        if intent.conf == 1.0:
-                            LOG.debug(f"Returning perfect match")
-                            return intent
-            return padatious_intent
+                intents = [_calc_padatious_intent(utt, intent_container) for utt in utterances]
+
+            intents = [i for i in intents if i is not None]
+            # select best
+            if intents:
+                return max(intents, key=lambda k: k.conf)
 
 
+@lru_cache(maxsize=10)  # repeat calls under different conf levels wont re-run code
 def _calc_padatious_intent(*args) -> \
         Optional[PadatiousIntent]:
     """
@@ -400,7 +341,6 @@ def _calc_padatious_intent(*args) -> \
     @return: matched PadatiousIntent
     """
     try:
-        LOG.info(args)
         if len(args) == 1:
             args = args[0]
         utt = args[0]
@@ -411,9 +351,8 @@ def _calc_padatious_intent(*args) -> \
                 intent["matches"] = intent.pop("entities")
             intent["sent"] = utt
             intent = PadatiousIntent(**intent)
-        else:
-            LOG.info(f"Overriding `intent.sent` with matched utterance")
-            intent.sent = utt
+
+        intent.sent = utt
         return intent
     except Exception as e:
         LOG.error(e)

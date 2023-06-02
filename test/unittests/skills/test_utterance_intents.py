@@ -126,16 +126,15 @@ class UtteranceIntentMatchingTest(unittest.TestCase):
             utterances.append("tell me about Mycroft")
         intent_service.padatious_config['threaded_inference'] = False
         start = time()
-        intent = intent_service.threaded_calc_intent(utterances, "en-US")
+        intent = intent_service.calc_intent(utterances, "en-US")
         single_thread_time = time() - start
         self.assertEqual(intent.name, "test2")
-        self.assertEqual(intent.matches, {'thing': 'Mycroft',
-                                          'utterance': utterances[0]})
+        self.assertEqual(intent.matches, {'thing': 'Mycroft'})
         self.assertEqual(intent.sent, utterances[0])
 
         intent_service.padatious_config['threaded_inference'] = True
         start = time()
-        intent2 = intent_service.threaded_calc_intent(utterances, "en-US")
+        intent2 = intent_service.calc_intent(utterances, "en-US")
         multi_thread_time = time() - start
         self.assertEqual(intent.__dict__, intent2.__dict__)
 

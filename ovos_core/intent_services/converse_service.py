@@ -259,5 +259,5 @@ class ConverseService:
         # check if any skill wants to handle utterance
         for skill_id in self._collect_converse_skills():
             if self.converse(utterances, skill_id, lang, message):
-                return ovos_core.intent_services.IntentMatch('Converse', None, None, skill_id)
+                return ovos_core.intent_services.IntentMatch('Converse', None, None, skill_id, utterances[0])
         return None

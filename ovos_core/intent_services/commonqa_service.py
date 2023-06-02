@@ -104,7 +104,7 @@ class CommonQAService:
                 message.data["utterance"] = utterance
                 answered = self.handle_question(message)
                 if answered:
-                    match = ovos_core.intent_services.IntentMatch('CommonQuery', None, {}, None)
+                    match = ovos_core.intent_services.IntentMatch('CommonQuery', None, {}, None, utterance)
                 break
         return match
 

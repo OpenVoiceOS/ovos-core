@@ -247,7 +247,8 @@ class AdaptService:
             self.update_context(best_intent)
             skill_id = best_intent['intent_type'].split(":")[0]
             ret = ovos_core.intent_services.IntentMatch(
-                'Adapt', best_intent['intent_type'], best_intent, skill_id
+                'Adapt', best_intent['intent_type'], best_intent, skill_id,
+                best_intent['utterance']
             )
         else:
             ret = None
