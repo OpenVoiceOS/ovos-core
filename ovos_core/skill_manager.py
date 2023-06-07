@@ -129,6 +129,7 @@ class SkillManager(Thread):
     def _init_filewatcher(self):
         # monitor skill settings files for changes
         sspath = f"{get_xdg_config_save_path()}/skills/"
+        os.makedirs(sspath, exist_ok=True)
         self._settings_watchdog = FileWatcher([sspath],
                                               callback=self._handle_settings_file_change,
                                               recursive=True,
