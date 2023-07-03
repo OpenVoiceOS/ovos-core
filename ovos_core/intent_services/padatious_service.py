@@ -22,6 +22,8 @@ from typing import List, Optional, Tuple
 
 from ovos_bus_client.message import Message
 from ovos_config.config import Configuration
+from ovos_utils.xdg_utils import xdg_data_home
+from ovos_config.meta import get_xdg_base
 from padacioso import IntentContainer as FallbackIntentContainer
 from time import time as get_time, sleep
 
@@ -158,7 +160,6 @@ class PadatiousService:
     def __init__(self, bus, config):
         self.padatious_config = config
         self.bus = bus
-        intent_cache = expanduser(self.padatious_config['intent_cache'])
 
         core_config = Configuration()
         self.lang = core_config.get("lang", "en-us")
@@ -184,8 +185,9 @@ class PadatiousService:
                 self.padatious_config.get("fuzz"))
                                for lang in langs}
         else:
+            intent_cache = self.padatious_config.get('intent_cache') or f"{xdg_data_home()}/{get_xdg_base()}/intent_cache"
             self.containers = {
-                lang: _pd.IntentContainer(path.join(intent_cache, lang))
+                lang: _pd.IntentContainer(path.join(expanduser(intent_cache), lang))
                 for lang in langs}
 
         self.bus.on('padatious:register_intent', self.register_intent)
@@ -197,7 +199,7 @@ class PadatiousService:
         self.finished_training_event = Event()
         self.finished_initial_train = False
 
-        self.train_delay = self.padatious_config['train_delay']
+        self.train_delay = self.padatious_config.get('train_delay', 4)
         self.train_time = get_time() + self.train_delay
 
         self.registered_intents = []
