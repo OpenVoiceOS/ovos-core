@@ -226,7 +226,7 @@ class PadatiousService:
         """
         self.finished_training_event.clear()
         if not self.is_regex_only:
-            padatious_single_thread = self.padatious_config['single_thread']
+            padatious_single_thread = self.padatious_config.get('single_thread', True)
             if message is None:
                 single_thread = padatious_single_thread
             else:
