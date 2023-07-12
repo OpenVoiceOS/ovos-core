@@ -263,6 +263,7 @@ class IntentService:
                     match = match_func(utterances, lang, message)
                     if match:
                         break
+            LOG.debug(f"intent matching took: {stopwatch.time}")
             if match:
                 message.data["utterance"] = match.utterance
 
