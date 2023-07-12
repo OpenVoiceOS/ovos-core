@@ -13,8 +13,8 @@
 # limitations under the License.
 #
 """Intent service wrapping padatious."""
+import concurrent.futures
 from functools import lru_cache
-from multiprocessing import Pool
 from os import path
 from os.path import expanduser, isfile
 from threading import Event
@@ -314,15 +314,35 @@ class PadatiousService:
         lang = lang or self.lang
         lang = lang.lower()
         if lang in self.containers:
+            intents = []
             intent_container = self.containers.get(lang)
+
             if self.threaded_inference:
-                with Pool() as pool:
-                    intents = (intent for intent in
-                               pool.imap_unordered(_calc_padatious_intent,
-                                                   ((utt, intent_container)
-                                                    for utt in utterances)))
-                    pool.close()
-                    pool.join()
+                # differences between ThreadPoolExecutor and ProcessPoolExecutor
+                # ThreadPoolExecutor
+                #     Uses Threads, not processes.
+                #     Lightweight workers, not heavyweight workers.
+                #     Shared Memory, not inter-process communication.
+                #     Subject to the GIL, not parallel execution.
+                #     Suited to IO-bound Tasks, not CPU-bound tasks.
+                #     Create 10s to 1,000s Workers, not really constrained.
+                #
+                # ProcessPoolExecutor
+                #     Uses Processes, not threads.
+                #     Heavyweight Workers, not lightweight workers.
+                #     Inter-Process Communication, not shared memory.
+                #     Not Subject to the GIL, not constrained to sequential execution.
+                #     Suited to CPU-bound Tasks, probably not IO-bound tasks.
+                #     Create 10s of Workers, not 100s or 1,000s of tasks.
+
+                self.workers = 4  # do the work in parallel instead of sequentially
+                with concurrent.futures.ProcessPoolExecutor(max_workers=self.workers) as executor:
+                    future_to_source = {
+                        executor.submit(_calc_padatious_intent,
+                                        (s, intent_container)): s
+                        for s in utterances
+                    }
+                    intents = [future.result() for future in concurrent.futures.as_completed(future_to_source)]
             else:
                 intents = [_calc_padatious_intent(utt, intent_container) for utt in utterances]
 
