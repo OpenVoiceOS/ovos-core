@@ -11,8 +11,8 @@ class TestAbortSkill(OVOSSkill):
     send "my.own.abort.msg" and confirm intent3 is aborted
     say "stop" and confirm all intents are aborted
     """
-    def __init__(self):
-        super(TestAbortSkill, self).__init__("KillableSkill")
+    def __init__(self, *args, **kwargs):
+        super(TestAbortSkill, self).__init__(*args, **kwargs)
         self.my_special_var = "default"
         self.stop_called = False
 

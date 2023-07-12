@@ -104,7 +104,7 @@ class TestKillableIntents(unittest.TestCase):
         sleep(2)
         # check that intent triggered
         start_msg = {'type': 'mycroft.skill.handler.start',
-                     'data': {'name': 'KillableSkill.handle_test_abort_intent'}}
+                     'data': {'name': 'TestAbortSkill.handle_test_abort_intent'}}
         speak_msg = {'type': 'speak',
                      'data': {'utterance': 'still here', 'expect_response': False,
                               'meta': {'skill': 'abort.test'},
@@ -148,7 +148,7 @@ class TestKillableIntents(unittest.TestCase):
         sleep(2)
         # check that intent triggered
         start_msg = {'type': 'mycroft.skill.handler.start',
-                     'data': {'name': 'KillableSkill.handle_test_abort_intent'}}
+                     'data': {'name': 'TestAbortSkill.handle_test_abort_intent'}}
         speak_msg = {'type': 'speak',
                      'data': {'utterance': 'still here', 'expect_response': False,
                               'meta': {'skill': 'abort.test'}, 'lang': 'en-us'}}
@@ -189,10 +189,13 @@ class TestKillableIntents(unittest.TestCase):
         self.bus.emitted_msgs = []
         # skill will enter a infinite loop unless aborted
         self.bus.emit(Message(f"{self.skill.skill_id}:test2.intent"))
-        sleep(2)
+        sleep(1)  # mock wait=True in speak_dialog
+        self.bus.emit(Message("recognizer_loop:audio_output_end"))
+        sleep(1)
+
         # check that intent triggered
         start_msg = {'type': 'mycroft.skill.handler.start',
-                     'data': {'name': 'KillableSkill.handle_test_get_response_intent'}}
+                     'data': {'name': 'TestAbortSkill.handle_test_get_response_intent'}}
         speak_msg = {'type': 'speak',
                      'data': {'utterance': 'this is a question',
                               'expect_response': True,
@@ -230,7 +233,7 @@ class TestKillableIntents(unittest.TestCase):
         sleep(2)
         # check that intent triggered
         start_msg = {'type': 'mycroft.skill.handler.start',
-                     'data': {'name': 'KillableSkill.handle_test_msg_intent'}}
+                     'data': {'name': 'TestAbortSkill.handle_test_msg_intent'}}
         speak_msg = {'type': 'speak',
                      'data': {'utterance': "you can't abort me",
                               'expect_response': False,
