@@ -314,7 +314,6 @@ class PadatiousService:
         lang = lang or self.lang
         lang = lang.lower()
         if lang in self.containers:
-            intents = []
             intent_container = self.containers.get(lang)
 
             if self.threaded_inference:
