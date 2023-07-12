@@ -1,8 +1,8 @@
-ovos-skill-volume~=0.0, >=0.0.1
-ovos-skill-fallback-unknown~=0.0.2
-ovos-skill-stop~=0.2
-neon-skill-alerts~=1.2
-ovos-skill-personal~=0.0, >=0.0.3
+ovos-skill-volume~=0.0, >=0.0.2a3
+ovos-skill-fallback-unknown~=0.0, >=0.0.4a1
+ovos-skill-stop>=0.3.0a4
+# neon-skill-alerts>=1.5.2a2
+ovos-skill-personal~=0.0, >=0.0.4a1
 ovos-skill-naptime~=0.2, >=0.2.2
-ovos-skill-date-time~=0.2, >=0.2.2
-ovos-skill-hello-world~=0.0, >=0.0.3
+ovos-skill-date-time>=0.2.3a4
+ovos-skill-hello-world~=0.0, >=0.0.4a2

@@ -81,8 +81,8 @@ class SkillLoader(_SL):
         self.last_modified = 0
         self.modtime_error_log_written = False
 
-    def _handle_filechange(self):
-        super()._handle_filechange()
+    def _handle_filechange(self, path):
+        super()._handle_filechange(path)
         # NOTE: below could be removed, but is kept for api backwards compatibility
         # users of SkillLoader will still have all properties properly updated
         # TODO on ntp sync last_modified needs to be updated

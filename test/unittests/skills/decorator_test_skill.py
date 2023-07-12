@@ -14,11 +14,11 @@
 #
 from adapt.intent import IntentBuilder
 
-from mycroft.skills.core import MycroftSkill
-from mycroft.skills.core import intent_handler, intent_file_handler
+from ovos_workshop.skills.ovos import OVOSSkill
+from ovos_workshop.decorators import intent_handler, intent_file_handler
 
 
-class TestSkill(MycroftSkill):
+class TestSkill(OVOSSkill):
     """ Test skill for intent_handler decorator. """
     @intent_handler(IntentBuilder('a').require('Keyword').build())
     def handler(self, message):

@@ -1,16 +1,16 @@
 from unittest import TestCase, mock
 
-from mycroft import MycroftSkill
+from ovos_workshop.skills.ovos import OVOSSkill
 from ovos_bus_client.message import Message
-from mycroft.skills import skill_api_method
-from mycroft.skills.api import SkillApi
+from ovos_workshop.decorators import skill_api_method
+from ovos_utils.skills.api import SkillApi
 
 
-class Skill(MycroftSkill):
+class Skill(OVOSSkill):
     """Test skill with registered API methods."""
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
         self.registered_methods = {}
+        super().__init__(*args, **kwargs)
 
     def add_event(self, event_type, func, **kwargs):
         """Mock handler of add_event, simply storing type and method.
@@ -37,9 +37,7 @@ def load_test_skill():
         (MycroftSkill): created test skill
     """
     bus = mock.Mock()
-    test_skill = Skill()
-    test_skill.skill_id = 'test_skill'
-    test_skill.bind(bus)
+    test_skill = Skill(skill_id = 'test_skill', bus=bus)
     return test_skill
 
 
@@ -136,7 +134,7 @@ class TestApiObject(TestCase):
         expected_response = 'all is good'
         sent_message = None
 
-        def capture_sent_message(message):
+        def capture_sent_message(message, timeout=3):
             """Capture sent message and return expected response message."""
             nonlocal sent_message
             sent_message = message

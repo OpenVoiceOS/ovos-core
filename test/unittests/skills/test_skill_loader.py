@@ -202,7 +202,7 @@ class TestSkillLoader(unittest.TestCase):
         loader.last_modified = 0
         loader.reload = Mock()
 
-        loader._handle_filechange()
+        loader._handle_filechange(self.skill_directory)
         loader.reload.assert_called_once_with()
         self.assertNotEqual(loader.last_modified, 0)
 

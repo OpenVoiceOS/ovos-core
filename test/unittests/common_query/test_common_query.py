@@ -42,7 +42,7 @@ class TestCommonQuery(unittest.TestCase):
             # thinking animation
             {'type': 'enclosure.mouth.think',
              'data': {},
-             'context': {'destination': ['enclosure'],
+             'context': {'destination': "skills", 'source': 'audio',
                          'skill_id': self.cc.skill_id}},
             # send query
             {'type': 'question:query',
@@ -73,8 +73,8 @@ class TestCommonQuery(unittest.TestCase):
             # stop thinking animation
             {'type': 'enclosure.mouth.reset',
              'data': {},
-             'context': {'destination': ['enclosure'],
-                         'skill_id': self.cc.skill_id}
+             'context': {'destination': "audio", 'source': 'skills',
+                         'skill_id': "wiki.test"}
              },
             # skill callback event
             {'type': 'question:action',
@@ -86,7 +86,7 @@ class TestCommonQuery(unittest.TestCase):
             # tell enclosure about active skill (speak method)
             {'type': 'enclosure.active_skill',
              'data': {'skill_id': 'wiki.test'},
-             'context': {'destination': ['enclosure'],
+             'context': {'destination': "audio", 'source': 'skills',
                          'skill_id': 'wiki.test'}},
             # execution of speak method
             {'type': 'speak',

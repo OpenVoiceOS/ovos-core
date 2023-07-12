@@ -1,36 +1,24 @@
 mycroft-messagebus-client
 
 # ovos modules for compat with mycroft namespace
-ovos_PHAL<0.1.0, >=0.0.2
-ovos-audio~=0.0, >=0.0.2a10
-ovos-listener~=0.0, >=0.0.2a9
-ovos-gui~=0.0, >=0.0.2
-ovos-messagebus~=0.0, >=0.0.3a1
+ovos_PHAL<0.1.0, >=0.0.5a9
+ovos-audio~=0.0, >=0.0.2a14
+ovos-listener~=0.0, >=0.0.2a13
+ovos-gui~=0.0, >=0.0.3a8
+ovos-messagebus~=0.0, >=0.0.4a1
 
 # default plugins
-ovos-stt-plugin-server>=0.0.2, <0.1.0
+ovos-stt-plugin-server>=0.0.3, <0.1.0
 ovos-tts-plugin-mimic>=0.2.8, <0.3.0
-ovos-tts-plugin-mimic3-server<0.1.0
+ovos-tts-plugin-server>=0.0.2a6
 
 ovos-ww-plugin-pocketsphinx~=0.1
 ovos-ww-plugin-precise~=0.1
 ovos-vad-plugin-webrtcvad>=0.0.1, <0.1.0
 
-ovos_plugin_common_play>=0.0.5a5, <0.1.0
+ovos_plugin_common_play>=0.0.6a3, <0.1.0
 # ovos-ocp-youtube-plugin~=0.0, >=0.0.1
 ovos-ocp-m3u-plugin>=0.0.1,<0.1.0
 ovos-ocp-rss-plugin>=0.0.2,<0.1.0
 ovos-ocp-files-plugin~=0.13
 ovos-ocp-news-plugin>=0.0.3,<0.1.0
-
-
-# default skills
-ovos-skill-volume>=0.0.1,<0.1.0
-ovos-skill-fallback-unknown>=0.0.2,<0.1.0
-ovos-skill-stop>=0.2,<0.3.0
-# neon-skill-alerts~=1.2
-ovos-skill-personal>=0.0.3,<0.1.0
-ovos-skill-naptime>=0.2.2,<0.3.0
-ovos-skill-date-time>=0.2.2,<0.3.0
-ovos-skill-hello-world>=0.0.3,<0.1.0
-ovos-skill-filebrowser>=0.0.2,<0.1.0
