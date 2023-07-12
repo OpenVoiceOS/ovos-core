@@ -177,10 +177,10 @@ class PadatiousService:
 
     @property
     def threaded_inference(self):
-        if not self.is_regex_only:
-            # Padatious isn't thread-safe, so don't even try
-            return False
-        return self.padatious_config.get("threaded_inference", False)
+        LOG.warning("threaded_inference config has been deprecated")
+        # Padatious isn't thread-safe, so don't even try
+        # Padacioso already uses concurrent.futures internally, no benefit
+        return False
 
     def train(self, message=None):
         """Perform padatious training.
@@ -316,34 +316,7 @@ class PadatiousService:
         lang = lang.lower()
         if lang in self.containers:
             intent_container = self.containers.get(lang)
-
-            if self.threaded_inference:
-                # differences between ThreadPoolExecutor and ProcessPoolExecutor
-                # ThreadPoolExecutor
-                #     Uses Threads, not processes.
-                #     Lightweight workers, not heavyweight workers.
-                #     Shared Memory, not inter-process communication.
-                #     Subject to the GIL, not parallel execution.
-                #     Suited to IO-bound Tasks, not CPU-bound tasks.
-                #     Create 10s to 1,000s Workers, not really constrained.
-                #
-                # ProcessPoolExecutor
-                #     Uses Processes, not threads.
-                #     Heavyweight Workers, not lightweight workers.
-                #     Inter-Process Communication, not shared memory.
-                #     Not Subject to the GIL, not constrained to sequential execution.
-                #     Suited to CPU-bound Tasks, probably not IO-bound tasks.
-                #     Create 10s of Workers, not 100s or 1,000s of tasks.
-                with concurrent.futures.ProcessPoolExecutor(max_workers=self.workers) as executor:
-                    future_to_source = {
-                        executor.submit(_calc_padatious_intent,
-                                        (s, intent_container)): s
-                        for s in utterances
-                    }
-                    intents = [future.result() for future in concurrent.futures.as_completed(future_to_source)]
-            else:
-                intents = [_calc_padatious_intent(utt, intent_container) for utt in utterances]
-
+            intents = [_calc_padatious_intent(utt, intent_container) for utt in utterances]
             intents = [i for i in intents if i is not None]
             # select best
             if intents:

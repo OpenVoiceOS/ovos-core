@@ -117,28 +117,3 @@ class UtteranceIntentMatchingTest(unittest.TestCase):
         self.assertEqual(intent.matches, {'thing': 'Mycroft'})
         self.assertEqual(intent.sent, utterance)
         self.assertTrue(intent.conf <= 0.8)
-
-    def test_threaded_intent(self):
-        from time import time
-        intent_service = self.get_service(regex_only=True, fuzz=False)
-        utterances = []
-        for i in range(50):
-            utterances.append("tell me about Mycroft")
-        intent_service.padatious_config['threaded_inference'] = False
-        start = time()
-        intent = intent_service.calc_intent(utterances, "en-US")
-        single_thread_time = time() - start
-        self.assertEqual(intent.name, "test2")
-        self.assertEqual(intent.matches, {'thing': 'Mycroft'})
-        self.assertEqual(intent.sent, utterances[0])
-
-        intent_service.padatious_config['threaded_inference'] = True
-        start = time()
-        intent2 = intent_service.calc_intent(utterances, "en-US")
-        multi_thread_time = time() - start
-        self.assertEqual(intent.__dict__, intent2.__dict__)
-
-        speedup = (single_thread_time - multi_thread_time) / len(utterances)
-        print(f"speedup={speedup}")
-        # Assert threaded execution was faster (or at least not much slower)
-        self.assertGreaterEqual(speedup, -0.01)
