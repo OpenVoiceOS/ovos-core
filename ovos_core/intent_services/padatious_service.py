@@ -139,11 +139,12 @@ class PadatiousService:
         self.conf_high = self.padatious_config.get("conf_high") or 0.95
         self.conf_med = self.padatious_config.get("conf_med") or 0.8
         self.conf_low = self.padatious_config.get("conf_low") or 0.5
+        self.workers = self.padatious_config.get("workers") or 4
 
         if self.is_regex_only:
             LOG.debug('Using Padacioso intent parser.')
             self.containers = {lang: FallbackIntentContainer(
-                self.padatious_config.get("fuzz"))
+                self.padatious_config.get("fuzz"), n_workers=self.workers)
                 for lang in langs}
         else:
             LOG.debug('Using Padatious intent parser.')
@@ -333,8 +334,6 @@ class PadatiousService:
                 #     Not Subject to the GIL, not constrained to sequential execution.
                 #     Suited to CPU-bound Tasks, probably not IO-bound tasks.
                 #     Create 10s of Workers, not 100s or 1,000s of tasks.
-
-                self.workers = 4  # do the work in parallel instead of sequentially
                 with concurrent.futures.ProcessPoolExecutor(max_workers=self.workers) as executor:
                     future_to_source = {
                         executor.submit(_calc_padatious_intent,
