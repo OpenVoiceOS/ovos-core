@@ -16,18 +16,23 @@ from collections import namedtuple
 
 from ovos_config.config import Configuration
 from ovos_config.locale import setup_locale
-
-from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
-from ovos_core.intent_services.adapt_service import AdaptService
-from ovos_core.intent_services.commonqa_service import CommonQAService
-from ovos_core.intent_services.converse_service import ConverseService
-from ovos_core.intent_services.fallback_service import FallbackService
-from ovos_core.intent_services.padatious_service import PadatiousService, PadatiousMatcher
 from ovos_utils.intents.intent_service_interface import open_intent_envelope
 from ovos_utils.log import LOG
 from ovos_utils.messagebus import get_message_lang
 from ovos_utils.metrics import Stopwatch
 from ovos_utils.sound import play_error_sound
+
+from ovos_core.intent_services.adapt_service import AdaptService
+from ovos_core.intent_services.commonqa_service import CommonQAService
+from ovos_core.intent_services.converse_service import ConverseService
+from ovos_core.intent_services.fallback_service import FallbackService
+from ovos_core.intent_services.padacioso_service import PadaciosoService
+from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
+
+try:
+    from ovos_core.intent_services.padatious_service import PadatiousService, PadatiousMatcher
+except ImportError:
+    from ovos_core.intent_services.padacioso_service import PadaciosoService as PadatiousService
 
 # Intent match response tuple containing
 # intent_service: Name of the service that matched the intent
@@ -56,10 +61,12 @@ class IntentService:
 
         # TODO - replace with plugins
         self.adapt_service = AdaptService(config.get('context', {}))
-        try:
+        if PadaciosoService is not PadatiousService:
             self.padatious_service = PadatiousService(bus, config['padatious'])
-        except Exception as err:
-            LOG.exception(f'Failed to create padatious handlers ({err})')
+        else:
+            LOG.error(f'Failed to create padatious handlers, padatious not installed')
+            self.padatious_service = None
+        self.padacioso_service = PadaciosoService(bus, config['padatious'])
         self.fallback = FallbackService(bus)
         self.converse = ConverseService(bus)
         self.common_qa = CommonQAService(bus)
@@ -104,6 +111,22 @@ class IntentService:
                     self.handle_padatious_manifest)
         self.bus.on('intent.service.padatious.entities.manifest.get',
                     self.handle_entity_manifest)
+
+    @property
+    def pipeline(self):
+        # List of functions to use to match the utterance with intent, listed in priority order.
+        config = Configuration().get("intents") or {}
+        return config.get("pipeline", [
+            "converse",
+            "padacioso_high",
+            "adapt",
+            "common_qa",
+            "fallback_high",
+            "padacioso_medium",
+            "fallback_medium",
+            "padacioso_low",
+            "fallback_low"
+        ])
 
     @property
     def registered_intents(self):
@@ -199,6 +222,38 @@ class IntentService:
 
         return default_lang
 
+    def get_pipeline(self, skip_converse=False, skip_fallback=False):
+        # Create matchers
+        # TODO - from plugins
+        if self.padatious_service is None:
+            if any("padatious" in p for p in self.pipeline):
+                LOG.warning("padatious is not available! using padacioso in it's place")
+            padatious_matcher = self.padacioso_service
+        else:
+            from ovos_core.intent_services.padatious_service import PadatiousMatcher
+            padatious_matcher = PadatiousMatcher(self.padatious_service)
+
+        matchers = {
+            "converse": self.converse.converse_with_skills,
+            "padatious_high": padatious_matcher.match_high,
+            "padacioso_high": self.padacioso_service.match_high,
+            "adapt": self.adapt_service.match_intent,
+            "common_qa": self.common_qa.match,
+            "fallback_high": self.fallback.high_prio,
+            "padatious_medium": padatious_matcher.match_medium,
+            "padacioso_medium": self.padacioso_service.match_medium,
+            "fallback_medium": self.fallback.medium_prio,
+            "padatious_low": padatious_matcher.match_low,
+            "padacioso_low": self.padacioso_service.match_low,
+            "fallback_low": self.fallback.low_prio
+        }
+        pipeline = list(self.pipeline)
+        if skip_converse and "converse" in pipeline:
+            pipeline.remove("converse")
+        if skip_fallback:
+            pipeline = [p for p in pipeline if not p.startswith("fallback_")]
+        return [matchers[k] for k in pipeline]
+
     def handle_utterance(self, message):
         """Main entrypoint for handling user utterances
 
@@ -242,24 +297,11 @@ class IntentService:
 
             stopwatch = Stopwatch()
 
-            # Create matchers
-            padatious_matcher = PadatiousMatcher(self.padatious_service)
-
-            # List of functions to use to match the utterance with intent.
-            # These are listed in priority order.
-            match_funcs = [
-                self.converse.converse_with_skills, padatious_matcher.match_high,
-                self.adapt_service.match_intent, self.common_qa.match,
-                self.fallback.high_prio, padatious_matcher.match_medium,
-                self.fallback.medium_prio, padatious_matcher.match_low,
-                self.fallback.low_prio
-            ]
-
             # match
             match = None
             with stopwatch:
                 # Loop through the matching functions until a match is found.
-                for match_func in match_funcs:
+                for match_func in self.get_pipeline():
                     match = match_func(utterances, lang, message)
                     if match:
                         break
@@ -392,24 +434,8 @@ class IntentService:
         utterance = message.data["utterance"]
         lang = get_message_lang(message)
 
-        # Create matchers
-        padatious_matcher = PadatiousMatcher(self.padatious_service)
-
-        # List of functions to use to match the utterance with intent.
-        # These are listed in priority order.
-        # TODO once we have a mechanism for checking if a fallback will
-        #  trigger without actually triggering it, those should be added here
-        match_funcs = [
-            padatious_matcher.match_high,
-            self.adapt_service.match_intent,
-            # self.fallback.high_prio,
-            padatious_matcher.match_medium,
-            # self.fallback.medium_prio,
-            padatious_matcher.match_low,
-            # self.fallback.low_prio
-        ]
         # Loop through the matching functions until a match is found.
-        for match_func in match_funcs:
+        for match_func in self.get_pipeline(skip_converse=True, skip_fallback=True):
             match = match_func([utterance], lang, message)
             if match:
                 if match.intent_type:
@@ -483,9 +509,9 @@ class IntentService:
         """
         utterance = message.data["utterance"]
         norm = message.data.get('norm_utt', utterance)
-        intent = self.padatious_service.calc_intent(utterance)
+        intent = self.padacioso_service.calc_intent(utterance)
         if not intent and norm != utterance:
-            intent = self.padatious_service.calc_intent(norm)
+            intent = self.padacioso_service.calc_intent(norm)
         if intent:
             intent = intent.__dict__
         self.bus.emit(message.reply("intent.service.padatious.reply",
@@ -499,7 +525,7 @@ class IntentService:
         """
         self.bus.emit(message.reply(
             "intent.service.padatious.manifest",
-            {"intents": self.padatious_service.registered_intents}))
+            {"intents": self.padacioso_service.registered_intents}))
 
     def handle_entity_manifest(self, message):
         """Messagebus handler returning the registered padatious entities.
@@ -509,7 +535,7 @@ class IntentService:
         """
         self.bus.emit(message.reply(
             "intent.service.padatious.entities.manifest",
-            {"entities": self.padatious_service.registered_entities}))
+            {"entities": self.padacioso_service.registered_entities}))
 
 
 def _is_old_style_keyword_message(message):

@@ -13,5 +13,5 @@
 # limitations under the License.
 #
 """Intent service wrapping padatious."""
-from ovos_core.intent_services.padatious_service import PadatiousMatcher, PadatiousService, PadatiousIntent, FallbackIntentContainer
+from ovos_core.intent_services.padatious_service import PadatiousMatcher, PadatiousService, PadatiousIntent
 
