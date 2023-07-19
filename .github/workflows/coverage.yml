@@ -1,0 +1,44 @@
+name: Run CodeCov
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      PYTHON: '3.9'
+    steps:
+    - uses: actions/checkout@master
+    - name: Setup Python
+      uses: actions/setup-python@master
+      with:
+        python-version: 3.9
+    - name: Install System Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt install python3-dev
+        python -m pip install build wheel
+    - name: Install repo
+      run: |
+        pip install -e .[mycroft,deprecated]
+    - name: Install test dependencies
+      run: |
+        sudo apt install libssl-dev libfann-dev portaudio19-dev libpulse-dev
+        pip install -r requirements/tests.txt
+        pip install ./test/unittests/common_query/ovos_tskill_fakewiki
+    - name: Generate coverage report
+      run: |
+        pytest --cov=./ovos_core --cov-report=xml
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        directory: ./coverage/reports/
+        fail_ci_if_error: true
+        files: ./coverage.xml,!./cache
+        flags: unittests
+        name: codecov-umbrella
+        verbose: true

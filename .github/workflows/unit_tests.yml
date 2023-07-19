@@ -50,7 +50,7 @@ jobs:
           python -m pip install build wheel
       - name: Install core repo
         run: |
-          pip install .[mycroft,deprecated]
+          pip install -e .[mycroft,deprecated]
       - name: Install test dependencies
         run: |
           pip install -r requirements/tests.txt
@@ -68,6 +68,7 @@ jobs:
           #       or they will overwrite previous invocations' coverage reports
           #       (for an example, see OVOS Skill Manager's workflow)
       - name: Upload coverage
+        if: "${{ matrix.python-version == '3.9' }}"
         env:
           CODECOV_TOKEN: ${{secrets.CODECOV_TOKEN}}
         uses: codecov/codecov-action@v2
