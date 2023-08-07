@@ -222,7 +222,7 @@ class IntentService:
 
         return default_lang
 
-    def get_pipeline(self, skip_converse=False, skip_fallback=False):
+    def get_pipeline(self, skips=None):
         """return a list of matcher functions ordered by priority
         utterances will be sent to each matcher in order until one can handle the utterance
         the list can be configured in mycroft.conf under intents.pipeline,
@@ -252,11 +252,8 @@ class IntentService:
             "padacioso_low": self.padacioso_service.match_low,
             "fallback_low": self.fallback.low_prio
         }
-        pipeline = list(self.pipeline)
-        if skip_converse and "converse" in pipeline:
-            pipeline.remove("converse")
-        if skip_fallback:
-            pipeline = [p for p in pipeline if not p.startswith("fallback_")]
+        skips = skips or []
+        pipeline = [k for k in self.pipeline if k not in skips]
         return [matchers[k] for k in pipeline]
 
     def handle_utterance(self, message):
@@ -441,7 +438,10 @@ class IntentService:
         lang = get_message_lang(message)
 
         # Loop through the matching functions until a match is found.
-        for match_func in self.get_pipeline(skip_converse=True, skip_fallback=True):
+        for match_func in self.get_pipeline(skips=["converse",
+                                                   "fallback_high",
+                                                   "fallback_medium",
+                                                   "fallback_low"]):
             match = match_func([utterance], lang, message)
             if match:
                 if match.intent_type:
