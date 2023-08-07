@@ -48,6 +48,7 @@ class ConverseService:
                 self.active_skills.pop(idx)
                 self.bus.emit(
                     Message("intent.service.skills.deactivated",
+                            {"skill_id": skill_id},
                             {"skill_id": skill_id}))
                 if skill_id in self._consecutive_activations:
                     self._consecutive_activations[skill_id] = 0
@@ -75,6 +76,7 @@ class ConverseService:
             self.active_skills.insert(0, [skill_id, time.time()])
             self.bus.emit(
                 Message("intent.service.skills.activated",
+                        {"skill_id": skill_id},
                         {"skill_id": skill_id}))
 
             self._consecutive_activations[skill_id] += 1
