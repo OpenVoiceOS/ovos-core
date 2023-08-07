@@ -223,6 +223,11 @@ class IntentService:
         return default_lang
 
     def get_pipeline(self, skip_converse=False, skip_fallback=False):
+        """return a list of matcher functions ordered by priority
+        utterances will be sent to each matcher in order until one can handle the utterance
+        the list can be configured in mycroft.conf under intents.pipeline,
+        in the future plugins will be supported for users to define their own pipeline"""
+
         # Create matchers
         # TODO - from plugins
         if self.padatious_service is None:
