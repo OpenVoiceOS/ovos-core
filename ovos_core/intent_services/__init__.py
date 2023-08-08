@@ -16,18 +16,20 @@ from collections import namedtuple
 
 from ovos_config.config import Configuration
 from ovos_config.locale import setup_locale
-from ovos_utils.intents.intent_service_interface import open_intent_envelope
-from ovos_utils.log import LOG
-from ovos_utils.messagebus import get_message_lang
-from ovos_utils.metrics import Stopwatch
-from ovos_utils.sound import play_error_sound
 
+from ovos_bus_client.message import Message
+from ovos_bus_client.session import SessionManager
 from ovos_core.intent_services.adapt_service import AdaptService
 from ovos_core.intent_services.commonqa_service import CommonQAService
 from ovos_core.intent_services.converse_service import ConverseService
 from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.padacioso_service import PadaciosoService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
+from ovos_utils.intents.intent_service_interface import open_intent_envelope
+from ovos_utils.log import LOG
+from ovos_utils.messagebus import get_message_lang
+from ovos_utils.metrics import Stopwatch
+from ovos_utils.sound import play_error_sound
 
 try:
     from ovos_core.intent_services.padatious_service import PadatiousService, PadatiousMatcher
@@ -60,7 +62,7 @@ class IntentService:
         self.skill_names = {}
 
         # TODO - replace with plugins
-        self.adapt_service = AdaptService(config.get('context', {}))
+        self.adapt_service = AdaptService()
         if PadaciosoService is not PadatiousService:
             self.padatious_service = PadatiousService(bus, config['padatious'])
         else:
@@ -412,7 +414,8 @@ class IntentService:
         entity['match'] = word
         entity['key'] = word
         entity['origin'] = origin
-        self.adapt_service.context_manager.inject_context(entity)
+        sess = SessionManager.get(message)
+        sess.context.inject_context(entity)
 
     def handle_remove_context(self, message):
         """Remove specific context
@@ -422,11 +425,13 @@ class IntentService:
         """
         context = message.data.get('context')
         if context:
-            self.adapt_service.context_manager.remove_context(context)
+            sess = SessionManager.get(message)
+            sess.context.remove_context(context)
 
-    def handle_clear_context(self, _):
+    def handle_clear_context(self, message):
         """Clears all keywords from context """
-        self.adapt_service.context_manager.clear_context()
+        sess = SessionManager.get(message)
+        sess.context.clear_context()
 
     def handle_get_intent(self, message):
         """Get intent from either adapt or padatious.
@@ -484,7 +489,7 @@ class IntentService:
         """
         utterance = message.data["utterance"]
         lang = get_message_lang(message)
-        intent = self.adapt_service.match_intent([utterance], lang)
+        intent = self.adapt_service.match_intent([utterance], lang, message)
         intent_data = intent.intent_data if intent else None
         self.bus.emit(message.reply("intent.service.adapt.reply",
                                     {"intent": intent_data}))
