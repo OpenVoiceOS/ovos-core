@@ -56,11 +56,48 @@ class AdaptService:
 
         self.lock = Lock()
 
-        # unused - backwards compat context related vars
-        self.context_keywords = self.config.get('keywords', [])
-        self.context_max_frames = self.config.get('max_frames', 3)
-        self.context_timeout = self.config.get('timeout', 2)
-        self.context_greedy = self.config.get('greedy', False)
+    @property
+    def context_keywords(self):
+        LOG.warning(
+            "self.context_keywords has been deprecated and is unused, use self.config.get('keywords', []) instead")
+        return self.config.get('keywords', [])
+
+    @context_keywords.setter
+    def context_keywords(self, val):
+        LOG.warning(
+            "self.context_keywords has been deprecated and is unused, edit mycroft.conf instead, setter will be ignored")
+
+    @property
+    def context_max_frames(self):
+        LOG.warning(
+            "self.context_keywords has been deprecated and is unused, use self.config.get('max_frames', 3) instead")
+        return self.config.get('max_frames', 3)
+
+    @context_max_frames.setter
+    def context_max_frames(self, val):
+        LOG.warning(
+            "self.context_max_frames has been deprecated and is unused, edit mycroft.conf instead, setter will be ignored")
+
+    @property
+    def context_timeout(self):
+        LOG.warning("self.context_timeout has been deprecated and is unused, use self.config.get('timeout', 2) instead")
+        return self.config.get('timeout', 2)
+
+    @context_timeout.setter
+    def context_timeout(self, val):
+        LOG.warning(
+            "self.context_timeout has been deprecated and is unused, edit mycroft.conf instead, setter will be ignored")
+
+    @property
+    def context_greedy(self):
+        LOG.warning(
+            "self.context_greedy has been deprecated and is unused, use self.config.get('greedy', False) instead")
+        return self.config.get('greedy', False)
+
+    @context_greedy.setter
+    def context_greedy(self, val):
+        LOG.warning(
+            "self.context_greedy has been deprecated and is unused, edit mycroft.conf instead, setter will be ignored")
 
     @property
     def context_manager(self):
