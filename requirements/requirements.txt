@@ -9,7 +9,7 @@ adapt-parser>=1.0.0, <2.0.0
 ovos_bus_client<0.0.6a1, >=0.0.5
 ovos-utils<0.1.0, >=0.0.35a7
 ovos-plugin-manager<0.1.0, >=0.0.24a5
-ovos-config~=0.0,>=0.0.11a7
+ovos-config~=0.0,>=0.0.11a9
 ovos-lingua-franca>=0.4.7
 ovos_backend_client>=0.1.0a6
 ovos_workshop<0.1.0, >=0.0.12a50
