@@ -1,6 +1,6 @@
 import unittest
 from unittest import mock
-from ovos_utils.messagebus import EventContainer
+from ovos_utils.events import EventContainer
 
 
 def example_handler(message):
@@ -17,7 +17,7 @@ class TestEventContainer(unittest.TestCase):
 
         # Set bus using .set_bus
         container = EventContainer(None)
-        self.assertEqual(container.bus, None)
+        self.assertIsNotNone(container.bus)
         container.set_bus(bus)
         self.assertEqual(container.bus, bus)
 
