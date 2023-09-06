@@ -29,7 +29,6 @@ from ovos_utils.intents.intent_service_interface import open_intent_envelope
 from ovos_utils.log import LOG
 from ovos_utils.messagebus import get_message_lang
 from ovos_utils.metrics import Stopwatch
-from ovos_utils.sound import play_error_sound
 
 try:
     from ovos_core.intent_services.padatious_service import PadatiousService, PadatiousMatcher
@@ -344,7 +343,8 @@ class IntentService:
         Args:
             message (Message): original message to forward from
         """
-        play_error_sound()
+        sound = Configuration().get('sounds', {}).get('error', "snd/error.mp3")
+        self.bus.emit(message.forward('mycroft.audio.play_sound', {"uri": sound}))
         self.bus.emit(message.forward('complete_intent_failure'))
 
     def handle_register_vocab(self, message):
