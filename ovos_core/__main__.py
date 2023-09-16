@@ -29,6 +29,7 @@ from ovos_core.skill_manager import SkillManager, on_error, on_stopping, on_read
 from ovos_utils import wait_for_exit_signal
 from ovos_utils.log import LOG, init_service_logger
 from ovos_utils.process_utils import reset_sigint_handler
+from ovos_core.skill_installer import SkillsStore
 from ovos_workshop.skills.fallback import FallbackSkill
 
 
@@ -52,6 +53,9 @@ def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
     event_scheduler = EventScheduler(bus, autostart=False)
     event_scheduler.daemon = True
     event_scheduler.start()
+
+    osm = SkillsStore(bus)
+
     SkillApi.connect_bus(bus)
     skill_manager = SkillManager(bus, watchdog,
                                  alive_hook=alive_hook,
@@ -64,7 +68,7 @@ def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
 
     wait_for_exit_signal()
 
-    shutdown(skill_manager, event_scheduler)
+    shutdown(skill_manager, event_scheduler, osm)
 
 
 def _register_intent_services(bus):
@@ -82,7 +86,7 @@ def _register_intent_services(bus):
     return service
 
 
-def shutdown(skill_manager, event_scheduler):
+def shutdown(skill_manager, event_scheduler, osm):
     LOG.info('Shutting down Skills service')
     if event_scheduler is not None:
         event_scheduler.shutdown()
@@ -90,6 +94,8 @@ def shutdown(skill_manager, event_scheduler):
     if skill_manager is not None:
         skill_manager.stop()
         skill_manager.join()
+    if osm is not None:
+        osm.shutdown()
     LOG.info('Skills service shutdown complete!')
 
 
