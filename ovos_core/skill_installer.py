@@ -20,6 +20,7 @@ class SkillsStore:
         self.config = config or Configuration()["skills"]
         self.bus = bus
         self.bus.on("ovos.skills.install", self.handle_install_skill)
+        self.bus.on("ovos.pip.install", self.handle_install_skill)
 
     def shutdown(self):
         pass
@@ -77,3 +78,11 @@ class SkillsStore:
                 self.bus.emit(message.reply("ovos.skills.install.failed", {"error": "pip install failed"}))
         else:
             self.bus.emit(message.reply("ovos.skills.install.failed", {"error": "not a github url"}))
+
+    def handle_install_python(self, message: Message):
+        pkgs = message.data["packages"]
+        success = self.pip_install(pkgs)
+        if success:
+            self.bus.emit(message.reply("ovos.pip.install.complete"))
+        else:
+            self.bus.emit(message.reply("ovos.pip.install.failed", {"error": "pip install failed"}))
