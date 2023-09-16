@@ -1,57 +1,77 @@
-from datetime import datetime, timedelta
-from os import makedirs
-from os.path import isdir
-from ovos_config.config import Configuration
-from ovos_skills_manager.osm import OVOSSkillsManager
-from ovos_skills_manager.skill_entry import SkillEntry
-from ovos_utils.event_scheduler import EventSchedulerInterface
-from typing import List, Optional, Generator, Union
+import sys
+from os.path import join, exists
+from subprocess import Popen, PIPE
+from tempfile import gettempdir
+from typing import Optional
 
+from combo_lock import ComboLock
+from ovos_config.config import Configuration
+
+from ovos_bus_client import Message
 from ovos_utils.log import LOG
 
 
 class SkillsStore:
+    # default constraints to use if none are given
+    DEFAULT_CONSTRAINTS = '/etc/mycroft/constraints.txt'
+    PIP_LOCK = ComboLock(join(gettempdir(), "ovos_pip.lock"))
+
     def __init__(self, bus, config=None):
         self.config = config or Configuration()["skills"]
-        self.osm = OVOSSkillsManager()
         self.bus = bus
-        self.scheduler = EventSchedulerInterface(skill_id="osm",
-                                                 bus=self.bus)
-        if self.config.get("appstore_sync_interval"):
-            self.schedule_sync()
-
         self.bus.on("ovos.skills.install", self.handle_install_skill)
-        self.bus.on("ovos.skills.sync", self.handle_sync_appstores)
-
-    def schedule_sync(self):
-        """
-        Use the EventScheduler to update osm with updated appstore data
-        """
-        # every X hours
-        interval = 60 * 60 * self.config["appstore_sync_interval"]
-        when = datetime.now() + timedelta(seconds=interval)
-        self.scheduler.schedule_repeating_event(self.handle_sync_appstores,
-                                                when, interval=interval,
-                                                name="appstores.sync")
-
-    def handle_sync_appstores(self, message=None):
-        """
-        Scheduled action to update OSM appstore listings
-        """
-        try:
-            self.osm.sync_appstores()
-        except Exception as e:
-            LOG.error(f"appstore sync failed: {e}")
 
     def shutdown(self):
-        self.scheduler.shutdown()
+        pass
+
+    @staticmethod
+    def pip_install(packages: list, constraints: Optional[str] = None, print_logs: bool = False):
+        if not len(packages):
+            return False
+        # Use constraints to limit the installed versions
+        if constraints and not exists(constraints):
+            LOG.error('Couldn\'t find the constraints file')
+            return False
+        elif exists(SkillsStore.DEFAULT_CONSTRAINTS):
+            constraints = SkillsStore.DEFAULT_CONSTRAINTS
+
+        pip_args = [sys.executable, '-m', 'pip', 'install']
+        if constraints:
+            pip_args += ['-c', constraints]
+
+        with SkillsStore.PIP_LOCK:
+            """
+            Iterate over the individual Python packages and
+            install them one by one to enforce the order specified
+            in the manifest.
+            """
+            for dependent_python_package in packages:
+                LOG.info("(pip) Installing " + dependent_python_package)
+                pip_command = pip_args + [dependent_python_package]
+                if print_logs:
+                    proc = Popen(pip_command)
+                else:
+                    proc = Popen(pip_command, stdout=PIPE, stderr=PIPE)
+                pip_code = proc.wait()
+                if pip_code != 0:
+                    stderr = proc.stderr.read().decode()
+                    raise RuntimeError(stderr)
+
+        return True
+
+    def validate_skill(self, url):
+        if not url.startswith("https://github.com/"):
+            return False
+        # TODO - check if setup.py
+        # TODO - check if not using MycroftSkill class
+        # TODO - check if not mycroft CommonPlay
+        return True
 
     def handle_install_skill(self, message: Message):
         url = message.data["url"]
-        # TODO - update OSM to use latest pip install methods and setup.py
-        entry = SkillEntry.from_github_url(url)
-        success = entry.install(*args, **kwargs)
-        if success:
-            self.bus.emit(message.reply("ovos.skills.install.complete"))
-        else:
-            self.bus.emit(message.reply("ovos.skills.install.failed"))
+        if self.validate_skill(url):
+            success = self.pip_install([f"git+{url}"])
+            if success:
+                self.bus.emit(message.reply("ovos.skills.install.complete"))
+            else:
+                self.bus.emit(message.reply("ovos.skills.install.failed"))
