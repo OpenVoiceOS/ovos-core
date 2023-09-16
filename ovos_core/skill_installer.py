@@ -74,4 +74,6 @@ class SkillsStore:
             if success:
                 self.bus.emit(message.reply("ovos.skills.install.complete"))
             else:
-                self.bus.emit(message.reply("ovos.skills.install.failed"))
+                self.bus.emit(message.reply("ovos.skills.install.failed", {"error": "pip install failed"}))
+        else:
+            self.bus.emit(message.reply("ovos.skills.install.failed", {"error": "not a github url"}))
