@@ -39,11 +39,11 @@ class SkillsStore:
 
     def play_error_sound(self):
         snd = Configuration().get("sounds", {}).get("pip_error", "snd/error.mp3")
-        self.bus.emit(Message("mycroft.audio.play_sound",  {"uri": snd}))
+        self.bus.emit(Message("mycroft.audio.play_sound", {"uri": snd}))
 
     def play_success_sound(self):
         snd = Configuration().get("sounds", {}).get("pip_success", "snd/acknowledge.mp3")
-        self.bus.emit(Message("mycroft.audio.play_sound",  {"uri": snd}))
+        self.bus.emit(Message("mycroft.audio.play_sound", {"uri": snd}))
 
     def pip_install(self, packages: list,
                     constraints: Optional[str] = None,
@@ -176,12 +176,15 @@ class SkillsStore:
                                         {"error": InstallError.DISABLED.value}))
             return
         pkgs = message.data["packages"]
-        success = self.pip_install(pkgs)
-        if success:
-            self.bus.emit(message.reply("ovos.pip.install.complete"))
+        if pkgs:
+            if self.pip_install(pkgs):
+                self.bus.emit(message.reply("ovos.pip.install.complete"))
+            else:
+                self.bus.emit(message.reply("ovos.pip.install.failed",
+                                            {"error": InstallError.PIP_ERROR.value}))
         else:
             self.bus.emit(message.reply("ovos.pip.install.failed",
-                                        {"error": InstallError.PIP_ERROR.value}))
+                                        {"error": InstallError.NO_PKGS.value}))
 
     def handle_uninstall_python(self, message: Message):
         if not self.config.get("allow_pip"):
@@ -191,9 +194,12 @@ class SkillsStore:
                                         {"error": InstallError.DISABLED.value}))
             return
         pkgs = message.data["packages"]
-        success = self.pip_uninstall(pkgs)
-        if success:
-            self.bus.emit(message.reply("ovos.pip.uninstall.complete"))
+        if pkgs:
+            if self.pip_uninstall(pkgs):
+                self.bus.emit(message.reply("ovos.pip.uninstall.complete"))
+            else:
+                self.bus.emit(message.reply("ovos.pip.uninstall.failed",
+                                            {"error": InstallError.PIP_ERROR.value}))
         else:
-            self.bus.emit(message.reply("ovos.pip.uninstall.failed",
-                                        {"error": InstallError.PIP_ERROR.value}))
+            self.bus.emit(message.reply("ovos.pip.install.failed",
+                                        {"error": InstallError.NO_PKGS.value}))
