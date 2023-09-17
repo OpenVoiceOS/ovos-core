@@ -38,12 +38,12 @@ class SkillsStore:
         pass
 
     def play_error_sound(self):
-        self.bus.emit(Message("mycroft.audio.play_sound",
-                              {"uri": "snd/error.mp3"}))
+        snd = Configuration().get("sounds", {}).get("pip_error", "snd/error.mp3")
+        self.bus.emit(Message("mycroft.audio.play_sound",  {"uri": snd}))
 
     def play_success_sound(self):
-        self.bus.emit(Message("mycroft.audio.play_sound",
-                              {"uri": "snd/acknowledge.mp3"}))
+        snd = Configuration().get("sounds", {}).get("pip_success", "snd/acknowledge.mp3")
+        self.bus.emit(Message("mycroft.audio.play_sound",  {"uri": snd}))
 
     def pip_install(self, packages: list,
                     constraints: Optional[str] = None,
