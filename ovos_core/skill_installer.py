@@ -41,6 +41,7 @@ class SkillsStore:
                     constraints: Optional[str] = None,
                     print_logs: bool = True):
         if not len(packages):
+            LOG.error("no package list provided to install")
             self.play_error_sound()
             return False
         # Use constraints to limit the installed versions
@@ -84,6 +85,7 @@ class SkillsStore:
     def pip_uninstall(self, packages: list,
                       print_logs: bool = True):
         if not len(packages):
+            LOG.error("no package list provided to uninstall")
             self.play_error_sound()
             return False
 
@@ -125,6 +127,7 @@ class SkillsStore:
 
     def handle_install_skill(self, message: Message):
         if not self.config.get("allow_pip"):
+            LOG.error("pip not enabled in mycroft.conf")
             self.bus.emit(message.reply("ovos.skills.install.failed", {"error": "disallowed in config"}))
             self.play_error_sound()
             return
@@ -137,20 +140,24 @@ class SkillsStore:
             else:
                 self.bus.emit(message.reply("ovos.skills.install.failed", {"error": "pip install failed"}))
         else:
+            LOG.error("invalid skill url, does not appear to be a github skill")
             self.play_error_sound()
             self.bus.emit(message.reply("ovos.skills.install.failed", {"error": "not a github url"}))
 
     def handle_uninstall_skill(self, message: Message):
         if not self.config.get("allow_pip"):
+            LOG.error("pip not enabled in mycroft.conf")
             self.play_error_sound()
             self.bus.emit(message.reply("ovos.skills.uninstall.failed", {"error": "disallowed in config"}))
             return
         # TODO
+        LOG.error("pip uninstall not yet implemented")
         self.play_error_sound()
         self.bus.emit(message.reply("ovos.skills.uninstall.failed", {"error": "not implemented"}))
 
     def handle_install_python(self, message: Message):
         if not self.config.get("allow_pip"):
+            LOG.error("pip not enabled in mycroft.conf")
             self.play_error_sound()
             self.bus.emit(message.reply("ovos.pip.install.failed", {"error": "disallowed in config"}))
             return
@@ -163,6 +170,7 @@ class SkillsStore:
 
     def handle_uninstall_python(self, message: Message):
         if not self.config.get("allow_pip"):
+            LOG.error("pip not enabled in mycroft.conf")
             self.play_error_sound()
             self.bus.emit(message.reply("ovos.pip.uninstall.failed", {"error": "disallowed in config"}))
             return
