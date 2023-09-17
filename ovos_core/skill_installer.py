@@ -1,4 +1,6 @@
+import enum
 import sys
+from importlib import reload
 from os.path import join, exists
 from subprocess import Popen, PIPE
 from tempfile import gettempdir
@@ -7,10 +9,16 @@ from typing import Optional
 from combo_lock import ComboLock
 from ovos_config.config import Configuration
 
+import ovos_plugin_manager
 from ovos_bus_client import Message
 from ovos_utils.log import LOG
-from importlib import reload
-import ovos_plugin_manager
+
+
+class InstallError(str, enum.Enum):
+    DISABLED = "pip disabled in mycroft.conf"
+    PIP_ERROR = "error in pip subprocess"
+    BAD_URL = "skill url validation failed"
+    NO_PKGS = "no packages to install"
 
 
 class SkillsStore:
@@ -127,9 +135,10 @@ class SkillsStore:
 
     def handle_install_skill(self, message: Message):
         if not self.config.get("allow_pip"):
-            LOG.error("pip not enabled in mycroft.conf")
-            self.bus.emit(message.reply("ovos.skills.install.failed", {"error": "disallowed in config"}))
+            LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()
+            self.bus.emit(message.reply("ovos.skills.install.failed",
+                                        {"error": InstallError.DISABLED.value}))
             return
 
         url = message.data["url"]
@@ -138,45 +147,53 @@ class SkillsStore:
             if success:
                 self.bus.emit(message.reply("ovos.skills.install.complete"))
             else:
-                self.bus.emit(message.reply("ovos.skills.install.failed", {"error": "pip install failed"}))
+                self.bus.emit(message.reply("ovos.skills.install.failed",
+                                            {"error": InstallError.PIP_ERROR.value}))
         else:
             LOG.error("invalid skill url, does not appear to be a github skill")
             self.play_error_sound()
-            self.bus.emit(message.reply("ovos.skills.install.failed", {"error": "not a github url"}))
+            self.bus.emit(message.reply("ovos.skills.install.failed",
+                                        {"error": InstallError.BAD_URL.value}))
 
     def handle_uninstall_skill(self, message: Message):
         if not self.config.get("allow_pip"):
-            LOG.error("pip not enabled in mycroft.conf")
+            LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()
-            self.bus.emit(message.reply("ovos.skills.uninstall.failed", {"error": "disallowed in config"}))
+            self.bus.emit(message.reply("ovos.skills.uninstall.failed",
+                                        {"error": InstallError.DISABLED.value}))
             return
         # TODO
         LOG.error("pip uninstall not yet implemented")
         self.play_error_sound()
-        self.bus.emit(message.reply("ovos.skills.uninstall.failed", {"error": "not implemented"}))
+        self.bus.emit(message.reply("ovos.skills.uninstall.failed",
+                                    {"error": "not implemented"}))
 
     def handle_install_python(self, message: Message):
         if not self.config.get("allow_pip"):
-            LOG.error("pip not enabled in mycroft.conf")
+            LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()
-            self.bus.emit(message.reply("ovos.pip.install.failed", {"error": "disallowed in config"}))
+            self.bus.emit(message.reply("ovos.pip.install.failed",
+                                        {"error": InstallError.DISABLED.value}))
             return
         pkgs = message.data["packages"]
         success = self.pip_install(pkgs)
         if success:
             self.bus.emit(message.reply("ovos.pip.install.complete"))
         else:
-            self.bus.emit(message.reply("ovos.pip.install.failed", {"error": "pip install failed"}))
+            self.bus.emit(message.reply("ovos.pip.install.failed",
+                                        {"error": InstallError.PIP_ERROR.value}))
 
     def handle_uninstall_python(self, message: Message):
         if not self.config.get("allow_pip"):
-            LOG.error("pip not enabled in mycroft.conf")
+            LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()
-            self.bus.emit(message.reply("ovos.pip.uninstall.failed", {"error": "disallowed in config"}))
+            self.bus.emit(message.reply("ovos.pip.uninstall.failed",
+                                        {"error": InstallError.DISABLED.value}))
             return
         pkgs = message.data["packages"]
         success = self.pip_uninstall(pkgs)
         if success:
             self.bus.emit(message.reply("ovos.pip.uninstall.complete"))
         else:
-            self.bus.emit(message.reply("ovos.pip.uninstall.failed", {"error": "pip uninstall failed"}))
+            self.bus.emit(message.reply("ovos.pip.uninstall.failed",
+                                        {"error": InstallError.PIP_ERROR.value}))
