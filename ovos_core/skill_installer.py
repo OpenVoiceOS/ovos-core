@@ -9,6 +9,8 @@ from ovos_config.config import Configuration
 
 from ovos_bus_client import Message
 from ovos_utils.log import LOG
+from importlib import reload
+import ovos_plugin_manager
 
 
 class SkillsStore:
@@ -64,6 +66,7 @@ class SkillsStore:
                     stderr = proc.stderr.read().decode()
                     raise RuntimeError(stderr)
 
+        reload(ovos_plugin_manager)  # force core to pick new entry points
         return True
 
     def pip_uninstall(self, packages: list,
@@ -72,6 +75,8 @@ class SkillsStore:
             return False
 
         pip_args = [sys.executable, '-m', 'pip', 'uninstall']
+        if self.config.get("break_system_packages", True):
+            pip_args += ["--break-system-packages"]
 
         with SkillsStore.PIP_LOCK:
             """
@@ -92,6 +97,7 @@ class SkillsStore:
                     stderr = proc.stderr.read().decode()
                     raise RuntimeError(stderr)
 
+        reload(ovos_plugin_manager)  # force core to pick new entry points
         return True
 
     def validate_skill(self, url):
