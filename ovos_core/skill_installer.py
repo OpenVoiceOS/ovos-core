@@ -44,7 +44,7 @@ class SkillsStore:
         pip_args = [sys.executable, '-m', 'pip', 'install']
         if constraints:
             pip_args += ['-c', constraints]
-        if self.config.get("break_system_packages", True):
+        if self.config.get("break_system_packages", False):
             pip_args += ["--break-system-packages"]
 
         with SkillsStore.PIP_LOCK:
@@ -75,7 +75,7 @@ class SkillsStore:
             return False
 
         pip_args = [sys.executable, '-m', 'pip', 'uninstall']
-        if self.config.get("break_system_packages", True):
+        if self.config.get("break_system_packages", False):
             pip_args += ["--break-system-packages"]
 
         with SkillsStore.PIP_LOCK:
