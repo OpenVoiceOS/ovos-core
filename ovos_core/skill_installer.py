@@ -19,7 +19,7 @@ class SkillsStore:
     PIP_LOCK = ComboLock(join(gettempdir(), "ovos_pip.lock"))
 
     def __init__(self, bus, config=None):
-        self.config = config or Configuration()["skills"]
+        self.config = config or Configuration().get("skills", {}).get("installer", {})
         self.bus = bus
         self.bus.on("ovos.skills.install", self.handle_install_skill)
         self.bus.on("ovos.skills.uninstall", self.handle_uninstall_skill)
@@ -109,6 +109,10 @@ class SkillsStore:
         return True
 
     def handle_install_skill(self, message: Message):
+        if not self.config.get("allow_pip"):
+            self.bus.emit(message.reply("ovos.skills.install.failed", {"error": "disallowed in config"}))
+            return
+
         url = message.data["url"]
         if self.validate_skill(url):
             success = self.pip_install([f"git+{url}"])
@@ -120,10 +124,16 @@ class SkillsStore:
             self.bus.emit(message.reply("ovos.skills.install.failed", {"error": "not a github url"}))
 
     def handle_uninstall_skill(self, message: Message):
+        if not self.config.get("allow_pip"):
+            self.bus.emit(message.reply("ovos.skills.uninstall.failed", {"error": "disallowed in config"}))
+            return
         # TODO
         self.bus.emit(message.reply("ovos.skills.uninstall.failed", {"error": "not implemented"}))
 
     def handle_install_python(self, message: Message):
+        if not self.config.get("allow_pip"):
+            self.bus.emit(message.reply("ovos.pip.install.failed", {"error": "disallowed in config"}))
+            return
         pkgs = message.data["packages"]
         success = self.pip_install(pkgs)
         if success:
@@ -132,6 +142,9 @@ class SkillsStore:
             self.bus.emit(message.reply("ovos.pip.install.failed", {"error": "pip install failed"}))
 
     def handle_uninstall_python(self, message: Message):
+        if not self.config.get("allow_pip"):
+            self.bus.emit(message.reply("ovos.pip.uninstall.failed", {"error": "disallowed in config"}))
+            return
         pkgs = message.data["packages"]
         success = self.pip_uninstall(pkgs)
         if success:
