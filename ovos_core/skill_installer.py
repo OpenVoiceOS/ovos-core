@@ -29,14 +29,24 @@ class SkillsStore:
     def shutdown(self):
         pass
 
+    def play_error_sound(self):
+        self.bus.emit(Message("mycroft.audio.play_sound",
+                              {"uri": "snd/error.mp3"}))
+
+    def play_success_sound(self):
+        self.bus.emit(Message("mycroft.audio.play_sound",
+                              {"uri": "snd/acknowledge.mp3"}))
+
     def pip_install(self, packages: list,
                     constraints: Optional[str] = None,
                     print_logs: bool = True):
         if not len(packages):
+            self.play_error_sound()
             return False
         # Use constraints to limit the installed versions
         if constraints and not exists(constraints):
             LOG.error('Couldn\'t find the constraints file')
+            self.play_error_sound()
             return False
         elif exists(SkillsStore.DEFAULT_CONSTRAINTS):
             constraints = SkillsStore.DEFAULT_CONSTRAINTS
@@ -64,14 +74,17 @@ class SkillsStore:
                 pip_code = proc.wait()
                 if pip_code != 0:
                     stderr = proc.stderr.read().decode()
+                    self.play_error_sound()
                     raise RuntimeError(stderr)
 
         reload(ovos_plugin_manager)  # force core to pick new entry points
+        self.play_success_sound()
         return True
 
     def pip_uninstall(self, packages: list,
                       print_logs: bool = True):
         if not len(packages):
+            self.play_error_sound()
             return False
 
         pip_args = [sys.executable, '-m', 'pip', 'uninstall']
@@ -95,9 +108,11 @@ class SkillsStore:
                 pip_code = proc.wait()
                 if pip_code != 0:
                     stderr = proc.stderr.read().decode()
+                    self.play_error_sound()
                     raise RuntimeError(stderr)
 
         reload(ovos_plugin_manager)  # force core to pick new entry points
+        self.play_success_sound()
         return True
 
     def validate_skill(self, url):
@@ -111,6 +126,7 @@ class SkillsStore:
     def handle_install_skill(self, message: Message):
         if not self.config.get("allow_pip"):
             self.bus.emit(message.reply("ovos.skills.install.failed", {"error": "disallowed in config"}))
+            self.play_error_sound()
             return
 
         url = message.data["url"]
@@ -121,17 +137,21 @@ class SkillsStore:
             else:
                 self.bus.emit(message.reply("ovos.skills.install.failed", {"error": "pip install failed"}))
         else:
+            self.play_error_sound()
             self.bus.emit(message.reply("ovos.skills.install.failed", {"error": "not a github url"}))
 
     def handle_uninstall_skill(self, message: Message):
         if not self.config.get("allow_pip"):
+            self.play_error_sound()
             self.bus.emit(message.reply("ovos.skills.uninstall.failed", {"error": "disallowed in config"}))
             return
         # TODO
+        self.play_error_sound()
         self.bus.emit(message.reply("ovos.skills.uninstall.failed", {"error": "not implemented"}))
 
     def handle_install_python(self, message: Message):
         if not self.config.get("allow_pip"):
+            self.play_error_sound()
             self.bus.emit(message.reply("ovos.pip.install.failed", {"error": "disallowed in config"}))
             return
         pkgs = message.data["packages"]
@@ -143,6 +163,7 @@ class SkillsStore:
 
     def handle_uninstall_python(self, message: Message):
         if not self.config.get("allow_pip"):
+            self.play_error_sound()
             self.bus.emit(message.reply("ovos.pip.uninstall.failed", {"error": "disallowed in config"}))
             return
         pkgs = message.data["packages"]
