@@ -20,13 +20,16 @@ class SkillsStore:
         self.config = config or Configuration()["skills"]
         self.bus = bus
         self.bus.on("ovos.skills.install", self.handle_install_skill)
-        self.bus.on("ovos.pip.install", self.handle_install_skill)
+        self.bus.on("ovos.skills.uninstall", self.handle_uninstall_skill)
+        self.bus.on("ovos.pip.install", self.handle_install_python)
+        self.bus.on("ovos.pip.uninstall", self.handle_uninstall_python)
 
     def shutdown(self):
         pass
 
-    @staticmethod
-    def pip_install(packages: list, constraints: Optional[str] = None, print_logs: bool = False):
+    def pip_install(self, packages: list,
+                    constraints: Optional[str] = None,
+                    print_logs: bool = True):
         if not len(packages):
             return False
         # Use constraints to limit the installed versions
@@ -39,6 +42,8 @@ class SkillsStore:
         pip_args = [sys.executable, '-m', 'pip', 'install']
         if constraints:
             pip_args += ['-c', constraints]
+        if self.config.get("break_system_packages", True):
+            pip_args += ["--break-system-packages"]
 
         with SkillsStore.PIP_LOCK:
             """
@@ -49,6 +54,35 @@ class SkillsStore:
             for dependent_python_package in packages:
                 LOG.info("(pip) Installing " + dependent_python_package)
                 pip_command = pip_args + [dependent_python_package]
+                LOG.debug(" ".join(pip_command))
+                if print_logs:
+                    proc = Popen(pip_command)
+                else:
+                    proc = Popen(pip_command, stdout=PIPE, stderr=PIPE)
+                pip_code = proc.wait()
+                if pip_code != 0:
+                    stderr = proc.stderr.read().decode()
+                    raise RuntimeError(stderr)
+
+        return True
+
+    def pip_uninstall(self, packages: list,
+                      print_logs: bool = True):
+        if not len(packages):
+            return False
+
+        pip_args = [sys.executable, '-m', 'pip', 'uninstall']
+
+        with SkillsStore.PIP_LOCK:
+            """
+            Iterate over the individual Python packages and
+            install them one by one to enforce the order specified
+            in the manifest.
+            """
+            for dependent_python_package in packages:
+                LOG.info("(pip) Uninstalling " + dependent_python_package)
+                pip_command = pip_args + [dependent_python_package]
+                LOG.debug(" ".join(pip_command))
                 if print_logs:
                     proc = Popen(pip_command)
                 else:
@@ -79,6 +113,10 @@ class SkillsStore:
         else:
             self.bus.emit(message.reply("ovos.skills.install.failed", {"error": "not a github url"}))
 
+    def handle_uninstall_skill(self, message: Message):
+        # TODO
+        self.bus.emit(message.reply("ovos.skills.uninstall.failed", {"error": "not implemented"}))
+
     def handle_install_python(self, message: Message):
         pkgs = message.data["packages"]
         success = self.pip_install(pkgs)
@@ -86,3 +124,11 @@ class SkillsStore:
             self.bus.emit(message.reply("ovos.pip.install.complete"))
         else:
             self.bus.emit(message.reply("ovos.pip.install.failed", {"error": "pip install failed"}))
+
+    def handle_uninstall_python(self, message: Message):
+        pkgs = message.data["packages"]
+        success = self.pip_uninstall(pkgs)
+        if success:
+            self.bus.emit(message.reply("ovos.pip.uninstall.complete"))
+        else:
+            self.bus.emit(message.reply("ovos.pip.uninstall.failed", {"error": "pip uninstall failed"}))
