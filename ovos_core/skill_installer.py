@@ -108,14 +108,14 @@ class SkillsStore:
 
         if constraints:
             with open(constraints) as f:
-                # remove version pinning
-                cpkgs = [p.split("~")[0].split("<")[0].split(">")[0].split("=")[0]
+                # remove version pinning and normalize _ to - (pip accepts both)
+                cpkgs = [p.split("~")[0].split("<")[0].split(">")[0].split("=")[0].replace("_", "-")
                          for p in f.read().split("\n") if p.strip()]
         else:
             cpkgs = ["ovos-core", "ovos-utils", "ovos-plugin-manager",
                      "ovos-config", "ovos-bus-client", "ovos-workshop"]
 
-        # pip accepts both _ and -
+        # normalize _ to - (pip accepts both)
         if any(p.replace("_", "-") in cpkgs for p in packages):
             LOG.error(f'tried to uninstall a protected package: {constraints}')
             self.play_error_sound()
