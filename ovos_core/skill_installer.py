@@ -1,12 +1,11 @@
 import enum
 import sys
 from importlib import reload
-from os.path import join, exists
+from os.path import exists
 from subprocess import Popen, PIPE
-from tempfile import gettempdir
 from typing import Optional
 
-from combo_lock import ComboLock
+from combo_lock import NamedLock
 from ovos_config.config import Configuration
 
 import ovos_plugin_manager
@@ -23,8 +22,8 @@ class InstallError(str, enum.Enum):
 
 class SkillsStore:
     # default constraints to use if none are given
-    DEFAULT_CONSTRAINTS = '/etc/mycroft/constraints.txt'
-    PIP_LOCK = ComboLock(join(gettempdir(), "ovos_pip.lock"))
+    DEFAULT_CONSTRAINTS = '/etc/mycroft/constraints.txt'  # TODO XDG paths, keep backwards compat for now with msm/osm
+    PIP_LOCK = NamedLock("ovos_pip.lock")
 
     def __init__(self, bus, config=None):
         self.config = config or Configuration().get("skills", {}).get("installer", {})
