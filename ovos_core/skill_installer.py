@@ -91,9 +91,33 @@ class SkillsStore:
         return True
 
     def pip_uninstall(self, packages: list,
+                      constraints: Optional[str] = None,
                       print_logs: bool = True):
         if not len(packages):
             LOG.error("no package list provided to uninstall")
+            self.play_error_sound()
+            return False
+
+        # Use constraints to limit package removal
+        if constraints and not exists(constraints):
+            LOG.error('Couldn\'t find the constraints file')
+            self.play_error_sound()
+            return False
+        elif exists(SkillsStore.DEFAULT_CONSTRAINTS):
+            constraints = SkillsStore.DEFAULT_CONSTRAINTS
+
+        if constraints:
+            with open(constraints) as f:
+                # remove version pinning
+                cpkgs = [p.split("~")[0].split("<")[0].split(">")[0].split("=")[0]
+                         for p in f.read().split("\n") if p.strip()]
+        else:
+            cpkgs = ["ovos-core", "ovos-utils", "ovos-plugin-manager",
+                     "ovos-config", "ovos-bus-client", "ovos-workshop"]
+
+        # pip accepts both _ and -
+        if any(p.replace("_", "-") in cpkgs for p in packages):
+            LOG.error(f'tried to uninstall a protected package: {constraints}')
             self.play_error_sound()
             return False
 
@@ -201,5 +225,5 @@ class SkillsStore:
                 self.bus.emit(message.reply("ovos.pip.uninstall.failed",
                                             {"error": InstallError.PIP_ERROR.value}))
         else:
-            self.bus.emit(message.reply("ovos.pip.install.failed",
+            self.bus.emit(message.reply("ovos.pip.uninstall.failed",
                                         {"error": InstallError.NO_PKGS.value}))
