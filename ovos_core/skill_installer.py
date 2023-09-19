@@ -117,7 +117,7 @@ class SkillsStore:
 
         # normalize _ to - (pip accepts both)
         if any(p.replace("_", "-") in cpkgs for p in packages):
-            LOG.error(f'tried to uninstall a protected package: {constraints}')
+            LOG.error(f'tried to uninstall a protected package: {cpkgs}')
             self.play_error_sound()
             return False
 
