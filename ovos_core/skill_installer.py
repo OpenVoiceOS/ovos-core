@@ -121,7 +121,7 @@ class SkillsStore:
             self.play_error_sound()
             return False
 
-        pip_args = [sys.executable, '-m', 'pip', 'uninstall']
+        pip_args = [sys.executable, '-m', 'pip', 'uninstall', '-y']
         if self.config.get("break_system_packages", False):
             pip_args += ["--break-system-packages"]
 
