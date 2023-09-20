@@ -5,7 +5,7 @@ from ovos_config.locale import setup_locale
 
 import ovos_core.intent_services
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import SessionManager
+from ovos_bus_client.session import SessionManager, UtteranceState
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
 from ovos_utils.messagebus import get_message_lang
@@ -23,6 +23,8 @@ class ConverseService:
         self.bus.on('intent.service.skills.activate', self.handle_activate_skill_request)
         self.bus.on('active_skill_request', self.handle_activate_skill_request)  # TODO backwards compat, deprecate
         self.bus.on('intent.service.active_skills.get', self.handle_get_active_skills)
+        self.bus.on("skill.converse.get_response.enable", self.handle_get_response_enable)
+        self.bus.on("skill.converse.get_response.disable", self.handle_get_response_disable)
 
     @property
     def config(self):
@@ -256,6 +258,17 @@ class ConverseService:
         """
         session = SessionManager.get(message)
         session.lang = lang
+
+        state = session.utterance_states.get(skill_id, UtteranceState.INTENT)
+        if state == UtteranceState.RESPONSE:
+            session.update_history(message)
+            converse_msg = message.reply("skill.converse.get_response",
+                                         {"skill_id": skill_id,
+                                          "utterances": utterances,
+                                          "lang": lang})
+            self.bus.emit(converse_msg)
+            return True
+
         if self._converse_allowed(skill_id):
             session.update_history(message)
             converse_msg = message.reply("skill.converse.request",
@@ -292,6 +305,16 @@ class ConverseService:
             if self.converse(utterances, skill_id, lang, message):
                 return ovos_core.intent_services.IntentMatch('Converse', None, None, skill_id, utterances[0])
         return None
+
+    def handle_get_response_enable(self, message):
+        skill_id = message.data["skill_id"]
+        session = SessionManager.get(message)
+        session.enable_response_mode(skill_id)
+
+    def handle_get_response_disable(self, message):
+        skill_id = message.data["skill_id"]
+        session = SessionManager.get(message)
+        session.disable_response_mode(skill_id)
 
     def handle_activate_skill_request(self, message):
         # TODO imperfect solution - only a skill can activate itself
