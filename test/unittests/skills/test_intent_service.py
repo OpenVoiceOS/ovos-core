@@ -98,8 +98,8 @@ class ConversationTest(TestCase):
         self.intent_service.converse.activate_skill('atari_skill')
         self.intent_service.converse.activate_skill('c64_skill')
 
-        def _collect():
-            return [i[0] for i in self.intent_service.active_skills]
+        def _collect(message=None):
+            return [i[0] for i in self.intent_service.converse.active_skills]
 
         self.intent_service.converse._collect_converse_skills = _collect
 
@@ -183,7 +183,7 @@ class ConversationTest(TestCase):
                                               'result': False})
             msgs = {'c64_skill': c64, 'atari_skill': atari}
 
-            return msgs[message.data['skill_id']]
+            return msgs.get(message.data['skill_id'], None)
 
         reset_msg = Message('mycroft.speech.recognition.unknown',
                             data={'lang': 'en-US'})
