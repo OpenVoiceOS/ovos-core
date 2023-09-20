@@ -1,10 +1,14 @@
 import time
-from ovos_bus_client.message import Message
+
 from ovos_config.config import Configuration
+from ovos_config.locale import setup_locale
 
 import ovos_core.intent_services
+from ovos_bus_client.message import Message
+from ovos_bus_client.session import SessionManager
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
+from ovos_utils.messagebus import get_message_lang
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
 
 
@@ -14,7 +18,12 @@ class ConverseService:
     def __init__(self, bus):
         self.bus = bus
         self._consecutive_activations = {}
-        self.active_skills = []  # [skill_id , timestamp]
+
+        self.bus.on('mycroft.speech.recognition.unknown', self.reset_converse)
+        self.bus.on('intent.service.skills.deactivate', self.handle_deactivate_skill_request)
+        self.bus.on('intent.service.skills.activate', self.handle_activate_skill_request)
+        self.bus.on('active_skill_request', self.handle_activate_skill_request)  # TODO backwards compat, deprecate
+        self.bus.on('intent.service.active_skills.get', self.handle_get_active_skills)
 
     @property
     def config(self):
@@ -24,16 +33,17 @@ class ConverseService:
         """
         return Configuration().get("skills", {}).get("converse") or {}
 
-    def get_active_skills(self):
+    def get_active_skills(self, message=None):
         """Active skill ids ordered by converse priority
         this represents the order in which converse will be called
 
         Returns:
             active_skills (list): ordered list of skill_ids
         """
-        return [skill[0] for skill in self.active_skills]
+        session = SessionManager.get(message)
+        return [skill[0] for skill in session.active_skills]
 
-    def deactivate_skill(self, skill_id, source_skill=None):
+    def deactivate_skill(self, skill_id, source_skill=None, message=None):
         """Remove a skill from being targetable by converse.
 
         Args:
@@ -42,18 +52,24 @@ class ConverseService:
         """
         source_skill = source_skill or skill_id
         if self._deactivate_allowed(skill_id, source_skill):
-            active_skills = self.get_active_skills()
-            if skill_id in active_skills:
-                idx = active_skills.index(skill_id)
-                self.active_skills.pop(idx)
+            session = SessionManager.get(message)
+            if session.is_active(skill_id):
+                # update converse session
+                if message:
+                    session.update_history(message)
+                session.deactivate_skill(skill_id)
+
+                # keep message.context
+                message = message or Message("")
+                message.context["skill_id"] = self.skill_id
+                # send bus event
                 self.bus.emit(
-                    Message("intent.service.skills.deactivated",
-                            data={"skill_id": skill_id},
-                            context={"skill_id": skill_id}))
+                    message.forward("intent.service.skills.deactivated",
+                                    data={"skill_id": skill_id}))
                 if skill_id in self._consecutive_activations:
                     self._consecutive_activations[skill_id] = 0
 
-    def activate_skill(self, skill_id, source_skill=None):
+    def activate_skill(self, skill_id, source_skill=None, message=None):
         """Add a skill or update the position of an active skill.
 
         The skill is added to the front of the list, if it's already in the
@@ -65,20 +81,20 @@ class ConverseService:
         """
         source_skill = source_skill or skill_id
         if self._activate_allowed(skill_id, source_skill):
-            # NOTE: do not call self.remove_active_skill
-            # do not want to send the deactivation bus event!
-            active_skills = self.get_active_skills()
-            if skill_id in active_skills:
-                idx = active_skills.index(skill_id)
-                self.active_skills.pop(idx)
+            # update converse session
+            session = SessionManager.get(message)
+            if message:
+                session.update_history(message)
+            session.activate_skill(skill_id)
 
-            # add skill with timestamp to start of skill_list
-            self.active_skills.insert(0, [skill_id, time.time()])
-            self.bus.emit(
-                Message("intent.service.skills.activated",
-                        data={"skill_id": skill_id},
-                        context={"skill_id": skill_id}))
-
+            # keep message.context
+            message = message or Message("")
+            message.context["skill_id"] = self.skill_id
+            message = message.forward("intent.service.skills.activated",
+                                      {"skill_id": skill_id})
+            # send bus event
+            self.bus.emit(message)
+            # update activation counter
             self._consecutive_activations[skill_id] += 1
 
     def _activate_allowed(self, skill_id, source_skill=None):
@@ -115,7 +131,7 @@ class ConverseService:
             # define their default priority, this is a user/developer setting
             priority = prio.get(skill_id, 50)
             if any(p > priority for p in
-                   [prio.get(s[0], 50) for s in self.active_skills]):
+                   [prio.get(s, 50) for s in self.get_active_skills()]):
                 return False
         elif acmode == ConverseActivationMode.BLACKLIST:
             if skill_id in self.config.get("converse_blacklist", []):
@@ -181,16 +197,16 @@ class ConverseService:
             return False
         return True
 
-    def _collect_converse_skills(self):
+    def _collect_converse_skills(self, message):
         """use the messagebus api to determine which skills want to converse
         This includes all skills and external applications"""
         skill_ids = []
         want_converse = []
         active_skills = self.get_active_skills()
 
-        def handle_ack(message):
-            skill_id = message.data["skill_id"]
-            if message.data.get("can_handle", True):
+        def handle_ack(msg):
+            skill_id = msg.data["skill_id"]
+            if msg.data.get("can_handle", True):
                 if skill_id in active_skills:
                     want_converse.append(skill_id)
             skill_ids.append(skill_id)
@@ -198,7 +214,7 @@ class ConverseService:
         self.bus.on("skill.converse.pong", handle_ack)
 
         # wait for all skills to acknowledge they want to converse
-        self.bus.emit(Message("skill.converse.ping"))
+        self.bus.emit(message.forward("skill.converse.ping"))
         start = time.time()
         while not all(s in skill_ids for s in active_skills) \
                 and time.time() - start <= 0.5:
@@ -207,12 +223,13 @@ class ConverseService:
         self.bus.remove("skill.converse.pong", handle_ack)
         return want_converse
 
-    def _check_converse_timeout(self):
+    def _check_converse_timeout(self, message):
         """ filter active skill list based on timestamps """
         timeouts = self.config.get("skill_timeouts") or {}
         def_timeout = self.config.get("timeout", 300)
-        self.active_skills = [
-            skill for skill in self.active_skills
+        session = SessionManager.get(message)
+        session.active_skills = [
+            skill for skill in session.active_skills
             if time.time() - skill[1] <= timeouts.get(skill[0], def_timeout)]
 
     def converse(self, utterances, skill_id, lang, message):
@@ -228,7 +245,10 @@ class ConverseService:
         Returns:
             handled (bool): True if handled otherwise False.
         """
+        session = SessionManager.get(message)
+        session.lang = lang
         if self._converse_allowed(skill_id):
+            session.update_history(message)
             converse_msg = message.reply("skill.converse.request",
                                          {"skill_id": skill_id,
                                           "utterances": utterances,
@@ -257,9 +277,46 @@ class ConverseService:
         # we call flatten in case someone is sending the old style list of tuples
         utterances = flatten_list(utterances)
         # filter allowed skills
-        self._check_converse_timeout()
+        self._check_converse_timeout(message)
         # check if any skill wants to handle utterance
-        for skill_id in self._collect_converse_skills():
+        for skill_id in self._collect_converse_skills(message):
             if self.converse(utterances, skill_id, lang, message):
                 return ovos_core.intent_services.IntentMatch('Converse', None, None, skill_id, utterances[0])
         return None
+
+    def handle_activate_skill_request(self, message):
+        # TODO imperfect solution - only a skill can activate itself
+        # someone can forge this message and emit it raw, but in OpenVoiceOS all
+        # skill messages should have skill_id in context, so let's make sure
+        # this doesnt happen accidentally at very least
+        skill_id = message.data['skill_id']
+        source_skill = message.context.get("skill_id")
+        self.activate_skill(skill_id, source_skill, message)
+
+    def handle_deactivate_skill_request(self, message):
+        # TODO imperfect solution - only a skill can deactivate itself
+        # someone can forge this message and emit it raw, but in ovos-core all
+        # skill message should have skill_id in context, so let's make sure
+        # this doesnt happen accidentally
+        skill_id = message.data['skill_id']
+        source_skill = message.context.get("skill_id") or skill_id
+        self.deactivate_skill(skill_id, source_skill, message)
+
+    def reset_converse(self, message):
+        """Let skills know there was a problem with speech recognition"""
+        lang = get_message_lang(message)
+        try:
+            setup_locale(lang)  # restore default lang
+        except Exception as e:
+            LOG.exception(f"Failed to set lingua_franca default lang to {lang}")
+
+        self.converse_with_skills([], lang, message)
+
+    def handle_get_active_skills(self, message):
+        """Send active skills to caller.
+
+        Argument:
+            message: query message to reply to.
+        """
+        self.bus.emit(message.reply("intent.service.active_skills.reply",
+                                    {"skills": self.get_active_skills(message)}))

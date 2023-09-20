@@ -26,7 +26,7 @@ from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.padacioso_service import PadaciosoService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
 from ovos_utils.intents.intent_service_interface import open_intent_envelope
-from ovos_utils.log import LOG
+from ovos_utils.log import LOG, deprecated, log_deprecation
 from ovos_utils.messagebus import get_message_lang
 from ovos_utils.metrics import Stopwatch
 
@@ -85,22 +85,12 @@ class IntentService:
         self.bus.on('clear_context', self.handle_clear_context)
 
         # Converse method
-        self.bus.on('mycroft.speech.recognition.unknown', self.reset_converse)
         self.bus.on('mycroft.skills.loaded', self.update_skill_name_dict)
-
-        self.bus.on('intent.service.skills.activate',
-                    self.handle_activate_skill_request)
-        self.bus.on('intent.service.skills.deactivate',
-                    self.handle_deactivate_skill_request)
-        # TODO backwards compat, deprecate
-        self.bus.on('active_skill_request', self.handle_activate_skill_request)
 
         # Intents API
         self.registered_vocab = []
         self.bus.on('intent.service.intent.get', self.handle_get_intent)
         self.bus.on('intent.service.skills.get', self.handle_get_skills)
-        self.bus.on('intent.service.active_skills.get',
-                    self.handle_get_active_skills)
         self.bus.on('intent.service.adapt.get', self.handle_get_adapt)
         self.bus.on('intent.service.adapt.manifest.get',
                     self.handle_adapt_manifest)
@@ -153,34 +143,32 @@ class IntentService:
     # converse handling
     @property
     def active_skills(self):
-        return self.converse.active_skills  # [skill_id , timestamp]
+        log_deprecation("self.active_skills is deprecated! use Session instead", "0.0.9")
+        session = SessionManager.get()
+        return session.active_skills
 
+    @active_skills.setter
+    def active_skills(self, val):
+        log_deprecation("self.active_skills is deprecated! use Session instead", "0.0.9")
+        session = SessionManager.get()
+        session.active_skills = []
+        for skill_id, ts in val:
+            session.activate_skill(skill_id)
+
+    @deprecated("handle_activate_skill_request moved to ConverseService, overriding this method has no effect, "
+                "it has been disconnected from the bus event", "0.0.8")
     def handle_activate_skill_request(self, message):
-        # TODO imperfect solution - only a skill can activate itself
-        # someone can forge this message and emit it raw, but in OpenVoiceOS all
-        # skill messages should have skill_id in context, so let's make sure
-        # this doesnt happen accidentally at very least
-        skill_id = message.data['skill_id']
-        source_skill = message.context.get("skill_id")
-        self.converse.activate_skill(skill_id, source_skill)
+        self.converse.handle_activate_skill_request(message)
 
+    @deprecated("handle_deactivate_skill_request moved to ConverseService, overriding this method has no effect, "
+                "it has been disconnected from the bus event", "0.0.8")
     def handle_deactivate_skill_request(self, message):
-        # TODO imperfect solution - only a skill can deactivate itself
-        # someone can forge this message and emit it raw, but in ovos-core all
-        # skill message should have skill_id in context, so let's make sure
-        # this doesnt happen accidentally
-        skill_id = message.data['skill_id']
-        source_skill = message.context.get("skill_id") or skill_id
-        self.converse.deactivate_skill(skill_id, source_skill)
+        self.converse.handle_deactivate_skill_request(message)
 
+    @deprecated("reset_converse moved to ConverseService, overriding this method has no effect, "
+                "it has been disconnected from the bus event", "0.0.8")
     def reset_converse(self, message):
-        """Let skills know there was a problem with speech recognition"""
-        lang = get_message_lang(message)
-        try:
-            setup_locale(lang)  # restore default lang
-        except Exception as e:
-            LOG.exception(f"Failed to set lingua_franca default lang to {lang}")
-        self.converse.converse_with_skills([], lang, message)
+        self.converse.reset_converse(message)
 
     def _handle_transformers(self, message):
         """
@@ -472,14 +460,15 @@ class IntentService:
         self.bus.emit(message.reply("intent.service.skills.reply",
                                     {"skills": self.skill_names}))
 
+    @deprecated("handle_get_active_skills moved to ConverseService, overriding this method has no effect, "
+                "it has been disconnected from the bus event", "0.0.8")
     def handle_get_active_skills(self, message):
         """Send active skills to caller.
 
         Argument:
             message: query message to reply to.
         """
-        self.bus.emit(message.reply("intent.service.active_skills.reply",
-                                    {"skills": self.converse.active_skills}))
+        self.converse.handle_get_active_skills(message)
 
     def handle_get_adapt(self, message):
         """handler getting the adapt response for an utterance.
