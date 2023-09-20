@@ -23,12 +23,13 @@ from unittest.mock import MagicMock, patch
 
 from adapt.intent import IntentBuilder
 from ovos_config import Configuration
-from ovos_utils.intents.intent_service_interface import open_intent_envelope
 
 from mycroft.skills.skill_data import (load_regex_from_file, load_regex,
                                        load_vocabulary, read_vocab_file)
 from ovos_bus_client.message import Message
+from ovos_utils.intents.intent_service_interface import open_intent_envelope
 from ovos_workshop.decorators import resting_screen_handler, intent_handler
+from ovos_workshop.skills.mycroft_skill import MycroftSkill
 from ovos_workshop.skills.ovos import OVOSSkill
 from test.util import base_config
 
@@ -631,8 +632,9 @@ class _TestSkill(OVOSSkill):
     pass
 
 
-class SimpleSkill1(_TestSkill):
+class SimpleSkill1(MycroftSkill):
     """ Test skill for normal intent builder syntax """
+
     def initialize(self):
         self.handler_run = False
         i = IntentBuilder('a').require('Keyword').build()
@@ -647,6 +649,7 @@ class SimpleSkill1(_TestSkill):
 
 class SimpleSkill2(_TestSkill):
     """ Test skill for intent builder without .build() """
+
     def initialize(self):
         i = IntentBuilder('a').require('Keyword')
         self.register_intent(i, self.handler)
@@ -660,6 +663,7 @@ class SimpleSkill2(_TestSkill):
 
 class SimpleSkill3(_TestSkill):
     """ Test skill for invalid Intent for register_intent """
+
     def initialize(self):
         self.register_intent('string', self.handler)
 

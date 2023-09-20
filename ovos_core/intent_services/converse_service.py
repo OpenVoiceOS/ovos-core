@@ -72,7 +72,6 @@ class ConverseService:
 
                 # keep message.context
                 message = message or Message("")
-                message.context["skill_id"] = self.skill_id
                 # send bus event
                 self.bus.emit(
                     message.forward("intent.service.skills.deactivated",
@@ -100,7 +99,6 @@ class ConverseService:
 
             # keep message.context
             message = message or Message("")
-            message.context["skill_id"] = self.skill_id
             message = message.forward("intent.service.skills.activated",
                                       {"skill_id": skill_id})
             # send bus event
