@@ -18,7 +18,6 @@ class ConverseService:
     def __init__(self, bus):
         self.bus = bus
         self._consecutive_activations = {}
-
         self.bus.on('mycroft.speech.recognition.unknown', self.reset_converse)
         self.bus.on('intent.service.skills.deactivate', self.handle_deactivate_skill_request)
         self.bus.on('intent.service.skills.activate', self.handle_activate_skill_request)
@@ -32,6 +31,18 @@ class ConverseService:
             converse_config (dict): config for converse handling options
         """
         return Configuration().get("skills", {}).get("converse") or {}
+
+    @property
+    def active_skills(self):
+        session = SessionManager.get()
+        return session.active_skills
+
+    @active_skills.setter
+    def active_skills(self, val):
+        session = SessionManager.get()
+        session.active_skills = []
+        for skill_id, ts in val:
+            session.activate_skill(skill_id)
 
     def get_active_skills(self, message=None):
         """Active skill ids ordered by converse priority
