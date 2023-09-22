@@ -104,22 +104,6 @@ class IntentService:
                     self.handle_entity_manifest)
 
     @property
-    def pipeline(self):
-        # List of functions to use to match the utterance with intent, listed in priority order.
-        config = Configuration().get("intents") or {}
-        return config.get("pipeline", [
-            "converse",
-            "padacioso_high",
-            "adapt",
-            "common_qa",
-            "fallback_high",
-            "padacioso_medium",
-            "fallback_medium",
-            "padacioso_low",
-            "fallback_low"
-        ])
-
-    @property
     def registered_intents(self):
         lang = get_message_lang()
         return [parser.__dict__
@@ -211,16 +195,17 @@ class IntentService:
 
         return default_lang
 
-    def get_pipeline(self, skips=None):
+    def get_pipeline(self, skips=None, session=None):
         """return a list of matcher functions ordered by priority
         utterances will be sent to each matcher in order until one can handle the utterance
         the list can be configured in mycroft.conf under intents.pipeline,
         in the future plugins will be supported for users to define their own pipeline"""
+        session = session or SessionManager.get()
 
         # Create matchers
         # TODO - from plugins
         if self.padatious_service is None:
-            if any("padatious" in p for p in self.pipeline):
+            if any("padatious" in p for p in session.pipeline):
                 LOG.warning("padatious is not available! using padacioso in it's place")
             padatious_matcher = self.padacioso_service
         else:
@@ -242,7 +227,7 @@ class IntentService:
             "fallback_low": self.fallback.low_prio
         }
         skips = skips or []
-        pipeline = [k for k in self.pipeline if k not in skips]
+        pipeline = [k for k in session.pipeline if k not in skips]
         return [matchers[k] for k in pipeline]
 
     def handle_utterance(self, message):
@@ -292,7 +277,8 @@ class IntentService:
             match = None
             with stopwatch:
                 # Loop through the matching functions until a match is found.
-                for match_func in self.get_pipeline():
+                sess = SessionManager.get(message)
+                for match_func in self.get_pipeline(session=sess):
                     match = match_func(utterances, lang, message)
                     if match:
                         break
@@ -429,12 +415,14 @@ class IntentService:
         """
         utterance = message.data["utterance"]
         lang = get_message_lang(message)
+        sess = SessionManager.get(message)
 
         # Loop through the matching functions until a match is found.
         for match_func in self.get_pipeline(skips=["converse",
                                                    "fallback_high",
                                                    "fallback_medium",
-                                                   "fallback_low"]):
+                                                   "fallback_low"],
+                                            session=sess):
             match = match_func([utterance], lang, message)
             if match:
                 if match.intent_type:
