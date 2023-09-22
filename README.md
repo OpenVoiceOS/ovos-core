@@ -7,7 +7,7 @@
 
 # OVOS-core
 
-[OpenVoiceOS](https://openvoiceos.com/) is an open source platform for smart speakers and other voice-centric devices.
+[OpenVoiceOS](https://openvoiceos.org/) is an open source platform for smart speakers and other voice-centric devices.
 
 [Mycroft](https://mycroft.ai) is a hackable, open source voice assistant by MycroftAI. OVOS-core is a
 backwards-compatible descendant of [Mycroft-core](https://github.com/MycroftAI/mycroft-core), the central component of
