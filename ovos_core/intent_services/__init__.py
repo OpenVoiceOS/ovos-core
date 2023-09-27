@@ -275,9 +275,9 @@ class IntentService:
 
             # match
             match = None
+            sess = SessionManager.get(message)
             with stopwatch:
                 # Loop through the matching functions until a match is found.
-                sess = SessionManager.get(message)
                 for match_func in self.get_pipeline(session=sess):
                     match = match_func(utterances, lang, message)
                     if match:
@@ -287,7 +287,7 @@ class IntentService:
                 message.data["utterance"] = match.utterance
 
                 if match.skill_id:
-                    self.converse.activate_skill(match.skill_id)
+                    self.converse.activate_skill(match.skill_id, message=message)
                     message.context["skill_id"] = match.skill_id
                     # If the service didn't report back the skill_id it
                     # takes on the responsibility of making the skill "active"
@@ -306,6 +306,10 @@ class IntentService:
                 # Ask politely for forgiveness for failing in this vital task
                 self.send_complete_intent_failure(message)
 
+            if sess.session_id == "default":
+                # sync any changes made to the default session, eg by ConverseService
+                self.bus.emit(Message("ovos.session.update_default",
+                                      {"session_data": SessionManager.default_session.serialize()}))
             return match, message.context, stopwatch
 
         except Exception as err:
