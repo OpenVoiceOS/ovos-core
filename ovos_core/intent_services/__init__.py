@@ -308,8 +308,8 @@ class IntentService:
 
             if sess.session_id == "default":
                 # sync any changes made to the default session, eg by ConverseService
-                self.bus.emit(Message("ovos.session.update_default",
-                                      {"session_data": SessionManager.default_session.serialize()}))
+                self.bus.emit(message.reply("ovos.session.update_default",
+                                            {"session_data": SessionManager.default_session.serialize()}))
             return match, message.context, stopwatch
 
         except Exception as err:
