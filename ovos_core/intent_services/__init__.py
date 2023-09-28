@@ -73,6 +73,9 @@ class IntentService:
         self.common_qa = CommonQAService(bus)
         self.utterance_plugins = UtteranceTransformersService(bus, config=config)
         self.metadata_plugins = MetadataTransformersService(bus, config=config)
+        # connection SessionManager to the bus,
+        # this will sync default session across all components
+        SessionManager.connect_to_bus(self.bus)
 
         self.bus.on('register_vocab', self.handle_register_vocab)
         self.bus.on('register_intent', self.handle_register_intent)
@@ -306,10 +309,8 @@ class IntentService:
                 # Ask politely for forgiveness for failing in this vital task
                 self.send_complete_intent_failure(message)
 
-            if sess.session_id == "default":
-                # sync any changes made to the default session, eg by ConverseService
-                self.bus.emit(message.reply("ovos.session.update_default",
-                                            {"session_data": SessionManager.default_session.serialize()}))
+            # sync any changes made to the default session, eg by ConverseService
+            SessionManager.sync()
             return match, message.context, stopwatch
 
         except Exception as err:
