@@ -276,9 +276,16 @@ class IntentService:
 
             stopwatch = Stopwatch()
 
+            # get session
+            sess = SessionManager.get(message)
+            if sess.session_id == "default":
+                # Default session, check if it needs to be (re)-created
+                if sess.expired():
+                    sess = SessionManager.reset_default_session()
+                sess.lang = lang
+
             # match
             match = None
-            sess = SessionManager.get(message)
             with stopwatch:
                 # Loop through the matching functions until a match is found.
                 for match_func in self.get_pipeline(session=sess):
@@ -310,7 +317,8 @@ class IntentService:
                 self.send_complete_intent_failure(message)
 
             # sync any changes made to the default session, eg by ConverseService
-            SessionManager.sync()
+            if sess.session_id == "default":
+                SessionManager.sync()
             return match, message.context, stopwatch
 
         except Exception as err:
