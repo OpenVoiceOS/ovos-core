@@ -282,7 +282,7 @@ class IntentService:
                 # Default session, check if it needs to be (re)-created
                 if sess.expired():
                     sess = SessionManager.reset_default_session()
-                sess.lang = lang
+            sess.lang = lang
 
             # match
             match = None
