@@ -33,8 +33,7 @@ class TestFallback(TestCase):
             while len(messages) < n:
                 sleep(0.1)
                 if time.time() - t > 10:
-                    print("taking too long! aborting wait, let tests fails")
-                    break
+                    raise RuntimeError("did not get the number of expected messages under 10 seconds")
 
         self.core.bus.on("message", new_msg)
 
