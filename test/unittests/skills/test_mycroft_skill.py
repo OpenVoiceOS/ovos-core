@@ -603,10 +603,10 @@ class TestOVOSSkill(unittest.TestCase):
         s.config_core['secondary_langs'] = ['en', 'en-us', 'en-AU',
                                             'es', 'pt-PT']
         self.assertEqual(s.lang, 'en-us')
-        self.assertEqual(s._secondary_langs, ['en', 'en-au', 'es',
+        self.assertEqual(s.secondary_langs, ['en', 'en-au', 'es',
                                               'pt-pt'])
-        self.assertEqual(len(s._native_langs), len(set(s._native_langs)))
-        self.assertEqual(set(s._native_langs), {'en-us', 'en-au', 'pt-pt'})
+        self.assertEqual(len(s.native_langs), len(set(s.native_langs)))
+        self.assertEqual(set(s.native_langs), {'en-us', 'en-au', 'pt-pt'})
         s.config_core['lang'] = lang
         s.config_core['secondary_langs'] = secondary
 
