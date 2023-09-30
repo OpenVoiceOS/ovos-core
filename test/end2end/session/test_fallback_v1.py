@@ -1,3 +1,4 @@
+import time
 from time import sleep
 from unittest import TestCase
 
@@ -28,8 +29,12 @@ class TestFallback(TestCase):
 
         def wait_for_n_messages(n):
             nonlocal messages
+            t = time.time()
             while len(messages) < n:
                 sleep(0.1)
+                if time.time() - t > 10:
+                    print("taking too long! aborting wait, let tests fails")
+                    break
 
         self.core.bus.on("message", new_msg)
 
