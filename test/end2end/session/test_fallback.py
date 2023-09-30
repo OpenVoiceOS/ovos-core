@@ -71,6 +71,10 @@ class TestFallback(TestCase):
         for m in messages:
             self.assertEqual(m.context["session"]["session_id"], "default")
             self.assertEqual(m.context["x"], "xx")
+        # verify active skills is empty until "intent.service.skills.activated"
+        for m in messages[:10]:
+            self.assertEqual(m.context["session"]["session_id"], "default")
+            self.assertEqual(m.context["session"]["active_skills"], [])
 
         # verify converse ping/pong answer from skill
         self.assertEqual(messages[1].msg_type, "skill.converse.ping")
@@ -107,6 +111,19 @@ class TestFallback(TestCase):
         # verify default session is now updated
         self.assertEqual(messages[12].msg_type, "ovos.session.update_default")
         self.assertEqual(messages[12].data["session_data"]["session_id"], "default")
+
+        # test second message with no session resumes default active skills
+        messages = []
+        utt = Message("recognizer_loop:utterance",
+                      {"utterances": ["invalid"]})
+        self.core.bus.emit(utt)
+        wait_for_n_messages(len(expected_messages))
+        self.assertEqual(len(expected_messages), len(messages))
+
+        # verify that contexts are kept around
+        for m in messages[1:]:
+            self.assertEqual(m.context["session"]["session_id"], "default")
+            self.assertEqual(m.context["session"]["active_skills"][0][0], self.skill_id)
 
     def test_fallback_with_session(self):
         SessionManager.sessions = {}
@@ -206,5 +223,3 @@ class TestFallback(TestCase):
         self.assertEqual(sess.active_skills[0][0], self.skill_id)
         # test that default session remains unchanged
         self.assertEqual(SessionManager.default_session.active_skills, [])
-
-
