@@ -54,6 +54,7 @@ jobs:
       - name: Install test dependencies
         run: |
           pip install -r requirements/tests.txt
+          pip install git+https://github.com/OpenVoiceOS/OVOS-workshop@fallback/no_make_active
           pip install ./test/unittests/common_query/ovos_tskill_fakewiki
           pip install ./test/end2end/session/skill-ovos-hello-world
           pip install ./test/end2end/session/skill-ovos-fallback-unknown
