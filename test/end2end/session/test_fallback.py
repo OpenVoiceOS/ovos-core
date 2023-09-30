@@ -41,15 +41,19 @@ class TestFallback(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",
+            # Converse
             "skill.converse.ping",
             "skill.converse.pong",
+            # FallbackV2
             "ovos.skills.fallback.ping",
             "ovos.skills.fallback.pong",
+            # skill executing
             f"ovos.skills.fallback.{self.skill_id}.request",
             f"ovos.skills.fallback.{self.skill_id}.start",
             "enclosure.active_skill",
             "speak",
             f"ovos.skills.fallback.{self.skill_id}.response",
+            # intent service post fallback
             "intent.service.skills.activated",
             f"{self.skill_id}.activate",
             "ovos.session.update_default"
@@ -80,42 +84,24 @@ class TestFallback(TestCase):
         self.assertEqual(messages[4].context["skill_id"], self.skill_id)
         self.assertTrue(messages[4].data["can_handle"])
 
-        return
-        # high prio fallback
-        self.assertEqual(messages[3].msg_type, "mycroft.skills.fallback")
-        self.assertEqual(messages[3].data["fallback_range"], [0, 5])
-        self.assertEqual(messages[4].msg_type, "mycroft.skill.handler.start")
-        self.assertEqual(messages[4].data["handler"], "fallback")
-        self.assertEqual(messages[5].msg_type, "mycroft.skill.handler.complete")
-        self.assertEqual(messages[5].data["handler"], "fallback")
-        self.assertEqual(messages[6].msg_type, "mycroft.skills.fallback.response")
-        self.assertFalse(messages[6].data["handled"])
+        # verify skill executes
+        self.assertEqual(messages[5].msg_type, f"ovos.skills.fallback.{self.skill_id}.request")
+        self.assertEqual(messages[5].data["skill_id"], self.skill_id)
+        self.assertEqual(messages[6].msg_type, f"ovos.skills.fallback.{self.skill_id}.start")
+        self.assertEqual(messages[7].msg_type, "enclosure.active_skill")
+        self.assertEqual(messages[7].data["skill_id"], self.skill_id)
+        self.assertEqual(messages[8].msg_type, "speak")
+        self.assertEqual(messages[8].data["meta"]["dialog"], "unknown")
+        self.assertEqual(messages[8].data["meta"]["skill"], self.skill_id)
+        self.assertEqual(messages[9].msg_type, f"ovos.skills.fallback.{self.skill_id}.response")
+        self.assertTrue(messages[9].data["result"])
+        self.assertEqual(messages[9].data["fallback_handler"], "UnknownSkill.handle_fallback")
 
-        # medium prio fallback
-        self.assertEqual(messages[7].msg_type, "mycroft.skills.fallback")
-        self.assertEqual(messages[7].data["fallback_range"], [5, 90])
-        self.assertEqual(messages[8].msg_type, "mycroft.skill.handler.start")
-        self.assertEqual(messages[8].data["handler"], "fallback")
-        self.assertEqual(messages[9].msg_type, "mycroft.skill.handler.complete")
-        self.assertEqual(messages[9].data["handler"], "fallback")
-        self.assertEqual(messages[10].msg_type, "mycroft.skills.fallback.response")
-        self.assertFalse(messages[10].data["handled"])
-
-        # low prio fallback
-        self.assertEqual(messages[11].msg_type, "mycroft.skills.fallback")
-        self.assertEqual(messages[11].data["fallback_range"], [90, 101])
-        self.assertEqual(messages[12].msg_type, "mycroft.skill.handler.start")
-        self.assertEqual(messages[12].data["handler"], "fallback")
-        self.assertEqual(messages[13].msg_type, "mycroft.skill.handler.complete")
-        self.assertEqual(messages[13].data["handler"], "fallback")
-        self.assertEqual(messages[14].msg_type, "mycroft.skills.fallback.response")
-        self.assertFalse(messages[14].data["handled"])
-
-        # complete intent failure
-        self.assertEqual(messages[15].msg_type, "mycroft.audio.play_sound")
-        self.assertEqual(messages[15].data["uri"], "snd/error.mp3")
-        self.assertEqual(messages[16].msg_type, "complete_intent_failure")
+        # verify skill is activated
+        self.assertEqual(messages[10].msg_type, "intent.service.skills.activated")
+        self.assertEqual(messages[10].data["skill_id"], self.skill_id)
+        self.assertEqual(messages[11].msg_type, f"{self.skill_id}.activate")
 
         # verify default session is now updated
-        self.assertEqual(messages[17].msg_type, "ovos.session.update_default")
-        self.assertEqual(messages[17].data["session_data"]["session_id"], "default")
+        self.assertEqual(messages[12].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[12].data["session_data"]["session_id"], "default")

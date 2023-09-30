@@ -335,8 +335,10 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",
+            # Converse
             "skill.converse.ping",
             "skill.converse.pong",
+            # FallbackV1
             "mycroft.skills.fallback",
             "mycroft.skill.handler.start",
             "mycroft.skill.handler.complete",
@@ -349,6 +351,7 @@ class TestSessions(TestCase):
             "mycroft.skill.handler.start",
             "mycroft.skill.handler.complete",
             "mycroft.skills.fallback.response",
+            # complete intent failure
             "mycroft.audio.play_sound",
             "complete_intent_failure",
             "ovos.session.update_default"
