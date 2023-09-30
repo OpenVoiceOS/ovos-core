@@ -57,6 +57,7 @@ jobs:
           pip install ./test/unittests/common_query/ovos_tskill_fakewiki
           pip install ./test/end2end/session/skill-ovos-hello-world
           pip install ./test/end2end/session/skill-ovos-fallback-unknown
+          pip install ./test/end2end/session/skill-ovos-fallback-unknownv1
       - name: Run unittests
         run: |
           pytest --cov=ovos_core --cov-report xml test/unittests
