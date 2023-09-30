@@ -64,7 +64,7 @@ jobs:
           #       (for an example, see OVOS Skill Manager's workflow)
       - name: Run full core unittests
         run: |
-          pytest --cov=ovos_core --cov-report xml test/end2end
+          pytest --cov-append --cov=ovos_core --cov-report xml test/end2end
       - name: Run integration tests
         run: |
           pytest --cov-append --cov=ovos_core --cov-report xml test/integrationtests

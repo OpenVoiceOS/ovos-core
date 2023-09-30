@@ -19,19 +19,26 @@ jobs:
     - name: Install System Dependencies
       run: |
         sudo apt-get update
-        sudo apt install python3-dev
+        sudo apt install python3-dev libssl-dev libfann-dev portaudio19-dev libpulse-dev
         python -m pip install build wheel
-    - name: Install repo
+    - name: Install core repo
       run: |
         pip install -e .[mycroft,deprecated]
     - name: Install test dependencies
       run: |
-        sudo apt install libssl-dev libfann-dev portaudio19-dev libpulse-dev
         pip install -r requirements/tests.txt
         pip install ./test/unittests/common_query/ovos_tskill_fakewiki
+        pip install ./test/end2end/session/skill-ovos-hello-world
     - name: Generate coverage report
       run: |
-        pytest --cov=./ovos_core --cov-report=xml
+        pytest --cov=ovos_core --cov-report xml test/unittests
+        pytest --cov-append --cov=ovos_core --cov-report xml test/end2end
+        pytest --cov-append --cov=ovos_core --cov-report xml test/integrationtests
+    - name: Generate coverage report with padatious
+      run: |
+        sudo apt install libfann-dev
+        pip install .[lgpl]
+        pytest --cov-append --cov=ovos_core --cov-report xml test/unittests/skills
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
