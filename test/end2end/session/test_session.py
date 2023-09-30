@@ -83,7 +83,10 @@ class TestSessions(TestCase):
 
         def new_msg(msg):
             nonlocal messages
-            messages.append(Message.deserialize(msg))
+            m = Message.deserialize(msg)
+            if m.msg_type in ["ovos.skills.settings_changed"]:
+                return  # skip these, only happen in 1st run
+            messages.append(m)
             print(len(messages), msg)
 
         def wait_for_n_messages(n):
@@ -181,7 +184,11 @@ class TestSessions(TestCase):
 
         def new_msg(msg):
             nonlocal messages
-            messages.append(Message.deserialize(msg))
+            m = Message.deserialize(msg)
+            if m.msg_type in ["ovos.skills.settings_changed"]:
+                return  # skip these, only happen in 1st run
+            messages.append(m)
+            print(len(messages), msg)
 
         def wait_for_n_messages(n):
             nonlocal messages
@@ -276,7 +283,10 @@ class TestSessions(TestCase):
 
         def new_msg(msg):
             nonlocal messages
-            messages.append(Message.deserialize(msg))
+            m = Message.deserialize(msg)
+            if m.msg_type in ["ovos.skills.settings_changed"]:
+                return  # skip these, only happen in 1st run
+            messages.append(m)
             print(len(messages), msg)
 
         def wait_for_n_messages(n):
@@ -382,7 +392,11 @@ class TestSessions(TestCase):
 
         def new_msg(msg):
             nonlocal messages
-            messages.append(Message.deserialize(msg))
+            m = Message.deserialize(msg)
+            if m.msg_type in ["ovos.skills.settings_changed"]:
+                return  # skip these, only happen in 1st run
+            messages.append(m)
+            print(len(messages), msg)
 
         def wait_for_n_messages(n):
             nonlocal messages
