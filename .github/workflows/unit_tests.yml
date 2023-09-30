@@ -70,6 +70,7 @@ jobs:
           pytest --cov-append --cov=ovos_core --cov-report xml test/integrationtests
       - name: Install padatious
         run: |
+          sudo apt install libfann-dev
           pip install .[lgpl]
       - name: Run unittests with padatious
         run: |
