@@ -12,7 +12,7 @@ ovos-plugin-manager<0.1.0, >=0.0.24a9
 ovos-config~=0.0,>=0.0.11a13
 ovos-lingua-franca>=0.4.7
 ovos-backend-client>=0.1.0a12
-ovos-workshop<0.1.0, >=0.0.13a5
+ovos-workshop<0.1.0, >=0.0.13a6
 
 # provides plugins and classic machine learning framework
 ovos-classifiers<0.1.0, >=0.0.0a37
