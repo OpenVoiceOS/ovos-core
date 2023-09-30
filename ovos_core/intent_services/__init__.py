@@ -180,16 +180,15 @@ class IntentService:
         3 - detected_lang -> tagged by transformers  (text classification, free form chat)
         4 - config lang (or from message.data)
         """
-        cfg = Configuration()
+        sess = SessionManager.get(message)
         default_lang = get_message_lang(message)
-        valid_langs = set([cfg.get("lang", "en-us")] + cfg.get("secondary_langs'", []))
         lang_keys = ["stt_lang",
                      "request_lang",
                      "detected_lang"]
         for k in lang_keys:
             if k in message.context:
                 v = message.context[k]
-                if v in valid_langs:
+                if v in sess.valid_languages:
                     if v != default_lang:
                         LOG.info(f"replaced {default_lang} with {k}: {v}")
                     return v
@@ -233,6 +232,26 @@ class IntentService:
         pipeline = [k for k in session.pipeline if k not in skips]
         return [matchers[k] for k in pipeline]
 
+    def _validate_session(self, message, lang):
+        # get session
+        sess = SessionManager.get(message)
+        if sess.session_id == "default":
+            updated = False
+            # Default session, check if it needs to be (re)-created
+            if sess.expired():
+                sess = SessionManager.reset_default_session()
+                updated = True
+            if lang != sess.lang:
+                sess.lang = lang
+                updated = True
+            if updated:
+                SessionManager.update(sess)
+                SessionManager.sync(message)
+        else:
+            sess.lang = lang
+            SessionManager.update(sess)
+        return sess
+
     def handle_utterance(self, message):
         """Main entrypoint for handling user utterances
 
@@ -267,6 +286,7 @@ class IntentService:
 
             # tag language of this utterance
             lang = self.disambiguate_lang(message)
+
             try:
                 setup_locale(lang)
             except Exception as e:
@@ -277,12 +297,8 @@ class IntentService:
             stopwatch = Stopwatch()
 
             # get session
-            sess = SessionManager.get(message)
-            if sess.session_id == "default":
-                # Default session, check if it needs to be (re)-created
-                if sess.expired():
-                    sess = SessionManager.reset_default_session()
-            sess.lang = lang
+            sess = self._validate_session(message, lang)
+            message.context["session"] = sess.serialize()
 
             # match
             match = None
@@ -292,6 +308,7 @@ class IntentService:
                     match = match_func(utterances, lang, message)
                     if match:
                         break
+
             LOG.debug(f"intent matching took: {stopwatch.time}")
             if match:
                 message.data["utterance"] = match.utterance
@@ -318,7 +335,7 @@ class IntentService:
 
             # sync any changes made to the default session, eg by ConverseService
             if sess.session_id == "default":
-                SessionManager.sync()
+                SessionManager.sync(message)
             return match, message.context, stopwatch
 
         except Exception as err:

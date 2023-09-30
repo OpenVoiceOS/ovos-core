@@ -150,7 +150,7 @@ class ConversationTest(TestCase):
                     'atari_skill': atari,
                     'amiga_skill': amiga}
 
-            return msgs[message.data['skill_id']]
+            return msgs.get(message.data['skill_id'])
 
         self.intent_service.converse.activate_skill('amiga_skill')
         self.intent_service.bus.wait_for_response.side_effect = response

@@ -74,6 +74,7 @@ class ConverseService:
 
                 # keep message.context
                 message = message or Message("")
+                message.context["session"] = session.serialize()  # update session active skills
                 # send bus event
                 self.bus.emit(
                     message.forward("intent.service.skills.deactivated",
@@ -101,6 +102,7 @@ class ConverseService:
 
             # keep message.context
             message = message or Message("")
+            message.context["session"] = session.serialize()  # update session active skills
             message = message.forward("intent.service.skills.activated",
                                       {"skill_id": skill_id})
             # send bus event
@@ -310,11 +312,15 @@ class ConverseService:
         skill_id = message.data["skill_id"]
         session = SessionManager.get(message)
         session.enable_response_mode(skill_id)
+        if session.session_id == "default":
+            SessionManager.sync(message)
 
     def handle_get_response_disable(self, message):
         skill_id = message.data["skill_id"]
         session = SessionManager.get(message)
         session.disable_response_mode(skill_id)
+        if session.session_id == "default":
+            SessionManager.sync(message)
 
     def handle_activate_skill_request(self, message):
         # TODO imperfect solution - only a skill can activate itself
