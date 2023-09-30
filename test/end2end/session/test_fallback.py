@@ -146,7 +146,7 @@ class TestFallback(TestCase):
             # FallbackV2
             "ovos.skills.fallback.ping",
             "ovos.skills.fallback.pong",
-            # skill executing
+            # skill executing - TODO "mycroft.skill.handler.start" +  "mycroft.skill.handler.complete" should be added
             f"ovos.skills.fallback.{self.skill_id}.request",
             f"ovos.skills.fallback.{self.skill_id}.start",
             "enclosure.active_skill",
