@@ -1,3 +1,4 @@
+import time
 from time import sleep
 from unittest import TestCase, skip
 
@@ -29,8 +30,11 @@ class TestSessions(TestCase):
 
         def wait_for_n_messages(n):
             nonlocal messages
+            t = time.time()
             while len(messages) < n:
                 sleep(0.1)
+                if time.time() - t > 10:
+                    raise RuntimeError("did not get the number of expected messages under 10 seconds")
 
         self.core.bus.on("message", new_msg)
 
@@ -130,8 +134,11 @@ class TestSessions(TestCase):
 
         def wait_for_n_messages(n):
             nonlocal messages
+            t = time.time()
             while len(messages) < n:
                 sleep(0.1)
+                if time.time() - t > 10:
+                    raise RuntimeError("did not get the number of expected messages under 10 seconds")
 
         self.core.bus.on("message", new_msg)
 
@@ -230,8 +237,11 @@ class TestSessions(TestCase):
 
         def wait_for_n_messages(n):
             nonlocal messages
+            t = time.time()
             while len(messages) < n:
                 sleep(0.1)
+                if time.time() - t > 10:
+                    raise RuntimeError("did not get the number of expected messages under 10 seconds")
 
         self.core.bus.on("message", new_msg)
 
@@ -322,8 +332,11 @@ class TestSessions(TestCase):
 
         def wait_for_n_messages(n):
             nonlocal messages
+            t = time.time()
             while len(messages) < n:
                 sleep(0.1)
+                if time.time() - t > 10:
+                    raise RuntimeError("did not get the number of expected messages under 10 seconds")
 
         self.core.bus.on("message", new_msg)
 
@@ -434,8 +447,11 @@ class TestSessions(TestCase):
 
         def wait_for_n_messages(n):
             nonlocal messages
+            t = time.time()
             while len(messages) < n:
                 sleep(0.1)
+                if time.time() - t > 10:
+                    raise RuntimeError("did not get the number of expected messages under 10 seconds")
 
         self.core.bus.on("message", new_msg)
 
