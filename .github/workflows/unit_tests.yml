@@ -77,9 +77,17 @@ jobs:
           pip install .[lgpl]
       - name: Run unittests with padatious
         run: |
-          pytest --cov=ovos_core --cov-report xml test/unittests/skills
+          pytest --cov-append --cov=ovos_core --cov-report xml test/unittests/skills
       - name: Upload coverage
         if: "${{ matrix.python-version == '3.9' }}"
         env:
           CODECOV_TOKEN: ${{secrets.CODECOV_TOKEN}}
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: ./coverage/reports/
+          fail_ci_if_error: true
+          files: ./coverage.xml,!./cache
+          flags: unittests
+          name: codecov-umbrella
+          verbose: true
