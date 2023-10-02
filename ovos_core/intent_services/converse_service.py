@@ -330,6 +330,9 @@ class ConverseService:
         skill_id = message.data['skill_id']
         source_skill = message.context.get("skill_id")
         self.activate_skill(skill_id, source_skill, message)
+        sess = SessionManager.get(message)
+        if sess.session_id == "default":
+            SessionManager.sync(message)
 
     def handle_deactivate_skill_request(self, message):
         # TODO imperfect solution - only a skill can deactivate itself
@@ -339,6 +342,9 @@ class ConverseService:
         skill_id = message.data['skill_id']
         source_skill = message.context.get("skill_id") or skill_id
         self.deactivate_skill(skill_id, source_skill, message)
+        sess = SessionManager.get(message)
+        if sess.session_id == "default":
+            SessionManager.sync(message)
 
     def reset_converse(self, message):
         """Let skills know there was a problem with speech recognition"""

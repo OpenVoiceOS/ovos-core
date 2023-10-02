@@ -431,4 +431,97 @@ class TestSessions(TestCase):
             self.assertEqual(messages[8].data["session_data"]["active_skills"][0][0], self.skill_id)
             self.assertEqual(messages[8].data["session_data"]["active_skills"][1][0], self.other_skill_id)
 
+            messages = []
+
         converse_capture()
+
+        def external_deactivate():
+            nonlocal messages
+
+            utt = Message("test_deactivate")
+            self.core.bus.emit(utt)
+
+            self.assertEqual(SessionManager.default_session.active_skills[0][0], self.other_skill_id)
+            # confirm all expected messages are sent
+            expected_messages = [
+                "test_deactivate",
+                "intent.service.skills.deactivate",
+                "intent.service.skills.deactivated",
+                "ovos-tskill-abort.openvoiceos.deactivate",
+                "ovos.session.update_default"
+            ]
+            wait_for_n_messages(len(expected_messages))
+
+            self.assertEqual(len(expected_messages), len(messages))
+
+            mtypes = [m.msg_type for m in messages]
+            for m in expected_messages:
+                self.assertTrue(m in mtypes)
+
+            # verify skill is no longer in active skills
+            self.assertEqual(SessionManager.default_session.active_skills[0][0], self.other_skill_id)
+            self.assertEqual(len(SessionManager.default_session.active_skills), 1)
+
+            # verify default session is now updated
+            self.assertEqual(messages[-1].msg_type, "ovos.session.update_default")
+            self.assertEqual(messages[-1].data["session_data"]["session_id"], "default")
+            # test deserialization of payload
+            sess = Session.deserialize(messages[-1].data["session_data"])
+            self.assertEqual(sess.session_id, "default")
+            # test that active skills list has been updated
+            self.assertEqual(len(sess.active_skills), 1)
+            self.assertEqual(sess.active_skills[0][0], self.other_skill_id)
+            self.assertEqual(len(messages[-1].data["session_data"]["active_skills"]), 1)
+            self.assertEqual(messages[-1].data["session_data"]["active_skills"][0][0], self.other_skill_id)
+
+            messages = []
+
+        external_deactivate()
+
+        def external_activate():
+            nonlocal messages
+
+            self.assertEqual(SessionManager.default_session.active_skills[0][0], self.other_skill_id)
+            utt = Message("test_activate")
+            self.core.bus.emit(utt)
+            self.assertEqual(SessionManager.default_session.active_skills[0][0], self.skill_id)
+            # confirm all expected messages are sent
+            expected_messages = [
+                "test_activate",
+                "intent.service.skills.activate",
+                "intent.service.skills.activated",
+                f"{self.skill_id}.activate",
+                "ovos.session.update_default",
+                "active_skill_request",  # backwards compat namespace classic core
+                "intent.service.skills.activated",
+                f"{self.skill_id}.activate",
+                "ovos.session.update_default"
+            ]
+            wait_for_n_messages(len(expected_messages))
+
+            self.assertEqual(len(expected_messages), len(messages))
+
+            mtypes = [m.msg_type for m in messages]
+            for m in expected_messages:
+                self.assertTrue(m in mtypes)
+
+            # verify skill is again in active skills
+            self.assertEqual(SessionManager.default_session.active_skills[0][0], self.skill_id)
+            self.assertEqual(len(SessionManager.default_session.active_skills), 2)
+
+            # verify default session is now updated
+            self.assertEqual(messages[-1].msg_type, "ovos.session.update_default")
+            self.assertEqual(messages[-1].data["session_data"]["session_id"], "default")
+            # test deserialization of payload
+            sess = Session.deserialize(messages[-1].data["session_data"])
+            self.assertEqual(sess.session_id, "default")
+            # test that active skills list has been updated
+            self.assertEqual(len(sess.active_skills), 2)
+            self.assertEqual(sess.active_skills[0][0], self.skill_id)
+            self.assertEqual(len(messages[-1].data["session_data"]["active_skills"]), 2)
+            self.assertEqual(messages[-1].data["session_data"]["active_skills"][0][0], self.skill_id)
+
+            messages = []
+
+        external_activate()
+
