@@ -14,8 +14,14 @@ class TestAbortSkill(OVOSSkill):
     def initialize(self):
         self.stop_called = False
         self._converse = False
-        self.add_event(f"{self.skill_id}.converse_enable", self.handle_converse_on)
-        self.add_event(f"{self.skill_id}.converse_disable", self.handle_converse_off)
+        self.bus.on("test_activate", self.do_activate)
+        self.bus.on("test_deactivate", self.do_deactivate)
+
+    def do_activate(self, message):
+        self.activate()
+
+    def do_deactivate(self, message):
+        self.deactivate()
 
     @intent_file_handler("converse_on.intent")
     def handle_converse_on(self, message):
