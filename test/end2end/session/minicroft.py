@@ -58,7 +58,10 @@ class MiniCroft(SkillManager):
 
 
 def get_minicroft(skill_id):
-    croft1 = MiniCroft([skill_id])
+    if isinstance(skill_id, str):
+        skill_id = [skill_id]
+    assert isinstance(skill_id, list)
+    croft1 = MiniCroft(skill_id)
     croft1.start()
     while croft1.status.state != ProcessState.READY:
         sleep(0.2)
