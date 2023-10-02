@@ -39,7 +39,7 @@ class TestAbortSkill(OVOSSkill):
     @intent_file_handler("test_get_response.intent")
     def handle_test_get_response(self, message):
         ans = self.get_response("get")
-        self.speak(ans)
+        self.speak(ans or "ERROR")
 
     @killable_intent(callback=handle_intent_aborted)
     @intent_file_handler("test.intent")
