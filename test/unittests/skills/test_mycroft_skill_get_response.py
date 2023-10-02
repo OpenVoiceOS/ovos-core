@@ -88,7 +88,7 @@ class TestMycroftSkillWaitResponse(TestCase):
         def is_cancel(utterance):
             return utterance == 'cancel'
 
-        response = skill._wait_response(is_cancel, validator, on_fail, 1)
+        response = skill._wait_response(is_cancel, validator, on_fail, 1, Message(""))
         self.assertEqual(response, None)
         converser.join()
 
@@ -149,10 +149,11 @@ class TestMycroftSkillGetResponse(TestCase):
 
         expected_response = 'ice creamr please'
         skill._wait_response.return_value = expected_response
+        m = Message("")
         response = skill.get_response('what do you want',
-                                      validator=validator)
+                                      validator=validator, message=m)
         skill._wait_response.assert_called_with(AnyCallable(), validator,
-                                                AnyCallable(), -1)
+                                                AnyCallable(), -1, m)
 
     def test_converse_detection(self):
         """Ensure validator is passed on."""
@@ -164,9 +165,10 @@ class TestMycroftSkillGetResponse(TestCase):
             self.assertTrue(skill.converse_is_implemented)
 
         self.assertFalse(skill.converse_is_implemented)
-        skill.get_response('what do you want', validator=validator)
+        m = Message("")
+        skill.get_response('what do you want', validator=validator, message=m)
         skill._wait_response.assert_called_with(AnyCallable(), validator,
-                                                AnyCallable(), -1)
+                                                AnyCallable(), -1, m)
         self.assertFalse(skill.converse_is_implemented)
 
 
