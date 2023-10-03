@@ -250,6 +250,7 @@ class IntentService:
         else:
             sess.lang = lang
             SessionManager.update(sess)
+        sess.touch()
         return sess
 
     def handle_utterance(self, message):

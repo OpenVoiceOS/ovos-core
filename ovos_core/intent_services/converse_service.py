@@ -68,8 +68,6 @@ class ConverseService:
             session = SessionManager.get(message)
             if session.is_active(skill_id):
                 # update converse session
-                if message:
-                    session.update_history(message)
                 session.deactivate_skill(skill_id)
 
                 # keep message.context
@@ -96,8 +94,6 @@ class ConverseService:
         if self._activate_allowed(skill_id, source_skill):
             # update converse session
             session = SessionManager.get(message)
-            if message:
-                session.update_history(message)
             session.activate_skill(skill_id)
 
             # keep message.context
@@ -263,7 +259,6 @@ class ConverseService:
 
         state = session.utterance_states.get(skill_id, UtteranceState.INTENT)
         if state == UtteranceState.RESPONSE:
-            session.update_history(message)
             converse_msg = message.reply("skill.converse.get_response",
                                          {"skill_id": skill_id,
                                           "utterances": utterances,
@@ -272,7 +267,6 @@ class ConverseService:
             return True
 
         if self._converse_allowed(skill_id):
-            session.update_history(message)
             converse_msg = message.reply("skill.converse.request",
                                          {"skill_id": skill_id,
                                           "utterances": utterances,
