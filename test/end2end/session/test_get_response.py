@@ -894,4 +894,159 @@ class TestSessions(TestCase):
         self.assertEqual(messages[7].msg_type, "mycroft.skill.handler.start")
         self.assertEqual(messages[7].data["name"], "TestAbortSkill.handle_test_get_response_cascade")
 
-        # TODO
+        # post self.get_response intent code
+        self.assertEqual(messages[8].msg_type, "enclosure.active_skill")
+        self.assertEqual(messages[8].data["skill_id"], self.skill_id)
+        self.assertEqual(messages[9].msg_type, "speak")
+        self.assertEqual(messages[9].data["lang"], "en-us")
+        self.assertFalse(messages[9].data["expect_response"])
+        self.assertEqual(messages[9].data["utterance"], "give me items")
+        self.assertEqual(messages[9].data["meta"]["skill"], self.skill_id)
+
+        # enable get_response for this session
+        self.assertEqual(messages[10].msg_type, "skill.converse.get_response.enable")
+        self.assertEqual(messages[11].msg_type, "ovos.session.update_default")
+
+        # 3 sound prompts (no dialog in this test)
+        self.assertEqual(messages[12].msg_type, "mycroft.mic.listen")
+
+        # check utterance goes through converse cycle
+        self.assertEqual(messages[13].msg_type, "recognizer_loop:utterance")
+        self.assertEqual(messages[14].msg_type, "skill.converse.ping")
+
+        # assert it reports converse method has been implemented by skill
+        if messages[2].data["skill_id"] == self.skill_id:  # we dont know order of pong responses
+            self.assertTrue(messages[15].data["can_handle"])
+            self.assertFalse(messages[16].data["can_handle"])
+        if messages[3].data["skill_id"] == self.skill_id:  # we dont know order of pong responses
+            self.assertTrue(messages[16].data["can_handle"])
+            self.assertFalse(messages[15].data["can_handle"])
+
+        # captured utterance sent to get_response handler that is waiting
+        self.assertEqual(messages[17].msg_type, "skill.converse.get_response")
+        self.assertEqual(messages[17].data["skill_id"], self.skill_id)
+        self.assertEqual(messages[17].data["utterances"], ["A"])
+
+        # converse pipeline activates the skill last_used timestamp
+        self.assertEqual(messages[18].msg_type, "intent.service.skills.activated")
+        self.assertEqual(messages[19].msg_type, f"{self.skill_id}.activate")
+        self.assertEqual(messages[20].msg_type, "ovos.session.update_default")
+
+        # disable get_response for this session
+        self.assertEqual(messages[21].msg_type, "skill.converse.get_response.disable")
+        self.assertEqual(messages[22].msg_type, "ovos.session.update_default")
+
+        ## response 2
+
+        # enable get_response for this session
+        self.assertEqual(messages[23].msg_type, "skill.converse.get_response.enable")
+        self.assertEqual(messages[24].msg_type, "ovos.session.update_default")
+
+        # 3 sound prompts (no dialog in this test)
+        self.assertEqual(messages[25].msg_type, "mycroft.mic.listen")
+
+        # check utterance goes through converse cycle
+        self.assertEqual(messages[26].msg_type, "recognizer_loop:utterance")
+        self.assertEqual(messages[27].msg_type, "skill.converse.ping")
+
+        # assert it reports converse method has been implemented by skill
+        if messages[2].data["skill_id"] == self.skill_id:  # we dont know order of pong responses
+            self.assertTrue(messages[28].data["can_handle"])
+            self.assertFalse(messages[29].data["can_handle"])
+        if messages[3].data["skill_id"] == self.skill_id:  # we dont know order of pong responses
+            self.assertTrue(messages[29].data["can_handle"])
+            self.assertFalse(messages[28].data["can_handle"])
+
+        # captured utterance sent to get_response handler that is waiting
+        self.assertEqual(messages[30].msg_type, "skill.converse.get_response")
+        self.assertEqual(messages[30].data["skill_id"], self.skill_id)
+        self.assertEqual(messages[30].data["utterances"], ["B"])
+
+        # converse pipeline activates the skill last_used timestamp
+        self.assertEqual(messages[31].msg_type, "intent.service.skills.activated")
+        self.assertEqual(messages[32].msg_type, f"{self.skill_id}.activate")
+        self.assertEqual(messages[33].msg_type, "ovos.session.update_default")
+
+        # disable get_response for this session
+        self.assertEqual(messages[34].msg_type, "skill.converse.get_response.disable")
+        self.assertEqual(messages[35].msg_type, "ovos.session.update_default")
+
+        ## response 3
+
+        # enable get_response for this session
+        self.assertEqual(messages[36].msg_type, "skill.converse.get_response.enable")
+        self.assertEqual(messages[37].msg_type, "ovos.session.update_default")
+
+        # 3 sound prompts (no dialog in this test)
+        self.assertEqual(messages[38].msg_type, "mycroft.mic.listen")
+
+        # check utterance goes through converse cycle
+        self.assertEqual(messages[39].msg_type, "recognizer_loop:utterance")
+        self.assertEqual(messages[40].msg_type, "skill.converse.ping")
+
+        # assert it reports converse method has been implemented by skill
+        if messages[2].data["skill_id"] == self.skill_id:  # we dont know order of pong responses
+            self.assertTrue(messages[41].data["can_handle"])
+            self.assertFalse(messages[42].data["can_handle"])
+        if messages[3].data["skill_id"] == self.skill_id:  # we dont know order of pong responses
+            self.assertTrue(messages[42].data["can_handle"])
+            self.assertFalse(messages[41].data["can_handle"])
+
+        # captured utterance sent to get_response handler that is waiting
+        self.assertEqual(messages[43].msg_type, "skill.converse.get_response")
+        self.assertEqual(messages[43].data["skill_id"], self.skill_id)
+        self.assertEqual(messages[43].data["utterances"], ["C"])
+
+        # converse pipeline activates the skill last_used timestamp
+        self.assertEqual(messages[44].msg_type, "intent.service.skills.activated")
+        self.assertEqual(messages[45].msg_type, f"{self.skill_id}.activate")
+        self.assertEqual(messages[46].msg_type, "ovos.session.update_default")
+
+        # disable get_response for this session
+        self.assertEqual(messages[47].msg_type, "skill.converse.get_response.disable")
+        self.assertEqual(messages[48].msg_type, "ovos.session.update_default")
+
+        ## response 3
+
+        # enable get_response for this session
+        self.assertEqual(messages[49].msg_type, "skill.converse.get_response.enable")
+        self.assertEqual(messages[50].msg_type, "ovos.session.update_default")
+
+        # 3 sound prompts (no dialog in this test)
+        self.assertEqual(messages[51].msg_type, "mycroft.mic.listen")
+
+        # check utterance goes through converse cycle
+        self.assertEqual(messages[52].msg_type, "recognizer_loop:utterance")
+        self.assertEqual(messages[53].msg_type, "skill.converse.ping")
+
+        # assert it reports converse method has been implemented by skill
+        if messages[2].data["skill_id"] == self.skill_id:  # we dont know order of pong responses
+            self.assertTrue(messages[54].data["can_handle"])
+            self.assertFalse(messages[55].data["can_handle"])
+        if messages[3].data["skill_id"] == self.skill_id:  # we dont know order of pong responses
+            self.assertTrue(messages[55].data["can_handle"])
+            self.assertFalse(messages[54].data["can_handle"])
+
+        # captured utterance sent to get_response handler that is waiting
+        self.assertEqual(messages[56].msg_type, "skill.converse.get_response")
+        self.assertEqual(messages[56].data["skill_id"], self.skill_id)
+        self.assertEqual(messages[56].data["utterances"], ["cancel"])
+
+        # converse pipeline activates the skill last_used timestamp
+        self.assertEqual(messages[57].msg_type, "intent.service.skills.activated")
+        self.assertEqual(messages[58].msg_type, f"{self.skill_id}.activate")
+        self.assertEqual(messages[59].msg_type, "ovos.session.update_default")
+
+        # disable get_response for this session
+        self.assertEqual(messages[60].msg_type, "skill.converse.get_response.disable")
+        self.assertEqual(messages[61].msg_type, "ovos.session.update_default")
+
+        # intent return
+        self.assertEqual(messages[62].msg_type, "skill_items")
+        self.assertEqual(messages[62].data, {"items": ["A", "B", "C"]})
+
+        # report handler complete
+        self.assertEqual(messages[63].msg_type, "mycroft.skill.handler.complete")
+        self.assertEqual(messages[63].data["name"], "TestAbortSkill.handle_test_get_response_cascade")
+
+        self.assertEqual(messages[64].msg_type, "ovos.session.update_default")
