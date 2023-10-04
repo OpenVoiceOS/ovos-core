@@ -720,3 +720,178 @@ class TestSessions(TestCase):
         # test deserialization of payload
         sess = Session.deserialize(messages[26].data["session_data"])
         self.assertEqual(sess.session_id, "default")
+
+    def test_nested(self):
+        SessionManager.sessions = {}
+        SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
+        SessionManager.default_session.lang = "en-us"
+
+        messages = []
+
+        def new_msg(msg):
+            nonlocal messages
+            m = Message.deserialize(msg)
+            if m.msg_type in ["ovos.skills.settings_changed"]:
+                return  # skip these, only happen in 1st run
+            messages.append(m)
+            print(len(messages), msg)
+
+        def wait_for_n_messages(n):
+            nonlocal messages
+            t = time.time()
+            while len(messages) < n:
+                sleep(0.1)
+                if time.time() - t > 10:
+                    raise RuntimeError("did not get the number of expected messages under 10 seconds")
+
+        self.core.bus.on("message", new_msg)
+
+        items = ["A", "B", "C"]
+
+        def answer_get_response(msg):
+            nonlocal items
+            sleep(0.5)
+            if not len(items):
+                utt = Message("recognizer_loop:utterance",
+                              {"utterances": ["cancel"]},
+                              {"session": SessionManager.default_session.serialize()})
+            else:
+                utt = Message("recognizer_loop:utterance",
+                              {"utterances": [items[0]]},
+                              {"session": SessionManager.default_session.serialize()})
+            self.core.bus.emit(utt)
+            items = items[1:]
+
+        self.core.bus.on("mycroft.mic.listen", answer_get_response)
+
+        # trigger get_response
+        utt = Message("recognizer_loop:utterance",
+                      {"utterances": ["test get items"]})
+        self.core.bus.emit(utt)
+
+        # confirm all expected messages are sent
+        expected_messages = [
+            "recognizer_loop:utterance",  # no session
+            "skill.converse.ping",  # default session injected
+            "skill.converse.pong",  # test skill
+            "skill.converse.pong",  # hello world skill
+
+            # skill selected
+            "intent.service.skills.activated",
+            f"{self.skill_id}.activate",
+            f"{self.skill_id}:test_get_response_cascade.intent",
+
+            # intent code before self.get_response
+            "mycroft.skill.handler.start",
+            "enclosure.active_skill",
+            "speak",  # "give me items"
+
+            # first get_response
+            "skill.converse.get_response.enable",  # start of get_response
+            "ovos.session.update_default",  # sync get_response status
+            "mycroft.mic.listen",  # no dialog in self.get_response
+            "recognizer_loop:utterance",  # A
+            "skill.converse.ping",
+            "skill.converse.pong",
+            "skill.converse.pong",
+            "skill.converse.get_response",  # A
+            "intent.service.skills.activated",
+            f"{self.skill_id}.activate",
+            "ovos.session.update_default",  # sync skill trigger
+            "skill.converse.get_response.disable",
+            "ovos.session.update_default",  # sync get_response status
+
+            # second get_response
+            "skill.converse.get_response.enable",  # start of get_response
+            "ovos.session.update_default",  # sync get_response status
+            "mycroft.mic.listen",  # no dialog in self.get_response
+            "recognizer_loop:utterance",  # B
+            "skill.converse.ping",
+            "skill.converse.pong",
+            "skill.converse.pong",
+            "skill.converse.get_response",  # B
+            "intent.service.skills.activated",
+            f"{self.skill_id}.activate",
+            "ovos.session.update_default",  # sync skill trigger
+            "skill.converse.get_response.disable",
+            "ovos.session.update_default",  # sync get_response status
+
+            # 3rd get_response
+            "skill.converse.get_response.enable",  # start of get_response
+            "ovos.session.update_default",  # sync get_response status
+            "mycroft.mic.listen",  # no dialog in self.get_response
+            "recognizer_loop:utterance",  # C
+            "skill.converse.ping",
+            "skill.converse.pong",
+            "skill.converse.pong",
+            "skill.converse.get_response",  # C
+            "intent.service.skills.activated",
+            f"{self.skill_id}.activate",
+            "ovos.session.update_default",  # sync skill trigger
+            "skill.converse.get_response.disable",
+            "ovos.session.update_default",  # sync get_response status
+
+            # cancel get_response
+            "skill.converse.get_response.enable",  # start of get_response
+            "ovos.session.update_default",  # sync get_response status
+            "mycroft.mic.listen",  # no dialog in self.get_response
+            "recognizer_loop:utterance",  # cancel
+            "skill.converse.ping",
+            "skill.converse.pong",
+            "skill.converse.pong",
+            "skill.converse.get_response",  # cancel
+            "intent.service.skills.activated",
+            f"{self.skill_id}.activate",
+            "ovos.session.update_default",  # sync skill trigger
+            "skill.converse.get_response.disable",
+            "ovos.session.update_default",  # sync get_response status
+
+            "skill_items",  # skill emitted message [A, B, C]
+
+            "mycroft.skill.handler.complete",  # original intent finished executing
+
+            # session updated at end of intent pipeline
+            "ovos.session.update_default"
+
+        ]
+        wait_for_n_messages(len(expected_messages))
+
+        self.assertEqual(len(expected_messages), len(messages))
+
+        mtypes = [m.msg_type for m in messages]
+        for m in expected_messages:
+            self.assertTrue(m in mtypes)
+
+        # verify that "session" is injected
+        # (missing in utterance message) and kept in all messages
+        for m in messages[1:]:
+            print(m.msg_type, m.context["session"]["session_id"])
+            self.assertEqual(m.context["session"]["session_id"], "default")
+
+        # converse intent pipeline
+        self.assertEqual(messages[1].msg_type, "skill.converse.ping")
+        self.assertEqual(messages[2].msg_type, "skill.converse.pong")
+        self.assertEqual(messages[3].msg_type, "skill.converse.pong")
+        self.assertEqual(messages[2].data["skill_id"], messages[2].context["skill_id"])
+        self.assertEqual(messages[3].data["skill_id"], messages[3].context["skill_id"])
+        # assert it reports converse method has been implemented by skill
+        if messages[2].data["skill_id"] == self.skill_id:  # we dont know order of pong responses
+            self.assertTrue(messages[2].data["can_handle"])
+            self.assertFalse(messages[3].data["can_handle"])
+        if messages[3].data["skill_id"] == self.skill_id:  # we dont know order of pong responses
+            self.assertTrue(messages[3].data["can_handle"])
+            self.assertFalse(messages[2].data["can_handle"])
+
+        # verify skill is activated by intent service (intent pipeline matched)
+        self.assertEqual(messages[4].msg_type, "intent.service.skills.activated")
+        self.assertEqual(messages[4].data["skill_id"], self.skill_id)
+        self.assertEqual(messages[5].msg_type, f"{self.skill_id}.activate")
+
+        # verify intent triggers
+        self.assertEqual(messages[6].msg_type, f"{self.skill_id}:test_get_response_cascade.intent")
+
+        # verify intent execution
+        self.assertEqual(messages[7].msg_type, "mycroft.skill.handler.start")
+        self.assertEqual(messages[7].data["name"], "TestAbortSkill.handle_test_get_response_cascade")
+
+        # TODO

@@ -1,7 +1,8 @@
+from time import sleep
+
+from mycroft.skills import intent_file_handler
 from ovos_workshop.decorators import killable_intent
 from ovos_workshop.skills.ovos import OVOSSkill
-from mycroft.skills import intent_file_handler
-from time import sleep
 
 
 class TestAbortSkill(OVOSSkill):
@@ -11,9 +12,11 @@ class TestAbortSkill(OVOSSkill):
     send "my.own.abort.msg" and confirm intent3 is aborted
     say "stop" and confirm all intents are aborted
     """
+
     def initialize(self):
         self.stop_called = False
         self._converse = False
+        self.items = []
         self.bus.on("test_activate", self.do_activate)
         self.bus.on("test_deactivate", self.do_deactivate)
 
@@ -45,6 +48,19 @@ class TestAbortSkill(OVOSSkill):
     def handle_test_get_response3(self, message):
         ans = self.get_response(num_retries=3)
         self.speak(ans or "ERROR")
+
+    @intent_file_handler("test_get_response_cascade.intent")
+    def handle_test_get_response_cascade(self, message):
+        quit = False
+        self.items = []
+        self.speak("give me items", wait=True)
+        while not quit:
+            response = self.get_response(num_retries=0)
+            if response is None:
+                quit = True
+            else:
+                self.items.append(response)
+        self.bus.emit(message.forward("skill_items", {"items": self.items}))
 
     @killable_intent(callback=handle_intent_aborted)
     @intent_file_handler("test.intent")
