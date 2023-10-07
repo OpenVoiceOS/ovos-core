@@ -719,7 +719,7 @@ class SkillManager(Thread):
                     skill_loader.activate()
                     self.bus.emit(message.response())
         except Exception as err:
-            LOG.exception('Couldn\'t activate skill')
+            LOG.exception(f'Couldn\'t activate skill {message.data["skill"]}')
             self.bus.emit(message.response({'error': f'failed: {err}'}))
 
     def stop(self):
