@@ -689,8 +689,10 @@ class SkillManager(Thread):
                 if message.data['skill'] == skill_loader.skill_id:
                     LOG.info("Deactivating skill: " + skill_loader.skill_id)
                     skill_loader.deactivate()
-        except Exception:
+                    self.bus.emit(message.response())
+        except Exception as err:
             LOG.exception('Failed to deactivate ' + message.data['skill'])
+            self.bus.emit(message.response({'error': f'failed: {err}'}))
 
     def deactivate_except(self, message):
         """Deactivate all skills except the provided."""
@@ -715,8 +717,10 @@ class SkillManager(Thread):
                 if (message.data['skill'] in ('all', skill_loader.skill_id)
                         and not skill_loader.active):
                     skill_loader.activate()
-        except Exception:
+                    self.bus.emit(message.response())
+        except Exception as err:
             LOG.exception('Couldn\'t activate skill')
+            self.bus.emit(message.response({'error': f'failed: {err}'}))
 
     def stop(self):
         """Tell the manager to shutdown."""
