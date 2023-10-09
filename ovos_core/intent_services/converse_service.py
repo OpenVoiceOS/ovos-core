@@ -219,6 +219,9 @@ class ConverseService:
 
         active_skills = self.get_active_skills()
 
+        if not active_skills:
+            return want_converse
+
         event = Event()
 
         def handle_ack(msg):
@@ -240,7 +243,10 @@ class ConverseService:
 
         self.bus.on("skill.converse.pong", handle_ack)
 
-        self.bus.emit(message.forward("skill.converse.ping"))
+        # ask skills if they want to converse
+        for skill_id in active_skills:
+            self.bus.emit(message.forward(f"{skill_id}.converse.ping",
+                                          {"skill_id": skill_id}))
 
         # wait for all skills to acknowledge they want to converse
         event.wait(timeout=0.5)
@@ -275,17 +281,15 @@ class ConverseService:
 
         state = session.utterance_states.get(skill_id, UtteranceState.INTENT)
         if state == UtteranceState.RESPONSE:
-            converse_msg = message.reply("skill.converse.get_response",
-                                         {"skill_id": skill_id,
-                                          "utterances": utterances,
+            converse_msg = message.reply(f"{skill_id}.converse.get_response",
+                                         {"utterances": utterances,
                                           "lang": lang})
             self.bus.emit(converse_msg)
             return True
 
         if self._converse_allowed(skill_id):
-            converse_msg = message.reply("skill.converse.request",
-                                         {"skill_id": skill_id,
-                                          "utterances": utterances,
+            converse_msg = message.reply(f"{skill_id}.converse.request",
+                                         {"utterances": utterances,
                                           "lang": lang})
             result = self.bus.wait_for_response(converse_msg,
                                                 'skill.converse.response')
