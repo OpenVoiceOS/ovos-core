@@ -214,6 +214,8 @@ class TestSessions(TestCase):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
+        now = time.time()
+        SessionManager.default_session.active_skills = [(self.skill_id, now)]
 
         messages = []
 
