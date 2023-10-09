@@ -46,9 +46,6 @@ class TestFallback(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",
-            # Converse
-            "skill.converse.ping",
-            "skill.converse.pong",
             # FallbackV2
             "ovos.skills.fallback.ping",
             "ovos.skills.fallback.pong",
@@ -80,41 +77,34 @@ class TestFallback(TestCase):
             self.assertEqual(m.context["session"]["session_id"], "default")
             self.assertEqual(m.context["session"]["active_skills"], [])
 
-        # verify converse ping/pong answer from skill
-        self.assertEqual(messages[1].msg_type, "skill.converse.ping")
-        self.assertEqual(messages[2].msg_type, "skill.converse.pong")
+        # verify fallback ping/pong answer from skill
+        self.assertEqual(messages[1].msg_type, "ovos.skills.fallback.ping")
+        self.assertEqual(messages[2].msg_type, "ovos.skills.fallback.pong")
         self.assertEqual(messages[2].data["skill_id"], self.skill_id)
         self.assertEqual(messages[2].context["skill_id"], self.skill_id)
-        self.assertFalse(messages[2].data["can_handle"])
-
-        # verify fallback ping/pong answer from skill
-        self.assertEqual(messages[3].msg_type, "ovos.skills.fallback.ping")
-        self.assertEqual(messages[4].msg_type, "ovos.skills.fallback.pong")
-        self.assertEqual(messages[4].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[4].context["skill_id"], self.skill_id)
-        self.assertTrue(messages[4].data["can_handle"])
+        self.assertTrue(messages[2].data["can_handle"])
 
         # verify skill executes
-        self.assertEqual(messages[5].msg_type, f"ovos.skills.fallback.{self.skill_id}.request")
+        self.assertEqual(messages[3].msg_type, f"ovos.skills.fallback.{self.skill_id}.request")
+        self.assertEqual(messages[3].data["skill_id"], self.skill_id)
+        self.assertEqual(messages[4].msg_type, f"ovos.skills.fallback.{self.skill_id}.start")
+        self.assertEqual(messages[5].msg_type, "enclosure.active_skill")
         self.assertEqual(messages[5].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[6].msg_type, f"ovos.skills.fallback.{self.skill_id}.start")
-        self.assertEqual(messages[7].msg_type, "enclosure.active_skill")
-        self.assertEqual(messages[7].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[8].msg_type, "speak")
-        self.assertEqual(messages[8].data["meta"]["dialog"], "unknown")
-        self.assertEqual(messages[8].data["meta"]["skill"], self.skill_id)
-        self.assertEqual(messages[9].msg_type, f"ovos.skills.fallback.{self.skill_id}.response")
-        self.assertTrue(messages[9].data["result"])
-        self.assertEqual(messages[9].data["fallback_handler"], "UnknownSkill.handle_fallback")
+        self.assertEqual(messages[6].msg_type, "speak")
+        self.assertEqual(messages[6].data["meta"]["dialog"], "unknown")
+        self.assertEqual(messages[7].data["meta"]["skill"], self.skill_id)
+        self.assertEqual(messages[7].msg_type, f"ovos.skills.fallback.{self.skill_id}.response")
+        self.assertTrue(messages[7].data["result"])
+        self.assertEqual(messages[7].data["fallback_handler"], "UnknownSkill.handle_fallback")
 
         # verify skill is activated
-        self.assertEqual(messages[10].msg_type, "intent.service.skills.activated")
-        self.assertEqual(messages[10].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[11].msg_type, f"{self.skill_id}.activate")
+        self.assertEqual(messages[8].msg_type, "intent.service.skills.activated")
+        self.assertEqual(messages[8].data["skill_id"], self.skill_id)
+        self.assertEqual(messages[9].msg_type, f"{self.skill_id}.activate")
 
         # verify default session is now updated
-        self.assertEqual(messages[12].msg_type, "ovos.session.update_default")
-        self.assertEqual(messages[12].data["session_data"]["session_id"], "default")
+        self.assertEqual(messages[10].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[10].data["session_data"]["session_id"], "default")
 
         # test second message with no session resumes default active skills
         messages = []
@@ -164,9 +154,6 @@ class TestFallback(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",
-            # Converse
-            "skill.converse.ping",
-            "skill.converse.pong",
             # FallbackV2
             "ovos.skills.fallback.ping",
             "ovos.skills.fallback.pong",
@@ -193,37 +180,30 @@ class TestFallback(TestCase):
             self.assertEqual(m.context["session"]["session_id"], sess.session_id)
             self.assertEqual(m.context["x"], "xx")
 
-        # verify converse ping/pong answer from skill
-        self.assertEqual(messages[1].msg_type, "skill.converse.ping")
-        self.assertEqual(messages[2].msg_type, "skill.converse.pong")
+        # verify fallback ping/pong answer from skill
+        self.assertEqual(messages[1].msg_type, "ovos.skills.fallback.ping")
+        self.assertEqual(messages[2].msg_type, "ovos.skills.fallback.pong")
         self.assertEqual(messages[2].data["skill_id"], self.skill_id)
         self.assertEqual(messages[2].context["skill_id"], self.skill_id)
-        self.assertFalse(messages[2].data["can_handle"])
-
-        # verify fallback ping/pong answer from skill
-        self.assertEqual(messages[3].msg_type, "ovos.skills.fallback.ping")
-        self.assertEqual(messages[4].msg_type, "ovos.skills.fallback.pong")
-        self.assertEqual(messages[4].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[4].context["skill_id"], self.skill_id)
-        self.assertTrue(messages[4].data["can_handle"])
+        self.assertTrue(messages[2].data["can_handle"])
 
         # verify skill executes
-        self.assertEqual(messages[5].msg_type, f"ovos.skills.fallback.{self.skill_id}.request")
+        self.assertEqual(messages[3].msg_type, f"ovos.skills.fallback.{self.skill_id}.request")
+        self.assertEqual(messages[3].data["skill_id"], self.skill_id)
+        self.assertEqual(messages[4].msg_type, f"ovos.skills.fallback.{self.skill_id}.start")
+        self.assertEqual(messages[5].msg_type, "enclosure.active_skill")
         self.assertEqual(messages[5].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[6].msg_type, f"ovos.skills.fallback.{self.skill_id}.start")
-        self.assertEqual(messages[7].msg_type, "enclosure.active_skill")
-        self.assertEqual(messages[7].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[8].msg_type, "speak")
-        self.assertEqual(messages[8].data["meta"]["dialog"], "unknown")
-        self.assertEqual(messages[8].data["meta"]["skill"], self.skill_id)
-        self.assertEqual(messages[9].msg_type, f"ovos.skills.fallback.{self.skill_id}.response")
-        self.assertTrue(messages[9].data["result"])
-        self.assertEqual(messages[9].data["fallback_handler"], "UnknownSkill.handle_fallback")
+        self.assertEqual(messages[6].msg_type, "speak")
+        self.assertEqual(messages[6].data["meta"]["dialog"], "unknown")
+        self.assertEqual(messages[6].data["meta"]["skill"], self.skill_id)
+        self.assertEqual(messages[7].msg_type, f"ovos.skills.fallback.{self.skill_id}.response")
+        self.assertTrue(messages[7].data["result"])
+        self.assertEqual(messages[7].data["fallback_handler"], "UnknownSkill.handle_fallback")
 
         # verify skill is activated
-        self.assertEqual(messages[10].msg_type, "intent.service.skills.activated")
-        self.assertEqual(messages[10].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[11].msg_type, f"{self.skill_id}.activate")
+        self.assertEqual(messages[8].msg_type, "intent.service.skills.activated")
+        self.assertEqual(messages[8].data["skill_id"], self.skill_id)
+        self.assertEqual(messages[9].msg_type, f"{self.skill_id}.activate")
 
         # test that active skills list has been updated
         sess = SessionManager.sessions[sess.session_id]

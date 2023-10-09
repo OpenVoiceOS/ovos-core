@@ -39,7 +39,8 @@ class TestSessions(TestCase):
 
         self.core.bus.on("message", new_msg)
 
-        # triggers intent from test skill to make it active
+        # triggers intent from converse test skill to make it active
+        # no converse ping pong as no skill is active
         # verify active skills list (test)
         def skill_converse_no():
 
@@ -52,9 +53,6 @@ class TestSessions(TestCase):
             # confirm all expected messages are sent
             expected_messages = [
                 "recognizer_loop:utterance",  # no session
-                "skill.converse.ping",  # default session injected
-                "skill.converse.pong",
-                "skill.converse.pong",
                 # skill selected
                 "intent.service.skills.activated",
                 f"{self.skill_id}.activate",
@@ -79,65 +77,48 @@ class TestSessions(TestCase):
             # (missing in utterance message) and kept in all messages
             for m in messages[1:]:
                 self.assertEqual(m.context["session"]["session_id"], "default")
-
-            # verify that "lang" is injected by converse.ping
-            # (missing in utterance message) and kept in all messages
-            self.assertEqual(messages[1].msg_type, "skill.converse.ping")
-            for m in messages[1:]:
                 self.assertEqual(m.context["lang"], "en-us")
 
-            # verify "pong" answer from both skills
-            self.assertEqual(messages[2].msg_type, "skill.converse.pong")
-            self.assertEqual(messages[3].msg_type, "skill.converse.pong")
-            self.assertEqual(messages[2].data["skill_id"],messages[2].context["skill_id"])
-            self.assertEqual(messages[3].data["skill_id"], messages[3].context["skill_id"])
-            # assert it reports converse method has been implemented by skill
-            if messages[2].data["skill_id"] == self.skill_id: # we dont know order of pong responses
-                self.assertTrue(messages[2].data["can_handle"])
-                self.assertFalse(messages[3].data["can_handle"])
-            if messages[3].data["skill_id"] == self.skill_id: # we dont know order of pong responses
-                self.assertTrue(messages[3].data["can_handle"])
-                self.assertFalse(messages[2].data["can_handle"])
-
             # verify skill is activated by intent service (intent pipeline matched)
-            self.assertEqual(messages[4].msg_type, "intent.service.skills.activated")
-            self.assertEqual(messages[4].data["skill_id"], self.skill_id)
-            self.assertEqual(messages[5].msg_type, f"{self.skill_id}.activate")
+            self.assertEqual(messages[1].msg_type, "intent.service.skills.activated")
+            self.assertEqual(messages[1].data["skill_id"], self.skill_id)
+            self.assertEqual(messages[2].msg_type, f"{self.skill_id}.activate")
 
             # verify intent triggers
-            self.assertEqual(messages[6].msg_type, f"{self.skill_id}:converse_off.intent")
+            self.assertEqual(messages[3].msg_type, f"{self.skill_id}:converse_off.intent")
             # verify skill_id is now present in every message.context
-            for m in messages[6:]:
+            for m in messages[3:]:
                 self.assertEqual(m.context["skill_id"], self.skill_id)
 
             # verify intent execution
-            self.assertEqual(messages[7].msg_type, "mycroft.skill.handler.start")
+            self.assertEqual(messages[4].msg_type, "mycroft.skill.handler.start")
+            self.assertEqual(messages[4].data["name"], "TestAbortSkill.handle_converse_off")
+            self.assertEqual(messages[5].msg_type, "enclosure.active_skill")
+            self.assertEqual(messages[5].data["skill_id"], self.skill_id)
+            self.assertEqual(messages[6].msg_type, "speak")
+            self.assertEqual(messages[6].data["lang"], "en-us")
+            self.assertFalse(messages[6].data["expect_response"])
+            self.assertEqual(messages[6].data["meta"]["skill"], self.skill_id)
+            self.assertEqual(messages[7].msg_type, "mycroft.skill.handler.complete")
             self.assertEqual(messages[7].data["name"], "TestAbortSkill.handle_converse_off")
-            self.assertEqual(messages[8].msg_type, "enclosure.active_skill")
-            self.assertEqual(messages[8].data["skill_id"], self.skill_id)
-            self.assertEqual(messages[9].msg_type, "speak")
-            self.assertEqual(messages[9].data["lang"], "en-us")
-            self.assertFalse(messages[9].data["expect_response"])
-            self.assertEqual(messages[9].data["meta"]["skill"], self.skill_id)
-            self.assertEqual(messages[10].msg_type, "mycroft.skill.handler.complete")
-            self.assertEqual(messages[10].data["name"], "TestAbortSkill.handle_converse_off")
 
             # verify default session is now updated
-            self.assertEqual(messages[11].msg_type, "ovos.session.update_default")
-            self.assertEqual(messages[11].data["session_data"]["session_id"], "default")
+            self.assertEqual(messages[8].msg_type, "ovos.session.update_default")
+            self.assertEqual(messages[8].data["session_data"]["session_id"], "default")
             # test deserialization of payload
-            sess = Session.deserialize(messages[11].data["session_data"])
+            sess = Session.deserialize(messages[8].data["session_data"])
             self.assertEqual(sess.session_id, "default")
 
             # test that active skills list has been updated
             self.assertEqual(sess.active_skills[0][0], self.skill_id)
-            self.assertEqual(messages[11].data["session_data"]["active_skills"][0][0], self.skill_id)
+            self.assertEqual(messages[8].data["session_data"]["active_skills"][0][0], self.skill_id)
 
             messages = []
 
         skill_converse_no()
 
-        # test hello world skill triggers, test skill says it does not want to converse
+        # converse test skill is now active
+        # test hello world skill triggers, converse test skill says it does not want to converse
         # verify active skills list (hello, test)
         def hello_world():
             nonlocal messages
@@ -148,10 +129,9 @@ class TestSessions(TestCase):
             # confirm all expected messages are sent
             expected_messages = [
                 "recognizer_loop:utterance",  # no session
-                "skill.converse.ping",  # default session injected
+                f"{self.skill_id}.converse.ping",  # default session injected
                 "skill.converse.pong",
-                "skill.converse.pong",
-                "skill.converse.request",
+                f"{self.skill_id}.converse.request",
                 "skill.converse.response",  # does not want to converse
                 # skill selected
                 "intent.service.skills.activated",
@@ -165,6 +145,7 @@ class TestSessions(TestCase):
                 # session updated
                 "ovos.session.update_default"
             ]
+
             wait_for_n_messages(len(expected_messages))
 
             self.assertEqual(len(expected_messages), len(messages))
@@ -177,73 +158,64 @@ class TestSessions(TestCase):
             # (missing in utterance message) and kept in all messages
             for m in messages[1:]:
                 self.assertEqual(m.context["session"]["session_id"], "default")
+                self.assertEqual(m.context["lang"], "en-us")
 
             # verify that "lang" is injected by converse.ping
             # (missing in utterance message) and kept in all messages
-            self.assertEqual(messages[1].msg_type, "skill.converse.ping")
-            for m in messages[1:]:
-                self.assertEqual(m.context["lang"], "en-us")
+            self.assertEqual(messages[1].msg_type, f"{self.skill_id}.converse.ping")                
 
-            # verify "pong" answer from both skills
+            # verify "pong" answer from converse test skill
             self.assertEqual(messages[2].msg_type, "skill.converse.pong")
-            self.assertEqual(messages[3].msg_type, "skill.converse.pong")
-            self.assertEqual(messages[2].data["skill_id"], messages[2].context["skill_id"])
-            self.assertEqual(messages[3].data["skill_id"], messages[3].context["skill_id"])
             # assert it reports converse method has been implemented by skill
-            if messages[2].data["skill_id"] == self.skill_id:  # we dont know order of pong responses
-                self.assertTrue(messages[2].data["can_handle"])
-                self.assertFalse(messages[3].data["can_handle"])
-            if messages[3].data["skill_id"] == self.skill_id:  # we dont know order of pong responses
-                self.assertTrue(messages[3].data["can_handle"])
-                self.assertFalse(messages[2].data["can_handle"])
+            self.assertTrue(messages[2].data["can_handle"])
 
             # verify answer from skill that it does not want to converse
-            self.assertEqual(messages[4].msg_type, "skill.converse.request")
+            self.assertEqual(messages[3].msg_type, f"{self.skill_id}.converse.request")
+            self.assertEqual(messages[4].msg_type, "skill.converse.response")
             self.assertEqual(messages[4].data["skill_id"], self.skill_id)
-            self.assertEqual(messages[5].msg_type, "skill.converse.response")
-            self.assertEqual(messages[5].data["skill_id"], self.skill_id)
-            self.assertFalse(messages[5].data["result"])  # does not want to converse
+            self.assertFalse(messages[4].data["result"])  # does not want to converse
 
             # verify skill is activated by intent service (intent pipeline matched)
-            self.assertEqual(messages[6].msg_type, "intent.service.skills.activated")
-            self.assertEqual(messages[6].data["skill_id"], self.other_skill_id)
-            self.assertEqual(messages[7].msg_type, f"{self.other_skill_id}.activate")
+            self.assertEqual(messages[5].msg_type, "intent.service.skills.activated")
+            self.assertEqual(messages[5].data["skill_id"], self.other_skill_id)
+            self.assertEqual(messages[6].msg_type, f"{self.other_skill_id}.activate")
 
             # verify intent triggers
-            self.assertEqual(messages[8].msg_type, f"{self.other_skill_id}:HelloWorldIntent")
+            self.assertEqual(messages[7].msg_type, f"{self.other_skill_id}:HelloWorldIntent")
             # verify skill_id is now present in every message.context
-            for m in messages[8:]:
+            for m in messages[7:]:
                 self.assertEqual(m.context["skill_id"], self.other_skill_id)
 
             # verify intent execution
-            self.assertEqual(messages[9].msg_type, "mycroft.skill.handler.start")
-            self.assertEqual(messages[9].data["name"], "HelloWorldSkill.handle_hello_world_intent")
-            self.assertEqual(messages[10].msg_type, "enclosure.active_skill")
-            self.assertEqual(messages[10].data["skill_id"], self.other_skill_id)
-            self.assertEqual(messages[11].msg_type, "speak")
-            self.assertEqual(messages[11].data["lang"], "en-us")
-            self.assertFalse(messages[11].data["expect_response"])
-            self.assertEqual(messages[11].data["meta"]["skill"], self.other_skill_id)
-            self.assertEqual(messages[12].msg_type, "mycroft.skill.handler.complete")
-            self.assertEqual(messages[12].data["name"], "HelloWorldSkill.handle_hello_world_intent")
+            self.assertEqual(messages[8].msg_type, "mycroft.skill.handler.start")
+            self.assertEqual(messages[8].data["name"], "HelloWorldSkill.handle_hello_world_intent")
+            self.assertEqual(messages[9].msg_type, "enclosure.active_skill")
+            self.assertEqual(messages[9].data["skill_id"], self.other_skill_id)
+            self.assertEqual(messages[10].msg_type, "speak")
+            self.assertEqual(messages[10].data["lang"], "en-us")
+            self.assertFalse(messages[10].data["expect_response"])
+            self.assertEqual(messages[10].data["meta"]["skill"], self.other_skill_id)
+            self.assertEqual(messages[11].msg_type, "mycroft.skill.handler.complete")
+            self.assertEqual(messages[11].data["name"], "HelloWorldSkill.handle_hello_world_intent")
 
             # verify default session is now updated
-            self.assertEqual(messages[13].msg_type, "ovos.session.update_default")
-            self.assertEqual(messages[13].data["session_data"]["session_id"], "default")
+            self.assertEqual(messages[12].msg_type, "ovos.session.update_default")
+            self.assertEqual(messages[12].data["session_data"]["session_id"], "default")
             # test deserialization of payload
-            sess = Session.deserialize(messages[13].data["session_data"])
+            sess = Session.deserialize(messages[12].data["session_data"])
             self.assertEqual(sess.session_id, "default")
 
             # test that active skills list has been updated
             self.assertEqual(sess.active_skills[0][0], self.other_skill_id)
             self.assertEqual(sess.active_skills[1][0], self.skill_id)
-            self.assertEqual(messages[13].data["session_data"]["active_skills"][0][0], self.other_skill_id)
-            self.assertEqual(messages[13].data["session_data"]["active_skills"][1][0], self.skill_id)
+            self.assertEqual(messages[12].data["session_data"]["active_skills"][0][0], self.other_skill_id)
+            self.assertEqual(messages[12].data["session_data"]["active_skills"][1][0], self.skill_id)
 
             messages = []
 
         hello_world()
 
+        # both skills are now active
         # trigger skill intent that makes it return True in next converse
         # verify active skills list gets swapped (test, hello)
         def skill_converse_yes():
@@ -256,7 +228,8 @@ class TestSessions(TestCase):
             # confirm all expected messages are sent
             expected_messages = [
                 "recognizer_loop:utterance",  # no session
-                "skill.converse.ping",  # default session injected
+                f"{self.skill_id}.converse.ping",  # default session injected
+                f"{self.other_skill_id}.converse.ping",
                 "skill.converse.pong",
                 "skill.converse.pong",
                 "skill.converse.request",
@@ -285,68 +258,67 @@ class TestSessions(TestCase):
             # (missing in utterance message) and kept in all messages
             for m in messages[1:]:
                 self.assertEqual(m.context["session"]["session_id"], "default")
+                self.assertEqual(m.context["lang"], "en-us")
 
             # verify that "lang" is injected by converse.ping
             # (missing in utterance message) and kept in all messages
-            self.assertEqual(messages[1].msg_type, "skill.converse.ping")
-            for m in messages[1:]:
-                self.assertEqual(m.context["lang"], "en-us")
+            self.assertEqual(messages[1].msg_type, f"{self.skill_id}.converse.ping")
+            self.assertEqual(messages[2].msg_type, f"{self.other_skill_id}.converse.ping")
 
             # verify "pong" answer from both skills
-            self.assertEqual(messages[2].msg_type, "skill.converse.pong")
             self.assertEqual(messages[3].msg_type, "skill.converse.pong")
-            self.assertEqual(messages[2].data["skill_id"],messages[2].context["skill_id"])
-            self.assertEqual(messages[3].data["skill_id"], messages[3].context["skill_id"])
+            self.assertEqual(messages[4].msg_type, "skill.converse.pong")
+            self.assertEqual(messages[3].data["skill_id"],messages[2].context["skill_id"])
+            self.assertEqual(messages[4].data["skill_id"], messages[3].context["skill_id"])
             # assert it reports converse method has been implemented by skill
-            if messages[2].data["skill_id"] == self.skill_id: # we dont know order of pong responses
-                self.assertTrue(messages[2].data["can_handle"])
-                self.assertFalse(messages[3].data["can_handle"])
             if messages[3].data["skill_id"] == self.skill_id: # we dont know order of pong responses
                 self.assertTrue(messages[3].data["can_handle"])
-                self.assertFalse(messages[2].data["can_handle"])
+                self.assertFalse(messages[4].data["can_handle"])
+            if messages[4].data["skill_id"] == self.skill_id: # we dont know order of pong responses
+                self.assertTrue(messages[4].data["can_handle"])
+                self.assertFalse(messages[3].data["can_handle"])
 
             # verify answer from skill that it does not want to converse
-            self.assertEqual(messages[4].msg_type, "skill.converse.request")
-            self.assertEqual(messages[4].data["skill_id"], self.skill_id)
-            self.assertEqual(messages[5].msg_type, "skill.converse.response")
-            self.assertEqual(messages[5].data["skill_id"], self.skill_id)
-            self.assertFalse(messages[5].data["result"])  # do not want to converse
+            self.assertEqual(messages[5].msg_type, f"{self.skill_id}.converse.request")
+            self.assertEqual(messages[6].msg_type, "skill.converse.response")
+            self.assertEqual(messages[6].data["skill_id"], self.skill_id)
+            self.assertFalse(messages[6].data["result"])  # do not want to converse
 
             # verify skill is activated by intent service (intent pipeline matched)
-            self.assertEqual(messages[6].msg_type, "intent.service.skills.activated")
-            self.assertEqual(messages[6].data["skill_id"], self.skill_id)
-            self.assertEqual(messages[7].msg_type, f"{self.skill_id}.activate")
+            self.assertEqual(messages[7].msg_type, "intent.service.skills.activated")
+            self.assertEqual(messages[7].data["skill_id"], self.skill_id)
+            self.assertEqual(messages[8].msg_type, f"{self.skill_id}.activate")
 
             # verify intent triggers
-            self.assertEqual(messages[8].msg_type, f"{self.skill_id}:converse_on.intent")
+            self.assertEqual(messages[9].msg_type, f"{self.skill_id}:converse_on.intent")
             # verify skill_id is now present in every message.context
-            for m in messages[8:]:
+            for m in messages[9:]:
                 self.assertEqual(m.context["skill_id"], self.skill_id)
 
             # verify intent execution
-            self.assertEqual(messages[9].msg_type, "mycroft.skill.handler.start")
-            self.assertEqual(messages[9].data["name"], "TestAbortSkill.handle_converse_on")
-            self.assertEqual(messages[10].msg_type, "enclosure.active_skill")
-            self.assertEqual(messages[10].data["skill_id"], self.skill_id)
-            self.assertEqual(messages[11].msg_type, "speak")
-            self.assertEqual(messages[11].data["lang"], "en-us")
-            self.assertFalse(messages[11].data["expect_response"])
-            self.assertEqual(messages[11].data["meta"]["skill"], self.skill_id)
-            self.assertEqual(messages[12].msg_type, "mycroft.skill.handler.complete")
-            self.assertEqual(messages[12].data["name"], "TestAbortSkill.handle_converse_on")
+            self.assertEqual(messages[10].msg_type, "mycroft.skill.handler.start")
+            self.assertEqual(messages[10].data["name"], "TestAbortSkill.handle_converse_on")
+            self.assertEqual(messages[11].msg_type, "enclosure.active_skill")
+            self.assertEqual(messages[11].data["skill_id"], self.skill_id)
+            self.assertEqual(messages[12].msg_type, "speak")
+            self.assertEqual(messages[12].data["lang"], "en-us")
+            self.assertFalse(messages[12].data["expect_response"])
+            self.assertEqual(messages[12].data["meta"]["skill"], self.skill_id)
+            self.assertEqual(messages[13].msg_type, "mycroft.skill.handler.complete")
+            self.assertEqual(messages[13].data["name"], "TestAbortSkill.handle_converse_on")
 
             # verify default session is now updated
-            self.assertEqual(messages[13].msg_type, "ovos.session.update_default")
-            self.assertEqual(messages[13].data["session_data"]["session_id"], "default")
+            self.assertEqual(messages[14].msg_type, "ovos.session.update_default")
+            self.assertEqual(messages[14].data["session_data"]["session_id"], "default")
             # test deserialization of payload
-            sess = Session.deserialize(messages[13].data["session_data"])
+            sess = Session.deserialize(messages[14].data["session_data"])
             self.assertEqual(sess.session_id, "default")
 
             # test that active skills list has been updated
             self.assertEqual(sess.active_skills[0][0], self.skill_id)
             self.assertEqual(sess.active_skills[1][0], self.other_skill_id)
-            self.assertEqual(messages[13].data["session_data"]["active_skills"][0][0], self.skill_id)
-            self.assertEqual(messages[13].data["session_data"]["active_skills"][1][0], self.other_skill_id)
+            self.assertEqual(messages[14].data["session_data"]["active_skills"][0][0], self.skill_id)
+            self.assertEqual(messages[14].data["session_data"]["active_skills"][1][0], self.other_skill_id)
 
             messages = []
 
@@ -362,10 +334,11 @@ class TestSessions(TestCase):
             # confirm all expected messages are sent
             expected_messages = [
                 "recognizer_loop:utterance",  # no session
-                "skill.converse.ping",  # default session injected
+                f"{self.skill_id}.converse.ping",  # default session injected
+                f"{self.other_skill_id}.converse.ping",
                 "skill.converse.pong",
                 "skill.converse.pong",
-                "skill.converse.request",
+                f"{self.skill_id}.converse.request",
                 "skill.converse.response",  # CONVERSED
                 # skill selected
                 "intent.service.skills.activated",
@@ -382,54 +355,52 @@ class TestSessions(TestCase):
                 print(m)
                 self.assertTrue(m in mtypes)
 
-            # verify that "session" is injected
+            # verify that "session" and "lang" is injected
             # (missing in utterance message) and kept in all messages
             for m in messages[1:]:
                 self.assertEqual(m.context["session"]["session_id"], "default")
-
-            # verify that "lang" is injected by converse.ping
-            # (missing in utterance message) and kept in all messages
-            self.assertEqual(messages[1].msg_type, "skill.converse.ping")
-            for m in messages[1:]:
                 self.assertEqual(m.context["lang"], "en-us")
 
+            self.assertEqual(messages[1].msg_type, f"{self.skill_id}.converse.ping")
+            self.assertEqual(messages[2].msg_type, f"{self.other_skill_id}.converse.ping")
+
             # verify "pong" answer from both skills
-            self.assertEqual(messages[2].msg_type, "skill.converse.pong")
             self.assertEqual(messages[3].msg_type, "skill.converse.pong")
-            self.assertEqual(messages[2].data["skill_id"], messages[2].context["skill_id"])
-            self.assertEqual(messages[3].data["skill_id"], messages[3].context["skill_id"])
+            self.assertEqual(messages[4].msg_type, "skill.converse.pong")
+            self.assertEqual(messages[3].data["skill_id"], messages[2].context["skill_id"])
+            self.assertEqual(messages[4].data["skill_id"], messages[3].context["skill_id"])
             # assert it reports converse method has been implemented by skill
-            if messages[2].data["skill_id"] == self.skill_id:  # we dont know order of pong responses
-                self.assertTrue(messages[2].data["can_handle"])
-                self.assertFalse(messages[3].data["can_handle"])
             if messages[3].data["skill_id"] == self.skill_id:  # we dont know order of pong responses
                 self.assertTrue(messages[3].data["can_handle"])
-                self.assertFalse(messages[2].data["can_handle"])
+                self.assertFalse(messages[4].data["can_handle"])
+            if messages[4].data["skill_id"] == self.skill_id:  # we dont know order of pong responses
+                self.assertTrue(messages[4].data["can_handle"])
+                self.assertFalse(messages[3].data["can_handle"])
 
             # verify answer from skill that it does not want to converse
-            self.assertEqual(messages[4].msg_type, "skill.converse.request")
-            self.assertEqual(messages[4].data["skill_id"], self.skill_id)
-            self.assertEqual(messages[5].msg_type, "skill.converse.response")
+            self.assertEqual(messages[5].msg_type, "skill.converse.request")
             self.assertEqual(messages[5].data["skill_id"], self.skill_id)
-            self.assertTrue(messages[5].data["result"])  # CONVERSED
+            self.assertEqual(messages[6].msg_type, "skill.converse.response")
+            self.assertEqual(messages[6].data["skill_id"], self.skill_id)
+            self.assertTrue(messages[6].data["result"])  # CONVERSED
 
             # verify skill is activated by intent service (intent pipeline matched)
-            self.assertEqual(messages[6].msg_type, "intent.service.skills.activated")
-            self.assertEqual(messages[6].data["skill_id"], self.skill_id)
-            self.assertEqual(messages[7].msg_type, f"{self.skill_id}.activate")
+            self.assertEqual(messages[7].msg_type, "intent.service.skills.activated")
+            self.assertEqual(messages[7].data["skill_id"], self.skill_id)
+            self.assertEqual(messages[8].msg_type, f"{self.skill_id}.activate")
 
             # verify default session is now updated
-            self.assertEqual(messages[8].msg_type, "ovos.session.update_default")
-            self.assertEqual(messages[8].data["session_data"]["session_id"], "default")
+            self.assertEqual(messages[9].msg_type, "ovos.session.update_default")
+            self.assertEqual(messages[9].data["session_data"]["session_id"], "default")
             # test deserialization of payload
-            sess = Session.deserialize(messages[8].data["session_data"])
+            sess = Session.deserialize(messages[9].data["session_data"])
             self.assertEqual(sess.session_id, "default")
 
             # test that active skills list has been updated
             self.assertEqual(sess.active_skills[0][0], self.skill_id)
             self.assertEqual(sess.active_skills[1][0], self.other_skill_id)
-            self.assertEqual(messages[8].data["session_data"]["active_skills"][0][0], self.skill_id)
-            self.assertEqual(messages[8].data["session_data"]["active_skills"][1][0], self.other_skill_id)
+            self.assertEqual(messages[9].data["session_data"]["active_skills"][0][0], self.skill_id)
+            self.assertEqual(messages[9].data["session_data"]["active_skills"][1][0], self.other_skill_id)
 
             messages = []
 

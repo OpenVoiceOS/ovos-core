@@ -17,6 +17,7 @@ class TestSessions(TestCase):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.active_skills = [(self.skill_id, time.time())]
         messages = []
 
         def new_msg(msg):
@@ -46,7 +47,7 @@ class TestSessions(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             # Converse
-            "skill.converse.ping",
+            f"{self.skill_id}.converse.ping",
             "skill.converse.pong",
             # FallbackV1
             "mycroft.skills.fallback",
@@ -81,7 +82,7 @@ class TestSessions(TestCase):
             self.assertEqual(m.context["session"]["session_id"], "default")
 
         # verify ping/pong answer from hello world skill
-        self.assertEqual(messages[1].msg_type, "skill.converse.ping")
+        self.assertEqual(messages[1].msg_type, f"{self.skill_id}.converse.ping")
         self.assertEqual(messages[2].msg_type, "skill.converse.pong")
         self.assertEqual(messages[2].data["skill_id"], self.skill_id)
         self.assertEqual(messages[2].context["skill_id"], self.skill_id)
@@ -131,6 +132,7 @@ class TestSessions(TestCase):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.active_skills = [(self.skill_id, time.time())]
 
         stt_lang_detect = "pt-pt"
 
@@ -167,7 +169,7 @@ class TestSessions(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.session.update_default",  # language changed
-            "skill.converse.ping",
+            f"{self.skill_id}.converse.ping",
             "skill.converse.pong",
             "mycroft.skills.fallback",
             "mycroft.skill.handler.start",

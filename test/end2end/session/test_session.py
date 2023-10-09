@@ -45,9 +45,7 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",  # no session
-            "skill.converse.ping",  # default session injected
-            "skill.converse.pong",
-            "intent.service.skills.activated",
+            "intent.service.skills.activated",  # default session injected
             f"{self.skill_id}.activate",
             f"{self.skill_id}:HelloWorldIntent",
             "mycroft.skill.handler.start",
@@ -64,58 +62,47 @@ class TestSessions(TestCase):
         for m in expected_messages:
             self.assertTrue(m in mtypes)
 
-        # verify that "session" is injected
+        # verify that "session" and "lang" is injected
         # (missing in utterance message) and kept in all messages
         for m in messages[1:]:
             self.assertEqual(m.context["session"]["session_id"], "default")
-
-        # verify that "lang" is injected by converse.ping
-        # (missing in utterance message) and kept in all messages
-        self.assertEqual(messages[1].msg_type, "skill.converse.ping")
-        for m in messages[1:]:
             self.assertEqual(m.context["lang"], "en-us")
 
-        # verify "pong" answer from hello world skill
-        self.assertEqual(messages[2].msg_type, "skill.converse.pong")
-        self.assertEqual(messages[2].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[2].context["skill_id"], self.skill_id)
-        self.assertFalse(messages[2].data["can_handle"])
-
         # verify skill is activated by intent service (intent pipeline matched)
-        self.assertEqual(messages[3].msg_type, "intent.service.skills.activated")
-        self.assertEqual(messages[3].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[4].msg_type, f"{self.skill_id}.activate")
+        self.assertEqual(messages[1].msg_type, "intent.service.skills.activated")
+        self.assertEqual(messages[1].data["skill_id"], self.skill_id)
+        self.assertEqual(messages[2].msg_type, f"{self.skill_id}.activate")
 
         # verify intent triggers
-        self.assertEqual(messages[5].msg_type, f"{self.skill_id}:HelloWorldIntent")
-        self.assertEqual(messages[5].data["intent_type"], f"{self.skill_id}:HelloWorldIntent")
+        self.assertEqual(messages[3].msg_type, f"{self.skill_id}:HelloWorldIntent")
+        self.assertEqual(messages[3].data["intent_type"], f"{self.skill_id}:HelloWorldIntent")
         # verify skill_id is now present in every message.context
-        for m in messages[5:]:
+        for m in messages[3:]:
             self.assertEqual(m.context["skill_id"], self.skill_id)
 
         # verify intent execution
-        self.assertEqual(messages[6].msg_type, "mycroft.skill.handler.start")
-        self.assertEqual(messages[6].data["name"], "HelloWorldSkill.handle_hello_world_intent")
-        self.assertEqual(messages[7].msg_type, "enclosure.active_skill")
-        self.assertEqual(messages[7].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[8].msg_type, "speak")
-        self.assertEqual(messages[8].data["lang"], "en-us")
-        self.assertFalse(messages[8].data["expect_response"])
-        self.assertEqual(messages[8].data["meta"]["dialog"], "hello.world")
-        self.assertEqual(messages[8].data["meta"]["skill"], self.skill_id)
-        self.assertEqual(messages[9].msg_type, "mycroft.skill.handler.complete")
-        self.assertEqual(messages[9].data["name"], "HelloWorldSkill.handle_hello_world_intent")
+        self.assertEqual(messages[4].msg_type, "mycroft.skill.handler.start")
+        self.assertEqual(messages[4].data["name"], "HelloWorldSkill.handle_hello_world_intent")
+        self.assertEqual(messages[5].msg_type, "enclosure.active_skill")
+        self.assertEqual(messages[5].data["skill_id"], self.skill_id)
+        self.assertEqual(messages[6].msg_type, "speak")
+        self.assertEqual(messages[6].data["lang"], "en-us")
+        self.assertFalse(messages[6].data["expect_response"])
+        self.assertEqual(messages[6].data["meta"]["dialog"], "hello.world")
+        self.assertEqual(messages[6].data["meta"]["skill"], self.skill_id)
+        self.assertEqual(messages[7].msg_type, "mycroft.skill.handler.complete")
+        self.assertEqual(messages[7].data["name"], "HelloWorldSkill.handle_hello_world_intent")
 
         # verify default session is now updated
-        self.assertEqual(messages[10].msg_type, "ovos.session.update_default")
-        self.assertEqual(messages[10].data["session_data"]["session_id"], "default")
+        self.assertEqual(messages[8].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[8].data["session_data"]["session_id"], "default")
         # test deserialization of payload
         sess = Session.deserialize(messages[10].data["session_data"])
         self.assertEqual(sess.session_id, "default")
 
         # test that active skills list has been updated
         self.assertEqual(sess.active_skills[0][0], self.skill_id)
-        self.assertEqual(messages[10].data["session_data"]["active_skills"][0][0], self.skill_id)
+        self.assertEqual(messages[8].data["session_data"]["active_skills"][0][0], self.skill_id)
 
     def test_explicit_default_session(self):
         SessionManager.sessions = {}
@@ -151,7 +138,7 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",
-            "skill.converse.ping",
+            f"{self.skill_id}.converse.ping",
             "skill.converse.pong",
             "intent.service.skills.activated",
             f"{self.skill_id}.activate",
@@ -176,7 +163,7 @@ class TestSessions(TestCase):
             self.assertEqual(m.context["xxx"], "not-valid")
 
         # verify ping/pong answer from hello world skill
-        self.assertEqual(messages[1].msg_type, "skill.converse.ping")
+        self.assertEqual(messages[1].msg_type, f"{self.skill_id}.converse.ping")
         self.assertEqual(messages[2].msg_type, "skill.converse.pong")
         self.assertEqual(messages[2].data["skill_id"], self.skill_id)
         self.assertEqual(messages[2].context["skill_id"], self.skill_id)
@@ -224,6 +211,8 @@ class TestSessions(TestCase):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
+        now = time.time()
+        SessionManager.default_session.active_skills = [(self.skill_id, now)]
 
         messages = []
 
@@ -255,7 +244,7 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",
-            "skill.converse.ping",
+            f"{self.skill_id}.converse.ping",
             "skill.converse.pong",
             "intent.service.skills.activated",
             f"{self.skill_id}.activate",
@@ -279,7 +268,7 @@ class TestSessions(TestCase):
             self.assertEqual(m.context["xxx"], "not-valid")
 
         # verify ping/pong answer from hello world skill
-        self.assertEqual(messages[1].msg_type, "skill.converse.ping")
+        self.assertEqual(messages[1].msg_type, f"{self.skill_id}.converse.ping")
         self.assertEqual(messages[2].msg_type, "skill.converse.pong")
         self.assertEqual(messages[2].data["skill_id"], self.skill_id)
         self.assertEqual(messages[2].context["skill_id"], self.skill_id)
@@ -313,6 +302,7 @@ class TestSessions(TestCase):
         # test that active skills list has been updated
         sess = SessionManager.sessions[sess.session_id]
         self.assertEqual(sess.active_skills[0][0], self.skill_id)
+        self.assertNotEqual(sess.active_skills[0][1], now)
         # test that default session remains unchanged
         self.assertEqual(SessionManager.default_session.active_skills, [])
 
