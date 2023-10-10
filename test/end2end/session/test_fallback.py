@@ -73,7 +73,7 @@ class TestFallback(TestCase):
             self.assertEqual(m.context["session"]["session_id"], "default")
             self.assertEqual(m.context["x"], "xx")
         # verify active skills is empty until "intent.service.skills.activated"
-        for m in messages[:10]:
+        for m in messages[:8]:
             self.assertEqual(m.context["session"]["session_id"], "default")
             self.assertEqual(m.context["session"]["active_skills"], [])
 
@@ -92,7 +92,7 @@ class TestFallback(TestCase):
         self.assertEqual(messages[5].data["skill_id"], self.skill_id)
         self.assertEqual(messages[6].msg_type, "speak")
         self.assertEqual(messages[6].data["meta"]["dialog"], "unknown")
-        self.assertEqual(messages[7].data["meta"]["skill"], self.skill_id)
+        self.assertEqual(messages[6].data["meta"]["skill"], self.skill_id)
         self.assertEqual(messages[7].msg_type, f"ovos.skills.fallback.{self.skill_id}.response")
         self.assertTrue(messages[7].data["result"])
         self.assertEqual(messages[7].data["fallback_handler"], "UnknownSkill.handle_fallback")
@@ -111,6 +111,8 @@ class TestFallback(TestCase):
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["invalid"]})
         self.core.bus.emit(utt)
+        # converse ping/pong due being active
+        expected_messages.extend([f"{self.skill_id}.converse.ping", "skill.converse.pong"])
         wait_for_n_messages(len(expected_messages))
         self.assertEqual(len(expected_messages), len(messages))
 

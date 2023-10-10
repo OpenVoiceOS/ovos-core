@@ -232,7 +232,7 @@ class TestSessions(TestCase):
                 f"{self.other_skill_id}.converse.ping",
                 "skill.converse.pong",
                 "skill.converse.pong",
-                "skill.converse.request",
+                f"{self.skill_id}.converse.request",
                 "skill.converse.response",  # does not want to converse
                 # skill selected
                 "intent.service.skills.activated",
@@ -254,29 +254,21 @@ class TestSessions(TestCase):
             for m in expected_messages:
                 self.assertTrue(m in mtypes)
 
-            # verify that "session" is injected
+            # verify that "session" and "lang" is injected
             # (missing in utterance message) and kept in all messages
             for m in messages[1:]:
                 self.assertEqual(m.context["session"]["session_id"], "default")
                 self.assertEqual(m.context["lang"], "en-us")
 
-            # verify that "lang" is injected by converse.ping
-            # (missing in utterance message) and kept in all messages
-            self.assertEqual(messages[1].msg_type, f"{self.skill_id}.converse.ping")
-            self.assertEqual(messages[2].msg_type, f"{self.other_skill_id}.converse.ping")
-
-            # verify "pong" answer from both skills
-            self.assertEqual(messages[3].msg_type, "skill.converse.pong")
+            # converse
+            self.assertEqual(messages[1].msg_type, f"{self.other_skill_id}.converse.ping")
+            self.assertEqual(messages[2].msg_type, "skill.converse.pong")
+            self.assertEqual(messages[2].data["skill_id"],messages[2].context["skill_id"])
+            self.assertFalse(messages[2].data["can_handle"])
+            self.assertEqual(messages[3].msg_type, f"{self.skill_id}.converse.ping")
             self.assertEqual(messages[4].msg_type, "skill.converse.pong")
-            self.assertEqual(messages[3].data["skill_id"],messages[2].context["skill_id"])
-            self.assertEqual(messages[4].data["skill_id"], messages[3].context["skill_id"])
-            # assert it reports converse method has been implemented by skill
-            if messages[3].data["skill_id"] == self.skill_id: # we dont know order of pong responses
-                self.assertTrue(messages[3].data["can_handle"])
-                self.assertFalse(messages[4].data["can_handle"])
-            if messages[4].data["skill_id"] == self.skill_id: # we dont know order of pong responses
-                self.assertTrue(messages[4].data["can_handle"])
-                self.assertFalse(messages[3].data["can_handle"])
+            self.assertEqual(messages[4].data["skill_id"], messages[4].context["skill_id"])
+            self.assertTrue(messages[4].data["can_handle"])
 
             # verify answer from skill that it does not want to converse
             self.assertEqual(messages[5].msg_type, f"{self.skill_id}.converse.request")
@@ -361,25 +353,18 @@ class TestSessions(TestCase):
                 self.assertEqual(m.context["session"]["session_id"], "default")
                 self.assertEqual(m.context["lang"], "en-us")
 
+            # converse
             self.assertEqual(messages[1].msg_type, f"{self.skill_id}.converse.ping")
-            self.assertEqual(messages[2].msg_type, f"{self.other_skill_id}.converse.ping")
-
-            # verify "pong" answer from both skills
-            self.assertEqual(messages[3].msg_type, "skill.converse.pong")
+            self.assertEqual(messages[2].msg_type, "skill.converse.pong")
+            self.assertEqual(messages[2].data["skill_id"],messages[2].context["skill_id"])
+            self.assertTrue(messages[2].data["can_handle"])
+            self.assertEqual(messages[3].msg_type, f"{self.other_skill_id}.converse.ping")
             self.assertEqual(messages[4].msg_type, "skill.converse.pong")
-            self.assertEqual(messages[3].data["skill_id"], messages[2].context["skill_id"])
-            self.assertEqual(messages[4].data["skill_id"], messages[3].context["skill_id"])
-            # assert it reports converse method has been implemented by skill
-            if messages[3].data["skill_id"] == self.skill_id:  # we dont know order of pong responses
-                self.assertTrue(messages[3].data["can_handle"])
-                self.assertFalse(messages[4].data["can_handle"])
-            if messages[4].data["skill_id"] == self.skill_id:  # we dont know order of pong responses
-                self.assertTrue(messages[4].data["can_handle"])
-                self.assertFalse(messages[3].data["can_handle"])
+            self.assertEqual(messages[4].data["skill_id"], messages[4].context["skill_id"])
+            self.assertFalse(messages[4].data["can_handle"])
 
             # verify answer from skill that it does not want to converse
-            self.assertEqual(messages[5].msg_type, "skill.converse.request")
-            self.assertEqual(messages[5].data["skill_id"], self.skill_id)
+            self.assertEqual(messages[5].msg_type, f"{self.skill_id}.converse.request")
             self.assertEqual(messages[6].msg_type, "skill.converse.response")
             self.assertEqual(messages[6].data["skill_id"], self.skill_id)
             self.assertTrue(messages[6].data["result"])  # CONVERSED

@@ -207,7 +207,7 @@ class TestSessions(TestCase):
         self.assertEqual(messages[1].data["session_data"]["lang"], stt_lang_detect)
 
         # verify ping/pong answer from hello world skill
-        self.assertEqual(messages[2].msg_type, "skill.converse.ping")
+        self.assertEqual(messages[2].msg_type, f"{self.skill_id}.converse.ping")
         self.assertEqual(messages[3].msg_type, "skill.converse.pong")
         self.assertEqual(messages[3].data["skill_id"], self.skill_id)
         self.assertEqual(messages[3].context["skill_id"], self.skill_id)

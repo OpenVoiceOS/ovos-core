@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 from unittest import TestCase, mock
+import time
 
 from adapt.intent import IntentBuilder
 from mycroft.configuration.locale import setup_locale
@@ -20,6 +21,7 @@ from mycroft.configuration import Configuration
 from ovos_bus_client.message import Message
 from mycroft.skills.intent_service import IntentService
 from ovos_utils.messagebus import get_message_lang
+from ovos_utils.log import LOG
 from mycroft.skills.intent_services.adapt_service import (ContextManager,
                                                           AdaptIntent)
 
@@ -95,11 +97,11 @@ class ConversationTest(TestCase):
     def setUp(self):
         bus = mock.Mock()
         self.intent_service = IntentService(bus)
-        self.intent_service.converse.activate_skill('atari_skill')
         self.intent_service.converse.activate_skill('c64_skill')
+        self.intent_service.converse.activate_skill('atari_skill')
 
         def _collect(message=None):
-            return [i[0] for i in self.intent_service.converse.active_skills]
+            return self.intent_service.converse.get_active_skills()
 
         self.intent_service.converse._collect_converse_skills = _collect
 
@@ -115,7 +117,7 @@ class ConversationTest(TestCase):
             atari = Message(return_msg_type, {'skill_id': 'atari_skill',
                                               'result': True})
             msgs = {'c64_skill': c64, 'atari_skill': atari}
-
+            LOG.debug(f'message: {message.serialize()}')
             return msgs[message.data['skill_id']]
 
         self.intent_service.converse.bus.wait_for_response.side_effect = response
@@ -124,12 +126,12 @@ class ConversationTest(TestCase):
         utterance_msg = Message('recognizer_loop:utterance',
                                 data={'lang': 'en-US',
                                       'utterances': hello})
+        #self.assertEqual(self.intent_service.converse.get_active_skills(), ['c64_skill', 'atari_skill'])
         result = self.intent_service.converse.converse_with_skills(hello, "en-US", utterance_msg)
         self.intent_service.converse.activate_skill(result.skill_id)
         # Check that the active skill list was updated to set the responding
         # Skill first.
-        first_active_skill = self.intent_service.active_skills[0][0]
-        self.assertEqual(first_active_skill, 'atari_skill')
+        self.assertEqual(self.intent_service.converse.active_skills[0][0], 'atari_skill')
 
         # Check that a skill responded that it could handle the message
         self.assertTrue(result)

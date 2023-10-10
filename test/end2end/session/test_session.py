@@ -97,7 +97,7 @@ class TestSessions(TestCase):
         self.assertEqual(messages[8].msg_type, "ovos.session.update_default")
         self.assertEqual(messages[8].data["session_data"]["session_id"], "default")
         # test deserialization of payload
-        sess = Session.deserialize(messages[10].data["session_data"])
+        sess = Session.deserialize(messages[8].data["session_data"])
         self.assertEqual(sess.session_id, "default")
 
         # test that active skills list has been updated
@@ -108,6 +108,8 @@ class TestSessions(TestCase):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
+        now = time.time()
+        SessionManager.default_session.active_skills = [(self.skill_id, now)]
 
         messages = []
 
@@ -206,13 +208,12 @@ class TestSessions(TestCase):
         # test that active skills list has been updated
         self.assertEqual(messages[10].data["session_data"]["active_skills"][0][0], self.skill_id)
         self.assertEqual(sess.active_skills[0][0], self.skill_id)
+        self.assertNotEqual(sess.active_skills[0][1], now)
 
     def test_explicit_session(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
-        now = time.time()
-        SessionManager.default_session.active_skills = [(self.skill_id, now)]
 
         messages = []
 
@@ -234,7 +235,9 @@ class TestSessions(TestCase):
 
         self.core.bus.on("message", new_msg)
 
-        sess = Session()
+        sess = Session("test-session")
+        now = time.time()
+        sess.active_skills = [(self.skill_id, now)]
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["hello world"]},
                       {"session": sess.serialize(),  # explicit

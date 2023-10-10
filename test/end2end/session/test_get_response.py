@@ -4,6 +4,7 @@ from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, Session
+from ovos_utils.log import LOG
 from .minicroft import get_minicroft
 
 
@@ -94,12 +95,7 @@ class TestSessions(TestCase):
         for m in messages[1:]:
             print(m.msg_type, m.context["session"]["session_id"])
             self.assertEqual(m.context["session"]["session_id"], "default")
-
-        # verify that "lang" is injected by converse.ping
-        # (missing in utterance message) and kept in all messages
-        self.assertEqual(messages[1].msg_type, "skill.converse.ping")
-        for m in messages[1:]:
-            self.assertEqual(m.context["lang"], "en-us")
+            self.assertEqual(m.context["lang"], "en-us")            
 
         # verify skill is activated by intent service (intent pipeline matched)
         self.assertEqual(messages[1].msg_type, "intent.service.skills.activated")
@@ -806,7 +802,7 @@ class TestSessions(TestCase):
         self.assertEqual(messages[6].data["utterance"], "give me items")
         self.assertEqual(messages[6].data["meta"]["skill"], self.skill_id)
 
-        responses = items + ["cancel"] 
+        responses = ["A", "B", "C", "cancel"] 
         for response in responses:
             i = 6 + responses.index(response) * 12
             # enable get_response for this session
