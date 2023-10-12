@@ -209,8 +209,11 @@ class ConverseService:
     def _collect_converse_skills(self, message):
         """use the messagebus api to determine which skills want to converse
         This includes all skills and external applications"""
+        session = SessionManager.get(message)
+
         skill_ids = []
-        want_converse = []
+        want_converse = [skill_id for skill_id, state in session.utterance_states.items()
+                         if state == UtteranceState.RESPONSE] # include all skills in get_response state here
         active_skills = self.get_active_skills()
 
         def handle_ack(msg):
