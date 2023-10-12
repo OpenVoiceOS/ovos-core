@@ -211,8 +211,12 @@ class ConverseService:
         This includes all skills and external applications"""
         session = SessionManager.get(message)
 
-        skill_ids = want_converse = [skill_id for skill_id, state in session.utterance_states.items()
-                                     if state == UtteranceState.RESPONSE]  # include all skills in get_response state
+        skill_ids = []
+        # include all skills in get_response state
+        want_converse = [skill_id for skill_id, state in session.utterance_states.items()
+                         if state == UtteranceState.RESPONSE]
+        skill_ids += want_converse # dont wait for these pong answers (optimization)
+
         active_skills = self.get_active_skills()
 
         event = Event()
@@ -220,22 +224,25 @@ class ConverseService:
         def handle_ack(msg):
             nonlocal event
             skill_id = msg.data["skill_id"]
+
+            # validate the converse pong
             if all(skill_id not in want_converse,
                    msg.data.get("can_handle", True),
                    skill_id in active_skills):
                 want_converse.append(skill_id)
 
-            if skill_id not in skill_ids:
+            if skill_id not in skill_ids: # track which answer we got
                 skill_ids.append(skill_id)
 
             if all(s in skill_ids for s in active_skills):
+                # all skills answered the ping!
                 event.set()
 
         self.bus.on("skill.converse.pong", handle_ack)
 
-        # wait for all skills to acknowledge they want to converse
         self.bus.emit(message.forward("skill.converse.ping"))
 
+        # wait for all skills to acknowledge they want to converse
         event.wait(timeout=0.5)
 
         self.bus.remove("skill.converse.pong", handle_ack)
