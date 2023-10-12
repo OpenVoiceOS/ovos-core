@@ -1,15 +1,15 @@
 import time
-
-from ovos_config.config import Configuration
-from ovos_config.locale import setup_locale
-
-import ovos_core.intent_services
+from threading import Event
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, UtteranceState
+from ovos_config.config import Configuration
+from ovos_config.locale import setup_locale
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
 from ovos_utils.messagebus import get_message_lang
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
+
+import ovos_core.intent_services
 
 
 class ConverseService:
@@ -211,26 +211,32 @@ class ConverseService:
         This includes all skills and external applications"""
         session = SessionManager.get(message)
 
-        skill_ids = []
-        want_converse = [skill_id for skill_id, state in session.utterance_states.items()
-                         if state == UtteranceState.RESPONSE] # include all skills in get_response state here
+        skill_ids = want_converse = [skill_id for skill_id, state in session.utterance_states.items()
+                                     if state == UtteranceState.RESPONSE]  # include all skills in get_response state
         active_skills = self.get_active_skills()
 
+        event = Event()
+
         def handle_ack(msg):
+            nonlocal event
             skill_id = msg.data["skill_id"]
-            if msg.data.get("can_handle", True):
-                if skill_id in active_skills:
-                    want_converse.append(skill_id)
-            skill_ids.append(skill_id)
+            if all(skill_id not in want_converse,
+                   msg.data.get("can_handle", True),
+                   skill_id in active_skills):
+                want_converse.append(skill_id)
+
+            if skill_id not in skill_ids:
+                skill_ids.append(skill_id)
+
+            if all(s in skill_ids for s in active_skills):
+                event.set()
 
         self.bus.on("skill.converse.pong", handle_ack)
 
         # wait for all skills to acknowledge they want to converse
         self.bus.emit(message.forward("skill.converse.ping"))
-        start = time.time()
-        while not all(s in skill_ids for s in active_skills) \
-                and time.time() - start <= 0.5:
-            time.sleep(0.02)
+
+        event.wait(timeout=0.5)
 
         self.bus.remove("skill.converse.pong", handle_ack)
         return want_converse
