@@ -226,9 +226,9 @@ class ConverseService:
             skill_id = msg.data["skill_id"]
 
             # validate the converse pong
-            if all(skill_id not in want_converse,
+            if all((skill_id not in want_converse,
                    msg.data.get("can_handle", True),
-                   skill_id in active_skills):
+                   skill_id in active_skills)):
                 want_converse.append(skill_id)
 
             if skill_id not in skill_ids: # track which answer we got

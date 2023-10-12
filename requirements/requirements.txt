@@ -7,7 +7,7 @@ padacioso~=0.2, >=0.2.1a8
 adapt-parser>=1.0.0, <2.0.0
 
 ovos-bus-client<0.1.0, >=0.0.6a10
-ovos-utils<0.1.0, >=0.0.36a8
+ovos-utils<0.1.0, ==0.0.36a8
 ovos-plugin-manager<0.1.0, >=0.0.24a9
 ovos-config~=0.0,>=0.0.11a13
 ovos-lingua-franca>=0.4.7
