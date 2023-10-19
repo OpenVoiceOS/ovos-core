@@ -1,6 +1,6 @@
 import time
 from time import sleep
-from unittest import TestCase, skip
+from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, Session
@@ -13,6 +13,9 @@ class TestSessions(TestCase):
         self.skill_id = "ovos-tskill-abort.openvoiceos"
         self.other_skill_id = "skill-ovos-hello-world.openvoiceos"
         self.core = get_minicroft([self.skill_id, self.other_skill_id])
+
+    def tearDown(self) -> None:
+        self.core.stop()
 
     def test_no_session(self):
         SessionManager.sessions = {}
@@ -162,7 +165,7 @@ class TestSessions(TestCase):
 
             # verify that "lang" is injected by converse.ping
             # (missing in utterance message) and kept in all messages
-            self.assertEqual(messages[1].msg_type, f"{self.skill_id}.converse.ping")                
+            self.assertEqual(messages[1].msg_type, f"{self.skill_id}.converse.ping")
 
             # verify "pong" answer from converse test skill
             self.assertEqual(messages[2].msg_type, "skill.converse.pong")
@@ -263,7 +266,7 @@ class TestSessions(TestCase):
             # converse
             self.assertEqual(messages[1].msg_type, f"{self.other_skill_id}.converse.ping")
             self.assertEqual(messages[2].msg_type, "skill.converse.pong")
-            self.assertEqual(messages[2].data["skill_id"],messages[2].context["skill_id"])
+            self.assertEqual(messages[2].data["skill_id"], messages[2].context["skill_id"])
             self.assertFalse(messages[2].data["can_handle"])
             self.assertEqual(messages[3].msg_type, f"{self.skill_id}.converse.ping")
             self.assertEqual(messages[4].msg_type, "skill.converse.pong")
@@ -356,7 +359,7 @@ class TestSessions(TestCase):
             # converse
             self.assertEqual(messages[1].msg_type, f"{self.skill_id}.converse.ping")
             self.assertEqual(messages[2].msg_type, "skill.converse.pong")
-            self.assertEqual(messages[2].data["skill_id"],messages[2].context["skill_id"])
+            self.assertEqual(messages[2].data["skill_id"], messages[2].context["skill_id"])
             self.assertTrue(messages[2].data["can_handle"])
             self.assertEqual(messages[3].msg_type, f"{self.other_skill_id}.converse.ping")
             self.assertEqual(messages[4].msg_type, "skill.converse.pong")
@@ -480,4 +483,3 @@ class TestSessions(TestCase):
             messages = []
 
         external_activate()
-

@@ -4,7 +4,6 @@ from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, Session
-from ovos_utils.log import LOG
 from .minicroft import get_minicroft
 
 
@@ -14,6 +13,9 @@ class TestSessions(TestCase):
         self.skill_id = "ovos-tskill-abort.openvoiceos"
         self.other_skill_id = "skill-ovos-hello-world.openvoiceos"
         self.core = get_minicroft([self.skill_id, self.other_skill_id])
+
+    def tearDown(self) -> None:
+        self.core.stop()
 
     def test_no_response(self):
         SessionManager.sessions = {}
@@ -56,7 +58,7 @@ class TestSessions(TestCase):
             "recognizer_loop:utterance",  # no session
 
             # skill selected
-            "intent.service.skills.activated", # default session injected
+            "intent.service.skills.activated",  # default session injected
             f"{self.skill_id}.activate",
             f"{self.skill_id}:test_get_response.intent",
 
@@ -95,9 +97,9 @@ class TestSessions(TestCase):
         for m in messages[1:]:
             print(m.msg_type, m.context["session"]["session_id"])
             self.assertEqual(m.context["session"]["session_id"], "default")
-            self.assertEqual(m.context["lang"], "en-us")            
+            self.assertEqual(m.context["lang"], "en-us")
 
-        # verify skill is activated by intent service (intent pipeline matched)
+            # verify skill is activated by intent service (intent pipeline matched)
         self.assertEqual(messages[1].msg_type, "intent.service.skills.activated")
         self.assertEqual(messages[1].data["skill_id"], self.skill_id)
         self.assertEqual(messages[2].msg_type, f"{self.skill_id}.activate")
@@ -694,7 +696,7 @@ class TestSessions(TestCase):
             "recognizer_loop:utterance",  # no session
 
             # skill selected
-            "intent.service.skills.activated", # default session injected
+            "intent.service.skills.activated",  # default session injected
             f"{self.skill_id}.activate",
             f"{self.skill_id}:test_get_response_cascade.intent",
 
@@ -802,33 +804,33 @@ class TestSessions(TestCase):
         self.assertEqual(messages[6].data["utterance"], "give me items")
         self.assertEqual(messages[6].data["meta"]["skill"], self.skill_id)
 
-        responses = ["A", "B", "C", "cancel"] 
+        responses = ["A", "B", "C", "cancel"]
         for response in responses:
             i = 6 + responses.index(response) * 12
             # enable get_response for this session
-            self.assertEqual(messages[i+1].msg_type, "skill.converse.get_response.enable")
-            self.assertEqual(messages[i+2].msg_type, "ovos.session.update_default")
+            self.assertEqual(messages[i + 1].msg_type, "skill.converse.get_response.enable")
+            self.assertEqual(messages[i + 2].msg_type, "ovos.session.update_default")
 
             # 3 sound prompts (no dialog in this test)
-            self.assertEqual(messages[i+3].msg_type, "mycroft.mic.listen")
+            self.assertEqual(messages[i + 3].msg_type, "mycroft.mic.listen")
 
             # check utterance goes through converse cycle
-            self.assertEqual(messages[i+4].msg_type, "recognizer_loop:utterance")
-            self.assertEqual(messages[i+5].msg_type, f"{self.skill_id}.converse.ping")
-            self.assertEqual(messages[i+6].msg_type, "skill.converse.pong")
+            self.assertEqual(messages[i + 4].msg_type, "recognizer_loop:utterance")
+            self.assertEqual(messages[i + 5].msg_type, f"{self.skill_id}.converse.ping")
+            self.assertEqual(messages[i + 6].msg_type, "skill.converse.pong")
 
             # captured utterance sent to get_response handler that is waiting
-            self.assertEqual(messages[i+7].msg_type, f"{self.skill_id}.converse.get_response")
-            self.assertEqual(messages[i+7].data["utterances"], [response])
+            self.assertEqual(messages[i + 7].msg_type, f"{self.skill_id}.converse.get_response")
+            self.assertEqual(messages[i + 7].data["utterances"], [response])
 
             # converse pipeline activates the skill last_used timestamp
-            self.assertEqual(messages[i+8].msg_type, "intent.service.skills.activated")
-            self.assertEqual(messages[i+9].msg_type, f"{self.skill_id}.activate")
-            self.assertEqual(messages[i+10].msg_type, "ovos.session.update_default")
+            self.assertEqual(messages[i + 8].msg_type, "intent.service.skills.activated")
+            self.assertEqual(messages[i + 9].msg_type, f"{self.skill_id}.activate")
+            self.assertEqual(messages[i + 10].msg_type, "ovos.session.update_default")
 
             # disable get_response for this session
-            self.assertEqual(messages[i+11].msg_type, "skill.converse.get_response.disable")
-            self.assertEqual(messages[i+12].msg_type, "ovos.session.update_default")
+            self.assertEqual(messages[i + 11].msg_type, "skill.converse.get_response.disable")
+            self.assertEqual(messages[i + 12].msg_type, "ovos.session.update_default")
 
         # intent return
         self.assertEqual(messages[55].msg_type, "skill_items")

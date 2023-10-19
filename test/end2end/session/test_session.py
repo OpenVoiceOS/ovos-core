@@ -1,6 +1,6 @@
 import time
 from time import sleep
-from unittest import TestCase, skip
+from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, Session
@@ -12,6 +12,9 @@ class TestSessions(TestCase):
     def setUp(self):
         self.skill_id = "skill-ovos-hello-world.openvoiceos"
         self.core = get_minicroft(self.skill_id)
+
+    def tearDown(self) -> None:
+        self.core.stop()
 
     def test_no_session(self):
         SessionManager.sessions = {}
@@ -308,4 +311,3 @@ class TestSessions(TestCase):
         self.assertNotEqual(sess.active_skills[0][1], now)
         # test that default session remains unchanged
         self.assertEqual(SessionManager.default_session.active_skills, [])
-

@@ -13,6 +13,9 @@ class TestFallback(TestCase):
         self.skill_id = "skill-ovos-fallback-unknownv1.openvoiceos"
         self.core = get_minicroft(self.skill_id)
 
+    def tearDown(self) -> None:
+        self.core.stop()
+
     def test_fallback_v1(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
@@ -166,4 +169,3 @@ class TestFallback(TestCase):
         for m in messages[1:]:
             self.assertEqual(m.context["session"]["session_id"], "default")
             self.assertEqual(m.context["session"]["active_skills"][0][0], self.skill_id)
-

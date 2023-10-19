@@ -59,6 +59,7 @@ jobs:
           pip install ./test/end2end/session/skill-ovos-fallback-unknown
           pip install ./test/end2end/session/skill-ovos-fallback-unknownv1
           pip install ./test/end2end/session/skill-converse_test
+          pip install ./test/end2end/session/skill-ovos-schedule
       - name: Run unittests
         run: |
           pytest --cov=ovos_core --cov-report xml test/unittests

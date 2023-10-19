@@ -1,5 +1,7 @@
 from time import sleep
+
 from ovos_bus_client.session import SessionManager, Session
+from ovos_bus_client.util.scheduler import EventScheduler
 from ovos_core.intent_services import IntentService
 from ovos_core.skill_manager import SkillManager
 from ovos_plugin_manager.skills import find_skill_plugins
@@ -15,6 +17,7 @@ class MiniCroft(SkillManager):
         super().__init__(bus, *args, **kwargs)
         self.skill_ids = skill_ids
         self.intent_service = self._register_intent_services()
+        self.scheduler = EventScheduler(bus, schedule_file="/tmp/schetest.json")
 
     def _register_intent_services(self):
         """Start up the all intent services and connect them as needed.
@@ -52,6 +55,7 @@ class MiniCroft(SkillManager):
 
     def stop(self):
         super().stop()
+        self.scheduler.shutdown()
         SessionManager.bus = None
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
@@ -66,4 +70,3 @@ def get_minicroft(skill_id):
     while croft1.status.state != ProcessState.READY:
         sleep(0.2)
     return croft1
-

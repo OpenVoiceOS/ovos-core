@@ -13,6 +13,9 @@ class TestFallback(TestCase):
         self.skill_id = "skill-ovos-fallback-unknown.openvoiceos"
         self.core = get_minicroft(self.skill_id)
 
+    def tearDown(self) -> None:
+        self.core.stop()
+
     def test_fallback(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
