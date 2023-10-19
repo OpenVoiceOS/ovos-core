@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
+from os import path, walk
+
 from setuptools import setup
-from os import getenv, path, walk
 
 
 def find_resource_files():

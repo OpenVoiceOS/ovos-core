@@ -1,5 +1,5 @@
-from ovos_workshop.skills.fallback import FallbackSkillV1
 from ovos_workshop.decorators import fallback_handler
+from ovos_workshop.skills.fallback import FallbackSkillV1
 
 
 # explicitly use class with compat for older cores

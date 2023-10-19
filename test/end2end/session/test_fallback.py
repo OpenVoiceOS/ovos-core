@@ -4,7 +4,7 @@ from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, Session
-from .minicroft import get_minicroft
+from ..minicroft import get_minicroft
 
 
 class TestFallback(TestCase):

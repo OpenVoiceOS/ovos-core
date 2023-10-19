@@ -1,5 +1,5 @@
-from ovos_workshop.skills.fallback import FallbackSkill
 from ovos_workshop.decorators import fallback_handler
+from ovos_workshop.skills.fallback import FallbackSkill
 
 
 class UnknownSkill(FallbackSkill):
