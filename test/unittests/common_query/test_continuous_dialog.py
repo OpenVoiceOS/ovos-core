@@ -11,7 +11,10 @@ class TestDialog(unittest.TestCase):
         self.bus.emitted_msgs = []
 
         def get_msg(msg):
-            self.bus.emitted_msgs.append(json.loads(msg))
+            m = json.loads(msg)
+            if "session" in m.get("context", {}):
+                m["context"].pop("session")  # simplify tests
+            self.bus.emitted_msgs.append(m)
 
         self.bus.on("message", get_msg)
 

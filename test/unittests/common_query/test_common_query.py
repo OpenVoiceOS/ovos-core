@@ -42,8 +42,7 @@ class TestCommonQuery(unittest.TestCase):
             # thinking animation
             {'type': 'enclosure.mouth.think',
              'data': {},
-             'context': {'destination': "skills", 'source': 'audio',
-                         'skill_id': self.cc.skill_id}},
+             'context': qq_ctxt},
             # send query
             {'type': 'question:query',
              'data': {'phrase': 'what is the speed of light'},
@@ -99,4 +98,8 @@ class TestCommonQuery(unittest.TestCase):
 
         for ctr, msg in enumerate(expected):
             m = self.bus.emitted_msgs[ctr]
+            if "session" in m.get("context", {}):
+                m["context"].pop("session")  # simplify test comparisons
+            if "session" in msg.get("context", {}):
+                msg["context"].pop("session")  # simplify test comparisons
             self.assertEqual(msg, m)
