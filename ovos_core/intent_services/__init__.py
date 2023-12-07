@@ -180,15 +180,15 @@ class IntentService:
         3 - detected_lang -> tagged by transformers  (text classification, free form chat)
         4 - config lang (or from message.data)
         """
-        sess = SessionManager.get(message)
         default_lang = get_message_lang(message)
+        valid_langs = [default_lang] + Configuration().get("secondary_langs", [])
         lang_keys = ["stt_lang",
                      "request_lang",
                      "detected_lang"]
         for k in lang_keys:
             if k in message.context:
                 v = message.context[k]
-                if v in sess.valid_languages:
+                if v in valid_langs:
                     if v != default_lang:
                         LOG.info(f"replaced {default_lang} with {k}: {v}")
                     return v
