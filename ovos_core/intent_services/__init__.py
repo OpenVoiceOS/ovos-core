@@ -15,7 +15,7 @@
 from collections import namedtuple
 
 from ovos_config.config import Configuration
-from ovos_config.locale import setup_locale
+from ovos_config.locale import setup_locale, get_valid_languages, get_full_lang_code
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
@@ -181,13 +181,13 @@ class IntentService:
         4 - config lang (or from message.data)
         """
         default_lang = get_message_lang(message)
-        valid_langs = [default_lang] + Configuration().get("secondary_langs", [])
+        valid_langs = get_valid_languages()
         lang_keys = ["stt_lang",
                      "request_lang",
                      "detected_lang"]
         for k in lang_keys:
             if k in message.context:
-                v = message.context[k]
+                v = get_full_lang_code(message.context[k])
                 if v in valid_langs:
                     if v != default_lang:
                         LOG.info(f"replaced {default_lang} with {k}: {v}")
