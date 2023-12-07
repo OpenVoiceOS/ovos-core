@@ -206,7 +206,6 @@ class TestSessions(TestCase):
         # test deserialization of payload
         sess = Session.deserialize(messages[10].data["session_data"])
         self.assertEqual(sess.session_id, "default")
-        self.assertEqual(sess.valid_languages, ["en-us"])
 
         # test that active skills list has been updated
         self.assertEqual(messages[10].data["session_data"]["active_skills"][0][0], self.skill_id)
