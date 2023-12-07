@@ -60,7 +60,7 @@ jobs:
           pip install ./test/end2end/skill-ovos-fallback-unknownv1
           pip install ./test/end2end/skill-converse_test
           pip install ./test/end2end/skill-ovos-schedule
-          pip install git+https://github.com/OpenVoiceOS/ovos-utils@troubleshoot
+          pip install git+https://github.com/OpenVoiceOS/ovos-utils
       - name: Run unittests
         run: |
           pytest --cov=ovos_core --cov-report xml test/unittests
