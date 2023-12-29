@@ -6,13 +6,13 @@ combo-lock>=0.2.2, <0.3
 padacioso~=0.2, >=0.2.1a9
 adapt-parser>=1.0.0, <2.0.0
 
-ovos-utils<0.2.0, >=0.1.0a1
-ovos_bus_client<0.1.0, >=0.0.8a1
-ovos-plugin-manager<0.1.0, >=0.0.25a3
+ovos-utils<0.1.0, >=0.0.37
+ovos_bus_client<0.1.0, >=0.0.7
+ovos-plugin-manager<0.1.0, >=0.0.24
 ovos-config~=0.0,>=0.0.12
 ovos-lingua-franca>=0.4.7
 ovos-backend-client>=0.1.0a12
-ovos-workshop<0.1.0, >=0.0.13a23
+ovos-workshop<0.1.0, >=0.0.12
 
 # provides plugins and classic machine learning framework
 ovos-classifiers<0.1.0, >=0.0.0a39
