@@ -11,7 +11,7 @@ ovos_bus_client<0.1.0, >=0.0.7
 ovos-plugin-manager<0.1.0, >=0.0.24
 ovos-config~=0.0,>=0.0.12
 ovos-lingua-franca>=0.4.7
-ovos-backend-client>=0.1.0a12
+ovos-backend-client>=0.1.0a14
 ovos-workshop<0.1.0, >=0.0.14
 
 # provides plugins and classic machine learning framework
