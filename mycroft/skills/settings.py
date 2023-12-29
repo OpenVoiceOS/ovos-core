@@ -69,6 +69,5 @@ from ovos_bus_client.message import Message, dig_for_message
 # backwards compat imports
 from mycroft.deprecated.skills.settings import SkillSettingsDownloader, SettingsMetaUploader, load_remote_settings_cache, \
     save_remote_settings_cache, REMOTE_CACHE
-# these 2 methods are maintained as part of ovos_utils but need to be available from this location for compatibility
-from ovos_utils.skills.settings import get_local_settings, save_settings
+
 from ovos_workshop.settings import SkillSettingsManager

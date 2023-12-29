@@ -19,7 +19,7 @@ from time import sleep
 from ovos_plugin_manager.templates.audio import AudioBackend
 from ovos_bus_client.message import Message
 from ovos_utils.log import LOG
-from ovos_utils.sound import play_wav, play_ogg, play_mp3
+from ovos_utils.sound import play_audio
 import mimetypes
 import re
 from requests import Session
@@ -117,15 +117,7 @@ class SimpleAudioService(AudioBackend):
         # Replace file:// uri's with normal paths
         track = track.replace('file://', '')
         try:
-            if 'mpeg' in mime[1]:
-                self.process = play_mp3(track)
-            elif 'ogg' in mime[1]:
-                self.process = play_ogg(track)
-            elif 'wav' in mime[1]:
-                self.process = play_wav(track)
-            else:
-                # If no mime info could be determined guess mp3
-                self.process = play_mp3(track)
+            self.process = play_audio(track)
         except FileNotFoundError as e:
             LOG.error('Couldn\'t play audio, {}'.format(repr(e)))
             self.process = None

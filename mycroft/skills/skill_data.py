@@ -14,7 +14,7 @@
 #
 """Handling of skill data such as intents and regular expressions."""
 # backwards compat imports, do not delete
-from ovos_utils.intents.intent_service_interface import munge_intent_parser
+from ovos_workshop.intents import munge_intent_parser
 from ovos_workshop.resource_files import SkillResourceTypes, ResourceType, ResourceFile, \
     QmlFile, DialogFile, VocabularyFile, NamedValueFile, ListFile, TemplateFile, RegexFile, WordFile, \
     CoreResources, UserResources, SkillResources, RegexExtractor, locate_base_directories, \

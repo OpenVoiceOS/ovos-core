@@ -19,7 +19,6 @@ from unittest import TestCase, skip
 from unittest.mock import call, Mock, patch
 
 from mycroft.skills.settings import (
-    get_local_settings,
     SkillSettingsDownloader,
     SettingsMetaUploader
 )
@@ -274,33 +273,3 @@ class TestSettingsDownloader(MycroftUnitTestBase):
             [remote_skill_settings],
             self.message_bus_mock.message_data
         )
-
-
-class TestSettings(TestCase):
-    def setUp(self) -> None:
-        temp_dir = tempfile.mkdtemp()
-        self.temp_dir = Path(temp_dir)
-        self.skill_mock = Mock()
-        self.skill_mock.root_dir = str(self.temp_dir)
-        self.skill_mock.name = 'test_skill'
-
-    def test_empty_settings(self):
-        settings = get_local_settings(
-            self.skill_mock.root_dir,
-            self.skill_mock.name
-        )
-        self.assertDictEqual(settings, {})
-
-    def test_settings_file_exists(self):
-        settings_path = str(self.temp_dir.joinpath('settings.json'))
-        with open(settings_path, 'w') as settings_file:
-            settings_file.write('{"foo": "bar"}\n')
-
-        settings = get_local_settings(
-            self.skill_mock.root_dir,
-            self.skill_mock.name
-        )
-        self.assertDictEqual(settings, {'foo': 'bar'})
-        self.assertEqual(settings['foo'], 'bar')
-        self.assertNotIn('store', settings)
-        self.assertIn('foo', settings)

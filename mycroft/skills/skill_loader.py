@@ -19,9 +19,9 @@ from ovos_utils.log import LOG
 
 # backwards compat imports do not delete
 from mycroft.deprecated.skills.settings import SettingsMetaUploader
-from ovos_plugin_manager.skills import find_skill_plugins
+from ovos_plugin_manager.skills import find_skill_plugins, get_default_skills_directory
 from ovos_workshop.skill_launcher import SKILL_MAIN_MODULE, get_skill_directories,\
-    get_default_skills_directory, remove_submodule_refs, load_skill_module, get_skill_class, \
+    remove_submodule_refs, load_skill_module, get_skill_class, \
     get_create_skill_function, SkillLoader as _SL, PluginSkillLoader as _PSL
 
 

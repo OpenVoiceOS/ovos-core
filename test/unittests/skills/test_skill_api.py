@@ -3,7 +3,7 @@ from unittest import TestCase, mock
 from ovos_workshop.skills.ovos import OVOSSkill
 from ovos_bus_client.message import Message
 from ovos_workshop.decorators import skill_api_method
-from ovos_utils.skills.api import SkillApi
+from ovos_workshop.skills.api import SkillApi
 
 
 class Skill(OVOSSkill):

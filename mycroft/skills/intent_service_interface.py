@@ -15,5 +15,5 @@
 """The intent service interface offers a unified wrapper class for the
 Intent Service. Including both adapt and padatious.
 """
-from ovos_utils.intents.intent_service_interface import IntentServiceInterface, IntentQueryApi, open_intent_envelope
+from ovos_workshop.intents import IntentServiceInterface, open_intent_envelope
 

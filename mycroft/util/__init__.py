@@ -19,8 +19,8 @@ A collections of utils and tools for making skill development easier.
 from __future__ import absolute_import
 
 from ovos_utils import camel_case_split
-from ovos_utils.sound import play_ogg, play_mp3, play_wav
-from mycroft.util.audio_utils import (play_audio_file, record, find_input_device)
+from ovos_utils.sound import play_audio as play_ogg, play_audio as play_mp3, play_audio as play_wav
+from mycroft.util.audio_utils import (play_audio_file, find_input_device)
 from mycroft.util.file_utils import (
     read_stripped_lines,
     read_dict,

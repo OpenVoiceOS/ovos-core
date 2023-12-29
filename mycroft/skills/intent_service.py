@@ -21,7 +21,7 @@ from ovos_bus_client.message import Message
 from ovos_core.intent_services import IntentService as _IS
 from ovos_utils.log import LOG
 # compat imports
-from ovos_utils.intents.intent_service_interface import open_intent_envelope
+from ovos_workshop.intents import open_intent_envelope
 
 
 class IntentService(_IS):

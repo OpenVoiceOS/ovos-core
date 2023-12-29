@@ -12,17 +12,14 @@ import re
 from os import walk
 from os.path import splitext, join
 from ovos_backend_client.pairing import is_paired
-from ovos_utils.enclosure.api import EnclosureAPI
+from ovos_bus_client.apis.enclosure import EnclosureAPI
 from mycroft.util.format import expand_options
 from ovos_utils.log import LOG
-from ovos_utils.intents.intent_service_interface import munge_regex, to_alnum
+from ovos_workshop.intents import munge_regex, to_alnum
 
 RASPBERRY_PI_PLATFORMS = ('mycroft_mark_1', 'picroft', 'mycroft_mark_2pi')
 
 ONE_MINUTE = 60
-
-# these 2 methods are maintained as part of ovos_utils but need to be available from this location for compatibility
-from ovos_utils.skills.settings import get_local_settings, save_settings
 
 
 def skill_is_blacklisted(skill):

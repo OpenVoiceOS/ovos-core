@@ -27,7 +27,7 @@ from ovos_config import Configuration
 from mycroft.skills.skill_data import (load_regex_from_file, load_regex,
                                        load_vocabulary, read_vocab_file)
 from ovos_bus_client.message import Message
-from ovos_utils.intents.intent_service_interface import open_intent_envelope
+from ovos_workshop.intents import open_intent_envelope
 from ovos_workshop.decorators import resting_screen_handler, intent_handler
 from ovos_workshop.skills.mycroft_skill import MycroftSkill
 from ovos_workshop.skills.ovos import OVOSSkill
