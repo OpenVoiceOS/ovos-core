@@ -7,12 +7,12 @@ padacioso~=0.2, >=0.2.1
 adapt-parser>=1.0.0, <2.0.0
 
 ovos-utils==0.0.37
-ovos_bus_client<0.1.0, >=0.0.8a2
-ovos-plugin-manager<0.1.0, >=0.0.25a4
+ovos_bus_client<0.1.0, >=0.0.8
+ovos-plugin-manager<0.1.0, >=0.0.25
 ovos-config~=0.0,>=0.0.12
 ovos-lingua-franca>=0.4.7
 ovos-backend-client~=0.1.0
-ovos-workshop<0.1.0, >=0.0.15a5
+ovos-workshop<0.1.0, >=0.0.15
 
 # provides plugins and classic machine learning framework
 ovos-classifiers<0.1.0, >=0.0.0a39
