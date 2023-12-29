@@ -1,11 +1,9 @@
-mycroft-messagebus-client
-
 # ovos modules for compat with mycroft namespace
-ovos_PHAL<0.1.0, >=0.0.5a9
-ovos-audio~=0.0, >=0.0.2a14
+ovos_PHAL<0.1.0, >=0.0.5a14
+ovos-audio~=0.0, >=0.0.2a32
 ovos-listener~=0.0, >=0.0.2a13
-ovos-gui~=0.0, >=0.0.3a11
-ovos-messagebus~=0.0, >=0.0.4a1
+ovos-gui~=0.0, >=0.0.4a5
+ovos-messagebus~=0.0, >=0.0.4a6
 
 # default plugins
 ovos-stt-plugin-server>=0.0.3, <0.1.0
@@ -16,7 +14,7 @@ ovos-ww-plugin-pocketsphinx~=0.1
 ovos-ww-plugin-precise~=0.1
 ovos-vad-plugin-webrtcvad>=0.0.1, <0.1.0
 
-ovos_plugin_common_play>=0.0.6a4, <0.1.0
+ovos_plugin_common_play>=0.0.6a10, <0.1.0
 # ovos-ocp-youtube-plugin~=0.0, >=0.0.1
 ovos-ocp-m3u-plugin>=0.0.1,<0.1.0
 ovos-ocp-rss-plugin>=0.0.2,<0.1.0
