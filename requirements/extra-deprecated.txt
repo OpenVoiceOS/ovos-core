@@ -1,4 +1,5 @@
 msm
+mycroft-bus-client
 mock_msm>=0.9
 ovos_cli_client
 python-vlc>=1.1.2
