@@ -48,9 +48,6 @@ jobs:
           sudo apt-get update
           sudo apt install python3-dev swig libssl-dev portaudio19-dev libpulse-dev
           python -m pip install build wheel
-      - name: Install core repo
-        run: |
-          pip install -e .[mycroft,deprecated]
       - name: Install test dependencies
         run: |
           pip install -r requirements/tests.txt
@@ -60,7 +57,9 @@ jobs:
           pip install ./test/end2end/skill-ovos-fallback-unknownv1
           pip install ./test/end2end/skill-converse_test
           pip install ./test/end2end/skill-ovos-schedule
-          pip install git+https://github.com/OpenVoiceOS/ovos-utils
+      - name: Install core repo
+        run: |
+          pip install -e .[mycroft,deprecated]
       - name: Run unittests
         run: |
           pytest --cov=ovos_core --cov-report xml test/unittests
