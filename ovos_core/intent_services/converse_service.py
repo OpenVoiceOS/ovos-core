@@ -6,7 +6,7 @@ from ovos_config.config import Configuration
 from ovos_config.locale import setup_locale
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
-from ovos_utils.messagebus import get_message_lang
+from ovos_bus_client.util import get_message_lang
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
 
 import ovos_core.intent_services

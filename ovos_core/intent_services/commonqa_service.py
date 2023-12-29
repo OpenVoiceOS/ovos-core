@@ -7,9 +7,9 @@ from ovos_bus_client.message import Message, dig_for_message
 
 import ovos_core.intent_services
 from ovos_utils import flatten_list
-from ovos_utils.enclosure.api import EnclosureAPI
+from ovos_bus_client.apis.enclosure import EnclosureAPI
 from ovos_utils.log import LOG
-from ovos_utils.messagebus import get_message_lang
+from ovos_bus_client.util import get_message_lang
 from ovos_workshop.resource_files import CoreResources
 
 EXTENSION_TIME = 10

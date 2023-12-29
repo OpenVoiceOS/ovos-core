@@ -25,13 +25,13 @@ from ovos_bus_client.message import Message
 from ovos_config.config import Configuration
 from ovos_config.locations import get_xdg_config_save_path
 from ovos_plugin_manager.skills import find_skill_plugins
-from ovos_utils.enclosure.api import EnclosureAPI
+from ovos_bus_client.apis.enclosure import EnclosureAPI
 from ovos_utils.file_utils import FileWatcher
 from ovos_utils.gui import is_gui_connected
 from ovos_utils.log import LOG
 from ovos_utils.network_utils import is_connected
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap, ProcessState
-from ovos_utils.skills.locations import get_skill_directories
+from ovos_plugin_manager.skills import get_skill_directories
 from ovos_workshop.skill_launcher import SKILL_MAIN_MODULE
 from ovos_workshop.skill_launcher import SkillLoader, PluginSkillLoader
 

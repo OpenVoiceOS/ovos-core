@@ -23,7 +23,7 @@ from ovos_config.locale import setup_locale
 
 from ovos_bus_client import MessageBusClient
 from ovos_bus_client.util.scheduler import EventScheduler
-from ovos_utils.skills.api import SkillApi
+from ovos_workshop.skills.api import SkillApi
 from ovos_core.intent_services import IntentService
 from ovos_core.skill_manager import SkillManager, on_error, on_stopping, on_ready, on_alive, on_started
 from ovos_utils import wait_for_exit_signal
