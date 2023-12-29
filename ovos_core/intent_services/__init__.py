@@ -25,9 +25,9 @@ from ovos_core.intent_services.converse_service import ConverseService
 from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.padacioso_service import PadaciosoService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
-from ovos_utils.intents.intent_service_interface import open_intent_envelope
+from ovos_workshop.intents import open_intent_envelope
 from ovos_utils.log import LOG, deprecated, log_deprecation
-from ovos_utils.messagebus import get_message_lang
+from ovos_bus_client.util import get_message_lang
 from ovos_utils.metrics import Stopwatch
 
 try:
