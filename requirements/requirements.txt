@@ -6,8 +6,8 @@ combo-lock>=0.2.2, <0.3
 padacioso~=0.2, >=0.2.1a9
 adapt-parser>=1.0.0, <2.0.0
 
-ovos-bus-client<0.1.0, >=0.0.7
-ovos-utils<0.1.0, >=0.0.37
+ovos-utils<0.2.0, >=0.1.0a1
+ovos_bus_client<0.1.0, >=0.0.8a1
 ovos-plugin-manager<0.1.0, >=0.0.25a3
 ovos-config~=0.0,>=0.0.12
 ovos-lingua-franca>=0.4.7
