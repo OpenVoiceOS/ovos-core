@@ -15,10 +15,7 @@ class UtteranceTransformersService:
         self.loaded_plugins = {}
         self.has_loaded = False
         self.bus = bus
-        self.config = self.config_core.get("utterance_transformers") or {
-            "ovos-utterance-normalizer": {},
-            "ovos-utterance-coref-normalizer": {}
-        }
+        self.config = self.config_core.get("utterance_transformers") or {}
         self.load_plugins()
 
     def load_plugins(self):
