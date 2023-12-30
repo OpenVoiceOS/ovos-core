@@ -1,7 +1,6 @@
 from time import sleep
 
-from mycroft.skills import intent_file_handler
-from ovos_workshop.decorators import killable_intent
+from ovos_workshop.decorators import killable_intent, intent_handler
 from ovos_workshop.skills.ovos import OVOSSkill
 
 
@@ -26,12 +25,12 @@ class TestAbortSkill(OVOSSkill):
     def do_deactivate(self, message):
         self.deactivate()
 
-    @intent_file_handler("converse_on.intent")
+    @intent_handler("converse_on.intent")
     def handle_converse_on(self, message):
         self._converse = True
         self.speak("on")
 
-    @intent_file_handler("converse_off.intent")
+    @intent_handler("converse_off.intent")
     def handle_converse_off(self, message):
         self._converse = False
         self.speak("off")
@@ -39,17 +38,17 @@ class TestAbortSkill(OVOSSkill):
     def handle_intent_aborted(self):
         self.speak("I am dead")
 
-    @intent_file_handler("test_get_response.intent")
+    @intent_handler("test_get_response.intent")
     def handle_test_get_response(self, message):
         ans = self.get_response("get", num_retries=1)
         self.speak(ans or "ERROR")
 
-    @intent_file_handler("test_get_response3.intent")
+    @intent_handler("test_get_response3.intent")
     def handle_test_get_response3(self, message):
         ans = self.get_response(num_retries=3)
         self.speak(ans or "ERROR")
 
-    @intent_file_handler("test_get_response_cascade.intent")
+    @intent_handler("test_get_response_cascade.intent")
     def handle_test_get_response_cascade(self, message):
         quit = False
         self.items = []
@@ -63,7 +62,7 @@ class TestAbortSkill(OVOSSkill):
         self.bus.emit(message.forward("skill_items", {"items": self.items}))
 
     @killable_intent(callback=handle_intent_aborted)
-    @intent_file_handler("test.intent")
+    @intent_handler("test.intent")
     def handle_test_abort_intent(self, message):
         self.stop_called = False
         self.my_special_var = "changed"
@@ -71,7 +70,7 @@ class TestAbortSkill(OVOSSkill):
             sleep(1)
             self.speak("still here")
 
-    @intent_file_handler("test2.intent")
+    @intent_handler("test2.intent")
     @killable_intent(callback=handle_intent_aborted)
     def handle_test_get_response_intent(self, message):
         self.stop_called = False
@@ -82,7 +81,7 @@ class TestAbortSkill(OVOSSkill):
             self.speak("question aborted")
 
     @killable_intent(msg="my.own.abort.msg", callback=handle_intent_aborted)
-    @intent_file_handler("test3.intent")
+    @intent_handler("test3.intent")
     def handle_test_msg_intent(self, message):
         self.stop_called = False
         if self.my_special_var != "default":

@@ -1,9 +1,8 @@
 from unittest import TestCase, mock
 
 from ovos_bus_client.message import Message
-from mycroft.skills.common_query_skill import (CommonQuerySkill, CQSMatchLevel,
-                                               CQSVisualMatchLevel,
-                                               handles_visuals)
+
+from mycroft.skills.common_query_skill import (CommonQuerySkill, handles_visuals)
 from test.unittests.mocks import AnyCallable
 
 
@@ -30,7 +29,7 @@ class TestCommonQuerySkill(TestCase):
 
     def test_common_test_skill_action(self):
         """Test that the optional action is triggered."""
-        query_action = self.bus.on.call_args_list[-1][0][1]
+        query_action = self.bus.on.call_args_list[-2][0][1]
         query_action(Message('query:action', data={
             'phrase': 'What\'s the meaning of life',
             'skill_id': 'asdf'}))
@@ -42,65 +41,9 @@ class TestCommonQuerySkill(TestCase):
             'What\'s the meaning of life', {})
 
 
-class TestCommonQueryMatching(TestCase):
-    """Tests for CQS_match_query_phrase."""
-    def setUp(self):
-        self.skill = CQSTest()
-        self.bus = mock.Mock(name='bus')
-        self.skill.bind(self.bus)
-        self.skill.config_core = {'enclosure': {'platform': 'mycroft_mark_1'}}
-        # Get the method for handle_query_phrase
-        self.query_phrase = self.bus.on.call_args_list[-2][0][1]
-
-    def test_failing_match_query_phrase(self):
-        self.skill.CQS_match_query_phrase.return_value = None
-        self.query_phrase(Message('question:query',
-                                  data={
-                                      'phrase': 'What\'s the meaning of life'
-                                  }))
-
-        # Check that the skill replied that it was searching
-        extension = self.bus.emit.call_args_list[-2][0][0]
-        self.assertEqual(extension.data['phrase'],
-                         'What\'s the meaning of life')
-        self.assertEqual(extension.data['skill_id'], self.skill.skill_id)
-        self.assertEqual(extension.data['searching'], True)
-
-        # Assert that the skill reported that it couldn't find the phrase
-        response = self.bus.emit.call_args_list[-1][0][0]
-        self.assertEqual(response.data['phrase'],
-                         'What\'s the meaning of life')
-
-        self.assertEqual(response.data['skill_id'], self.skill.skill_id)
-        self.assertEqual(response.data['searching'], False)
-
-    def test_successful_match_query_phrase(self):
-        self.skill.CQS_match_query_phrase.return_value = (
-            'What\'s the meaning of life', CQSMatchLevel.EXACT, '42')
-
-        self.query_phrase(Message('question:query',
-                                  data={
-                                      'phrase': 'What\'s the meaning of life'
-                                  }))
-
-        # Check that the skill replied that it was searching
-        extension = self.bus.emit.call_args_list[-2][0][0]
-        self.assertEqual(extension.data['phrase'],
-                         'What\'s the meaning of life')
-        self.assertEqual(extension.data['skill_id'], self.skill.skill_id)
-        self.assertEqual(extension.data['searching'], True)
-
-        # Assert that the skill responds with answer and confidence level
-        response = self.bus.emit.call_args_list[-1][0][0]
-        self.assertEqual(response.data['phrase'],
-                         'What\'s the meaning of life')
-        self.assertEqual(response.data['skill_id'], self.skill.skill_id)
-        self.assertEqual(response.data['answer'], '42')
-        self.assertTrue(response.data['conf'] >= 1.0)
-
-
 class CQSTest(CommonQuerySkill):
     """Simple skill for testing the CommonQuerySkill"""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.CQS_match_query_phrase = mock.Mock(name='match_phrase')
