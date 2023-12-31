@@ -124,6 +124,7 @@ class PadatiousService:
 
         self.registered_intents = []
         self.registered_entities = []
+        self.max_words = 50  # if an utterance contains more words than this, don't attempt to match
 
     def train(self, message=None):
         """Perform padatious training.
@@ -259,6 +260,11 @@ class PadatiousService:
         """
         if isinstance(utterances, str):
             utterances = [utterances]  # backwards compat when arg was a single string
+        utterances = [u for u in utterances if len(u.split()) < self.max_words]
+        if not utterances:
+            LOG.error(f"utterance exceeds max size of {self.max_words} words, skipping padatious match")
+            return None
+
         lang = lang or self.lang
         lang = lang.lower()
         if lang in self.containers:

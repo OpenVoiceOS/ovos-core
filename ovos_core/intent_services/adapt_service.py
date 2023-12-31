@@ -55,6 +55,7 @@ class AdaptService:
                         for lang in langs}
 
         self.lock = Lock()
+        self.max_words = 50  # if an utterance contains more words than this, don't attempt to match
 
     @property
     def context_keywords(self):
@@ -143,6 +144,12 @@ class AdaptService:
         """
         # we call flatten in case someone is sending the old style list of tuples
         utterances = flatten_list(utterances)
+
+        utterances = [u for u in utterances if len(u.split()) < self.max_words]
+        if not utterances:
+            LOG.error(f"utterance exceeds max size of {self.max_words} words, skipping adapt match")
+            return None
+
         lang = lang or self.lang
         if lang not in self.engines:
             return None
