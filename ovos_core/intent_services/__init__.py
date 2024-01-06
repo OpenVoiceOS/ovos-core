@@ -14,27 +14,32 @@
 #
 from collections import namedtuple
 
-from ovos_config.config import Configuration
-from ovos_config.locale import setup_locale, get_valid_languages, get_full_lang_code
-
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
+from ovos_bus_client.util import get_message_lang
+from ovos_config.config import Configuration
+from ovos_config.locale import setup_locale, get_valid_languages, get_full_lang_code
 from ovos_core.intent_services.adapt_service import AdaptService
 from ovos_core.intent_services.commonqa_service import CommonQAService
 from ovos_core.intent_services.converse_service import ConverseService
-from ovos_core.intent_services.stop_service import StopService
 from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.padacioso_service import PadaciosoService
+from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
-from ovos_workshop.intents import open_intent_envelope
 from ovos_utils.log import LOG, deprecated, log_deprecation
-from ovos_bus_client.util import get_message_lang
 from ovos_utils.metrics import Stopwatch
+from ovos_workshop.intents import open_intent_envelope
 
 try:
     from ovos_core.intent_services.padatious_service import PadatiousService, PadatiousMatcher
 except ImportError:
     from ovos_core.intent_services.padacioso_service import PadaciosoService as PadatiousService
+
+try:
+    from ovos_core.intent_services.ocp_service import OCPPipelineMatcher
+except ImportError:
+    LOG.warning("OCPPipelineMatcher unavailable, please install ovos-utils >= 0.1.0")
+    OCPPipelineMatcher = None
 
 # Intent match response tuple containing
 # intent_service: Name of the service that matched the intent
@@ -73,6 +78,10 @@ class IntentService:
         self.converse = ConverseService(bus)
         self.common_qa = CommonQAService(bus)
         self.stop = StopService(bus)
+        if OCPPipelineMatcher is not None:
+            self.ocp = OCPPipelineMatcher(bus)
+        else:
+            self.ocp = None
         self.utterance_plugins = UtteranceTransformersService(bus, config=config)
         self.metadata_plugins = MetadataTransformersService(bus, config=config)
         # connection SessionManager to the bus,
@@ -210,7 +219,8 @@ class IntentService:
         # TODO - from plugins
         if self.padatious_service is None:
             if any("padatious" in p for p in session.pipeline):
-                LOG.warning("padatious is not available! using padacioso in it's place")
+                LOG.warning("padatious is not available! using padacioso in it's place, "
+                            "intent matching will be extremely slow in comparison")
             padatious_matcher = self.padacioso_service
         else:
             from ovos_core.intent_services.padatious_service import PadatiousMatcher
@@ -233,8 +243,14 @@ class IntentService:
             "padatious_low": padatious_matcher.match_low,
             "padacioso_low": self.padacioso_service.match_low,
             "adapt_low": self.adapt_service.match_low,
-            "fallback_low": self.fallback.low_prio
+            "fallback_low": self.fallback.low_prio,
+            "adapt": self.adapt_service.match_medium # DEPRECATED - compat only TODO remove before stable, was only in alphas
         }
+        if self.ocp is not None:
+            matchers.update({
+                "ocp_high": self.ocp.match_high,
+                "ocp_medium": self.ocp.match_medium,
+                "ocp_fallback": self.ocp.match_fallback})
         skips = skips or []
         pipeline = [k for k in session.pipeline if k not in skips]
         return [matchers[k] for k in pipeline]
@@ -291,7 +307,7 @@ class IntentService:
 
             # Get utterance utterance_plugins additional context
             message = self._handle_transformers(message)
-            
+
             if message.context.get("canceled"):
                 # TODO - play dedicated sound
                 LOG.info("utterance canceled, cancel_word:" + message.context.get("cancel_word"))
