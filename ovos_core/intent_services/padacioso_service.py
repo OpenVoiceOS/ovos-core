@@ -140,6 +140,16 @@ class PadaciosoService:
         """
         self.__detach_intent(message.data.get('intent_name'))
 
+    def __detach_entity(self, name, lang):
+        """ Remove an entity.
+
+        Args:
+            entity name
+            entity lang
+        """
+        if lang in self.containers:
+            self.containers[lang].remove_entity(name)
+
     def handle_detach_skill(self, message):
         """Messagebus handler for detaching all intents for skill.
 
@@ -150,6 +160,10 @@ class PadaciosoService:
         remove_list = [i for i in self.registered_intents if skill_id in i]
         for i in remove_list:
             self.__detach_intent(i)
+        skill_id_colon = skill_id + ":"
+        for en in self.registered_entities:
+            if en["name"].startswith(skill_id_colon):
+                self.__detach_entity(en["name"], en["lang"])
 
     def _register_object(self, message, object_name, register_func):
         """Generic method for registering a padacioso object.
