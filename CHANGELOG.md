@@ -2,7 +2,20 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a61...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a62...HEAD)
+
+**Fixed bugs:**
+
+- Padacioso fails when a skill with entities is reloaded [\#394](https://github.com/OpenVoiceOS/ovos-core/issues/394)
+- Deregister any entities when a skill is detached. Fixes \#394 [\#395](https://github.com/OpenVoiceOS/ovos-core/pull/395) ([lbt](https://github.com/lbt))
+
+**Merged pull requests:**
+
+- allow alpha versions of ovos-utils [\#398](https://github.com/OpenVoiceOS/ovos-core/pull/398) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a62](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a62) (2023-12-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a61...V0.0.8a62)
 
 **Fixed bugs:**
 
@@ -533,10 +546,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.7...V0.0.8a1)
 
-**Implemented enhancements:**
-
-- roadmap - 0.0.7 [\#270](https://github.com/OpenVoiceOS/ovos-core/issues/270)
-
 **Merged pull requests:**
 
 - Adds easy input box support for skill [\#298](https://github.com/OpenVoiceOS/ovos-core/pull/298) ([AIIX](https://github.com/AIIX))
@@ -625,17 +634,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.7a4...V0.0.7a5)
 
-**Implemented enhancements:**
-
-- skill loading requirements continued [\#272](https://github.com/OpenVoiceOS/ovos-core/pull/272) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.7a4](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a4) (2023-02-10)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.7a3...V0.0.7a4)
-
-**Merged pull requests:**
-
-- fix color scheme selection popups on vertical displays [\#275](https://github.com/OpenVoiceOS/ovos-core/pull/275) ([AIIX](https://github.com/AIIX))
 
 ## [V0.0.7a3](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a3) (2023-02-10)
 
@@ -652,10 +653,6 @@
 ## [V0.0.7a2](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a2) (2023-02-07)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.7a1...V0.0.7a2)
-
-**Fixed bugs:**
-
-- default VAD to "ovos-vad-plugin-webrtcvad" + setup/requirements cleanup [\#271](https://github.com/OpenVoiceOS/ovos-core/pull/271) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.7a1](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a1) (2023-02-02)
 
