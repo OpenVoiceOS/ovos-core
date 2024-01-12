@@ -26,6 +26,7 @@ class Query:
     responses_gathered: Event = Event()
     completed: Event = Event()
     answered: bool = False
+    selected_skill: str = ""
 
 
 class CommonQAService:
@@ -116,11 +117,11 @@ class CommonQAService:
             if self.is_question_like(utterance, lang):
                 message.data["lang"] = lang  # only used for speak
                 message.data["utterance"] = utterance
-                answered = self.handle_question(message)
+                answered, skill_id = self.handle_question(message)
                 if answered:
                     match = ovos_core.intent_services.IntentMatch('CommonQuery',
                                                                   None, {},
-                                                                  None,
+                                                                  skill_id,
                                                                   utterance)
                 break
         return match
@@ -168,7 +169,7 @@ class CommonQAService:
         self.active_queries.pop(sid)
         LOG.debug(f"answered={answered}|"
                   f"remaining active_queries={len(self.active_queries)}")
-        return answered
+        return answered, query.selected_skill
 
     def handle_query_response(self, message: Message):
         search_phrase = message.data['phrase']
@@ -243,6 +244,7 @@ class CommonQAService:
             if not best.get('handles_speech'):
                 self.speak(best['answer'], message.forward("", best))
             LOG.info('Handling with: ' + str(best['skill_id']))
+            query.selected_skill = best["skill_id"]
             response_data = {**best, "phrase": search_phrase}
             self.bus.emit(message.forward('question:action',
                                           data=response_data))
