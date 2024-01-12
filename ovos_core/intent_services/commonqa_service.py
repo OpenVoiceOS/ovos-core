@@ -21,6 +21,7 @@ class Query:
     query: str
     replies: list = None
     extensions: list = None
+    queried_skills: list = None
     query_time: float = time.time()
     timeout_time: float = time.time() + 1
     responses_gathered: Event = Event()
@@ -36,13 +37,22 @@ class CommonQAService:
         self.active_queries: Dict[str, Query] = dict()
         self.enclosure = EnclosureAPI(self.bus, self.skill_id)
         self._vocabs = {}
+        self.common_query_skills = None
         config = Configuration().get('skills', {}).get("common_query") or dict()
         self._extension_time = config.get('extension_time') or 3
         CommonQAService._EXTENSION_TIME = self._extension_time
         self._min_response_wait = config.get('min_response_wait') or 1
         self.bus.on('question:query.response', self.handle_query_response)
         self.bus.on('common_query.question', self.handle_question)
-        # TODO: Register available CommonQuery skills
+        self.bus.on('ovos.common_query.pong', self.handle_skill_pong)
+        self.bus.emit(Message("ovos.common_query.ping")) # gather any skills that already loaded
+
+    def handle_skill_pong(self, message: Message):
+        """ track running common query skills """
+        if self.common_query_skills is None:
+            self.common_query_skills = []
+        if msg.data["skill_id"] not in self.common_query_skills: 
+            self.common_query_skills.append(msg.data["skill_id"])
 
     def voc_match(self, utterance: str, voc_filename: str, lang: str,
                   exact: bool = False) -> bool:
@@ -113,6 +123,15 @@ class CommonQAService:
         # we call flatten in case someone is sending the old style list of tuples
         utterances = flatten_list(utterances)
         match = None
+
+        # exit early if no common query skills are installed
+        if self.common_query_skills is None:
+            # when None means a older ovos-workshop is in use
+            LOG.warning("you seem to be running an old ovos-workshop version, CommonQuery will wait minimum 2 seconds for skill responses")
+        elif not self.common_query_skills:
+            LOG.info("No Commonquery skills to search")
+            return None
+            
         for utterance in utterances:
             if self.is_question_like(utterance, lang):
                 message.data["lang"] = lang  # only used for speak
@@ -136,7 +155,7 @@ class CommonQAService:
         query = Query(session_id=sid, query=utt, replies=[], extensions=[],
                       query_time=time.time(), timeout_time=time.time() + 1,
                       responses_gathered=Event(), completed=Event(),
-                      answered=False)
+                      answered=False, queried_skills=self.common_query_skills)
         assert query.responses_gathered.is_set() is False
         assert query.completed.is_set() is False
         self.active_queries[sid] = query
@@ -180,6 +199,8 @@ class CommonQAService:
         query = self.active_queries.get(SessionManager.get(message).session_id)
         if not query:
             LOG.warning(f"No active query for: {search_phrase}")
+            return
+            
         # Manage requests for time to complete searches
         if searching:
             LOG.debug(f"{skill_id} is searching")
@@ -208,6 +229,10 @@ class CommonQAService:
             if not query.extensions:
                 LOG.debug(f"No more skills to wait for ({query.session_id})")
                 query.responses_gathered.set()
+
+            # if all skills answered, stop searching
+            if self.common_query_skills is not None and query.queried_skills == self.common_query_skills:
+                self._query_timeout(message)
 
     def _query_timeout(self, message: Message):
         """
