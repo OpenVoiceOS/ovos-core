@@ -154,7 +154,7 @@ class CommonQAService:
         timeout = False
         while not query.responses_gathered.wait(self._extension_time):
             # forcefully timeout if search is still going
-            if time.time() > query.timeout_time + 1:
+            if time.time() > query.timeout_time:
                 LOG.debug(f"Timeout gathering responses ({query.session_id})")
                 timeout = True
                 break
