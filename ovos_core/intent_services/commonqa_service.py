@@ -288,8 +288,7 @@ class CommonQAService:
             LOG.info('Handling with: ' + str(best['skill_id']))
             query.selected_skill = best["skill_id"]
             response_data = {**best, "phrase": search_phrase}
-            self.bus.emit(message.forward('question:action',
-                                          data=response_data))
+            self.bus.emit(message.reply('question:action', data=response_data))
             query.answered = True
         else:
             query.answered = False
