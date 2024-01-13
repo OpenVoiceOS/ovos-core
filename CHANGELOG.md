@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a62...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a63...HEAD)
+
+**Implemented enhancements:**
+
+- CommonQuery thread safety and concurrent request handling [\#329](https://github.com/OpenVoiceOS/ovos-core/pull/329) ([NeonDaniel](https://github.com/NeonDaniel))
+
+## [V0.0.8a63](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a63) (2024-01-08)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a62...V0.0.8a63)
 
 **Fixed bugs:**
 
@@ -645,10 +653,6 @@
 **Fixed bugs:**
 
 - rm setup skill [\#278](https://github.com/OpenVoiceOS/ovos-core/pull/278) ([JarbasAl](https://github.com/JarbasAl))
-
-**Closed issues:**
-
-- planned 0.0.7 breaks platforms and distribution packaging. [\#276](https://github.com/OpenVoiceOS/ovos-core/issues/276)
 
 ## [V0.0.7a2](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a2) (2023-02-07)
 
