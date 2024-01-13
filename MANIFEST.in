@@ -1,4 +1,5 @@
 recursive-include mycroft/ *
+recursive-include ovos-core/ *
 recursive-include requirements/ *
 include CHANGELOG.md
 include LICENSE
