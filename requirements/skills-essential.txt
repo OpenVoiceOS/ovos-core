@@ -8,6 +8,5 @@ ovos-skill-hello-world~=0.0, >=0.0.4a2
 ovos-skill-weather~=0.0, >=0.0.1a14
 ovos-skill-ddg
 ovos-skill-wolfie
-ovos-skill-news
 ovos-skill-parrot
 skill-ovos-fallback-chatgpt
