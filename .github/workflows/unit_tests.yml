@@ -57,6 +57,8 @@ jobs:
           pip install ./test/end2end/skill-ovos-fallback-unknownv1
           pip install ./test/end2end/skill-converse_test
           pip install ./test/end2end/skill-ovos-schedule
+          pip install ./test/end2end/skill-new-stop
+          pip install ./test/end2end/skill-old-stop
       - name: Install core repo
         run: |
           pip install -e .[mycroft,deprecated]

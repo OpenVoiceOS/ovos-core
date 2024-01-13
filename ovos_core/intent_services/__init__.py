@@ -22,6 +22,7 @@ from ovos_bus_client.session import SessionManager
 from ovos_core.intent_services.adapt_service import AdaptService
 from ovos_core.intent_services.commonqa_service import CommonQAService
 from ovos_core.intent_services.converse_service import ConverseService
+from ovos_core.intent_services.stop_service import StopService
 from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.padacioso_service import PadaciosoService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
@@ -71,6 +72,7 @@ class IntentService:
         self.fallback = FallbackService(bus)
         self.converse = ConverseService(bus)
         self.common_qa = CommonQAService(bus)
+        self.stop = StopService(bus)
         self.utterance_plugins = UtteranceTransformersService(bus, config=config)
         self.metadata_plugins = MetadataTransformersService(bus, config=config)
         # connection SessionManager to the bus,
@@ -216,6 +218,9 @@ class IntentService:
 
         matchers = {
             "converse": self.converse.converse_with_skills,
+            "stop_high": self.stop.match_stop_high,
+            "stop_medium": self.stop.match_stop_medium,
+            "stop_low": self.stop.match_stop_low,
             "padatious_high": padatious_matcher.match_high,
             "padacioso_high": self.padacioso_service.match_high,
             "adapt": self.adapt_service.match_intent,

@@ -1,4 +1,4 @@
-from ovos_utils.intents import IntentBuilder
+from ovos_workshop.intents import IntentBuilder
 from ovos_workshop.decorators import intent_handler
 from ovos_workshop.skills import OVOSSkill
 
