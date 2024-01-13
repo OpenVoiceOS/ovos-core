@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a64...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a65...HEAD)
+
+**Merged pull requests:**
+
+- Update MANIFEST.in [\#400](https://github.com/OpenVoiceOS/ovos-core/pull/400) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a65](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a65) (2024-01-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a64...V0.0.8a65)
 
 **Implemented enhancements:**
 
@@ -641,10 +649,6 @@
 ## [V0.0.7a6](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a6) (2023-02-10)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.7a5...V0.0.7a6)
-
-**Merged pull requests:**
-
-- Fix invalid license spec in setup.py [\#279](https://github.com/OpenVoiceOS/ovos-core/pull/279) ([NeonDaniel](https://github.com/NeonDaniel))
 
 ## [V0.0.7a5](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a5) (2023-02-10)
 
