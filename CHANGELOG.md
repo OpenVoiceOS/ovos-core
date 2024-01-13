@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a63...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a64...HEAD)
+
+**Implemented enhancements:**
+
+- feat/stop\_per\_session [\#391](https://github.com/OpenVoiceOS/ovos-core/pull/391) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a64](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a64) (2024-01-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a63...V0.0.8a64)
 
 **Implemented enhancements:**
 
@@ -649,10 +657,6 @@
 ## [V0.0.7a3](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a3) (2023-02-10)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.7a2...V0.0.7a3)
-
-**Fixed bugs:**
-
-- rm setup skill [\#278](https://github.com/OpenVoiceOS/ovos-core/pull/278) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.7a2](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a2) (2023-02-07)
 
