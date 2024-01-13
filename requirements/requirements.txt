@@ -18,4 +18,4 @@ ovos-workshop<0.1.0, >=0.0.15
 ovos-classifiers<0.1.0, >=0.0.0a48
 
 # ensure default plugin available for any solver plugins
-ovos-translate-plugin-server
+ovos-translate-server-plugin
