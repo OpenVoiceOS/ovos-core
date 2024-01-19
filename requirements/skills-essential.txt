@@ -5,9 +5,6 @@ ovos-skill-personal~=0.0, >=0.0.4a1
 ovos-skill-naptime~=0.2, >=0.2.2
 ovos-skill-date-time>=0.2.3a4
 ovos-skill-hello-world~=0.0, >=0.0.4a2
-ovos-skill-weather~=0.0, >=0.0.1a14
-ovos-skill-ddg
-ovos-skill-wolfie
-ovos-skill-wikipedia
 ovos-skill-parrot
-skill-ovos-fallback-chatgpt
+# TODO - publish
+# https://github.com/OpenVoiceOS/skill-ovos-boot-finished
