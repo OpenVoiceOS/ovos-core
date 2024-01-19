@@ -66,6 +66,8 @@ setup(
         'lgpl': required('requirements/lgpl.txt'),
         'deprecated': required('requirements/extra-deprecated.txt'),
         'skills-essential': required('requirements/skills-essential.txt'),
+        'skills-desktop': required('requirements/skills-desktop.txt'),
+        'skills-internet': required('requirements/skills-internet.txt'),
         'skills-media': required('requirements/skills-media.txt')
     },
     packages=find_packages(include=['mycroft*']) + find_packages(include=['ovos_core*']),
