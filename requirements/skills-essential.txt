@@ -8,3 +8,4 @@ ovos-skill-hello-world~=0.0, >=0.0.4a2
 ovos-skill-parrot
 # TODO - publish
 # https://github.com/OpenVoiceOS/skill-ovos-boot-finished
+# https://github.com/OpenVoiceOS/skill-ovos-audio-recording
