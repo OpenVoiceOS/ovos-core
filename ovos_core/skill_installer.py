@@ -37,11 +37,11 @@ class SkillsStore:
         pass
 
     def play_error_sound(self):
-        snd = Configuration().get("sounds", {}).get("pip_error", "snd/error.mp3")
+        snd = self.config.get("sounds", {}).get("pip_error", "snd/error.mp3")
         self.bus.emit(Message("mycroft.audio.play_sound", {"uri": snd}))
 
     def play_success_sound(self):
-        snd = Configuration().get("sounds", {}).get("pip_success", "snd/acknowledge.mp3")
+        snd = self.config.get("sounds", {}).get("pip_success", "snd/acknowledge.mp3")
         self.bus.emit(Message("mycroft.audio.play_sound", {"uri": snd}))
 
     def pip_install(self, packages: list,
@@ -81,7 +81,9 @@ class SkillsStore:
                     proc = Popen(pip_command, stdout=PIPE, stderr=PIPE)
                 pip_code = proc.wait()
                 if pip_code != 0:
-                    stderr = proc.stderr.read().decode()
+                    stderr = proc.stderr
+                    if stderr:
+                        stderr = stderr.read().decode()
                     self.play_error_sound()
                     raise RuntimeError(stderr)
 
@@ -198,7 +200,7 @@ class SkillsStore:
             self.bus.emit(message.reply("ovos.pip.install.failed",
                                         {"error": InstallError.DISABLED.value}))
             return
-        pkgs = message.data["packages"]
+        pkgs = message.data.get("packages")
         if pkgs:
             if self.pip_install(pkgs):
                 self.bus.emit(message.reply("ovos.pip.install.complete"))
@@ -216,7 +218,7 @@ class SkillsStore:
             self.bus.emit(message.reply("ovos.pip.uninstall.failed",
                                         {"error": InstallError.DISABLED.value}))
             return
-        pkgs = message.data["packages"]
+        pkgs = message.data.get("packages")
         if pkgs:
             if self.pip_uninstall(pkgs):
                 self.bus.emit(message.reply("ovos.pip.uninstall.complete"))
