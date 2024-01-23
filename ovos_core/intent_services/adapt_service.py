@@ -57,6 +57,11 @@ class AdaptService:
         self.lock = Lock()
         self.max_words = 50  # if an utterance contains more words than this, don't attempt to match
 
+        # TODO sanitize config option
+        self.conf_high = self.config.get("conf_high") or 0.95
+        self.conf_med = self.config.get("conf_med") or 0.8
+        self.conf_low = self.config.get("conf_low") or 0.5
+
     @property
     def context_keywords(self):
         LOG.warning(
@@ -127,8 +132,35 @@ class AdaptService:
         sess = SessionManager.get()
         ents = [tag['entities'][0] for tag in intent['__tags__'] if 'entities' in tag]
         sess.context.update_context(ents)
+    
+    def match_high(self, utterances, lang=None, message=None):
+        """Intent matcher for high confidence.
 
-    def match_intent(self, utterances, lang=None, message=None):
+        Args:
+            utterances (list of tuples): Utterances to parse, originals paired
+                                         with optional normalized version.
+        """
+        return self.match_intent(utterances, self.conf_high, lang, message)
+
+    def match_medium(self, utterances, lang=None, message=None):
+        """Intent matcher for medium confidence.
+
+        Args:
+            utterances (list of tuples): Utterances to parse, originals paired
+                                         with optional normalized version.
+        """
+        return self.match_intent(utterances, self.conf_med, lang, message)
+
+    def match_low(self, utterances, lang=None, message=None):
+        """Intent matcher for low confidence.
+
+        Args:
+            utterances (list of tuples): Utterances to parse, originals paired
+                                         with optional normalized version.
+        """
+        return self.match_intent(utterances, self.conf_low, lang, message)
+
+    def match_intent(self, utterances, limit, lang=None, message=None):
         """Run the Adapt engine to search for an matching intent.
 
         Args:
@@ -160,7 +192,7 @@ class AdaptService:
             nonlocal best_intent
             best = best_intent.get('confidence', 0.0) if best_intent else 0.0
             conf = intent.get('confidence', 0.0)
-            if conf > best:
+            if best < conf >= limit:
                 best_intent = intent
                 # TODO - Shouldn't Adapt do this?
                 best_intent['utterance'] = utt
