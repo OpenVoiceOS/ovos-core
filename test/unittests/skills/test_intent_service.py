@@ -21,7 +21,6 @@ from ovos_config import Configuration
 from ovos_bus_client.message import Message
 from ovos_core.intent_services import IntentService
 from ovos_bus_client.util import get_message_lang
-from ovos_bus_client.session import Session
 from ovos_utils.log import LOG
 from ovos_core.intent_services.adapt_service import ContextManager
 
@@ -133,22 +132,6 @@ def get_last_message(bus):
 class TestIntentServiceApi(TestCase):
     def setUp(self):
         self.intent_service = IntentService(mock.Mock())
-        self.sess = Session("adapt",
-                       pipeline=[
-                           "stop_high",
-                           "converse",
-                           "padatious_high",
-                           "adapt_high",
-                           "common_qa",
-                           "fallback_high",
-                           "stop_medium",
-                           "padatious_medium",
-                           "adapt_medium",
-                           "fallback_medium",
-                           "padatious_low",
-                           "adapt_low",
-                           "fallback_low"
-                       ])
 
     def setup_simple_adapt_intent(self,
                                   msg=create_vocab_msg('testKeyword', 'test')):
@@ -165,8 +148,7 @@ class TestIntentServiceApi(TestCase):
 
         # Check that the intent is returned
         msg = Message('intent.service.adapt.get',
-                      data={'utterance': 'test'},
-                      context={"session": self.sess.serialize()})
+                      data={'utterance': 'test'})
         self.intent_service.handle_get_adapt(msg)
 
         reply = get_last_message(self.intent_service.bus)
@@ -177,8 +159,7 @@ class TestIntentServiceApi(TestCase):
         self.setup_simple_adapt_intent()
         # Check that the intent is returned
         msg = Message('intent.service.adapt.get',
-                      data={'utterance': 'test'},
-                      context={"session": self.sess.serialize()})
+                      data={'utterance': 'test'})
         self.intent_service.handle_get_adapt(msg)
 
         reply = get_last_message(self.intent_service.bus)
@@ -190,8 +171,7 @@ class TestIntentServiceApi(TestCase):
         self.setup_simple_adapt_intent()
         # Check that no intent is matched
         msg = Message('intent.service.adapt.get',
-                      data={'utterance': 'five'},
-                      context={"session": self.sess.serialize()})
+                      data={'utterance': 'five'})
         self.intent_service.handle_get_adapt(msg)
         reply = get_last_message(self.intent_service.bus)
         self.assertEqual(reply.data['intent'], None)
@@ -201,8 +181,7 @@ class TestIntentServiceApi(TestCase):
         self.setup_simple_adapt_intent()
         # Check that the intent is returned
         msg = Message('intent.service.adapt.get',
-                      data={'utterance': 'test'},
-                      context={"session": self.sess.serialize()})
+                      data={'utterance': 'test'})
         self.intent_service.handle_get_intent(msg)
 
         reply = get_last_message(self.intent_service.bus)
@@ -214,8 +193,7 @@ class TestIntentServiceApi(TestCase):
         self.setup_simple_adapt_intent()
         # Check that no intent is matched
         msg = Message('intent.service.intent.get',
-                      data={'utterance': 'five'},
-                      context={"session": self.sess.serialize()})
+                      data={'utterance': 'five'})
         self.intent_service.handle_get_intent(msg)
         reply = get_last_message(self.intent_service.bus)
         self.assertEqual(reply.data['intent'], None)
@@ -225,8 +203,7 @@ class TestIntentServiceApi(TestCase):
         self.setup_simple_adapt_intent()
         # Check that no intent is matched
         msg = Message('intent.service.intent.get',
-                      data={'utterance': 'five'},
-                      context={"session": self.sess.serialize()})
+                      data={'utterance': 'five'})
         self.intent_service.handle_get_intent(msg)
         reply = get_last_message(self.intent_service.bus)
         self.assertEqual(reply.data['intent'], None)
@@ -234,8 +211,7 @@ class TestIntentServiceApi(TestCase):
     def test_get_adapt_intent_manifest(self):
         """Make sure the manifest returns a list of Intent Parser objects."""
         self.setup_simple_adapt_intent()
-        msg = Message('intent.service.adapt.manifest.get',
-                      context={"session": self.sess.serialize()})
+        msg = Message('intent.service.adapt.manifest.get')
         self.intent_service.handle_adapt_manifest(msg)
         reply = get_last_message(self.intent_service.bus)
         self.assertEqual(reply.data['intents'][0]['name'],
@@ -243,8 +219,7 @@ class TestIntentServiceApi(TestCase):
 
     def test_get_adapt_vocab_manifest(self):
         self.setup_simple_adapt_intent()
-        msg = Message('intent.service.adapt.vocab.manifest.get',
-                      context={"session": self.sess.serialize()})
+        msg = Message('intent.service.adapt.vocab.manifest.get')
         self.intent_service.handle_vocab_manifest(msg)
         reply = get_last_message(self.intent_service.bus)
         value = reply.data['vocab'][0]['entity_value']
@@ -257,8 +232,7 @@ class TestIntentServiceApi(TestCase):
         self.setup_simple_adapt_intent()
         # Check that no intent is matched
         msg = Message('detach_intent',
-                      data={'intent_name': 'skill:testIntent'},
-                      context={"session": self.sess.serialize()})
+                      data={'intent_name': 'skill:testIntent'})
         self.intent_service.handle_detach_intent(msg)
         msg = Message('intent.service.adapt.get', data={'utterance': 'test'})
         self.intent_service.handle_get_adapt(msg)
@@ -270,8 +244,7 @@ class TestIntentServiceApi(TestCase):
         self.setup_simple_adapt_intent()
         # Check that no intent is matched
         msg = Message('detach_intent',
-                      data={'skill_id': 'skill'},
-                      context={"session": self.sess.serialize()})
+                      data={'skill_id': 'skill'})
         self.intent_service.handle_detach_skill(msg)
         msg = Message('intent.service.adapt.get', data={'utterance': 'test'})
         self.intent_service.handle_get_adapt(msg)

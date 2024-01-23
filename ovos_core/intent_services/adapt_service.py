@@ -14,6 +14,7 @@
 #
 """An intent parsing service using the Adapt parser."""
 from threading import Lock
+from functools import lru_cache
 
 from adapt.engine import IntentDeterminationEngine
 from ovos_config.config import Configuration
@@ -140,7 +141,10 @@ class AdaptService:
             utterances (list of tuples): Utterances to parse, originals paired
                                          with optional normalized version.
         """
-        return self.match_intent(utterances, self.conf_high, lang, message)
+        match = self.match_intent(utterances, lang, message.serialize())
+        if match and match.confidence > self.conf_high:
+            return match
+        return None
 
     def match_medium(self, utterances, lang=None, message=None):
         """Intent matcher for medium confidence.
@@ -149,7 +153,10 @@ class AdaptService:
             utterances (list of tuples): Utterances to parse, originals paired
                                          with optional normalized version.
         """
-        return self.match_intent(utterances, self.conf_med, lang, message)
+        match = self.match_intent(utterances, lang, message.serialize())
+        if match and match.confidence > self.conf_med:
+            return match
+        return None
 
     def match_low(self, utterances, lang=None, message=None):
         """Intent matcher for low confidence.
@@ -158,9 +165,13 @@ class AdaptService:
             utterances (list of tuples): Utterances to parse, originals paired
                                          with optional normalized version.
         """
-        return self.match_intent(utterances, self.conf_low, lang, message)
+        match = self.match_intent(utterances, lang, message.serialize())
+        if match and match.confidence > self.conf_low:
+            return match
+        return None
 
-    def match_intent(self, utterances, limit=0, lang=None, message=None):
+    @lru_cache(maxsize=3)
+    def match_intent(self, utterances, lang=None, message=None):
         """Run the Adapt engine to search for an matching intent.
 
         Args:
@@ -195,7 +206,7 @@ class AdaptService:
             nonlocal best_intent
             best = best_intent.get('confidence', 0.0) if best_intent else 0.0
             conf = intent.get('confidence', 0.0)
-            if best < conf >= limit:
+            if best < conf:
                 best_intent = intent
                 # TODO - Shouldn't Adapt do this?
                 best_intent['utterance'] = utt
