@@ -135,7 +135,7 @@ class AdaptService:
         ents = [tag['entities'][0] for tag in intent['__tags__'] if 'entities' in tag]
         sess.context.update_context(ents)
     
-    def match_high(self, utterances: List[str, tuple],
+    def match_high(self, utterances: List[str],
                          lang: Optional[str] = None,
                          message: Optional[Message] = None):
         """Intent matcher for high confidence.
@@ -149,7 +149,7 @@ class AdaptService:
             return match
         return None
 
-    def match_medium(self, utterances: List[str, tuple],
+    def match_medium(self, utterances: List[str],
                            lang: Optional[str] = None,
                            message: Optional[Message] = None):
         """Intent matcher for medium confidence.
@@ -163,7 +163,7 @@ class AdaptService:
             return match
         return None
 
-    def match_low(self, utterances: List[str, tuple],
+    def match_low(self, utterances: List[str],
                         lang: Optional[str] = None,
                         message: Optional[Message] = None):
         """Intent matcher for low confidence.
@@ -178,7 +178,7 @@ class AdaptService:
         return None
 
     @lru_cache(maxsize=3)
-    def match_intent(self, utterances: Tuple[str, tuple],
+    def match_intent(self, utterances: Tuple[str],
                            lang: Optional[str] = None,
                            message: Optional[str] = None):
         """Run the Adapt engine to search for an matching intent.
