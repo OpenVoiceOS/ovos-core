@@ -504,7 +504,7 @@ class IntentService:
         """
         utterance = message.data["utterance"]
         lang = get_message_lang(message)
-        intent = self.adapt_service.match_intent([utterance], lang, message)
+        intent = self.adapt_service.match_intent([utterance], lang=lang, message=message)
         intent_data = intent.intent_data if intent else None
         self.bus.emit(message.reply("intent.service.adapt.reply",
                                     {"intent": intent_data}))

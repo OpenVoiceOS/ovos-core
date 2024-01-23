@@ -160,7 +160,7 @@ class AdaptService:
         """
         return self.match_intent(utterances, self.conf_low, lang, message)
 
-    def match_intent(self, utterances, limit, lang=None, message=None):
+    def match_intent(self, utterances, limit=0, lang=None, message=None):
         """Run the Adapt engine to search for an matching intent.
 
         Args:
