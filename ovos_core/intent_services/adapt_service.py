@@ -145,7 +145,7 @@ class AdaptService:
                                          with optional normalized version.
         """
         match = self.match_intent(tuple(utterances), lang, message.serialize())
-        if match and match.confidence > self.conf_high:
+        if match and match.intent_data.get("confidence", 0.0) > self.conf_high:
             return match
         return None
 
@@ -159,7 +159,7 @@ class AdaptService:
                                          with optional normalized version.
         """
         match = self.match_intent(tuple(utterances), lang, message.serialize())
-        if match and match.confidence > self.conf_med:
+        if match and match.intent_data.get("confidence", 0.0) > self.conf_med:
             return match
         return None
 
@@ -173,7 +173,7 @@ class AdaptService:
                                          with optional normalized version.
         """
         match = self.match_intent(tuple(utterances), lang, message.serialize())
-        if match and match.confidence > self.conf_low:
+        if match and match.intent_data.get("confidence", 0.0) > self.conf_low:
             return match
         return None
 
