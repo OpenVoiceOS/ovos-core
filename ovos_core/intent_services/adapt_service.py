@@ -164,12 +164,15 @@ class AdaptService:
         """Run the Adapt engine to search for an matching intent.
 
         Args:
-            utterances (iterable): utterances for consideration in intent
-            matching. As a practical matter, a single utterance will be
-            passed in most cases.  But there are instances, such as
-            streaming STT that could pass multiple.  Each utterance
-            is represented as a tuple containing the raw, normalized, and
-            possibly other variations of the utterance.
+            utterances (iterable): utterances for consideration in intent 
+                    matching. As a practical matter, a single utterance will 
+                    be passed in most cases. But there are instances, such as
+                    streaming STT that could pass multiple. Each utterance is 
+                    represented as a tuple containing the raw, normalized, and
+                    possibly other variations of the utterance.
+            limit (float): confidence threshold for intent matching
+            lang (str): language to use for intent matching
+            message (Message): message to use for context
 
         Returns:
             Intent structure, or None if no match was found.
