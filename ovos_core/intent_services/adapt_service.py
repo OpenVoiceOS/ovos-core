@@ -15,10 +15,11 @@
 """An intent parsing service using the Adapt parser."""
 from threading import Lock
 from functools import lru_cache
+from typing import List, Tuple, Optional
 
 from adapt.engine import IntentDeterminationEngine
 from ovos_config.config import Configuration
-
+from ovos_bus_client.message import Message
 import ovos_core.intent_services
 from ovos_bus_client.session import IntentContextManager as ContextManager, \
     SessionManager
@@ -134,44 +135,52 @@ class AdaptService:
         ents = [tag['entities'][0] for tag in intent['__tags__'] if 'entities' in tag]
         sess.context.update_context(ents)
     
-    def match_high(self, utterances, lang=None, message=None):
+    def match_high(self, utterances: List[str, tuple],
+                         lang: Optional[str] = None,
+                         message: Optional[Message] = None):
         """Intent matcher for high confidence.
 
         Args:
             utterances (list of tuples): Utterances to parse, originals paired
                                          with optional normalized version.
         """
-        match = self.match_intent(utterances, lang, message.serialize())
+        match = self.match_intent(tuple(utterances), lang, message.serialize())
         if match and match.confidence > self.conf_high:
             return match
         return None
 
-    def match_medium(self, utterances, lang=None, message=None):
+    def match_medium(self, utterances: List[str, tuple],
+                           lang: Optional[str] = None,
+                           message: Optional[Message] = None):
         """Intent matcher for medium confidence.
 
         Args:
             utterances (list of tuples): Utterances to parse, originals paired
                                          with optional normalized version.
         """
-        match = self.match_intent(utterances, lang, message.serialize())
+        match = self.match_intent(tuple(utterances), lang, message.serialize())
         if match and match.confidence > self.conf_med:
             return match
         return None
 
-    def match_low(self, utterances, lang=None, message=None):
+    def match_low(self, utterances: List[str, tuple],
+                        lang: Optional[str] = None,
+                        message: Optional[Message] = None):
         """Intent matcher for low confidence.
 
         Args:
             utterances (list of tuples): Utterances to parse, originals paired
                                          with optional normalized version.
         """
-        match = self.match_intent(utterances, lang, message.serialize())
+        match = self.match_intent(tuple(utterances), lang, message.serialize())
         if match and match.confidence > self.conf_low:
             return match
         return None
 
     @lru_cache(maxsize=3)
-    def match_intent(self, utterances, lang=None, message=None):
+    def match_intent(self, utterances: Tuple[str, tuple],
+                           lang: Optional[str] = None,
+                           message: Optional[str] = None):
         """Run the Adapt engine to search for an matching intent.
 
         Args:
@@ -211,6 +220,8 @@ class AdaptService:
                 # TODO - Shouldn't Adapt do this?
                 best_intent['utterance'] = utt
 
+        if message:
+            message = Message.deserialize(message)
         sess = SessionManager.get(message)
         for utt in utterances:
             try:

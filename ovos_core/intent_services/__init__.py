@@ -496,7 +496,7 @@ class IntentService:
         """
         self.converse.handle_get_active_skills(message)
 
-    def handle_get_adapt(self, message):
+    def handle_get_adapt(self, message: Message):
         """handler getting the adapt response for an utterance.
 
         Args:
@@ -504,7 +504,7 @@ class IntentService:
         """
         utterance = message.data["utterance"]
         lang = get_message_lang(message)
-        intent = self.adapt_service.match_intent([utterance], lang, message)
+        intent = self.adapt_service.match_intent([utterance], lang, message.serialize())
         intent_data = intent.intent_data if intent else None
         self.bus.emit(message.reply("intent.service.adapt.reply",
                                     {"intent": intent_data}))
