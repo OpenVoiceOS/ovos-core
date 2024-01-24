@@ -57,7 +57,8 @@ class UtteranceTransformersService:
         for module in self.plugins:
             try:
                 utterances, data = module.transform(utterances, context)
-                LOG.debug(f"{module.name}: {data}")
+                _safe = {k:v for k,v in data.items() if k != "session"}  # no leaking TTS/STT creds in logs    
+                LOG.debug(f"{module.name}: {_safe}")
                 context = merge_dict(context, data)
             except Exception as e:
                 LOG.warning(f"{module.name} transform exception: {e}")
@@ -111,8 +112,9 @@ class MetadataTransformersService:
 
         for module in self.plugins:
             try:
-                data = module.transform(context)
-                LOG.debug(f"{module.name}: {data}")
+                data = module.transform(context)                
+                _safe = {k:v for k,v in data.items() if k != "session"}  # no leaking TTS/STT creds in logs    
+                LOG.debug(f"{module.name}: {_safe}")
                 context = merge_dict(context, data)
             except Exception as e:
                 LOG.warning(f"{module.name} transform exception: {e}")
