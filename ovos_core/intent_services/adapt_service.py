@@ -14,10 +14,12 @@
 #
 """An intent parsing service using the Adapt parser."""
 from threading import Lock
+from functools import lru_cache
+from typing import List, Tuple, Optional
 
 from adapt.engine import IntentDeterminationEngine
 from ovos_config.config import Configuration
-
+from ovos_bus_client.message import Message
 import ovos_core.intent_services
 from ovos_bus_client.session import IntentContextManager as ContextManager, \
     SessionManager
@@ -56,6 +58,11 @@ class AdaptService:
 
         self.lock = Lock()
         self.max_words = 50  # if an utterance contains more words than this, don't attempt to match
+
+        # TODO sanitize config option
+        self.conf_high = self.config.get("conf_high") or 0.95
+        self.conf_med = self.config.get("conf_med") or 0.8
+        self.conf_low = self.config.get("conf_low") or 0.5
 
     @property
     def context_keywords(self):
@@ -127,17 +134,65 @@ class AdaptService:
         sess = SessionManager.get()
         ents = [tag['entities'][0] for tag in intent['__tags__'] if 'entities' in tag]
         sess.context.update_context(ents)
+    
+    def match_high(self, utterances: List[str],
+                         lang: Optional[str] = None,
+                         message: Optional[Message] = None):
+        """Intent matcher for high confidence.
 
-    def match_intent(self, utterances, lang=None, message=None):
+        Args:
+            utterances (list of tuples): Utterances to parse, originals paired
+                                         with optional normalized version.
+        """
+        match = self.match_intent(tuple(utterances), lang, message.serialize())
+        if match and match.intent_data.get("confidence", 0.0) > self.conf_high:
+            return match
+        return None
+
+    def match_medium(self, utterances: List[str],
+                           lang: Optional[str] = None,
+                           message: Optional[Message] = None):
+        """Intent matcher for medium confidence.
+
+        Args:
+            utterances (list of tuples): Utterances to parse, originals paired
+                                         with optional normalized version.
+        """
+        match = self.match_intent(tuple(utterances), lang, message.serialize())
+        if match and match.intent_data.get("confidence", 0.0) > self.conf_med:
+            return match
+        return None
+
+    def match_low(self, utterances: List[str],
+                        lang: Optional[str] = None,
+                        message: Optional[Message] = None):
+        """Intent matcher for low confidence.
+
+        Args:
+            utterances (list of tuples): Utterances to parse, originals paired
+                                         with optional normalized version.
+        """
+        match = self.match_intent(tuple(utterances), lang, message.serialize())
+        if match and match.intent_data.get("confidence", 0.0) > self.conf_low:
+            return match
+        return None
+
+    @lru_cache(maxsize=3)
+    def match_intent(self, utterances: Tuple[str],
+                           lang: Optional[str] = None,
+                           message: Optional[str] = None):
         """Run the Adapt engine to search for an matching intent.
 
         Args:
-            utterances (iterable): utterances for consideration in intent
-            matching. As a practical matter, a single utterance will be
-            passed in most cases.  But there are instances, such as
-            streaming STT that could pass multiple.  Each utterance
-            is represented as a tuple containing the raw, normalized, and
-            possibly other variations of the utterance.
+            utterances (iterable): utterances for consideration in intent 
+                    matching. As a practical matter, a single utterance will 
+                    be passed in most cases. But there are instances, such as
+                    streaming STT that could pass multiple. Each utterance is 
+                    represented as a tuple containing the raw, normalized, and
+                    possibly other variations of the utterance.
+            limit (float): confidence threshold for intent matching
+            lang (str): language to use for intent matching
+            message (Message): message to use for context
 
         Returns:
             Intent structure, or None if no match was found.
@@ -160,11 +215,13 @@ class AdaptService:
             nonlocal best_intent
             best = best_intent.get('confidence', 0.0) if best_intent else 0.0
             conf = intent.get('confidence', 0.0)
-            if conf > best:
+            if best < conf:
                 best_intent = intent
                 # TODO - Shouldn't Adapt do this?
                 best_intent['utterance'] = utt
 
+        if message:
+            message = Message.deserialize(message)
         sess = SessionManager.get(message)
         for utt in utterances:
             try:

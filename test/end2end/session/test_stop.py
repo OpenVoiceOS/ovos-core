@@ -47,13 +47,14 @@ class TestSessions(TestCase):
                            "stop_high",
                            "converse",
                            "padatious_high",
-                           "adapt",
-                           "common_qa",
+                           "adapt_high",
                            "fallback_high",
                            "stop_medium",
                            "padatious_medium",
+                           "adapt_medium",
+                           "adapt_low",
+                           "common_qa",
                            "fallback_medium",
-                           "padatious_low",
                            "fallback_low"
                        ])
 
@@ -238,13 +239,14 @@ class TestSessions(TestCase):
                            "stop_high",
                            "converse",
                            "padatious_high",
-                           "adapt",
-                           "common_qa",
+                           "adapt_high",
                            "fallback_high",
                            "stop_medium",
                            "padatious_medium",
+                           "adapt_medium",
+                           "adapt_low",
+                           "common_qa",
                            "fallback_medium",
-                           "padatious_low",
                            "fallback_low"
                        ])
 

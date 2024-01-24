@@ -223,14 +223,16 @@ class IntentService:
             "stop_low": self.stop.match_stop_low,
             "padatious_high": padatious_matcher.match_high,
             "padacioso_high": self.padacioso_service.match_high,
-            "adapt": self.adapt_service.match_intent,
+            "adapt_high": self.adapt_service.match_high,
             "common_qa": self.common_qa.match,
             "fallback_high": self.fallback.high_prio,
             "padatious_medium": padatious_matcher.match_medium,
             "padacioso_medium": self.padacioso_service.match_medium,
+            "adapt_medium": self.adapt_service.match_medium,
             "fallback_medium": self.fallback.medium_prio,
             "padatious_low": padatious_matcher.match_low,
             "padacioso_low": self.padacioso_service.match_low,
+            "adapt_low": self.adapt_service.match_low,
             "fallback_low": self.fallback.low_prio
         }
         skips = skips or []
@@ -494,7 +496,7 @@ class IntentService:
         """
         self.converse.handle_get_active_skills(message)
 
-    def handle_get_adapt(self, message):
+    def handle_get_adapt(self, message: Message):
         """handler getting the adapt response for an utterance.
 
         Args:
@@ -502,7 +504,7 @@ class IntentService:
         """
         utterance = message.data["utterance"]
         lang = get_message_lang(message)
-        intent = self.adapt_service.match_intent([utterance], lang, message)
+        intent = self.adapt_service.match_intent((utterance,), lang, message.serialize())
         intent_data = intent.intent_data if intent else None
         self.bus.emit(message.reply("intent.service.adapt.reply",
                                     {"intent": intent_data}))

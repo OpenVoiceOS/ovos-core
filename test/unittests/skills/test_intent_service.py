@@ -147,7 +147,8 @@ class TestIntentServiceApi(TestCase):
         )
 
         # Check that the intent is returned
-        msg = Message('intent.service.adapt.get', data={'utterance': 'test'})
+        msg = Message('intent.service.adapt.get',
+                      data={'utterance': 'test'})
         self.intent_service.handle_get_adapt(msg)
 
         reply = get_last_message(self.intent_service.bus)
@@ -157,7 +158,8 @@ class TestIntentServiceApi(TestCase):
     def test_get_adapt_intent(self):
         self.setup_simple_adapt_intent()
         # Check that the intent is returned
-        msg = Message('intent.service.adapt.get', data={'utterance': 'test'})
+        msg = Message('intent.service.adapt.get',
+                      data={'utterance': 'test'})
         self.intent_service.handle_get_adapt(msg)
 
         reply = get_last_message(self.intent_service.bus)
@@ -168,7 +170,8 @@ class TestIntentServiceApi(TestCase):
         """Check that if the intent doesn't match at all None is returned."""
         self.setup_simple_adapt_intent()
         # Check that no intent is matched
-        msg = Message('intent.service.adapt.get', data={'utterance': 'five'})
+        msg = Message('intent.service.adapt.get',
+                      data={'utterance': 'five'})
         self.intent_service.handle_get_adapt(msg)
         reply = get_last_message(self.intent_service.bus)
         self.assertEqual(reply.data['intent'], None)
@@ -177,7 +180,8 @@ class TestIntentServiceApi(TestCase):
         """Check that the registered adapt intent is triggered."""
         self.setup_simple_adapt_intent()
         # Check that the intent is returned
-        msg = Message('intent.service.adapt.get', data={'utterance': 'test'})
+        msg = Message('intent.service.adapt.get',
+                      data={'utterance': 'test'})
         self.intent_service.handle_get_intent(msg)
 
         reply = get_last_message(self.intent_service.bus)
@@ -188,7 +192,8 @@ class TestIntentServiceApi(TestCase):
         """Check that if the intent doesn't match at all None is returned."""
         self.setup_simple_adapt_intent()
         # Check that no intent is matched
-        msg = Message('intent.service.intent.get', data={'utterance': 'five'})
+        msg = Message('intent.service.intent.get',
+                      data={'utterance': 'five'})
         self.intent_service.handle_get_intent(msg)
         reply = get_last_message(self.intent_service.bus)
         self.assertEqual(reply.data['intent'], None)
@@ -197,7 +202,8 @@ class TestIntentServiceApi(TestCase):
         """Check that if the intent doesn't match at all None is returned."""
         self.setup_simple_adapt_intent()
         # Check that no intent is matched
-        msg = Message('intent.service.intent.get', data={'utterance': 'five'})
+        msg = Message('intent.service.intent.get',
+                      data={'utterance': 'five'})
         self.intent_service.handle_get_intent(msg)
         reply = get_last_message(self.intent_service.bus)
         self.assertEqual(reply.data['intent'], None)
