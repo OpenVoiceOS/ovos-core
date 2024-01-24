@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a67...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a68...HEAD)
+
+**Implemented enhancements:**
+
+- add "ovos.utterance.cancelled" event [\#404](https://github.com/OpenVoiceOS/ovos-core/pull/404) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a68](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a68) (2024-01-24)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a67...V0.0.8a68)
 
 **Fixed bugs:**
 
