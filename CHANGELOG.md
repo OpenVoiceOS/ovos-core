@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a66...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a67...HEAD)
+
+**Fixed bugs:**
+
+- fix/credentials\_leaking\_in\_logs [\#403](https://github.com/OpenVoiceOS/ovos-core/pull/403) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a67](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a67) (2024-01-24)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a66...V0.0.8a67)
 
 **Closed issues:**
 
@@ -561,10 +569,6 @@
 ## [V0.0.8a3](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a3) (2023-04-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a2...V0.0.8a3)
-
-**Merged pull requests:**
-
-- add common\_play.voc translations [\#284](https://github.com/OpenVoiceOS/ovos-core/pull/284) ([emphasize](https://github.com/emphasize))
 
 ## [V0.0.8a2](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a2) (2023-04-11)
 
