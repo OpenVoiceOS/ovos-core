@@ -291,6 +291,12 @@ class IntentService:
 
             # Get utterance utterance_plugins additional context
             message = self._handle_transformers(message)
+            
+            if message.context.get("canceled"):
+                # TODO - play dedicated sound
+                LOG.info("utterance canceled, cancel_word:" + message.context.get("cancel_word"))
+                self.bus.emit(message.reply("ovos.utterance.cancelled"))
+                return
 
             # tag language of this utterance
             lang = self.disambiguate_lang(message)
