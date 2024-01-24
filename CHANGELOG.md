@@ -2,7 +2,19 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a65...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a66...HEAD)
+
+**Closed issues:**
+
+- Select a new STT engine for unit tests [\#289](https://github.com/OpenVoiceOS/ovos-core/issues/289)
+
+**Merged pull requests:**
+
+- add adapt match levels [\#402](https://github.com/OpenVoiceOS/ovos-core/pull/402) ([emphasize](https://github.com/emphasize))
+
+## [V0.0.8a66](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a66) (2024-01-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a65...V0.0.8a66)
 
 **Merged pull requests:**
 
@@ -618,10 +630,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.7a9...V0.0.7a10)
 
-**Merged pull requests:**
-
-- Add default skills [\#282](https://github.com/OpenVoiceOS/ovos-core/pull/282) ([NeonDaniel](https://github.com/NeonDaniel))
-
 ## [V0.0.7a9](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a9) (2023-03-01)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.7a8...V0.0.7a9)
@@ -641,10 +649,6 @@
 ## [V0.0.7a7](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a7) (2023-02-11)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.7a6...V0.0.7a7)
-
-**Merged pull requests:**
-
-- Debug and fix skill load errors [\#280](https://github.com/OpenVoiceOS/ovos-core/pull/280) ([NeonDaniel](https://github.com/NeonDaniel))
 
 ## [V0.0.7a6](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a6) (2023-02-10)
 
