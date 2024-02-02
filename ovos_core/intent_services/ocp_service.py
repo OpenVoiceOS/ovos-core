@@ -161,9 +161,10 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             self.intent_matchers[lang] = IntentContainer()
             for intent_name in self.intents:
                 samples = intent_data.get(intent_name)
-                LOG.debug(f"registering OCP intent: {intent_name}")
-                self.intent_matchers[lang].add_intent(
-                    intent_name.replace(".intent", ""), samples)
+                if samples:
+                    LOG.debug(f"registering OCP intent: {intent_name}")
+                    self.intent_matchers[lang].add_intent(
+                        intent_name.replace(".intent", ""), samples)
 
         self.bus.on("ocp:play", self.handle_play_intent)
         self.bus.on("ocp:play_favorites", self.handle_play_favorites_intent)
