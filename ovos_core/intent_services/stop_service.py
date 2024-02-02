@@ -22,7 +22,7 @@ class StopService:
         self.load_resource_files()
 
     def load_resource_files(self):
-        base = f"{dirname(dirname(__file__))}/locale"
+        base = f"{dirname(__file__)}/locale"
         for lang in os.listdir(base):
             lang2 = lang.split("-")[0].lower()
             self._voc_cache[lang2] = {}

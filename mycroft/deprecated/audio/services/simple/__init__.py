@@ -230,6 +230,16 @@ class SimpleAudioService(AudioBackend):
                 self.process.kill()
         self.process = None
 
+    # mandatory abstract methods
+    def get_track_length(self) -> int:
+        return 0
+
+    def get_track_position(self) -> int:
+        return 0
+
+    def set_track_position(self, milliseconds):
+        pass
+
 
 def load_service(base_config, bus):
     backends = base_config.get('backends', [])
