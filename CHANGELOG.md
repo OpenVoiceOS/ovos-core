@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a68...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a69...HEAD)
+
+**Implemented enhancements:**
+
+- ocp pipeline [\#396](https://github.com/OpenVoiceOS/ovos-core/pull/396) ([NeonJarbas](https://github.com/NeonJarbas))
+
+## [V0.0.8a69](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a69) (2024-01-24)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a68...V0.0.8a69)
 
 **Implemented enhancements:**
 
@@ -653,10 +661,6 @@
 ## [V0.0.7a8](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a8) (2023-02-23)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.7a7...V0.0.7a8)
-
-**Merged pull requests:**
-
-- add wallpaper settings and switch all to new wallpaper manager [\#286](https://github.com/OpenVoiceOS/ovos-core/pull/286) ([AIIX](https://github.com/AIIX))
 
 ## [V0.0.7a7](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a7) (2023-02-11)
 
