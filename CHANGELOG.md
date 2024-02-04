@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a71...HEAD)
+
+**Fixed bugs:**
+
+- fix/ocp\_keywords [\#410](https://github.com/OpenVoiceOS/ovos-core/pull/410) ([NeonJarbas](https://github.com/NeonJarbas))
+
+## [V0.0.8a71](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a71) (2024-02-02)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a70...V0.0.8a71)
+
 ## [V0.0.8a70](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a70) (2024-02-02)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a69...V0.0.8a70)
@@ -653,10 +665,6 @@
 ## [V0.0.7a9](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a9) (2023-03-01)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.7a8...V0.0.7a9)
-
-**Merged pull requests:**
-
-- Fix AudioProducer shutdown [\#288](https://github.com/OpenVoiceOS/ovos-core/pull/288) ([NeonDaniel](https://github.com/NeonDaniel))
 
 ## [V0.0.7a8](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a8) (2023-02-23)
 
