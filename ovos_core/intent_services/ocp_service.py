@@ -22,7 +22,33 @@ from ovos_workshop.app import OVOSAbstractApplication
 class OCPFeaturizer:
     # ignore_list accounts for "noise" keywords in the csv file
     ocp_keywords = KeywordFeaturesVectorizer(ignore_list=["play", "stop"])
-    ocp_keywords.load_entities(f"{dirname(__file__)}/models/ocp_entities_v0.csv")
+    # defined at training time
+    _clf_labels = ['ad_keyword', 'album_name', 'anime_genre', 'anime_name', 'anime_streaming_service',
+                   'artist_name', 'asmr_keyword', 'asmr_trigger', 'audio_genre', 'audiobook_narrator',
+                   'audiobook_streaming_service', 'book_author', 'book_genre', 'book_name',
+                   'bw_movie_name', 'cartoon_genre', 'cartoon_name', 'cartoon_streaming_service',
+                   'comic_name', 'comic_streaming_service', 'comics_genre', 'country_name',
+                   'documentary_genre', 'documentary_name', 'documentary_streaming_service',
+                   'film_genre', 'film_studio', 'game_genre', 'game_name', 'gaming_console_name',
+                   'generic_streaming_service', 'hentai_name', 'hentai_streaming_service',
+                   'media_type_adult', 'media_type_adult_audio', 'media_type_anime', 'media_type_audio',
+                   'media_type_audiobook', 'media_type_bts', 'media_type_bw_movie', 'media_type_cartoon',
+                   'media_type_documentary', 'media_type_game', 'media_type_hentai', 'media_type_movie',
+                   'media_type_music', 'media_type_news', 'media_type_podcast', 'media_type_radio',
+                   'media_type_radio_theatre', 'media_type_short_film', 'media_type_silent_movie',
+                   'media_type_sound', 'media_type_trailer', 'media_type_tv', 'media_type_video',
+                   'media_type_video_episodes', 'media_type_visual_story', 'movie_actor',
+                   'movie_director', 'movie_name', 'movie_streaming_service', 'music_genre',
+                   'music_streaming_service', 'news_provider', 'news_streaming_service',
+                   'play_verb_audio', 'play_verb_video', 'playback_device', 'playlist_name',
+                   'podcast_genre', 'podcast_name', 'podcast_streaming_service', 'podcaster',
+                   'porn_film_name', 'porn_genre', 'porn_streaming_service', 'pornstar_name',
+                   'radio_drama_actor', 'radio_drama_genre', 'radio_drama_name', 'radio_program',
+                   'radio_program_name', 'radio_streaming_service', 'radio_theatre_company',
+                   'radio_theatre_streaming_service', 'record_label', 'series_name',
+                   'short_film_name', 'shorts_streaming_service', 'silent_movie_name',
+                   'song_name', 'sound_name', 'soundtrack_keyword', 'tv_channel', 'tv_genre',
+                   'tv_streaming_service', 'video_genre', 'video_streaming_service', 'youtube_channel']
 
     def __init__(self, base_clf=None):
         self.clf_feats = None
@@ -32,40 +58,27 @@ class OCPFeaturizer:
                 assert os.path.isfile(clf_path)
                 base_clf = SklearnOVOSClassifier.from_file(clf_path)
             self.clf_feats = ClassifierProbaVectorizer(base_clf)
+        for l in self._clf_labels:  # no samples, just to ensure featurizer has right number of feats
+            self.ocp_keywords.register_entity(l, [])
+
+    @classmethod
+    def load_csv(cls, entity_csvs: list):
+        for csv in entity_csvs or []:
+            if not os.path.isfile(csv):
+                # check for bundled files
+                if os.path.isfile(f"{dirname(__file__)}/models/{csv}"):
+                    csv = f"{dirname(__file__)}/models/{csv}"
+                else:
+                    LOG.error(f"Requested OCP entities file does not exist? {csv}")
+                    continue
+            OCPFeaturizer.ocp_keywords.load_entities(csv)
+            LOG.info(f"Loaded OCP keywords: {csv}")
 
     @classproperty
     def labels(cls):
         """
-        in V0 classifier using synth dataset
-
-        lbls = ['ad_keyword', 'album_name', 'anime_genre', 'anime_name', 'anime_streaming_service',
-                'artist_name', 'asmr_keyword', 'asmr_trigger', 'audio_genre', 'audiobook_narrator',
-                'audiobook_streaming_service', 'book_author', 'book_genre', 'book_name',
-                'bw_movie_name', 'cartoon_genre', 'cartoon_name', 'cartoon_streaming_service',
-                'comic_name', 'comic_streaming_service', 'comics_genre', 'country_name',
-                'documentary_genre', 'documentary_name', 'documentary_streaming_service',
-                'film_genre', 'film_studio', 'game_genre', 'game_name', 'gaming_console_name',
-                'generic_streaming_service', 'hentai_name', 'hentai_streaming_service',
-                'media_type_adult', 'media_type_adult_audio', 'media_type_anime', 'media_type_audio',
-                'media_type_audiobook', 'media_type_bts', 'media_type_bw_movie', 'media_type_cartoon',
-                'media_type_documentary', 'media_type_game', 'media_type_hentai', 'media_type_movie',
-                'media_type_music', 'media_type_news', 'media_type_podcast', 'media_type_radio',
-                'media_type_radio_theatre', 'media_type_short_film', 'media_type_silent_movie',
-                'media_type_sound', 'media_type_trailer', 'media_type_tv', 'media_type_video',
-                'media_type_video_episodes', 'media_type_visual_story', 'movie_actor',
-                'movie_director', 'movie_name', 'movie_streaming_service', 'music_genre',
-                'music_streaming_service', 'news_provider', 'news_streaming_service',
-                'play_verb_audio', 'play_verb_video', 'playback_device', 'playlist_name',
-                'podcast_genre', 'podcast_name', 'podcast_streaming_service', 'podcaster',
-                'porn_film_name', 'porn_genre', 'porn_streaming_service', 'pornstar_name',
-                'radio_drama_actor', 'radio_drama_genre', 'radio_drama_name', 'radio_program',
-                'radio_program_name', 'radio_streaming_service', 'radio_theatre_company',
-                'radio_theatre_streaming_service', 'record_label', 'series_name',
-                'short_film_name', 'shorts_streaming_service', 'silent_movie_name',
-                'song_name', 'sound_name', 'soundtrack_keyword', 'tv_channel', 'tv_genre',
-                'tv_streaming_service', 'video_genre', 'video_streaming_service', 'youtube_channel']
-        """
-        return cls.ocp_keywords._transformer.labels
+        in V0 classifier using synth dataset - this is tied to the classifier model"""
+        return cls._clf_labels
 
     def transform(self, X):
         if self.clf_feats:
@@ -98,7 +111,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.available_SEI = []
 
         self.intent_matchers = {}
-
+        self.entity_csvs = self.config.get("entity_csvs", [])  # user defined keyword csv files
         self.load_classifiers()
 
         self.register_ocp_api_events()
@@ -107,8 +120,13 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.bus.emit(Message("ovos.common_play.SEI.get"))
 
     def load_classifiers(self):
-        b = f"{dirname(__file__)}/models"
 
+        # warm up the featurizer so intent matches faster (lazy loaded)
+        if self.entity_csvs:
+            OCPFeaturizer.load_csv(self.entity_csvs)
+            OCPFeaturizer.extract_entities("UNLEASH THE AUTOMATONS")
+
+        b = f"{dirname(__file__)}/models"
         # lang agnostic classifiers
         c = SklearnOVOSClassifier.from_file(f"{b}/media_ocp_kw_small.clf")
         self._media_clf = (c, OCPFeaturizer())
@@ -121,9 +139,6 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self._media_en_clf = (c, OCPFeaturizer("media_ocp_cv2_medium"))
         c = SklearnOVOSClassifier.from_file(f"{b}/binary_ocp_cv2_kw_medium.clf")
         self._binary_en_clf = (c, OCPFeaturizer("binary_ocp_cv2_small"))
-
-        # warm up the featurizer so intent matches faster (lazy loaded)
-        OCPFeaturizer.extract_entities("UNLEASH THE AUTOMATONS")
 
     def load_resource_files(self):
         intents = {}
@@ -794,9 +809,10 @@ if __name__ == "__main__":
     LOG.set_level("DEBUG")
     bus = FakeBus()
 
-    ocp = OCPPipelineMatcher(bus=bus)
+    ocp = OCPPipelineMatcher(bus=bus,
+                             config={"entity_csvs": ["ocp_entities_v0.csv"]})
 
-    print(ocp.match_high("play metallica", "en-us"))
+    print(ocp.match_high(["play metallica"], "en-us"))
     # IntentMatch(intent_service='OCP_intents',
     #   intent_type='ocp:play',
     #   intent_data={'media_type': <MediaType.MUSIC: 2>, 'query': 'metallica',
@@ -804,7 +820,7 @@ if __name__ == "__main__":
     #                'conf': 0.96, 'lang': 'en-us'},
     #   skill_id='ovos.common_play', utterance='play metallica')
 
-    print(ocp.match_medium("put on some metallica", "en-us"))
+    print(ocp.match_medium(["put on some metallica"], "en-us"))
     # IntentMatch(intent_service='OCP_media',
     #   intent_type='ocp:play',
     #   intent_data={'media_type': <MediaType.MUSIC: 2>,
@@ -813,7 +829,7 @@ if __name__ == "__main__":
     #                'conf': 0.9578441098114333},
     #   skill_id='ovos.common_play', utterance='put on some metallica')
 
-    print(ocp.match_fallback("i wanna hear metallica", "en-us"))
+    print(ocp.match_fallback(["i wanna hear metallica"], "en-us"))
     #  IntentMatch(intent_service='OCP_fallback',
     #    intent_type='ocp:play',
     #    intent_data={'media_type': <MediaType.MUSIC: 2>,
