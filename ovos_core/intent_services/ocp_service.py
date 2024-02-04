@@ -803,37 +803,3 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         LOG.info(f"OVOSCommonPlay selected: {selected.skill_id} - {selected.match_confidence}")
         LOG.debug(str(selected))
         return selected
-
-
-if __name__ == "__main__":
-    LOG.set_level("DEBUG")
-    bus = FakeBus()
-
-    ocp = OCPPipelineMatcher(bus=bus,
-                             config={"entity_csvs": ["ocp_entities_v0.csv"]})
-
-    print(ocp.match_high(["play metallica"], "en-us"))
-    # IntentMatch(intent_service='OCP_intents',
-    #   intent_type='ocp:play',
-    #   intent_data={'media_type': <MediaType.MUSIC: 2>, 'query': 'metallica',
-    #                'entities': {'album_name': 'Metallica', 'artist_name': 'Metallica'},
-    #                'conf': 0.96, 'lang': 'en-us'},
-    #   skill_id='ovos.common_play', utterance='play metallica')
-
-    print(ocp.match_medium(["put on some metallica"], "en-us"))
-    # IntentMatch(intent_service='OCP_media',
-    #   intent_type='ocp:play',
-    #   intent_data={'media_type': <MediaType.MUSIC: 2>,
-    #                'entities': {'album_name': 'Metallica', 'artist_name': 'Metallica', 'movie_name': 'Some'},
-    #                'query': 'put on some metallica',
-    #                'conf': 0.9578441098114333},
-    #   skill_id='ovos.common_play', utterance='put on some metallica')
-
-    print(ocp.match_fallback(["i wanna hear metallica"], "en-us"))
-    #  IntentMatch(intent_service='OCP_fallback',
-    #    intent_type='ocp:play',
-    #    intent_data={'media_type': <MediaType.MUSIC: 2>,
-    #                 'entities': {'album_name': 'Metallica', 'artist_name': 'Metallica'},
-    #                 'query': 'i wanna hear metallica',
-    #                 'conf': 0.5027561091821287},
-    #    skill_id='ovos.common_play', utterance='i wanna hear metallica')

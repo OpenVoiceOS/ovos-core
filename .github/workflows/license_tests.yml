@@ -37,7 +37,7 @@ jobs:
           requirements: 'requirements-all.txt'
           fail: 'Copyleft,Other,Error'
           fails-only: true
-          exclude: '^(precise-runner|fann2|tqdm|bs4|mutagen|chardet|ovos-stt-plugin).*'
+          exclude: '^(precise-runner|fann2|tqdm|bs4|mutagen|chardet|text-unidecode|ovos-stt-plugin).*'
           exclude-license: '^(Mozilla).*$'
       - name: Print report
         if: ${{ always() }}
