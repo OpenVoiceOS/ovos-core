@@ -21,9 +21,6 @@ jobs:
         sudo apt-get update
         sudo apt install python3-dev libssl-dev libfann-dev portaudio19-dev libpulse-dev
         python -m pip install build wheel
-    - name: Install core repo
-      run: |
-        pip install -e .[mycroft,deprecated]
     - name: Install test dependencies
       run: |
           pip install -r requirements/tests.txt
@@ -35,6 +32,9 @@ jobs:
           pip install ./test/end2end/skill-ovos-schedule
           pip install ./test/end2end/skill-new-stop
           pip install ./test/end2end/skill-old-stop
+    - name: Install core repo
+      run: |
+        pip install -e .[mycroft,deprecated]
     - name: Generate coverage report
       run: |
         pytest --cov=ovos_core --cov-report xml test/unittests
