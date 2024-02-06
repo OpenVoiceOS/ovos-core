@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a71...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a72...HEAD)
+
+**Merged pull requests:**
+
+- license dance [\#413](https://github.com/OpenVoiceOS/ovos-core/pull/413) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a72](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a72) (2024-02-04)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a71...V0.0.8a72)
 
 **Fixed bugs:**
 
@@ -39,10 +47,6 @@
 ## [V0.0.8a67](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a67) (2024-01-24)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a66...V0.0.8a67)
-
-**Closed issues:**
-
-- Select a new STT engine for unit tests [\#289](https://github.com/OpenVoiceOS/ovos-core/issues/289)
 
 **Merged pull requests:**
 
