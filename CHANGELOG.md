@@ -2,7 +2,19 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a72...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a73...HEAD)
+
+**Closed issues:**
+
+- unittests/ skill installer class [\#348](https://github.com/OpenVoiceOS/ovos-core/issues/348)
+
+**Merged pull requests:**
+
+- test: skill\_installer tests [\#412](https://github.com/OpenVoiceOS/ovos-core/pull/412) ([mikejgray](https://github.com/mikejgray))
+
+## [V0.0.8a73](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a73) (2024-02-06)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a72...V0.0.8a73)
 
 **Merged pull requests:**
 
@@ -657,10 +669,6 @@
 ## [V0.0.7a11](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a11) (2023-03-08)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.7a10...V0.0.7a11)
-
-**Merged pull requests:**
-
-- dependency/imports clean up [\#291](https://github.com/OpenVoiceOS/ovos-core/pull/291) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.7a10](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a10) (2023-03-07)
 
