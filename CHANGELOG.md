@@ -2,7 +2,19 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a73...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a74...HEAD)
+
+**Fixed bugs:**
+
+- Can't install ovos-core and ovos-bus-client [\#344](https://github.com/OpenVoiceOS/ovos-core/issues/344)
+
+**Merged pull requests:**
+
+- Update README.md [\#411](https://github.com/OpenVoiceOS/ovos-core/pull/411) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a74](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a74) (2024-02-06)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a73...V0.0.8a74)
 
 **Closed issues:**
 
@@ -542,10 +554,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a11...V0.0.8a12)
 
-**Merged pull requests:**
-
-- Refactor/ovos-gui+ovos-messagebus packages [\#292](https://github.com/OpenVoiceOS/ovos-core/pull/292) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a11](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a11) (2023-04-28)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a10...V0.0.8a11)
@@ -661,10 +669,6 @@
 ## [V0.0.7a12](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a12) (2023-03-10)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.7a11...V0.0.7a12)
-
-**Merged pull requests:**
-
-- Update dependencies to stable versions [\#294](https://github.com/OpenVoiceOS/ovos-core/pull/294) ([NeonDaniel](https://github.com/NeonDaniel))
 
 ## [V0.0.7a11](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a11) (2023-03-08)
 
