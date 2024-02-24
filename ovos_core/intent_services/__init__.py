@@ -253,6 +253,11 @@ class IntentService:
                 "ocp_fallback": self.ocp.match_fallback})
         skips = skips or []
         pipeline = [k for k in session.pipeline if k not in skips]
+        if any(k not in matchers for k in pipeline):
+            LOG.warning(f"Requested some invalid pipeline components! "
+                        f"filtered {[k for k in pipeline if k not in matchers]}")
+            pipeline = [k for k in pipeline if k in matchers]
+        LOG.debug(f"Session pipeline: {pipeline}")
         return [matchers[k] for k in pipeline]
 
     def _validate_session(self, message, lang):
