@@ -21,6 +21,20 @@ class TestSessions(TestCase):
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
         SessionManager.default_session.active_skills = [(self.skill_id, time.time())]
+        SessionManager.default_session.pipeline = [
+                           "stop_high",
+                           "converse",
+                           "padatious_high",
+                           "adapt_high",
+                           "fallback_high",
+                           "stop_medium",
+                           "adapt_medium",
+                           "padatious_medium",
+                           "adapt_low",
+                           "common_qa",
+                           "fallback_medium",
+                           "fallback_low"
+                       ]
         messages = []
 
         def new_msg(msg):
@@ -136,6 +150,20 @@ class TestSessions(TestCase):
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
         SessionManager.default_session.active_skills = [(self.skill_id, time.time())]
+        SessionManager.default_session.pipeline = [
+                           "stop_high",
+                           "converse",
+                           "padatious_high",
+                           "adapt_high",
+                           "fallback_high",
+                           "stop_medium",
+                           "adapt_medium",
+                           "padatious_medium",
+                           "adapt_low",
+                           "common_qa",
+                           "fallback_medium",
+                           "fallback_low"
+                       ]
 
         stt_lang_detect = "pt-pt"
 

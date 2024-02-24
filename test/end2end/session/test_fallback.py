@@ -20,6 +20,12 @@ class TestFallback(TestCase):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.pipeline = [
+            "converse",
+            "fallback_high",
+            "fallback_medium",
+            "fallback_low"
+        ]
         messages = []
 
         def new_msg(msg):
@@ -128,9 +134,18 @@ class TestFallback(TestCase):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.pipeline = [
+            "fallback_high",
+            "fallback_medium",
+            "fallback_low"
+        ]
         messages = []
 
-        sess = Session()
+        sess = Session(pipeline=[
+            "fallback_high",
+            "fallback_medium",
+            "fallback_low"
+        ])
 
         def new_msg(msg):
             nonlocal messages
