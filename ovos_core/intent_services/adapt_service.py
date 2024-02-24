@@ -60,9 +60,9 @@ class AdaptService:
         self.max_words = 50  # if an utterance contains more words than this, don't attempt to match
 
         # TODO sanitize config option
-        self.conf_high = self.config.get("conf_high") or 0.95
-        self.conf_med = self.config.get("conf_med") or 0.8
-        self.conf_low = self.config.get("conf_low") or 0.5
+        self.conf_high = self.config.get("conf_high") or 0.8
+        self.conf_med = self.config.get("conf_med") or 0.5
+        self.conf_low = self.config.get("conf_low") or 0.3
 
     @property
     def context_keywords(self):
