@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a75...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a76...HEAD)
+
+**Merged pull requests:**
+
+- Update skills-essential.txt [\#401](https://github.com/OpenVoiceOS/ovos-core/pull/401) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a76](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a76) (2024-02-24)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a75...V0.0.8a76)
 
 **Fixed bugs:**
 
@@ -327,7 +335,6 @@
 
 **Implemented enhancements:**
 
-- Persona Initiative - Long Live the LLM [\#297](https://github.com/OpenVoiceOS/ovos-core/issues/297)
 - default session managed by core [\#354](https://github.com/OpenVoiceOS/ovos-core/pull/354) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a38](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a38) (2023-09-22)
