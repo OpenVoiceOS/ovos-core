@@ -1,0 +1,5 @@
+ovos-skill-weather~=0.0, >=0.0.1a14
+ovos-skill-ddg
+ovos-skill-wolfie
+ovos-skill-wikipedia
+skill-ovos-fallback-chatgpt
