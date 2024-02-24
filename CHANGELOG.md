@@ -2,7 +2,16 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a74...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a75...HEAD)
+
+**Fixed bugs:**
+
+- Problems with adapt service [\#417](https://github.com/OpenVoiceOS/ovos-core/issues/417)
+- fix: adjust adapt confidence levels [\#418](https://github.com/OpenVoiceOS/ovos-core/pull/418) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a75](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a75) (2024-02-14)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a74...V0.0.8a75)
 
 **Fixed bugs:**
 
@@ -650,17 +659,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.7a14...V0.0.7a15)
 
-**Merged pull requests:**
-
-- Update dependencies to stable versions [\#296](https://github.com/OpenVoiceOS/ovos-core/pull/296) ([NeonDaniel](https://github.com/NeonDaniel))
-
 ## [V0.0.7a14](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a14) (2023-03-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.7a13...V0.0.7a14)
-
-**Implemented enhancements:**
-
-- default settings cleanup [\#295](https://github.com/OpenVoiceOS/ovos-core/pull/295) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.7a13](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7a13) (2023-03-13)
 
