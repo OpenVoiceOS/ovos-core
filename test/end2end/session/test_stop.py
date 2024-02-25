@@ -63,6 +63,16 @@ class TestSessions(TestCase):
                           {"session": sess.serialize()})
             self.core.bus.emit(utt)
 
+            A = ['recognizer_loop:utterance',
+             'mycroft.stop',
+             'ovos.common_play.stop',
+             'ovos.common_play.stop.response',
+             'skill-new-stop.openvoiceos.stop',
+             'skill-new-stop.openvoiceos.stop.response',
+             'enclosure.active_skill',
+             'speak',
+             'skill-old-stop.openvoiceos.stop',
+             'skill-old-stop.openvoiceos.stop.response']
             # confirm all expected messages are sent
             expected_messages = [
                 "recognizer_loop:utterance",
