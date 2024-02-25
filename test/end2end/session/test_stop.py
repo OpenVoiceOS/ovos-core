@@ -1,6 +1,7 @@
 import time
 from time import sleep
 from unittest import TestCase
+
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, Session
 
@@ -21,13 +22,18 @@ class TestSessions(TestCase):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.pipeline = [
+            "stop_high",
+            "adapt_high"
+            "stop_medium"
+        ]
 
         messages = []
 
         def new_msg(msg):
             nonlocal messages
             m = Message.deserialize(msg)
-            if m.msg_type in ["ovos.skills.settings_changed"]:
+            if m.msg_type in ["ovos.skills.settings_changed", "ovos.common_play.status"]:
                 return  # skip these, only happen in 1st run
             messages.append(m)
             print(len(messages), msg)
@@ -45,17 +51,8 @@ class TestSessions(TestCase):
         sess = Session("123",
                        pipeline=[
                            "stop_high",
-                           "converse",
-                           "padatious_high",
                            "adapt_high",
-                           "fallback_high",
-                           "stop_medium",
-                           "padatious_medium",
-                           "adapt_medium",
-                           "adapt_low",
-                           "common_qa",
-                           "fallback_medium",
-                           "fallback_low"
+                           "stop_medium"
                        ])
 
         # old style global stop, even if nothing active
@@ -69,16 +66,23 @@ class TestSessions(TestCase):
             # confirm all expected messages are sent
             expected_messages = [
                 "recognizer_loop:utterance",
-                "mycroft.stop",
                 # global stop trigger
+                "mycroft.stop",
+                # ocp reporting nothing to stop
+                "ovos.common_play.stop",
+                "ovos.common_play.stop.response",
+
+                # skill reporting
                 f"{self.skill_id}.stop",  # internal, @killable_events
-                f"{self.skill_id}.stop.response", # skill reporting nothing to stop
-                f"{self.new_skill_id}.stop",  # internal, @killable_events
-                f"{self.new_skill_id}.stop.response", # skill reporting nothing to stop
+                f"{self.skill_id}.stop.response",  # skill reporting nothing to stop
 
                 # sanity check in test skill that method was indeed called
                 "enclosure.active_skill",
-                "speak"  # "utterance":"old stop called"
+                "speak",  # "utterance":"old stop called"
+
+                # NOTE: messages below might show up before enclosure.active_skill
+                f"{self.new_skill_id}.stop",  # internal, @killable_events
+                f"{self.new_skill_id}.stop.response",  # skill reporting nothing to stop
 
             ]
 
@@ -89,8 +93,9 @@ class TestSessions(TestCase):
                 self.assertTrue(m in mtypes)
 
             # sanity check stop triggered
-            speak = messages[-1]
-            self.assertEqual(speak.data["utterance"], "old stop called")
+            for m in messages:
+                if m.msg_type == "speak":
+                    self.assertEqual(m.data["utterance"], "old stop called")
 
             messages = []
 
@@ -123,8 +128,7 @@ class TestSessions(TestCase):
                 self.assertTrue(m in mtypes)
 
             # sanity check correct intent triggered
-            speak = messages[6]
-            self.assertEqual(speak.data["utterance"], "hello world")
+            self.assertEqual(messages[6].data["utterance"], "hello world")
 
             # test that active skills list has been updated
             sess = Session.deserialize(messages[-1].context["session"])
@@ -150,14 +154,6 @@ class TestSessions(TestCase):
                 f"{self.skill_id}.stop",  # skill specific stop trigger
                 f"{self.skill_id}.stop.response",  # skill fails to stop  (old style)
 
-                # rest of pipeline
-                f"{self.skill_id}.converse.ping", # converse
-                "skill.converse.pong",
-                "mycroft.skills.fallback",
-                "mycroft.skill.handler.start",
-                "mycroft.skill.handler.complete",
-                "mycroft.skills.fallback.response",
-
                 # stop medium
                 f"{self.skill_id}.stop.ping",
                 "skill.stop.pong",
@@ -166,6 +162,8 @@ class TestSessions(TestCase):
 
                 # stop fallback
                 "mycroft.stop",  # global stop for backwards compat
+                "ovos.common_play.stop",  # ocp stop ping
+                "ovos.common_play.stop.response",  # ocp nothing to stop
                 f"{self.skill_id}.stop",
                 f"{self.skill_id}.stop.response",  # apparently fails to stop  (old style)
 
@@ -190,15 +188,14 @@ class TestSessions(TestCase):
                 self.assertTrue(m in mtypes)
 
             # confirm all skills self.stop methods called
-            speak = messages[-1]
-            self.assertEqual(speak.data["utterance"], "old stop called")
-            speak = messages[-6]
-            self.assertEqual(speak.data["utterance"], "stop")
-
-            # confirm "skill-old-stop" was the one that reported success
-            handler = messages[-5]
-            self.assertEqual(handler.msg_type, "mycroft.stop.handled")
-            self.assertEqual(handler.data["by"], f"skill:{self.skill_id}")
+            for m in messages:
+                # sanity check stop triggered
+                if m.msg_type == "speak":
+                    self.assertIn(m.data["utterance"],
+                                  ["old stop called", "stop"])
+                # confirm "skill-old-stop" was the one that reported success
+                if m.msg_type == "mycroft.stop.handled":
+                    self.assertEqual(m.data["by"], f"skill:{self.skill_id}")
 
             messages = []
 
@@ -213,13 +210,18 @@ class TestSessions(TestCase):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.pipeline = [
+            "stop_high",
+            "adapt_high",
+            "stop_medium"
+        ]
 
         messages = []
 
         def new_msg(msg):
             nonlocal messages
             m = Message.deserialize(msg)
-            if m.msg_type in ["ovos.skills.settings_changed"]:
+            if m.msg_type in ["ovos.skills.settings_changed", "ovos.common_play.status"]:
                 return  # skip these, only happen in 1st run
             messages.append(m)
             print(len(messages), msg)
@@ -237,17 +239,8 @@ class TestSessions(TestCase):
         sess = Session("123",
                        pipeline=[
                            "stop_high",
-                           "converse",
-                           "padatious_high",
                            "adapt_high",
-                           "fallback_high",
-                           "stop_medium",
-                           "padatious_medium",
-                           "adapt_medium",
-                           "adapt_low",
-                           "common_qa",
-                           "fallback_medium",
-                           "fallback_low"
+                           "stop_medium"
                        ])
 
         # old style global stop, even if nothing active
@@ -261,12 +254,14 @@ class TestSessions(TestCase):
             # confirm all expected messages are sent
             expected_messages = [
                 "recognizer_loop:utterance",
-                "mycroft.stop",
                 # global stop trigger
+                "mycroft.stop",
+                "ovos.common_play.stop",
+                "ovos.common_play.stop.response",
                 f"{self.skill_id}.stop",  # internal, @killable_events
-                f"{self.skill_id}.stop.response", # skill reporting nothing to stop
+                f"{self.skill_id}.stop.response",  # skill reporting nothing to stop
                 f"{self.new_skill_id}.stop",  # internal, @killable_events
-                f"{self.new_skill_id}.stop.response", # skill reporting nothing to stop
+                f"{self.new_skill_id}.stop.response",  # skill reporting nothing to stop
 
                 # sanity check in test skill that method was indeed called
                 "enclosure.active_skill",
@@ -280,9 +275,10 @@ class TestSessions(TestCase):
             for m in expected_messages:
                 self.assertTrue(m in mtypes)
 
-            # sanity check stop triggered
-            speak = messages[-1]
-            self.assertEqual(speak.data["utterance"], "old stop called")
+            for m in messages:
+                # sanity check stop triggered
+                if m.msg_type == "speak":
+                    self.assertEqual(m.data["utterance"], "old stop called")
 
             messages = []
 
@@ -315,8 +311,11 @@ class TestSessions(TestCase):
                 self.assertTrue(m in mtypes)
 
             # sanity check correct intent triggered
-            speak = messages[6]
-            self.assertEqual(speak.data["utterance"], "hello world")
+
+            for m in messages:
+                # sanity check stop triggered
+                if m.msg_type == "speak":
+                    self.assertEqual(m.data["utterance"], "hello world")
 
             # test that active skills list has been updated
             sess = Session.deserialize(messages[-1].context["session"])
@@ -356,9 +355,12 @@ class TestSessions(TestCase):
             for m in expected_messages:
                 self.assertTrue(m in mtypes)
 
-            # confirm all skills self.stop methods called
-            speak = messages[-4]
-            self.assertEqual(speak.data["utterance"], "stop 123")
+            # confirm skill self.stop methods called
+
+            for m in messages:
+                # sanity check stop triggered
+                if m.msg_type == "speak":
+                    self.assertEqual(m.data["utterance"], "stop 123")
 
             # confirm "skill-new-stop" was the one that reported success
             handler = messages[-3]
@@ -385,21 +387,16 @@ class TestSessions(TestCase):
                 f"{self.new_skill_id}.stop.response",  # dont want to stop (new style)
 
                 # rest of pipeline
-                "skill-new-stop.openvoiceos.converse.ping",
-                "skill.converse.pong",
-                "mycroft.skills.fallback",
-                "mycroft.skill.handler.start",
-                "mycroft.skill.handler.complete",
-                "mycroft.skills.fallback.response",
-
                 # stop low
-                "skill-new-stop.openvoiceos.stop.ping",
+                f"{self.new_skill_id}.stop.ping",
                 "skill.stop.pong",
                 f"{self.new_skill_id}.stop",  # skill specific stop trigger
                 f"{self.new_skill_id}.stop.response",  # dont want to stop (new style)
 
                 # global stop fallback
                 "mycroft.stop",
+                "ovos.common_play.stop",
+                "ovos.common_play.stop.response",
                 f"{self.skill_id}.stop",  # skill specific stop trigger
                 f"{self.skill_id}.stop.response",  # old style, never stops
                 f"{self.new_skill_id}.stop",  # skill specific stop trigger
@@ -407,7 +404,7 @@ class TestSessions(TestCase):
 
                 # check the global stop handlers are called
                 "enclosure.active_skill",
-                "speak", # "utterance":"old stop called"
+                "speak",  # "utterance":"old stop called"
             ]
 
             wait_for_n_messages(len(expected_messages))
@@ -417,8 +414,10 @@ class TestSessions(TestCase):
                 self.assertTrue(m in mtypes)
 
             # confirm self.stop method called
-            speak = messages[-1]
-            self.assertEqual(speak.data["utterance"], "old stop called")
+            for m in messages:
+                # sanity check stop triggered
+                if m.msg_type == "speak":
+                    self.assertEqual(m.data["utterance"], "old stop called")
 
             messages = []
 
@@ -427,6 +426,6 @@ class TestSessions(TestCase):
 
         # get the skill in active list
         new_world()
-        skill_active() # reports success
+        skill_active()  # reports success
 
-        skill_already_stop() # reports failure
+        skill_already_stop()  # reports failure

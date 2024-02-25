@@ -4,6 +4,7 @@ from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, Session
+
 from ..minicroft import get_minicroft
 
 
@@ -20,6 +21,9 @@ class TestSessions(TestCase):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.pipeline = [
+            "adapt_high"
+        ]
 
         messages = []
 
@@ -113,6 +117,10 @@ class TestSessions(TestCase):
         SessionManager.default_session.lang = "en-us"
         now = time.time()
         SessionManager.default_session.active_skills = [(self.skill_id, now)]
+        SessionManager.default_session.pipeline = [
+            "converse",
+            "adapt_high"
+        ]
 
         messages = []
 
@@ -216,6 +224,10 @@ class TestSessions(TestCase):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.pipeline = [
+            "converse",
+            "adapt_high"
+        ]
 
         messages = []
 
@@ -237,7 +249,11 @@ class TestSessions(TestCase):
 
         self.core.bus.on("message", new_msg)
 
-        sess = Session("test-session")
+        sess = Session("test-session",
+                       pipeline=[
+                           "converse",
+                           "adapt_high"
+                       ])
         now = time.time()
         sess.active_skills = [(self.skill_id, now)]
         utt = Message("recognizer_loop:utterance",

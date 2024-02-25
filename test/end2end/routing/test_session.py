@@ -20,14 +20,15 @@ class TestRouting(TestCase):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
+        SessionManager.pipeline = ["adapt_high"]
 
         messages = []
 
         def new_msg(msg):
             nonlocal messages
             m = Message.deserialize(msg)
-            if m.msg_type in ["ovos.skills.settings_changed"]:
-                return  # skip these, only happen in 1st run
+            if m.msg_type in ["ovos.skills.settings_changed", "ovos.common_play.status"]:
+                return  # skip these
             messages.append(m)
             print(len(messages), m.msg_type, m.context.get("source"), m.context.get("destination"))
 
@@ -81,5 +82,3 @@ class TestRouting(TestCase):
         for m in messages[3:]:
             self.assertEqual(m.context["source"], "B")
             self.assertEqual(m.context["destination"], "A")
-
-

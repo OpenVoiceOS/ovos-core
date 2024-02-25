@@ -21,6 +21,11 @@ class TestSessions(TestCase):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.pipeline = [
+                           "converse",
+                           "padatious_high",
+                           "adapt_high"
+                       ]
 
         messages = []
 
