@@ -63,6 +63,16 @@ class TestSessions(TestCase):
                           {"session": sess.serialize()})
             self.core.bus.emit(utt)
 
+            A = ['recognizer_loop:utterance',
+             'mycroft.stop',
+             'ovos.common_play.stop',
+             'ovos.common_play.stop.response',
+             'skill-new-stop.openvoiceos.stop',
+             'skill-new-stop.openvoiceos.stop.response',
+             'enclosure.active_skill',
+             'speak',
+             'skill-old-stop.openvoiceos.stop',
+             'skill-old-stop.openvoiceos.stop.response']
             # confirm all expected messages are sent
             expected_messages = [
                 "recognizer_loop:utterance",
@@ -75,24 +85,27 @@ class TestSessions(TestCase):
                 # skill reporting
                 f"{self.skill_id}.stop",  # internal, @killable_events
                 f"{self.skill_id}.stop.response",  # skill reporting nothing to stop
-                f"{self.new_skill_id}.stop",  # internal, @killable_events
-                f"{self.new_skill_id}.stop.response",  # skill reporting nothing to stop
 
                 # sanity check in test skill that method was indeed called
                 "enclosure.active_skill",
-                "speak"  # "utterance":"old stop called"
+                "speak",  # "utterance":"old stop called"
+
+                # NOTE: messages below might show up before enclosure.active_skill
+                f"{self.new_skill_id}.stop",  # internal, @killable_events
+                f"{self.new_skill_id}.stop.response",  # skill reporting nothing to stop
 
             ]
 
             wait_for_n_messages(len(expected_messages))
 
             mtypes = [m.msg_type for m in messages]
-            print(mtypes)
             for m in expected_messages:
                 self.assertTrue(m in mtypes)
 
             # sanity check stop triggered
-            self.assertEqual(messages[9].data["utterance"], "old stop called")
+            for m in messages:
+                if m.msg_type == "speak":
+                    self.assertEqual(m.data["utterance"], "old stop called")
 
             messages = []
 
@@ -211,10 +224,10 @@ class TestSessions(TestCase):
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
         SessionManager.default_session.pipeline = [
-                           "stop_high",
-                           "adapt_high",
-                           "stop_medium"
-                       ]
+            "stop_high",
+            "adapt_high",
+            "stop_medium"
+        ]
 
         messages = []
 
