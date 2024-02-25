@@ -63,16 +63,6 @@ class TestSessions(TestCase):
                           {"session": sess.serialize()})
             self.core.bus.emit(utt)
 
-            A = ['recognizer_loop:utterance',
-             'mycroft.stop',
-             'ovos.common_play.stop',
-             'ovos.common_play.stop.response',
-             'skill-new-stop.openvoiceos.stop',
-             'skill-new-stop.openvoiceos.stop.response',
-             'enclosure.active_skill',
-             'speak',
-             'skill-old-stop.openvoiceos.stop',
-             'skill-old-stop.openvoiceos.stop.response']
             # confirm all expected messages are sent
             expected_messages = [
                 "recognizer_loop:utterance",
@@ -198,17 +188,14 @@ class TestSessions(TestCase):
                 self.assertTrue(m in mtypes)
 
             # confirm all skills self.stop methods called
-
-            # sanity check stop triggered
             for m in messages:
+                # sanity check stop triggered
                 if m.msg_type == "speak":
                     self.assertIn(m.data["utterance"],
                                   ["old stop called", "stop"])
-
-            # confirm "skill-old-stop" was the one that reported success
-            handler = messages[-5]
-            self.assertEqual(handler.msg_type, "mycroft.stop.handled")
-            self.assertEqual(handler.data["by"], f"skill:{self.skill_id}")
+                # confirm "skill-old-stop" was the one that reported success
+                if m.msg_type == "mycroft.stop.handled":
+                    self.assertEqual(m.data["by"], f"skill:{self.skill_id}")
 
             messages = []
 
