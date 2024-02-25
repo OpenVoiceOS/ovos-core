@@ -2,7 +2,19 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a76...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a77...HEAD)
+
+**Fixed bugs:**
+
+- unittests: update tests [\#421](https://github.com/OpenVoiceOS/ovos-core/pull/421) ([JarbasAl](https://github.com/JarbasAl))
+
+**Merged pull requests:**
+
+- unittests: OCP pipeline [\#422](https://github.com/OpenVoiceOS/ovos-core/pull/422) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a77](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a77) (2024-02-24)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a76...V0.0.8a77)
 
 **Merged pull requests:**
 
@@ -642,10 +654,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a1...V0.0.8a2)
 
-**Closed issues:**
-
-- Add padatious to extra-skills.txt [\#299](https://github.com/OpenVoiceOS/ovos-core/issues/299)
-
 **Merged pull requests:**
 
 - mycroft-bus-client -\> ovos-bus-client [\#300](https://github.com/OpenVoiceOS/ovos-core/pull/300) ([JarbasAl](https://github.com/JarbasAl))
@@ -653,10 +661,6 @@
 ## [V0.0.8a1](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a1) (2023-03-24)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.7...V0.0.8a1)
-
-**Merged pull requests:**
-
-- Adds easy input box support for skill [\#298](https://github.com/OpenVoiceOS/ovos-core/pull/298) ([AIIX](https://github.com/AIIX))
 
 ## [V0.0.7](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.7) (2023-03-14)
 
