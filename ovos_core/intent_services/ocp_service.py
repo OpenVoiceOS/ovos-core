@@ -379,6 +379,9 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         # classify the query media type
         media_type, confidence = self.classify_media(utterance, lang)
 
+        if confidence < 0.3:
+            return None
+
         # extract the query string
         query = self.remove_voc(utterance, "Play", lang).strip()
         return ovos_core.intent_services.IntentMatch(intent_service="OCP_fallback",
