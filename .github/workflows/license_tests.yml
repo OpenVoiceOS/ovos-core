@@ -37,7 +37,7 @@ jobs:
           requirements: 'requirements-all.txt'
           fail: 'Copyleft,Other,Error'
           fails-only: true
-          exclude: '^(precise-runner|fann2|tqdm|bs4|sonopy|ovos-stt-plugin).*'
+          exclude: '^(precise-runner|fann2|tqdm|bs4|sonopy|caldav|recurring-ical-events|x-wr-timezone).*'
           exclude-license: '^(Mozilla).*$'
       - name: Print report
         if: ${{ always() }}
