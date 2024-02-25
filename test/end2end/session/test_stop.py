@@ -275,8 +275,10 @@ class TestSessions(TestCase):
             for m in expected_messages:
                 self.assertTrue(m in mtypes)
 
-            # sanity check stop triggered
-            self.assertEqual(messages[9].data["utterance"], "old stop called")
+            for m in messages:
+                # sanity check stop triggered
+                if m.msg_type == "speak":
+                    self.assertEqual(m.data["utterance"], "old stop called")
 
             messages = []
 
@@ -309,7 +311,11 @@ class TestSessions(TestCase):
                 self.assertTrue(m in mtypes)
 
             # sanity check correct intent triggered
-            self.assertEqual(messages[6].data["utterance"], "hello world")
+
+            for m in messages:
+                # sanity check stop triggered
+                if m.msg_type == "speak":
+                    self.assertEqual(m.data["utterance"], "hello world")
 
             # test that active skills list has been updated
             sess = Session.deserialize(messages[-1].context["session"])
@@ -350,7 +356,11 @@ class TestSessions(TestCase):
                 self.assertTrue(m in mtypes)
 
             # confirm skill self.stop methods called
-            self.assertEqual(messages[5].data["utterance"], "stop 123")
+
+            for m in messages:
+                # sanity check stop triggered
+                if m.msg_type == "speak":
+                    self.assertEqual(m.data["utterance"], "stop 123")
 
             # confirm "skill-new-stop" was the one that reported success
             handler = messages[-3]
@@ -404,7 +414,10 @@ class TestSessions(TestCase):
                 self.assertTrue(m in mtypes)
 
             # confirm self.stop method called
-            self.assertEqual(messages[17].data["utterance"], "old stop called")
+            for m in messages:
+                # sanity check stop triggered
+                if m.msg_type == "speak":
+                    self.assertEqual(m.data["utterance"], "old stop called")
 
             messages = []
 
