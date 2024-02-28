@@ -128,7 +128,7 @@ class SkillManager(Thread):
 
     @property
     def blacklist(self):
-        return Configuration().get("skills", {}).get("blacklisted_skills", ["skill-ovos-fallback-unknown.openvoiceos"])
+        return Configuration().get("skills", {}).get("blacklisted_skills", ["skill-ovos-stop.openvoiceos"])
 
     def _init_filewatcher(self):
         # monitor skill settings files for changes
