@@ -600,7 +600,7 @@ class SkillManager(Thread):
         skill_id = basename(skill_directory)
         if skill_id in self.blacklist:
             LOG.warning(f"{skill_id} is blacklisted, it will NOT be loaded")
-            LOG.info(f"Consider uninstalling {skill_id} instead of blacklisting it")
+            LOG.info(f"Consider deleting {skill_directory} instead of blacklisting it")
             return None
 
         skill_loader = self._get_skill_loader(skill_directory)
