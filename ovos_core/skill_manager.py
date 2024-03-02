@@ -20,18 +20,18 @@ from threading import Thread, Event, Lock
 from time import sleep, monotonic
 
 from ovos_backend_client.pairing import is_paired
+from ovos_bus_client.apis.enclosure import EnclosureAPI
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
 from ovos_config.config import Configuration
 from ovos_config.locations import get_xdg_config_save_path
 from ovos_plugin_manager.skills import find_skill_plugins
-from ovos_bus_client.apis.enclosure import EnclosureAPI
+from ovos_plugin_manager.skills import get_skill_directories
 from ovos_utils.file_utils import FileWatcher
 from ovos_utils.gui import is_gui_connected
 from ovos_utils.log import LOG
 from ovos_utils.network_utils import is_connected
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap, ProcessState
-from ovos_plugin_manager.skills import get_skill_directories
 from ovos_workshop.skill_launcher import SKILL_MAIN_MODULE
 from ovos_workshop.skill_launcher import SkillLoader, PluginSkillLoader
 
@@ -125,6 +125,11 @@ class SkillManager(Thread):
 
         self.status.bind(self.bus)
         self._init_filewatcher()
+
+    @property
+    def blacklist(self):
+        return Configuration().get("skills", {}).get("blacklisted_skills",
+                                                     ["skill-ovos-stop.openvoiceos"])
 
     def _init_filewatcher(self):
         # monitor skill settings files for changes
@@ -326,6 +331,10 @@ class SkillManager(Thread):
         plugins = find_skill_plugins()
         loaded_skill_ids = [basename(p) for p in self.skill_loaders]
         for skill_id, plug in plugins.items():
+            if skill_id in self.blacklist:
+                LOG.warning(f"{skill_id} is blacklisted, it will NOT be loaded")
+                LOG.info(f"Consider uninstalling {skill_id} instead of blacklisting it")
+                continue
             if skill_id not in self.plugin_skills and skill_id not in loaded_skill_ids:
                 skill_loader = self._get_plugin_skill_loader(skill_id, init_bus=False)
                 requirements = skill_loader.runtime_requirements
@@ -586,6 +595,14 @@ class SkillManager(Thread):
         return SkillLoader(bus, skill_directory)
 
     def _load_skill(self, skill_directory):
+        LOG.warning(f"Found deprecated skill directory: {skill_directory}\n"
+                    f"please create a setup.py for this skill")
+        skill_id = basename(skill_directory)
+        if skill_id in self.blacklist:
+            LOG.warning(f"{skill_id} is blacklisted, it will NOT be loaded")
+            LOG.info(f"Consider deleting {skill_directory} instead of blacklisting it")
+            return None
+
         skill_loader = self._get_skill_loader(skill_directory)
         try:
             load_status = skill_loader.load()
@@ -594,7 +611,7 @@ class SkillManager(Thread):
             load_status = False
         finally:
             self.skill_loaders[skill_directory] = skill_loader
-
+        LOG.info(f"Loaded old style skill: {skill_directory}")
         return skill_loader if load_status else None
 
     def _unload_skill(self, skill_dir):
