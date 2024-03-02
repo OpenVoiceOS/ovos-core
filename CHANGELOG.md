@@ -2,7 +2,19 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a79...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a80...HEAD)
+
+**Breaking changes:**
+
+- \[BUG\] Classic Mycroft skill inits are not calling self.initialize\(\) [\#343](https://github.com/OpenVoiceOS/ovos-core/issues/343)
+
+**Merged pull requests:**
+
+- refactor/reduce code complexity [\#427](https://github.com/OpenVoiceOS/ovos-core/pull/427) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a80](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a80) (2024-03-02)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a79...V0.0.8a80)
 
 **Fixed bugs:**
 
@@ -607,10 +619,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a10...V0.0.8a11)
 
-**Merged pull requests:**
-
-- refactor/ovos\_audio [\#304](https://github.com/OpenVoiceOS/ovos-core/pull/304) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a10](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a10) (2023-04-28)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a9...V0.0.8a10)
@@ -650,10 +658,6 @@
 ## [V0.0.8a5](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a5) (2023-04-22)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a4...V0.0.8a5)
-
-**Merged pull requests:**
-
-- refactor/common\_qa\_speak [\#305](https://github.com/OpenVoiceOS/ovos-core/pull/305) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a4](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a4) (2023-04-14)
 
