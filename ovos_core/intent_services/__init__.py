@@ -364,7 +364,7 @@ class IntentService:
                             self.emit_match_message(match, message)
                             break
                         except:
-                            LOG.exception(f"{match_func} failed to match the utterance")
+                            LOG.exception(f"{match_func} returned an invalid match")
                     LOG.debug(f"no match from {match_func}")
                 else:
                     # Nothing was able to handle the intent
