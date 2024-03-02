@@ -281,7 +281,14 @@ class IntentService:
         sess.touch()
         return sess
 
-    def emit_match_message(self, match, message):
+    def _emit_match_message(self, match: IntentMatch, message: Message):
+        """Update the message data with the matched utterance information and
+        activate the corresponding skill if available.
+
+        Args:
+            match (IntentMatch): The matched utterance object.
+            message (Message): The messagebus data.
+        """
         message.data["utterance"] = match.utterance
 
         if match.skill_id:
@@ -299,7 +306,7 @@ class IntentService:
             reply = message.reply(match.intent_type, data)
             self.bus.emit(reply)
 
-    def handle_utterance(self, message):
+    def handle_utterance(self, message: Message):
         """Main entrypoint for handling user utterances
 
         Monitor the messagebus for 'recognizer_loop:utterance', typically
@@ -361,7 +368,7 @@ class IntentService:
                     match = match_func(utterances, lang, message)
                     if match:
                         try:
-                            self.emit_match_message(match, message)
+                            self._emit_match_message(match, message)
                             break
                         except:
                             LOG.exception(f"{match_func} returned an invalid match")
