@@ -281,6 +281,24 @@ class IntentService:
         sess.touch()
         return sess
 
+    def emit_match_message(self, match, message):
+        message.data["utterance"] = match.utterance
+
+        if match.skill_id:
+            self.converse.activate_skill(match.skill_id, message=message)
+            message.context["skill_id"] = match.skill_id
+            # If the service didn't report back the skill_id it
+            # takes on the responsibility of making the skill "active"
+
+        # Launch skill if not handled by the match function
+        if match.intent_type:
+            # keep all original message.data and update with intent
+            # match, mycroft-core only keeps "utterances"
+            data = dict(message.data)
+            data.update(match.intent_data)
+            reply = message.reply(match.intent_type, data)
+            self.bus.emit(reply)
+
     def handle_utterance(self, message):
         """Main entrypoint for handling user utterances
 
@@ -342,31 +360,18 @@ class IntentService:
                 for match_func in self.get_pipeline(session=sess):
                     match = match_func(utterances, lang, message)
                     if match:
-                        break
+                        try:
+                            self.emit_match_message(match, message)
+                            break
+                        except:
+                            LOG.exception(f"{match_func} failed to match the utterance")
+                    LOG.debug(f"no match from {match_func}")
+                else:
+                    # Nothing was able to handle the intent
+                    # Ask politely for forgiveness for failing in this vital task
+                    self.send_complete_intent_failure(message)
 
             LOG.debug(f"intent matching took: {stopwatch.time}")
-            if match:
-                message.data["utterance"] = match.utterance
-
-                if match.skill_id:
-                    self.converse.activate_skill(match.skill_id, message=message)
-                    message.context["skill_id"] = match.skill_id
-                    # If the service didn't report back the skill_id it
-                    # takes on the responsibility of making the skill "active"
-
-                # Launch skill if not handled by the match function
-                if match.intent_type:
-                    # keep all original message.data and update with intent
-                    # match, mycroft-core only keeps "utterances"
-                    data = dict(message.data)
-                    data.update(match.intent_data)
-                    reply = message.reply(match.intent_type, data)
-                    self.bus.emit(reply)
-
-            else:
-                # Nothing was able to handle the intent
-                # Ask politely for forgiveness for failing in this vital task
-                self.send_complete_intent_failure(message)
 
             # sync any changes made to the default session, eg by ConverseService
             if sess.session_id == "default":
