@@ -2,7 +2,20 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a77...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a78...HEAD)
+
+**Fixed bugs:**
+
+- Unable to blacklist skills or change the fallback priority [\#383](https://github.com/OpenVoiceOS/ovos-core/issues/383)
+- fix: blacklisted skills [\#424](https://github.com/OpenVoiceOS/ovos-core/pull/424) ([JarbasAl](https://github.com/JarbasAl))
+
+**Merged pull requests:**
+
+- test: fix codecov OCP tests [\#423](https://github.com/OpenVoiceOS/ovos-core/pull/423) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a78](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a78) (2024-02-25)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a77...V0.0.8a78)
 
 **Fixed bugs:**
 
@@ -642,10 +655,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a3...V0.0.8a4)
 
-**Fixed bugs:**
-
-- fix/common\_qa errors [\#302](https://github.com/OpenVoiceOS/ovos-core/pull/302) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a3](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a3) (2023-04-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a2...V0.0.8a3)
@@ -653,10 +662,6 @@
 ## [V0.0.8a2](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a2) (2023-04-11)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a1...V0.0.8a2)
-
-**Merged pull requests:**
-
-- mycroft-bus-client -\> ovos-bus-client [\#300](https://github.com/OpenVoiceOS/ovos-core/pull/300) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a1](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a1) (2023-03-24)
 
