@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a78...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a79...HEAD)
+
+**Fixed bugs:**
+
+- fix: old mycroft skills loading [\#426](https://github.com/OpenVoiceOS/ovos-core/pull/426) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a79](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a79) (2024-03-02)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a78...V0.0.8a79)
 
 **Fixed bugs:**
 
@@ -606,10 +614,6 @@
 ## [V0.0.8a10](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a10) (2023-04-28)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a9...V0.0.8a10)
-
-**Merged pull requests:**
-
-- refactor/ovos\_listener [\#303](https://github.com/OpenVoiceOS/ovos-core/pull/303) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a9](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a9) (2023-04-26)
 
