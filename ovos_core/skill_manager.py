@@ -408,8 +408,6 @@ class SkillManager(Thread):
 
     def run(self):
         """Load skills and update periodically from disk and internet."""
-        self._remove_git_locks()
-
         self.load_priority()
 
         self.status.set_alive()
@@ -477,14 +475,6 @@ class SkillManager(Thread):
                               'and the skill manager loop safety harness was '
                               'hit.')
                 sleep(30)
-
-    def _remove_git_locks(self):
-        """If git gets killed from an abrupt shutdown it leaves lock files."""
-        for skills_dir in get_skill_directories():
-            lock_path = os.path.join(skills_dir, '*/.git/index.lock')
-            for i in glob(lock_path):
-                LOG.warning('Found and removed git lock file: ' + i)
-                os.remove(i)
 
     def _load_on_network(self):
         LOG.info('Loading skills that require network...')
@@ -611,7 +601,10 @@ class SkillManager(Thread):
             load_status = False
         finally:
             self.skill_loaders[skill_directory] = skill_loader
-        LOG.info(f"Loaded old style skill: {skill_directory}")
+        if load_status:
+            LOG.info(f"Loaded old style skill: {skill_directory}")
+        else:
+            LOG.error(f"Failed to load old style skill: {skill_directory}")
         return skill_loader if load_status else None
 
     def _unload_skill(self, skill_dir):
@@ -628,7 +621,8 @@ class SkillManager(Thread):
         # let's scan all valid directories, if a skill folder name exists in
         # more than one of these then it should override the previous
         skillmap = {}
-        for skills_dir in get_skill_directories():
+        valid_skill_roots = ["/opt/mycroft/skills"] + get_skill_directories()
+        for skills_dir in valid_skill_roots:
             if not os.path.isdir(skills_dir):
                 continue
             for skill_id in os.listdir(skills_dir):
