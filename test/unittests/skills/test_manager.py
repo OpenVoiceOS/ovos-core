@@ -163,6 +163,25 @@ class TestSkillManager(unittest.TestCase):
         mock_MessageBusClient.assert_called_once_with(cache=True)
         self.assertTrue(result.run_in_thread.called)
 
+    @patch('ovos_core.skill_manager.LOG')
+    def test_load_new_skills_with_blacklisted_skill(self, mock_log):
+        # Mocking find_skill_plugins to return a blacklisted skill
+        with patch('ovos_core.skill_manager.find_skill_plugins', return_value={'blacklisted_skill': ''}):
+            # Mocking _load_skill method to prevent actual loading
+            with patch.object(self.skill_manager, '_load_skill', return_value=None):
+                self.skill_manager._load_skill = MagicMock()
+
+                # Setting up blacklisted skill in the configuration
+                self.skill_manager.config['skills']['blacklisted_skills'] = ['blacklisted_skill']
+
+                # Calling _load_new_skills
+                self.skill_manager._load_new_skills(network=True, internet=True, gui=True)
+
+                # Assert that a warning log message is generated for the blacklisted skill
+                mock_log.warning.assert_called_once_with("blacklisted_skill is blacklisted, it will NOT be loaded")
+                mock_log.info.assert_called_once_with(
+                    "Consider uninstalling blacklisted_skill instead of blacklisting it")
+
 
 if __name__ == '__main__':
     unittest.main()
