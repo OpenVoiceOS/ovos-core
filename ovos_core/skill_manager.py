@@ -14,7 +14,6 @@
 #
 """Load, update and manage skills on this device."""
 import os
-from glob import glob
 from os.path import basename
 from threading import Thread, Event, Lock
 from time import sleep, monotonic
@@ -78,6 +77,7 @@ def on_stopping():
 
 
 class SkillManager(Thread):
+    """Manages the loading, activation, and deactivation of Mycroft skills."""
 
     def __init__(self, bus, watchdog=None, alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
                  error_hook=on_error, stopping_hook=on_stopping):
@@ -86,6 +86,11 @@ class SkillManager(Thread):
         Args:
             bus (event emitter): Mycroft messagebus connection
             watchdog (callable): optional watchdog function
+            alive_hook (callable): callback function for skill alive status
+            started_hook (callable): callback function for skill started status
+            ready_hook (callable): callback function for skill ready status
+            error_hook (callable): callback function for skill error status
+            stopping_hook (callable): callback function for skill stopping status
         """
         super(SkillManager, self).__init__()
         self.bus = bus
@@ -128,11 +133,16 @@ class SkillManager(Thread):
 
     @property
     def blacklist(self):
+        """Get the list of blacklisted skills from the configuration.
+
+        Returns:
+            list: List of blacklisted skill ids.
+        """
         return Configuration().get("skills", {}).get("blacklisted_skills",
                                                      ["skill-ovos-stop.openvoiceos"])
 
     def _init_filewatcher(self):
-        # monitor skill settings files for changes
+        """Initialize the file watcher to monitor skill settings files for changes."""
         sspath = f"{get_xdg_config_save_path()}/skills/"
         os.makedirs(sspath, exist_ok=True)
         self._settings_watchdog = FileWatcher([sspath],
@@ -141,6 +151,11 @@ class SkillManager(Thread):
                                               ignore_creation=True)
 
     def _handle_settings_file_change(self, path: str):
+        """Handle changes to skill settings files.
+
+        Args:
+            path (str): Path to the settings file that has changed.
+        """
         if path.endswith("/settings.json"):
             skill_id = path.split("/")[-2]
             LOG.info(f"skill settings.json change detected for {skill_id}")
@@ -148,6 +163,7 @@ class SkillManager(Thread):
                                   {"skill_id": skill_id}))
 
     def _sync_skill_loading_state(self):
+        """Synchronize the loading state of skills with the current system state."""
         resp = self.bus.wait_for_response(Message("ovos.PHAL.internet_check"))
         network = False
         internet = False
@@ -164,10 +180,10 @@ class SkillManager(Thread):
             network = internet = is_connected()
 
         if internet and not self._connected_event.is_set():
-            LOG.debug("notify internet connected")
+            LOG.debug("Notify internet connected")
             self.bus.emit(Message("mycroft.internet.connected"))
         elif network and not self._network_event.is_set():
-            LOG.debug("notify network connected")
+            LOG.debug("Notify network connected")
             self.bus.emit(Message("mycroft.network.connected"))
 
     def _define_message_bus_events(self):
@@ -181,7 +197,7 @@ class SkillManager(Thread):
                       self.handle_check_device_readiness)
         self.bus.once('mycroft.skills.trained', self.handle_initial_training)
 
-        # load skills waiting for connectivity
+        # Load skills waiting for connectivity
         self.bus.on("mycroft.network.connected", self.handle_network_connected)
         self.bus.on("mycroft.internet.connected", self.handle_internet_connected)
         self.bus.on("mycroft.gui.available", self.handle_gui_connected)
@@ -190,8 +206,15 @@ class SkillManager(Thread):
         self.bus.on("mycroft.gui.unavailable", self.handle_gui_disconnected)
 
     def is_device_ready(self):
+        """Check if the device is ready by waiting for various services to start.
+
+        Returns:
+            bool: True if the device is ready, False otherwise.
+        Raises:
+            TimeoutError: If the device is not ready within a specified timeout.
+        """
         is_ready = False
-        # different setups will have different needs
+        # Different setups will have different needs
         # eg, a server does not care about audio
         # pairing -> device is paired
         # internet -> device is connected to the internet - NOT IMPLEMENTED
@@ -215,13 +238,14 @@ class SkillManager(Thread):
         return is_ready
 
     def handle_check_device_readiness(self, message):
+        """Handle the check device readiness event."""
         ready = False
         while not ready:
             try:
                 ready = self.is_device_ready()
             except TimeoutError:
                 if is_paired():
-                    LOG.warning("mycroft should already have reported ready!")
+                    LOG.warning("OVOS should already have reported ready!")
                 sleep(5)
 
         LOG.info("Mycroft is all loaded and ready to roll!")
@@ -230,7 +254,10 @@ class SkillManager(Thread):
     def check_services_ready(self, services):
         """Report if all specified services are ready.
 
-        services (iterable): service names to check.
+        Args:
+            services (iterable): Service names to check.
+        Returns:
+            bool: True if all specified services are ready, False otherwise.
         """
         backend_type = self.config.get("server", {}).get("backend_type", "offline")
         for ser, rdy in services.items():
@@ -285,10 +312,20 @@ class SkillManager(Thread):
 
     @property
     def skills_config(self):
+        """Get the skills service configuration.
+
+        Returns:
+            dict: Skills configuration.
+        """
         return self.config['skills']
 
     def handle_gui_connected(self, message):
-        # some gui extensions such as mobile may request that skills never unload
+        """Handle GUI connection event.
+
+        Args:
+            message: Message containing information about the GUI connection.
+        """
+        # Some GUI extensions, such as mobile, may request that skills never unload
         self._allow_state_reloads = not message.data.get("permanent", False)
         if not self._gui_event.is_set():
             LOG.debug("GUI Connected")
@@ -296,21 +333,41 @@ class SkillManager(Thread):
             self._load_new_skills()
 
     def handle_gui_disconnected(self, message):
+        """Handle GUI disconnection event.
+
+        Args:
+            message: Message containing information about the GUI disconnection.
+        """
         if self._allow_state_reloads:
             self._gui_event.clear()
             self._unload_on_gui_disconnect()
 
     def handle_internet_disconnected(self, message):
+        """Handle internet disconnection event.
+
+        Args:
+            message: Message containing information about the internet disconnection.
+        """
         if self._allow_state_reloads:
             self._connected_event.clear()
             self._unload_on_internet_disconnect()
 
     def handle_network_disconnected(self, message):
+        """Handle network disconnection event.
+
+        Args:
+            message: Message containing information about the network disconnection.
+        """
         if self._allow_state_reloads:
             self._network_event.clear()
             self._unload_on_network_disconnect()
 
     def handle_internet_connected(self, message):
+        """Handle internet connection event.
+
+        Args:
+            message: Message containing information about the internet connection.
+        """
         if not self._connected_event.is_set():
             LOG.debug("Internet Connected")
             self._network_event.set()
@@ -318,12 +375,23 @@ class SkillManager(Thread):
             self._load_on_internet()
 
     def handle_network_connected(self, message):
+        """Handle network connection event.
+
+        Args:
+            message: Message containing information about the network connection.
+        """
         if not self._network_event.is_set():
             LOG.debug("Network Connected")
             self._network_event.set()
             self._load_on_network()
 
     def load_plugin_skills(self, network=None, internet=None):
+        """Load plugin skills based on network and internet status.
+
+        Args:
+            network (bool): Network connection status.
+            internet (bool): Internet connection status.
+        """
         if network is None:
             network = self._network_event.is_set()
         if internet is None:
@@ -345,11 +413,15 @@ class SkillManager(Thread):
                 self._load_plugin_skill(skill_id, plug)
 
     def _get_internal_skill_bus(self):
+        """Get a dedicated skill bus connection per skill.
+
+        Returns:
+            MessageBusClient: Internal skill bus.
+        """
         if not self.config["websocket"].get("shared_connection", True):
-            # see BusBricker skill to understand why this matters
-            # any skill can manipulate the bus from other skills
-            # this patch ensures each skill gets it's own
-            # connection that can't be manipulated by others
+            # See BusBricker skill to understand why this matters.
+            # Any skill can manipulate the bus from other skills.
+            # This patch ensures each skill gets its own connection that can't be manipulated by others.
             # https://github.com/EvilJarbas/BusBrickerSkill
             bus = MessageBusClient(cache=True)
             bus.run_in_thread()
@@ -358,12 +430,30 @@ class SkillManager(Thread):
         return bus
 
     def _get_plugin_skill_loader(self, skill_id, init_bus=True):
+        """Get a plugin skill loader.
+
+        Args:
+            skill_id (str): ID of the skill.
+            init_bus (bool): Whether to initialize the internal skill bus.
+
+        Returns:
+            PluginSkillLoader: Plugin skill loader instance.
+        """
         bus = None
         if init_bus:
             bus = self._get_internal_skill_bus()
         return PluginSkillLoader(bus, skill_id)
 
     def _load_plugin_skill(self, skill_id, skill_plugin):
+        """Load a plugin skill.
+
+        Args:
+            skill_id (str): ID of the skill.
+            skill_plugin: Plugin skill instance.
+
+        Returns:
+            PluginSkillLoader: Loaded plugin skill loader instance if successful, None otherwise.
+        """
         skill_loader = self._get_plugin_skill_loader(skill_id)
         try:
             load_status = skill_loader.load(skill_plugin)
@@ -376,6 +466,7 @@ class SkillManager(Thread):
         return skill_loader if load_status else None
 
     def load_priority(self):
+        """DEPRECATED: Load priority skills based on the specified order in the configuration."""
         skill_ids = {os.path.basename(skill_path): skill_path
                      for skill_path in self._get_skill_directories()}
         priority_skills = self.skills_config.get("priority_skills") or []
@@ -404,10 +495,17 @@ class SkillManager(Thread):
                 LOG.error(f'Priority skill {skill_id} can\'t be found')
 
     def handle_initial_training(self, message):
+        """Handle the initial intent training completion event.
+
+        This usually only includes offline skills
+
+        Args:
+            message: Message containing information about the initial training completion.
+        """
         self.initial_load_complete = True
 
     def run(self):
-        """Load skills and update periodically from disk and internet."""
+        """Run the skill manager thread."""
         self.load_priority()
 
         self.status.set_alive()
@@ -416,12 +514,12 @@ class SkillManager(Thread):
 
         if self.skills_config.get("wait_for_internet", False):
             LOG.warning("`wait_for_internet` is a deprecated option, update to "
-                        "specify `network_skills`or `internet_skills` in "
+                        "specify `network_skills` or `internet_skills` in "
                         "`ready_settings`")
             # NOTE - self._connected_event will never be set
             # if PHAL plugin is not running to emit the connected events
             while not self._connected_event.is_set():
-                # ensure we dont block here forever if plugin not installed
+                # Ensure we don't block here forever if the plugin is not installed
                 self._sync_skill_loading_state()
                 sleep(1)
             LOG.debug("Internet Connected")
@@ -477,62 +575,67 @@ class SkillManager(Thread):
                 sleep(30)
 
     def _load_on_network(self):
+        """Load skills that require a network connection."""
         LOG.info('Loading skills that require network...')
         self._load_new_skills(network=True, internet=False)
         self._network_loaded.set()
 
     def _load_on_internet(self):
+        """Load skills that require both internet and network connections."""
         LOG.info('Loading skills that require internet (and network)...')
         self._load_new_skills(network=True, internet=True)
         self._internet_loaded.set()
         self._network_loaded.set()
 
     def _unload_on_network_disconnect(self):
-        """ unload skills that require network to work """
+        """Unload skills that require a network connection to work."""
         with self._lock:
             for skill_dir in self._get_skill_directories():
-                # by definition skill_id == folder name
                 skill_id = os.path.basename(skill_dir)
                 skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
                 requirements = skill_loader.runtime_requirements
                 if requirements.requires_network and \
                         not requirements.no_network_fallback:
-                    # unload until network is back
+                    # Unload skills until the network is back
                     self._unload_skill(skill_dir)
 
     def _unload_on_internet_disconnect(self):
-        """ unload skills that require internet to work """
+        """Unload skills that require an internet connection to work."""
         with self._lock:
             for skill_dir in self._get_skill_directories():
-                # by definition skill_id == folder name
                 skill_id = os.path.basename(skill_dir)
                 skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
                 requirements = skill_loader.runtime_requirements
                 if requirements.requires_internet and \
                         not requirements.no_internet_fallback:
-                    # unload until internet is back
+                    # Unload skills until the internet is back
                     self._unload_skill(skill_dir)
 
     def _unload_on_gui_disconnect(self):
-        """ unload skills that require gui to work """
+        """Unload skills that require a GUI to work."""
         with self._lock:
             for skill_dir in self._get_skill_directories():
-                # by definition skill_id == folder name
                 skill_id = os.path.basename(skill_dir)
                 skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
                 requirements = skill_loader.runtime_requirements
                 if requirements.requires_gui and \
                         not requirements.no_gui_fallback:
-                    # unload until gui is back
+                    # Unload skills until the GUI is back
                     self._unload_skill(skill_dir)
 
     def _load_on_startup(self):
-        """Handle initial skill load."""
+        """Handle offline skills load on startup."""
         LOG.info('Loading offline skills...')
         self._load_new_skills(network=False, internet=False)
 
     def _load_new_skills(self, network=None, internet=None, gui=None):
-        """Handle load of skills installed since startup."""
+        """Handle loading of skills installed since startup.
+
+        Args:
+            network (bool): Network connection status.
+            internet (bool): Internet connection status.
+            gui (bool): GUI connection status.
+        """
         if network is None:
             network = self._network_event.is_set()
         if internet is None:
@@ -540,15 +643,14 @@ class SkillManager(Thread):
         if gui is None:
             gui = self._gui_event.is_set() or is_gui_connected(self.bus)
 
-        # a lock is used because this can be called via state events or as part of the main loop
-        # there is a possible race condition where this handler would be executing several times otherwise
+        # A lock is used because this can be called via state events or as part of the main loop.
+        # There is a possible race condition where this handler would be executing several times otherwise.
         with self._lock:
 
             self.load_plugin_skills(network=network, internet=internet)
 
             for skill_dir in self._get_skill_directories():
                 replaced_skills = []
-                # by definition skill_id == folder name
                 skill_id = os.path.basename(skill_dir)
                 skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
                 requirements = skill_loader.runtime_requirements
@@ -560,7 +662,7 @@ class SkillManager(Thread):
                     # TODO - companion PR adding this one
                     continue
 
-                # a local source install is replacing this plugin, unload it!
+                # A local source install is replacing this plugin, unload it!
                 if skill_id in self.plugin_skills:
                     LOG.info(f"{skill_id} plugin will be replaced by a local version: {skill_dir}")
                     self._unload_plugin_skill(skill_id)
@@ -568,23 +670,40 @@ class SkillManager(Thread):
                 for old_skill_dir, skill_loader in self.skill_loaders.items():
                     if old_skill_dir != skill_dir and \
                             skill_loader.skill_id == skill_id:
-                        # a higher priority equivalent has been detected!
+                        # A higher priority equivalent has been detected!
                         replaced_skills.append(old_skill_dir)
 
                 for old_skill_dir in replaced_skills:
-                    # unload the old skill
+                    # Unload the old skill
                     self._unload_skill(old_skill_dir)
 
                 if skill_dir not in self.skill_loaders:
                     self._load_skill(skill_dir)
 
     def _get_skill_loader(self, skill_directory, init_bus=True):
+        """Get a skill loader instance.
+
+        Args:
+            skill_directory (str): Directory path of the skill.
+            init_bus (bool): Whether to initialize the internal skill bus.
+
+        Returns:
+            SkillLoader: Skill loader instance.
+        """
         bus = None
         if init_bus:
             bus = self._get_internal_skill_bus()
         return SkillLoader(bus, skill_directory)
 
     def _load_skill(self, skill_directory):
+        """Load an old-style skill.
+
+        Args:
+            skill_directory (str): Directory path of the skill.
+
+        Returns:
+            SkillLoader: Loaded skill loader instance if successful, None otherwise.
+        """
         LOG.warning(f"Found deprecated skill directory: {skill_directory}\n"
                     f"please create a setup.py for this skill")
         skill_id = basename(skill_directory)
@@ -608,9 +727,14 @@ class SkillManager(Thread):
         return skill_loader if load_status else None
 
     def _unload_skill(self, skill_dir):
+        """Unload a skill.
+
+        Args:
+            skill_dir (str): Directory path of the skill.
+        """
         if skill_dir in self.skill_loaders:
             skill = self.skill_loaders[skill_dir]
-            LOG.info(f'removing {skill.skill_id}')
+            LOG.info(f'Removing {skill.skill_id}')
             try:
                 skill.unload()
             except Exception:
@@ -618,8 +742,11 @@ class SkillManager(Thread):
             del self.skill_loaders[skill_dir]
 
     def _get_skill_directories(self):
-        # let's scan all valid directories, if a skill folder name exists in
-        # more than one of these then it should override the previous
+        """Get valid skill directories.
+
+        Returns:
+            list: List of valid skill directories.
+        """
         skillmap = {}
         valid_skill_roots = ["/opt/mycroft/skills"] + get_skill_directories()
         for skills_dir in valid_skill_roots:
@@ -646,7 +773,10 @@ class SkillManager(Thread):
         return skillmap.values()
 
     def _unload_removed_skills(self):
-        """Shutdown removed skills."""
+        """Shutdown removed skills.
+
+        Finds and unloads skills that were removed from the disk.
+        """
         skill_dirs = self._get_skill_directories()
         # Find loaded skills that don't exist on disk
         removed_skills = [
@@ -657,6 +787,11 @@ class SkillManager(Thread):
         return removed_skills
 
     def _unload_plugin_skill(self, skill_id):
+        """Unload a plugin skill.
+
+        Args:
+            skill_id (str): Identifier of the plugin skill to unload.
+        """
         if skill_id in self.plugin_skills:
             LOG.info('Unloading plugin skill: ' + skill_id)
             skill_loader = self.plugin_skills[skill_id]
