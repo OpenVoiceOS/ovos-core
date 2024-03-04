@@ -104,8 +104,6 @@ class TestSkillManager(unittest.TestCase):
         self.skill_manager._sync_skill_loading_state()
 
         self.assertTrue(self.skill_manager._gui_event.is_set())
-        self.assertTrue(self.skill_manager._connected_event.is_set())
-        self.assertTrue(self.skill_manager._network_event.is_set())
         self.assertTrue(self.bus.emit.called)
         self.assertEqual(self.bus.emit.call_args[0][0].msg_type, 'mycroft.internet.connected')
 
@@ -120,8 +118,8 @@ class TestSkillManager(unittest.TestCase):
         self.skill_manager._sync_skill_loading_state()
 
         self.assertFalse(self.skill_manager._gui_event.is_set())
-        self.assertTrue(self.skill_manager._connected_event.is_set())
-        self.assertTrue(self.skill_manager._network_event.is_set())
+        self.assertTrue(self.bus.emit.called)
+        self.assertEqual(self.bus.emit.call_args[0][0].msg_type, 'mycroft.internet.connected')
 
     @patch('ovos_core.skill_manager.is_gui_connected', return_value=True)
     @patch('ovos_core.skill_manager.is_connected', return_value=False)
