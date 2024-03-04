@@ -138,6 +138,31 @@ class TestSkillManager(unittest.TestCase):
         self.assertFalse(self.skill_manager._connected_event.is_set())
         self.assertFalse(self.skill_manager._network_event.is_set())
 
+    @patch('ovos_core.skill_manager.MessageBusClient', autospec=True)
+    def test_get_internal_skill_bus_shared_connection(self, mock_MessageBusClient):
+        # Set the configuration to use shared_connection=True
+        self.skill_manager.config = {'websocket': {'shared_connection': True}}
+
+        # Call the method under test
+        result = self.skill_manager._get_internal_skill_bus()
+
+        # Ensure the shared connection is returned
+        self.assertEqual(result, self.bus)
+        # Ensure that MessageBusClient is not called since shared_connection=True
+        self.assertFalse(mock_MessageBusClient.called)
+
+    @patch('ovos_core.skill_manager.MessageBusClient', autospec=True)
+    def test_get_internal_skill_bus_not_shared_connection(self, mock_MessageBusClient):
+        # Set the configuration to use shared_connection=False
+        self.skill_manager.config = {'websocket': {'shared_connection': False}}
+
+        # Call the method under test
+        result = self.skill_manager._get_internal_skill_bus()
+
+        # Ensure a new MessageBusClient is created and returned
+        mock_MessageBusClient.assert_called_once_with(cache=True)
+        self.assertTrue(result.run_in_thread.called)
+
 
 if __name__ == '__main__':
     unittest.main()
