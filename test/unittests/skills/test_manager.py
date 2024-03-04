@@ -92,6 +92,52 @@ class TestSkillManager(unittest.TestCase):
         self.assertFalse(self.skill_manager._network_event.is_set())
         self.assertTrue(self.skill_manager._unload_on_network_disconnect.called)
 
+    @patch('ovos_core.skill_manager.is_gui_connected', return_value=True)
+    @patch('ovos_core.skill_manager.is_connected', return_value=True)
+    def test_sync_skill_loading_state_no_phal_plugin(self, mock_is_connected, mock_is_gui_connected):
+        self.bus.wait_for_response.return_value = None
+
+        self.skill_manager._gui_event.clear()
+        self.skill_manager._connected_event.clear()
+        self.skill_manager._network_event.clear()
+
+        self.skill_manager._sync_skill_loading_state()
+
+        self.assertTrue(self.skill_manager._gui_event.is_set())
+        self.assertTrue(self.skill_manager._connected_event.is_set())
+        self.assertTrue(self.skill_manager._network_event.is_set())
+        self.assertTrue(self.bus.emit.called)
+        self.assertEqual(self.bus.emit.call_args[0][0].msg_type, 'mycroft.internet.connected')
+
+    @patch('ovos_core.skill_manager.is_gui_connected', return_value=False)
+    def test_sync_skill_loading_state_phal_plugin_no_gui(self, mock_is_gui_connected):
+        self.bus.wait_for_response.return_value = Message("ovos.PHAL.internet_check", data={"internet_connected": True})
+
+        self.skill_manager._gui_event.clear()
+        self.skill_manager._connected_event.clear()
+        self.skill_manager._network_event.clear()
+
+        self.skill_manager._sync_skill_loading_state()
+
+        self.assertFalse(self.skill_manager._gui_event.is_set())
+        self.assertTrue(self.skill_manager._connected_event.is_set())
+        self.assertTrue(self.skill_manager._network_event.is_set())
+
+    @patch('ovos_core.skill_manager.is_gui_connected', return_value=True)
+    @patch('ovos_core.skill_manager.is_connected', return_value=False)
+    def test_sync_skill_loading_state_gui_no_internet_no_network(self, mock_is_connected, mock_is_gui_connected):
+        self.bus.wait_for_response.return_value = None
+
+        self.skill_manager._gui_event.clear()
+        self.skill_manager._connected_event.clear()
+        self.skill_manager._network_event.clear()
+
+        self.skill_manager._sync_skill_loading_state()
+
+        self.assertTrue(self.skill_manager._gui_event.is_set())
+        self.assertFalse(self.skill_manager._connected_event.is_set())
+        self.assertFalse(self.skill_manager._network_event.is_set())
+
 
 if __name__ == '__main__':
     unittest.main()
