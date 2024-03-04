@@ -182,9 +182,12 @@ class SkillManager(Thread):
         if internet and not self._connected_event.is_set():
             LOG.debug("Notify internet connected")
             self.bus.emit(Message("mycroft.internet.connected"))
+            self._connected_event.set()
+            self._network_event.set()
         elif network and not self._network_event.is_set():
             LOG.debug("Notify network connected")
             self.bus.emit(Message("mycroft.network.connected"))
+            self._network_event.set()
 
     def _define_message_bus_events(self):
         """Define message bus events with handlers defined in this class."""
