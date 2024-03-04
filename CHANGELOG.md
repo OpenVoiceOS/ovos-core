@@ -2,7 +2,19 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a80...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a81...HEAD)
+
+**Closed issues:**
+
+- tests for blacklisted skills [\#425](https://github.com/OpenVoiceOS/ovos-core/issues/425)
+
+**Merged pull requests:**
+
+- more tests for skills manager [\#428](https://github.com/OpenVoiceOS/ovos-core/pull/428) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a81](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a81) (2024-03-02)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a80...V0.0.8a81)
 
 **Breaking changes:**
 
@@ -635,10 +647,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a7...V0.0.8a8)
 
-**Implemented enhancements:**
-
-- refactor/fallback\_skills\_v2 [\#307](https://github.com/OpenVoiceOS/ovos-core/pull/307) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a7](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a7) (2023-04-24)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a6...V0.0.8a7)
@@ -650,10 +658,6 @@
 ## [V0.0.8a6](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a6) (2023-04-22)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a5...V0.0.8a6)
-
-**Merged pull requests:**
-
-- refactor/skill\_loader\_from\_workshop [\#306](https://github.com/OpenVoiceOS/ovos-core/pull/306) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a5](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a5) (2023-04-22)
 
