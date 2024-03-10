@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a81...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a82...HEAD)
+
+**Merged pull requests:**
+
+- chore\(docs\): add a long description to PyPi [\#429](https://github.com/OpenVoiceOS/ovos-core/pull/429) ([mikejgray](https://github.com/mikejgray))
+
+## [V0.0.8a82](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a82) (2024-03-04)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a81...V0.0.8a82)
 
 **Closed issues:**
 
@@ -441,10 +449,6 @@
 ## [V0.0.8a33](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a33) (2023-08-08)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a32...V0.0.8a33)
-
-**Implemented enhancements:**
-
-- feat/context\_session [\#308](https://github.com/OpenVoiceOS/ovos-core/pull/308) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a32](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a32) (2023-08-07)
 
