@@ -54,12 +54,17 @@ def required(requirements_file):
                 if pkg.strip() and not pkg.startswith("#")]
 
 
+with open("README.md", "r") as f:
+    long_description = f.read()
+
 setup(
     name='ovos-core',
     version=get_version(),
     license='Apache-2.0',
     url='https://github.com/OpenVoiceOS/ovos-core',
-    description='mycroft-core packaged as a library',
+    description='The spiritual successor to Mycroft AI, OVOS is flexible voice assistant software that can be run almost anywhere!',
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     install_requires=required('requirements/requirements.txt'),
     extras_require={
         'mycroft': required('requirements/mycroft.txt'),
