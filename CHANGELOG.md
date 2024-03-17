@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a82...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a83...HEAD)
+
+**Implemented enhancements:**
+
+- add "allow\_alphas" config [\#430](https://github.com/OpenVoiceOS/ovos-core/pull/430) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a83](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a83) (2024-03-10)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a82...V0.0.8a83)
 
 **Merged pull requests:**
 
@@ -609,7 +617,6 @@
 **Fixed bugs:**
 
 - fix version [\#317](https://github.com/OpenVoiceOS/ovos-core/pull/317) ([JarbasAl](https://github.com/JarbasAl))
-- refactor/padatious\_samples [\#309](https://github.com/OpenVoiceOS/ovos-core/pull/309) ([JarbasAl](https://github.com/JarbasAl))
 
 **Merged pull requests:**
 
