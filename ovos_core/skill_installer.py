@@ -64,6 +64,8 @@ class SkillsStore:
             pip_args += ['-c', constraints]
         if self.config.get("break_system_packages", False):
             pip_args += ["--break-system-packages"]
+        if self.config.get("allow_alphas", False):
+            pip_args += ["--pre"]
 
         with SkillsStore.PIP_LOCK:
             """
