@@ -401,8 +401,10 @@ class SkillManager(Thread):
         loaded_skill_ids = [basename(p) for p in self.skill_loaders]
         for skill_id, plug in plugins.items():
             if skill_id in self.blacklist:
-                LOG.warning(f"{skill_id} is blacklisted, it will NOT be loaded")
-                LOG.info(f"Consider uninstalling {skill_id} instead of blacklisting it")
+                if skill_id not in self._logged_skill_warnings:
+                    self._logged_skill_warnings.append(skill_id)
+                    LOG.warning(f"{skill_id} is blacklisted, it will NOT be loaded")
+                    LOG.info(f"Consider uninstalling {skill_id} instead of blacklisting it")
                 continue
             if skill_id not in self.plugin_skills and skill_id not in loaded_skill_ids:
                 skill_loader = self._get_plugin_skill_loader(skill_id, init_bus=False)
