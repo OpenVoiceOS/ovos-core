@@ -115,6 +115,7 @@ class SkillManager(Thread):
         self._internet_loaded = Event()
         self._network_skill_timeout = 300
         self._allow_state_reloads = True
+        self._logged_skill_warnings = list()
 
         self.config = Configuration()
 
@@ -562,17 +563,15 @@ class SkillManager(Thread):
 
         # Scan the file folder that contains Skills.  If a Skill is updated,
         # unload the existing version from memory and reload from the disk.
-        while not self._stop_event.is_set():
+        while not self._stop_event.wait(30):
             try:
                 self._unload_removed_skills()
                 self._load_new_skills()
                 self._watchdog()
-                sleep(2)  # Pause briefly before beginning next scan
             except Exception:
                 LOG.exception('Something really unexpected has occurred '
                               'and the skill manager loop safety harness was '
                               'hit.')
-                sleep(30)
 
     def _load_on_network(self):
         """Load skills that require a network connection."""
@@ -664,7 +663,9 @@ class SkillManager(Thread):
 
                 # A local source install is replacing this plugin, unload it!
                 if skill_id in self.plugin_skills:
-                    LOG.info(f"{skill_id} plugin will be replaced by a local version: {skill_dir}")
+                    if skill_id not in self._logged_skill_warnings:
+                        self._logged_skill_warnings.append(skill_id)
+                        LOG.info(f"{skill_id} plugin will be replaced by a local version: {skill_dir}")
                     self._unload_plugin_skill(skill_id)
 
                 for old_skill_dir, skill_loader in self.skill_loaders.items():
@@ -708,8 +709,10 @@ class SkillManager(Thread):
                     f"please create a setup.py for this skill")
         skill_id = basename(skill_directory)
         if skill_id in self.blacklist:
-            LOG.warning(f"{skill_id} is blacklisted, it will NOT be loaded")
-            LOG.info(f"Consider deleting {skill_directory} instead of blacklisting it")
+            if skill_id not in self._logged_skill_warnings:
+                self._logged_skill_warnings.append(skill_id)
+                LOG.warning(f"{skill_id} is blacklisted, it will NOT be loaded")
+                LOG.info(f"Consider deleting {skill_directory} instead of blacklisting it")
             return None
 
         skill_loader = self._get_skill_loader(skill_directory)

@@ -175,8 +175,9 @@ class TestSkillManager(unittest.TestCase):
 
                 # Calling _load_new_skills
                 self.skill_manager._load_new_skills(network=True, internet=True, gui=True)
+                self.skill_manager._load_new_skills(network=True, internet=True, gui=True)
 
-                # Assert that a warning log message is generated for the blacklisted skill
+                # Assert that a warning log message is generated once for the blacklisted skill
                 mock_log.warning.assert_called_once_with("blacklisted_skill is blacklisted, it will NOT be loaded")
                 mock_log.info.assert_called_once_with(
                     "Consider uninstalling blacklisted_skill instead of blacklisting it")
