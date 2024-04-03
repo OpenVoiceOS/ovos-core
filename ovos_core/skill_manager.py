@@ -665,9 +665,7 @@ class SkillManager(Thread):
 
                 # A local source install is replacing this plugin, unload it!
                 if skill_id in self.plugin_skills:
-                    if skill_id not in self._logged_skill_warnings:
-                        self._logged_skill_warnings.append(skill_id)
-                        LOG.info(f"{skill_id} plugin will be replaced by a local version: {skill_dir}")
+                    LOG.info(f"{skill_id} plugin will be replaced by a local version: {skill_dir}")
                     self._unload_plugin_skill(skill_id)
 
                 for old_skill_dir, skill_loader in self.skill_loaders.items():

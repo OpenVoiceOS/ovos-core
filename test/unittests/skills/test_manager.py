@@ -1,4 +1,5 @@
 import unittest
+from os.path import join, dirname
 from unittest.mock import MagicMock, patch
 
 from ovos_bus_client.message import Message
@@ -175,12 +176,21 @@ class TestSkillManager(unittest.TestCase):
 
                 # Calling _load_new_skills
                 self.skill_manager._load_new_skills(network=True, internet=True, gui=True)
+                self.assertEqual(self.skill_manager._logged_skill_warnings, ["blacklisted_skill"])
                 self.skill_manager._load_new_skills(network=True, internet=True, gui=True)
 
                 # Assert that a warning log message is generated once for the blacklisted skill
                 mock_log.warning.assert_called_once_with("blacklisted_skill is blacklisted, it will NOT be loaded")
                 mock_log.info.assert_called_once_with(
                     "Consider uninstalling blacklisted_skill instead of blacklisting it")
+
+        # Mock loading a local directory that is blacklisted
+        self.skill_manager.config['skills']['blacklisted_skills'].append("local_skill.test")
+        self.skill_manager._load_skill(join(dirname(__file__), 'local_skill.test'))
+        mock_log.warning.assert_called_once_with("local_skill.test is blacklisted, it will NOT be loaded")
+        mock_log.info.assert_called_once_with(
+            "Consider uninstalling local_skill.test instead of blacklisting it")
+        self.assertIn("local_skill.test", self.skill_manager._logged_skill_warnings)
 
 
 if __name__ == '__main__':
