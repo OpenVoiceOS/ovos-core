@@ -186,10 +186,11 @@ class TestSkillManager(unittest.TestCase):
 
         # Mock loading a local directory that is blacklisted
         self.skill_manager.config['skills']['blacklisted_skills'].append("local_skill.test")
-        self.skill_manager._load_skill(join(dirname(__file__), 'local_skill.test'))
+        test_skill_path = join(dirname(__file__), 'local_skill.test')
+        self.skill_manager._load_skill(test_skill_path)
         mock_log.warning.assert_called_with("local_skill.test is blacklisted, it will NOT be loaded")
         mock_log.info.assert_called_with(
-            "Consider uninstalling local_skill.test instead of blacklisting it")
+            f"Consider deleting {test_skill_path} instead of blacklisting it")
         self.assertIn("local_skill.test", self.skill_manager._logged_skill_warnings)
 
 
