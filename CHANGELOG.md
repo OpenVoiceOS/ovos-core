@@ -2,7 +2,16 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a83...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a84...HEAD)
+
+**Fixed bugs:**
+
+- Blacklisted skill generates infinite logs [\#431](https://github.com/OpenVoiceOS/ovos-core/issues/431)
+- Update SkillManager logging and optimize infinite loop [\#432](https://github.com/OpenVoiceOS/ovos-core/pull/432) ([NeonDaniel](https://github.com/NeonDaniel))
+
+## [V0.0.8a84](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a84) (2024-03-17)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a83...V0.0.8a84)
 
 **Implemented enhancements:**
 
@@ -530,10 +539,6 @@
 
 - hotfix/default\_cfg [\#330](https://github.com/OpenVoiceOS/ovos-core/pull/330) ([JarbasAl](https://github.com/JarbasAl))
 
-**Closed issues:**
-
-- Bug - start-mycroft.sh debug is not handled. [\#312](https://github.com/OpenVoiceOS/ovos-core/issues/312)
-
 ## [V0.0.8a24](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a24) (2023-06-07)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a23...V0.0.8a24)
@@ -661,10 +666,6 @@
 ## [V0.0.8a7](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a7) (2023-04-24)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a6...V0.0.8a7)
-
-**Fixed bugs:**
-
-- bump dependencies [\#311](https://github.com/OpenVoiceOS/ovos-core/pull/311) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a6](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a6) (2023-04-22)
 
