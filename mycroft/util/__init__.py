@@ -27,6 +27,7 @@ from mycroft.util.file_utils import (
     create_file,
     ensure_directory_exists,
     curate_cache)
+from mycroft.util.audio_test import record
 from ovos_utils.file_utils import resolve_resource_file, get_cache_directory, get_temp_path
 from mycroft.util.network_utils import connected
 from mycroft.util.process_utils import (create_echo_function,
