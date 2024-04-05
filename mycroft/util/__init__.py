@@ -40,3 +40,8 @@ from ovos_utils.signal import check_for_signal, create_signal, \
     get_ipc_directory
 from mycroft.util.platform import get_arch
 from ovos_utils.log import init_service_logger, LOG
+
+
+def record(*args, **kwargs):
+    from mycroft.util.audio_test import record
+    record(*args, **kwargs)

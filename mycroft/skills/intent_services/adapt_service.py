@@ -15,5 +15,10 @@
 """An intent parsing service using the Adapt parser."""
 from adapt.context import ContextManagerFrame
 from adapt.engine import IntentDeterminationEngine
-from ovos_workshop.intents import Intent as AdaptIntent, IntentBuilder, Intent
+from ovos_workshop.intents import IntentBuilder, Intent
 from ovos_core.intent_services.adapt_service import ContextManager, AdaptService
+
+
+class AdaptIntent(IntentBuilder):
+    def __init__(self, name=''):
+        super().__init__(name)
