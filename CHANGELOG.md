@@ -2,7 +2,16 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a84...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a85...HEAD)
+
+**Fixed bugs:**
+
+- Missing backwards-compat. imports [\#433](https://github.com/OpenVoiceOS/ovos-core/issues/433)
+- Add back backwards-compat imports [\#434](https://github.com/OpenVoiceOS/ovos-core/pull/434) ([NeonDaniel](https://github.com/NeonDaniel))
+
+## [V0.0.8a85](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a85) (2024-04-04)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a84...V0.0.8a85)
 
 **Fixed bugs:**
 
@@ -623,10 +632,6 @@
 
 - fix version [\#317](https://github.com/OpenVoiceOS/ovos-core/pull/317) ([JarbasAl](https://github.com/JarbasAl))
 
-**Merged pull requests:**
-
-- refactor/ovos-core!! [\#313](https://github.com/OpenVoiceOS/ovos-core/pull/313) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a13](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a13) (2023-05-01)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a12...V0.0.8a13)
@@ -654,10 +659,6 @@
 ## [V0.0.8a9](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a9) (2023-04-26)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a8...V0.0.8a9)
-
-**Fixed bugs:**
-
-- fix/fallbacks [\#314](https://github.com/OpenVoiceOS/ovos-core/pull/314) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a8](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a8) (2023-04-25)
 
