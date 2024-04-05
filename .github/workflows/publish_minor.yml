@@ -71,8 +71,8 @@ jobs:
         with:
           commit_message: Prepare Next Version
           branch: dev
-      - name: Publish to Test PyPI
-        uses: pypa/gh-action-pypi-publish@master
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{secrets.PYPI_TOKEN}}
       - name: Send message to Matrix bots channel
