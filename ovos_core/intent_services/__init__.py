@@ -35,11 +35,6 @@ try:
 except ImportError:
     from ovos_core.intent_services.padacioso_service import PadaciosoService as PadatiousService
 
-try:
-    from ovos_core.intent_services.ocp_service import OCPPipelineMatcher
-except ImportError:
-    LOG.warning("OCPPipelineMatcher unavailable, please install ovos-utils >= 0.1.0")
-    OCPPipelineMatcher = None
 
 # Intent match response tuple containing
 # intent_service: Name of the service that matched the intent
@@ -78,12 +73,12 @@ class IntentService:
         self.converse = ConverseService(bus)
         self.common_qa = CommonQAService(bus)
         self.stop = StopService(bus)
-        if OCPPipelineMatcher is not None:
-            self.ocp = OCPPipelineMatcher(bus)
-        else:
-            self.ocp = None
+        self.ocp = None
         self.utterance_plugins = UtteranceTransformersService(bus, config=config)
         self.metadata_plugins = MetadataTransformersService(bus, config=config)
+
+        self._load_ocp_pipeline()  # TODO - enable by default once stable
+
         # connection SessionManager to the bus,
         # this will sync default session across all components
         SessionManager.connect_to_bus(self.bus)
@@ -116,6 +111,17 @@ class IntentService:
                     self.handle_padatious_manifest)
         self.bus.on('intent.service.padatious.entities.manifest.get',
                     self.handle_entity_manifest)
+
+    def _load_ocp_pipeline(self):
+        """EXPERIMENTAL: this feature is not yet ready for end users"""
+        audio_enabled = Configuration().get("enable_old_audioservice", True)
+        if not audio_enabled:
+            LOG.warning("EXPERIMENTAL: the OCP pipeline is enabled!")
+            try:
+                from ovos_core.intent_services.ocp_service import OCPPipelineMatcher
+                self.ocp = OCPPipelineMatcher(self.bus)
+            except ImportError:
+                LOG.error("OCPPipelineMatcher unavailable, please install ovos-utils >= 0.1.0")
 
     @property
     def registered_intents(self):
