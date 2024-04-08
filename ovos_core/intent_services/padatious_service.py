@@ -103,7 +103,6 @@ class PadatiousService:
         self.conf_med = self.padatious_config.get("conf_med") or 0.8
         self.conf_low = self.padatious_config.get("conf_low") or 0.5
 
-        LOG.debug('Using Padatious intent parser.')
         intent_cache = self.padatious_config.get(
             'intent_cache') or f"{xdg_data_home()}/{get_xdg_base()}/intent_cache"
         self.containers = {
@@ -125,6 +124,7 @@ class PadatiousService:
         self.registered_intents = []
         self.registered_entities = []
         self.max_words = 50  # if an utterance contains more words than this, don't attempt to match
+        LOG.debug('Loaded Padatious intent parser.')
 
     def train(self, message=None):
         """Perform padatious training.
