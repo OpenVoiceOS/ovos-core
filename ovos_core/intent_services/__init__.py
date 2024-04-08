@@ -59,7 +59,7 @@ class IntentService:
         # TODO - replace with plugins
         self.adapt_service = AdaptService()
         try:
-            from ovos_core.intent_services.padatious_service import PadatiousService, PadatiousMatcher
+            from ovos_core.intent_services.padatious_service import PadatiousService
             self.padatious_service = PadatiousService(bus, config['padatious'])
         except ImportError:
             LOG.error(f'Failed to create padatious intent handlers, padatious not installed')
