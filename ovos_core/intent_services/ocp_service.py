@@ -789,8 +789,8 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             self.bus.emit(Message("ovos.common_play.search.stop"))
 
             # search individual skills first if user specifically asked for it
+            results = []
             if skills:
-                results = []
                 for skill_id in skills:
                     LOG.debug(f"Searching OCP Skill: {skill_id}")
                     query = OCPQuery(query=phrase, media_type=media_type,
@@ -798,7 +798,12 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                     query.send(skill_id)
                     query.wait()
                     results += query.results
-            else:
+
+            # search all skills
+            if not results:
+                if skills:
+                    LOG.info(f"No specific skill results from {skills}, "
+                             f"performing global OCP search")
                 query = OCPQuery(query=phrase, media_type=media_type,
                                  config=self.config, bus=self.bus)
                 query.send()
