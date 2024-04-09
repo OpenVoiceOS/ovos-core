@@ -9,4 +9,6 @@ from mycroft.skills.intent_services.adapt_service import AdaptIntent, IntentBuil
 try:
     from ovos_core.intent_services.padatious_service import PadatiousService, PadatiousMatcher
 except ImportError:
+    from ovos_utils.log import LOG
+    LOG.warning("padatious not installed")
     from ovos_core.intent_services.padacioso_service import PadaciosoService as PadatiousService
