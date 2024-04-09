@@ -15,7 +15,7 @@ from ovos_classifiers.skovos.features import ClassifierProbaVectorizer, KeywordF
 from ovos_utils import classproperty
 from ovos_utils.log import LOG
 from ovos_utils.messagebus import FakeBus
-from ovos_utils.ocp import MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID, MediaEntry, Playlist
+from ovos_utils.ocp import MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID, MediaEntry, Playlist, MediaState
 from ovos_workshop.app import OVOSAbstractApplication
 
 
@@ -107,7 +107,8 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
         self.config = config or {}
         self.search_lock = RLock()
-        self.player_state = PlayerState.STOPPED
+        self.player_state = PlayerState.STOPPED.value
+        self.media_state = MediaState.UNKNOWN.value
         self.available_SEI = []
 
         self.intent_matchers = {}
@@ -283,21 +284,21 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         @param message: Message providing new "state" data
         """
         self.loop_state = message.data.get("loop_state")
-        self.media_state = message.data.get("media_state")
         self.media_type = message.data.get("media_type")
         self.playback_type = message.data.get("playback_type")
-        state = message.data.get("player_state")
-        if state:  # just for the LOGs
-            if state == self.player_state:
-                return
-            if state != self.player_state:
-                LOG.info(f"OCP PlayerState changed: {repr(state)}")
-                if state == PlayerState.PLAYING:
-                    self.player_state = PlayerState.PLAYING
-                elif state == PlayerState.PAUSED:
-                    self.player_state = PlayerState.PAUSED
-                elif state == PlayerState.STOPPED:
-                    self.player_state = PlayerState.STOPPED
+        if self.player_state != message.data.get("player_state"):
+            self.player_state = message.data.get("player_state")
+            LOG.info(f"OCP PlayerState: {self.player_state}")
+        if self.media_state != message.data.get("media_state"):
+            self.media_state = message.data.get("media_state")
+            LOG.info(f"OCP MediaState: {self.media_state}")
+
+    @property
+    def is_playing(self):
+        return (self.player_state != PlayerState.STOPPED.value or
+                self.media_state not in [MediaState.NO_MEDIA.value,
+                                         MediaState.UNKNOWN.value,
+                                         MediaState.END_OF_MEDIA.value])
 
     # pipeline
     def match_high(self, utterances: List[str], lang: str, message: Message = None):
@@ -323,7 +324,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             return None
 
         if match["name"] not in ["open", "play_favorites"] and \
-                self.player_state == PlayerState.STOPPED:
+                not self.is_playing:
             LOG.info(f'Ignoring OCP intent match {match["name"]}, OCP Virtual Player is not active')
             # next / previous / pause / resume not targeted
             # at OCP if playback is not happening / paused
