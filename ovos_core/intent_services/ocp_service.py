@@ -2,7 +2,7 @@ import os
 import random
 from os.path import join, dirname
 from threading import RLock
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from padacioso import IntentContainer
 from sklearn.pipeline import FeatureUnion
@@ -112,6 +112,9 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.available_SEI = []
 
         self.intent_matchers = {}
+        self.skill_aliases = {
+            # "skill_id": ["names"]
+        }
         self.entity_csvs = self.config.get("entity_csvs", [])  # user defined keyword csv files
         self.load_classifiers()
 
@@ -217,8 +220,10 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                 message.data.get("media_type") or []
         has_featured_media = message.data.get("featured_tracks", False)
         thumbnail = message.data.get("thumbnail", "")
-        display_name = message.data["skill_name"]
+        display_name = message.data["skill_name"].replace(" Skill", "")
         aliases = message.data.get("aliases", [display_name])
+        LOG.info(f"Registering OCP Keyword for {skill_id} : {aliases}")
+        self.skill_aliases[skill_id] = aliases
 
         # TODO - review below and add missing
         # set bias in classifier
@@ -417,6 +422,15 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                                                              utterance=utterance)
 
         self.speak_dialog("just.one.moment")
+
+        # if a skill was explicitly requested, search it first
+        valid_skills = [
+            skill_id for skill_id, samples in self.skill_aliases.items()
+            if any(s.lower() in utterance for s in samples)
+        ]
+        if valid_skills:
+            LOG.info(f"OCP specific skill names matched: {valid_skills}")
+
         # classify the query media type
         media_type, conf = self.classify_media(utterance, lang)
 
@@ -430,6 +444,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                                                      intent_data={"media_type": media_type,
                                                                   "query": query,
                                                                   "entities": ents,
+                                                                  "skills": valid_skills,
                                                                   "conf": match["conf"],
                                                                   "media_conf": float(conf),
                                                                   # "results": results,
@@ -475,6 +490,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         lang = message.data["lang"]
         query = message.data["query"]
         media_type = message.data["media_type"]
+        skills = message.data.get("skills", [])
 
         # search common play skills
         # convert int to enum
@@ -482,7 +498,8 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             if e == media_type:
                 media_type = e
                 break
-        results = self._search(query, media_type, lang)
+        results = self._search(query, media_type, lang,
+                               skills=skills)
 
         # tell OCP to play
         self.bus.emit(Message('ovos.common_play.reset'))
@@ -743,14 +760,17 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
         return results
 
-    def _search(self, phrase: str, media_type: MediaType, lang: str) -> list:
+    def _search(self, phrase: str, media_type: MediaType, lang: str,
+                skills: Optional[List[str]] = None) -> list:
         self.bus.emit(Message("ovos.common_play.search.start"))
         self.enclosure.mouth_think()  # animate mk1 mouth during search
 
         # Now we place a query on the messsagebus for anyone who wants to
         # attempt to service a 'play.request' message.
         results = []
-        for r in self._execute_query(phrase, media_type=media_type):
+        for r in self._execute_query(phrase,
+                                     media_type=media_type,
+                                     skills=skills):
             results += r["results"]
 
         LOG.debug(f"Got {len(results)} results")
@@ -759,19 +779,33 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.bus.emit(Message("ovos.common_play.search.end"))
         return results
 
-    def _execute_query(self, phrase: str, media_type: MediaType = MediaType.GENERIC) -> list:
+    def _execute_query(self, phrase: str,
+                       media_type: MediaType = MediaType.GENERIC,
+                       skills: Optional[List[str]] = None) -> list:
         """ actually send the search to OCP skills"""
         with self.search_lock:
             # stop any search still happening
             self.bus.emit(Message("ovos.common_play.search.stop"))
 
-            query = OCPQuery(query=phrase, media_type=media_type,
-                             config=self.config, bus=self.bus)
-            query.send()
-            query.wait()
+            # search individual skills first if user specifically asked for it
+            if skills:
+                results = []
+                for skill_id in skills:
+                    LOG.debug(f"Searching OCP Skill: {skill_id}")
+                    query = OCPQuery(query=phrase, media_type=media_type,
+                                     config=self.config, bus=self.bus)
+                    query.send(skill_id)
+                    query.wait()
+                    results += query.results
+            else:
+                query = OCPQuery(query=phrase, media_type=media_type,
+                                 config=self.config, bus=self.bus)
+                query.send()
+                query.wait()
+                results = query.results
 
             # fallback to generic search type
-            if not query.results and \
+            if not results and \
                     self.config.get("search_fallback", True) and \
                     media_type != MediaType.GENERIC:
                 LOG.debug("OVOSCommonPlay falling back to MediaType.GENERIC")
