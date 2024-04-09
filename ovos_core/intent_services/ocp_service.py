@@ -303,6 +303,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         return (self.player_state != PlayerState.STOPPED.value or
                 self.media_state not in [MediaState.NO_MEDIA.value,
                                          MediaState.UNKNOWN.value,
+                                         MediaState.LOADED_MEDIA.value,
                                          MediaState.END_OF_MEDIA.value])
 
     # pipeline
