@@ -804,8 +804,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                 if skills:
                     LOG.info(f"No specific skill results from {skills}, "
                              f"performing global OCP search")
-                query = OCPQuery(query=phrase, media_type=media_type,
-                                 config=self.config, bus=self.bus)
+                query.reset()
                 query.send()
                 query.wait()
                 results = query.results
@@ -819,9 +818,10 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                 query.reset()
                 query.send()
                 query.wait()
+                results = query.results
 
-        LOG.debug(f'Returning {len(query.results)} search results')
-        return query.results
+        LOG.debug(f'Returning {len(results)} search results')
+        return results
 
     def select_best(self, results: list) -> MediaEntry:
         # Look at any replies that arrived before the timeout
