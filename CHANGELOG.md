@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a87...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a88...HEAD)
+
+**Merged pull requests:**
+
+- Update ovos-messagebus requirement from \>=0.0.4a6,~=0.0 to ~=0.0 in /requirements [\#406](https://github.com/OpenVoiceOS/ovos-core/pull/406) ([dependabot[bot]](https://github.com/apps/dependabot))
+
+## [V0.0.8a88](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a88) (2024-04-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a87...V0.0.8a88)
 
 **Fixed bugs:**
 
@@ -603,10 +611,6 @@
 ## [V0.0.8a20](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a20) (2023-05-17)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a19...V0.0.8a20)
-
-**Merged pull requests:**
-
-- Allow Padatious confidence level overrides from configuration [\#319](https://github.com/OpenVoiceOS/ovos-core/pull/319) ([NeonDaniel](https://github.com/NeonDaniel))
 
 ## [V0.0.8a19](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a19) (2023-05-16)
 
