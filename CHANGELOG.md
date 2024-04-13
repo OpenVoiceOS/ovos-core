@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a86...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a87...HEAD)
+
+**Fixed bugs:**
+
+- feat/better\_ocp\_pipeline\_handling [\#441](https://github.com/OpenVoiceOS/ovos-core/pull/441) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a87](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a87) (2024-04-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a86...V0.0.8a87)
 
 **Fixed bugs:**
 
@@ -631,10 +639,6 @@
 ## [V0.0.8a15](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a15) (2023-05-02)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a14...V0.0.8a15)
-
-**Fixed bugs:**
-
-- fix:  import missed in refactor [\#318](https://github.com/OpenVoiceOS/ovos-core/pull/318) ([ChanceNCounter](https://github.com/ChanceNCounter))
 
 ## [V0.0.8a14](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a14) (2023-05-02)
 
