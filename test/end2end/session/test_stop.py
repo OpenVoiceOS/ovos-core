@@ -68,9 +68,6 @@ class TestSessions(TestCase):
                 "recognizer_loop:utterance",
                 # global stop trigger
                 "mycroft.stop",
-                # ocp reporting nothing to stop
-                "ovos.common_play.stop",
-                "ovos.common_play.stop.response",
 
                 # skill reporting
                 f"{self.skill_id}.stop",  # internal, @killable_events
@@ -162,8 +159,6 @@ class TestSessions(TestCase):
 
                 # stop fallback
                 "mycroft.stop",  # global stop for backwards compat
-                "ovos.common_play.stop",  # ocp stop ping
-                "ovos.common_play.stop.response",  # ocp nothing to stop
                 f"{self.skill_id}.stop",
                 f"{self.skill_id}.stop.response",  # apparently fails to stop  (old style)
 
@@ -256,8 +251,6 @@ class TestSessions(TestCase):
                 "recognizer_loop:utterance",
                 # global stop trigger
                 "mycroft.stop",
-                "ovos.common_play.stop",
-                "ovos.common_play.stop.response",
                 f"{self.skill_id}.stop",  # internal, @killable_events
                 f"{self.skill_id}.stop.response",  # skill reporting nothing to stop
                 f"{self.new_skill_id}.stop",  # internal, @killable_events
@@ -395,8 +388,6 @@ class TestSessions(TestCase):
 
                 # global stop fallback
                 "mycroft.stop",
-                "ovos.common_play.stop",
-                "ovos.common_play.stop.response",
                 f"{self.skill_id}.stop",  # skill specific stop trigger
                 f"{self.skill_id}.stop.response",  # old style, never stops
                 f"{self.new_skill_id}.stop",  # skill specific stop trigger
