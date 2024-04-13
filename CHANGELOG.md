@@ -2,7 +2,19 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a85...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a86...HEAD)
+
+**Fixed bugs:**
+
+- feat/request\_specific\_ocp\_skills [\#442](https://github.com/OpenVoiceOS/ovos-core/pull/442) ([NeonJarbas](https://github.com/NeonJarbas))
+
+**Merged pull requests:**
+
+- Update PyPI automation to use supported tag [\#435](https://github.com/OpenVoiceOS/ovos-core/pull/435) ([NeonDaniel](https://github.com/NeonDaniel))
+
+## [V0.0.8a86](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a86) (2024-04-05)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a85...V0.0.8a86)
 
 **Fixed bugs:**
 
@@ -628,21 +640,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a13...V0.0.8a14)
 
-**Fixed bugs:**
-
-- fix version [\#317](https://github.com/OpenVoiceOS/ovos-core/pull/317) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a13](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a13) (2023-05-01)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a12...V0.0.8a13)
-
-**Fixed bugs:**
-
-- fix/fallbackV1 [\#316](https://github.com/OpenVoiceOS/ovos-core/pull/316) ([JarbasAl](https://github.com/JarbasAl))
-
-**Closed issues:**
-
-- When I ran the ovos-cli-client I got a trace in core [\#315](https://github.com/OpenVoiceOS/ovos-core/issues/315)
 
 ## [V0.0.8a12](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a12) (2023-04-29)
 
