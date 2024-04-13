@@ -30,16 +30,6 @@ from ovos_utils.log import LOG, deprecated, log_deprecation
 from ovos_utils.metrics import Stopwatch
 from ovos_workshop.intents import open_intent_envelope
 
-try:
-    from ovos_core.intent_services.padatious_service import PadatiousService, PadatiousMatcher
-except ImportError:
-    from ovos_core.intent_services.padacioso_service import PadaciosoService as PadatiousService
-
-try:
-    from ovos_core.intent_services.ocp_service import OCPPipelineMatcher
-except ImportError:
-    LOG.warning("OCPPipelineMatcher unavailable, please install ovos-utils >= 0.1.0")
-    OCPPipelineMatcher = None
 
 # Intent match response tuple containing
 # intent_service: Name of the service that matched the intent
@@ -68,22 +58,23 @@ class IntentService:
 
         # TODO - replace with plugins
         self.adapt_service = AdaptService()
-        if PadaciosoService is not PadatiousService:
+        try:
+            from ovos_core.intent_services.padatious_service import PadatiousService
             self.padatious_service = PadatiousService(bus, config['padatious'])
-        else:
-            LOG.error(f'Failed to create padatious handlers, padatious not installed')
+        except ImportError:
+            LOG.error(f'Failed to create padatious intent handlers, padatious not installed')
             self.padatious_service = None
         self.padacioso_service = PadaciosoService(bus, config['padatious'])
         self.fallback = FallbackService(bus)
         self.converse = ConverseService(bus)
         self.common_qa = CommonQAService(bus)
         self.stop = StopService(bus)
-        if OCPPipelineMatcher is not None:
-            self.ocp = OCPPipelineMatcher(bus)
-        else:
-            self.ocp = None
+        self.ocp = None
         self.utterance_plugins = UtteranceTransformersService(bus, config=config)
         self.metadata_plugins = MetadataTransformersService(bus, config=config)
+
+        self._load_ocp_pipeline()  # TODO - enable by default once stable
+
         # connection SessionManager to the bus,
         # this will sync default session across all components
         SessionManager.connect_to_bus(self.bus)
@@ -116,6 +107,17 @@ class IntentService:
                     self.handle_padatious_manifest)
         self.bus.on('intent.service.padatious.entities.manifest.get',
                     self.handle_entity_manifest)
+
+    def _load_ocp_pipeline(self):
+        """EXPERIMENTAL: this feature is not yet ready for end users"""
+        audio_enabled = Configuration().get("enable_old_audioservice", True)
+        if not audio_enabled:
+            LOG.warning("EXPERIMENTAL: the OCP pipeline is enabled!")
+            try:
+                from ovos_core.intent_services.ocp_service import OCPPipelineMatcher
+                self.ocp = OCPPipelineMatcher(self.bus)
+            except ImportError:
+                LOG.error("OCPPipelineMatcher unavailable, please install ovos-utils >= 0.1.0")
 
     @property
     def registered_intents(self):
@@ -243,8 +245,7 @@ class IntentService:
             "padatious_low": padatious_matcher.match_low,
             "padacioso_low": self.padacioso_service.match_low,
             "adapt_low": self.adapt_service.match_low,
-            "fallback_low": self.fallback.low_prio,
-            "adapt": self.adapt_service.match_medium # DEPRECATED - compat only TODO remove before stable, was only in alphas
+            "fallback_low": self.fallback.low_prio
         }
         if self.ocp is not None:
             matchers.update({

@@ -61,7 +61,6 @@ class PadaciosoService:
         self.conf_low = self.padacioso_config.get("conf_low") or 0.5
         self.workers = self.padacioso_config.get("workers") or 4
 
-        LOG.debug('Using Padacioso intent parser.')
         self.containers = {lang: FallbackIntentContainer(
             self.padacioso_config.get("fuzz"), n_workers=self.workers)
             for lang in langs}
@@ -74,6 +73,7 @@ class PadaciosoService:
         self.registered_intents = []
         self.registered_entities = []
         self.max_words = 50  # if an utterance contains more words than this, don't attempt to match
+        LOG.debug('Loaded Padacioso intent parser.')
 
     def _match_level(self, utterances, limit, lang=None):
         """Match intent and make sure a certain level of confidence is reached.
