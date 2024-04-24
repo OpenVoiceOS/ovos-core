@@ -16,14 +16,12 @@ class TestConfiguration(TestCase):
         self.assertEqual(d['b']['d'], d2['b']['d'])
         self.assertEqual(d['b']['c'], d1['b']['c'])
 
-    @patch('mycroft.api.DeviceApi')
-    @skip("requires backend to be enabled, TODO refactor test!")
+    @patch('ovos_config.models.RemoteConf')
     def test_remote(self, mock_api):
-        remote_conf = {'TestConfig': True, 'uuid': 1234}
-        remote_location = {'city': {'name': 'Stockholm'}}
+        remote_conf = {'TestConfig': True, 'uuid': 1234,
+                       'location': {'city': {'name': 'Stockholm'}}}
         dev_api = MagicMock()
-        dev_api.get_settings.return_value = remote_conf
-        dev_api.get_location.return_value = remote_location
+        dev_api.load_local.return_value = remote_conf
         mock_api.return_value = dev_api
 
         rc = mycroft.configuration.RemoteConf()
