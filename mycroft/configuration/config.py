@@ -16,4 +16,11 @@ class Configuration(_Config):
         if configs or isinstance(configs, list):
             log_deprecation("`Configuration.get` now implements `dict.get`",
                             "0.1.0")
-            return _Config.get(*args, **kwargs)
+            return Configuration.fake_get(*args, **kwargs)
+
+    @staticmethod
+    def fake_get(configs=None, cache=True, remote=True):
+        """DEPRECATED - use Configuration class instead"""
+        # NOTE: this is only called if using the class directly
+        # if using an instance (dict object) self._real_get is called instead
+        return Configuration.load_config_stack(configs, cache, remote)
