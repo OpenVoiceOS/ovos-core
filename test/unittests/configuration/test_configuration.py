@@ -25,6 +25,7 @@ class TestConfiguration(TestCase):
         config_manager.config = remote_conf
 
         rc = mycroft.configuration.RemoteConf()
+        rc.reload()
         is_paired.assert_called_once()
         config_manager.download.assert_called_once()
 
