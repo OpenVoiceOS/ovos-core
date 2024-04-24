@@ -16,13 +16,18 @@ class TestConfiguration(TestCase):
         self.assertEqual(d['b']['d'], d2['b']['d'])
         self.assertEqual(d['b']['c'], d1['b']['c'])
 
-    @patch('ovos_config.models.RemoteConf')
-    def test_remote(self, mock_api):
+    @patch('ovos_backend_client.config.RemoteConfigManager')
+    @patch('ovos_backend_client.pairing.is_paired')
+    def test_remote(self, is_paired, config_manager):
         remote_conf = {'TestConfig': True, 'uuid': 1234,
                        'location': {'city': {'name': 'Stockholm'}}}
-        mock_api.return_value = remote_conf
+        is_paired.return_value = True
+        config_manager.config = remote_conf
 
         rc = mycroft.configuration.RemoteConf()
+        is_paired.assert_called_once()
+        config_manager.download.assert_called_once()
+
         self.assertTrue(rc['test_config'])
         self.assertEqual(rc['location']['city']['name'], 'Stockholm')
 
