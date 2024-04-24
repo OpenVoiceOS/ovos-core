@@ -16,13 +16,11 @@ class TestConfiguration(TestCase):
         self.assertEqual(d['b']['d'], d2['b']['d'])
         self.assertEqual(d['b']['c'], d1['b']['c'])
 
-    @patch('ovos_config.models.RemoteConf')
+    @patch('ovos_config.models.RemoteConf._real_get')
     def test_remote(self, mock_api):
         remote_conf = {'TestConfig': True, 'uuid': 1234,
                        'location': {'city': {'name': 'Stockholm'}}}
-        dev_api = MagicMock()
-        dev_api.load_local.return_value = remote_conf
-        mock_api.return_value = dev_api
+        mock_api.return_value = remote_conf
 
         rc = mycroft.configuration.RemoteConf()
         self.assertTrue(rc['test_config'])
