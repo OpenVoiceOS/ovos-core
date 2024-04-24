@@ -16,7 +16,7 @@ class TestConfiguration(TestCase):
         self.assertEqual(d['b']['d'], d2['b']['d'])
         self.assertEqual(d['b']['c'], d1['b']['c'])
 
-    @patch('ovos_config.models.RemoteConf._real_get')
+    @patch('ovos_config.models.RemoteConf')
     def test_remote(self, mock_api):
         remote_conf = {'TestConfig': True, 'uuid': 1234,
                        'location': {'city': {'name': 'Stockholm'}}}

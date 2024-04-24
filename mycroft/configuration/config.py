@@ -12,5 +12,8 @@ class Configuration(_Config):
         Backwards-compat `get` method from
         https://github.com/MycroftAI/mycroft-core/blob/dev/mycroft/configuration/config.py
         """
-        if not isinstance(cls, Configuration):
+        configs = args[0] if len(args) > 0 else kwargs.get("configs", None)
+        if configs or isinstance(configs, list):
+            log_deprecation("`Configuration.get` now implements `dict.get`",
+                            "0.1.0")
             return _Config.get(*args, **kwargs)
