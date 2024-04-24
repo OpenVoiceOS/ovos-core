@@ -28,7 +28,7 @@ class TestConfiguration(TestCase):
         rc.reload()
         is_paired.assert_called_once()
 
-        self.assertTrue(rc['test_config'])
+        self.assertTrue(rc['TestConfig'])
         self.assertEqual(rc['location']['city']['name'], 'Stockholm')
 
     @patch('json.dump')
