@@ -8,7 +8,6 @@ from mycroft.configuration import LocalConf
 
 
 class TestConfiguration(TestCase):
-    @skip("TODO patch and restore compat when imported from 'mycroft' module")
     def test_get(self):
         d1 = {'a': 1, 'b': {'c': 1, 'd': 2}}
         d2 = {'b': {'d': 'changed'}}
