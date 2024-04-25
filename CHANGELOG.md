@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a88...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a89...HEAD)
+
+**Fixed bugs:**
+
+- Add config module backwards-compat. [\#445](https://github.com/OpenVoiceOS/ovos-core/pull/445) ([NeonDaniel](https://github.com/NeonDaniel))
+
+## [V0.0.8a89](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a89) (2024-04-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a88...V0.0.8a89)
 
 **Merged pull requests:**
 
@@ -616,10 +624,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a18...V0.0.8a19)
 
-**Implemented enhancements:**
-
-- Implement threaded Padatious intent calculation [\#321](https://github.com/OpenVoiceOS/ovos-core/pull/321) ([NeonDaniel](https://github.com/NeonDaniel))
-
 ## [V0.0.8a18](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a18) (2023-05-16)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a17...V0.0.8a18)
@@ -631,10 +635,6 @@
 ## [V0.0.8a17](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a17) (2023-05-05)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a16...V0.0.8a17)
-
-**Fixed bugs:**
-
-- fix/padatious\_utt [\#320](https://github.com/OpenVoiceOS/ovos-core/pull/320) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a16](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a16) (2023-05-03)
 
