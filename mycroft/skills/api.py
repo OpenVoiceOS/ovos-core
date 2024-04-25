@@ -1,1 +1,1 @@
-from ovos_utils.skills.api import SkillApi
+from ovos_workshop.skills.api import SkillApi
