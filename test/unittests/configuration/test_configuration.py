@@ -22,10 +22,14 @@ class TestConfiguration(TestCase):
         remote_conf = {'TestConfig': True, 'uuid': 1234,
                        'location': {'city': {'name': 'Stockholm'}}}
         is_paired.return_value = True
-        config_manager.config = remote_conf
+
+        mock_api = MagicMock()
+        mock_api.config = remote_conf
+        config_manager.return_value = mock_api
 
         rc = mycroft.configuration.RemoteConf()
         rc.reload()
+        mock_api.download.assert_called_once()
         is_paired.assert_called_once()
 
         self.assertTrue(rc['TestConfig'])
