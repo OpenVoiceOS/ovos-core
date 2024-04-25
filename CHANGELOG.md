@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a91...HEAD)
+
+**Merged pull requests:**
+
+- Update backwards-compat import for ovos-utils 0.1 compat [\#446](https://github.com/OpenVoiceOS/ovos-core/pull/446) ([NeonDaniel](https://github.com/NeonDaniel))
+
+## [V0.0.8a91](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a91) (2024-04-25)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a90...V0.0.8a91)
+
 ## [V0.0.8a90](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a90) (2024-04-25)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a89...V0.0.8a90)
@@ -627,10 +639,6 @@
 ## [V0.0.8a18](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a18) (2023-05-16)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a17...V0.0.8a18)
-
-**Merged pull requests:**
-
-- Fix `mycroft` backwards-compat. [\#322](https://github.com/OpenVoiceOS/ovos-core/pull/322) ([NeonDaniel](https://github.com/NeonDaniel))
 
 ## [V0.0.8a17](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a17) (2023-05-05)
 
