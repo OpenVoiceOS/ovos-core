@@ -2,7 +2,19 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a91...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a92...HEAD)
+
+**Closed issues:**
+
+- Add back ovos-utils 0.0.X support [\#447](https://github.com/OpenVoiceOS/ovos-core/issues/447)
+
+**Merged pull requests:**
+
+- Loosen ovos-bus-client dependency to allow ovos-utils 0.0.X [\#448](https://github.com/OpenVoiceOS/ovos-core/pull/448) ([NeonDaniel](https://github.com/NeonDaniel))
+
+## [V0.0.8a92](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a92) (2024-04-25)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a91...V0.0.8a92)
 
 **Merged pull requests:**
 
@@ -616,17 +628,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a21...V0.0.8a22)
 
-**Merged pull requests:**
-
-- Update README.md + rm start/stop [\#324](https://github.com/OpenVoiceOS/ovos-core/pull/324) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a21](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a21) (2023-05-17)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a20...V0.0.8a21)
-
-**Fixed bugs:**
-
-- Update `get_skill_directories` import [\#323](https://github.com/OpenVoiceOS/ovos-core/pull/323) ([NeonDaniel](https://github.com/NeonDaniel))
 
 ## [V0.0.8a20](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a20) (2023-05-17)
 
