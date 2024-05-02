@@ -293,10 +293,8 @@ class IntentService:
         message.data["utterance"] = match.utterance
 
         if match.skill_id:
-            self.converse.activate_skill(match.skill_id, message=message)
+            # ensure skill_id is present in message.context
             message.context["skill_id"] = match.skill_id
-            # If the service didn't report back the skill_id it
-            # takes on the responsibility of making the skill "active"
 
         # Launch skill if not handled by the match function
         if match.intent_type:
