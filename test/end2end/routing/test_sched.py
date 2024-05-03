@@ -47,16 +47,22 @@ class TestSched(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",  # no session
-            "intent.service.skills.activated",  # default session injected
-            f"{self.skill_id}.activate",
-            f"{self.skill_id}:ScheduleIntent",
-            "mycroft.skill.handler.start",
+            f"{self.skill_id}:ScheduleIntent",  # intent trigger
+            "mycroft.skill.handler.start",  # intent code start
+
+            "intent.service.skills.activate",  # request (from workshop)
+            "intent.service.skills.activated",  # response (from core)
+            f"{self.skill_id}.activate",  # skill callback
+            "ovos.session.update_default",  # session update (active skill list ync)
+
             "enclosure.active_skill",
             "speak",
             "mycroft.scheduler.schedule_event",
-            "mycroft.skill.handler.complete",
-            "ovos.session.update_default",
-            # event triggering after 3 seconds
+
+            "mycroft.skill.handler.complete",  # intent code end
+            "ovos.session.update_default",  # session update (end of utterance default sync)
+
+            # skill event triggering after 3 seconds
             "skill-ovos-schedule.openvoiceos:my_event",
             "enclosure.active_skill",
             "speak"
@@ -69,16 +75,15 @@ class TestSched(TestCase):
         for m in expected_messages:
             self.assertTrue(m in mtypes)
 
-        # verify that source an destination are kept until intent trigger
-        for m in messages[:3]:
-            self.assertEqual(m.context["source"], "A")
-            self.assertEqual(m.context["destination"], "B")
-
         # verify that source and destination are swapped after intent trigger
-        self.assertEqual(messages[3].msg_type, f"{self.skill_id}:ScheduleIntent")
-        for m in messages[3:]:
-            self.assertEqual(m.context["source"], "B")
-            self.assertEqual(m.context["destination"], "A")
+        self.assertEqual(messages[1].msg_type, f"{self.skill_id}:ScheduleIntent")
+        for m in messages:
+            if m.msg_type in ["recognizer_loop:utterance", "ovos.session.update_default"]:
+                self.assertEqual(messages[0].context["source"], "A")
+                self.assertEqual(messages[0].context["destination"], "B")
+            else:
+                self.assertEqual(m.context["source"], "B")
+                self.assertEqual(m.context["destination"], "A")
 
     def tearDown(self) -> None:
         self.core.stop()
