@@ -70,16 +70,11 @@ class TestFallback(TestCase):
             "mycroft.skill.handler.start",
             "enclosure.active_skill",
             "speak",
-            # self activation from skill, instead of from core
+            # activation from skill, because fallback consumed utterance
             "intent.service.skills.activate",
             "intent.service.skills.activated",
             f"{self.skill_id}.activate",
-            "ovos.session.update_default",  # because it comes from skill
-            # backwards compat activation for older cores
-            "active_skill_request",
-            "intent.service.skills.activated",
-            f"{self.skill_id}.activate",
-            "ovos.session.update_default",  # because it comes from skill
+            "ovos.session.update_default",
             # report handling
             "mycroft.skill.handler.complete",
             "mycroft.skills.fallback.response",
@@ -143,23 +138,16 @@ class TestFallback(TestCase):
         self.assertEqual(messages[14].data["skill_id"], self.skill_id)
         self.assertEqual(messages[15].msg_type, f"{self.skill_id}.activate")
         self.assertEqual(messages[16].msg_type, 'ovos.session.update_default')
-        # skill making itself active again - backwards compat namespace
-        self.assertEqual(messages[17].msg_type, "active_skill_request")
-        self.assertEqual(messages[17].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[18].msg_type, "intent.service.skills.activated")
-        self.assertEqual(messages[18].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[19].msg_type, f"{self.skill_id}.activate")
-        self.assertEqual(messages[20].msg_type, 'ovos.session.update_default')
 
         # fallback execution response
-        self.assertEqual(messages[21].msg_type, "mycroft.skill.handler.complete")
-        self.assertEqual(messages[21].data["handler"], "fallback")
-        self.assertEqual(messages[22].msg_type, "mycroft.skills.fallback.response")
-        self.assertTrue(messages[22].data["handled"])
+        self.assertEqual(messages[17].msg_type, "mycroft.skill.handler.complete")
+        self.assertEqual(messages[17].data["handler"], "fallback")
+        self.assertEqual(messages[18].msg_type, "mycroft.skills.fallback.response")
+        self.assertTrue(messages[18].data["handled"])
 
         # verify default session is now updated
-        self.assertEqual(messages[23].msg_type, "ovos.session.update_default")
-        self.assertEqual(messages[23].data["session_data"]["session_id"], "default")
+        self.assertEqual(messages[19].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[19].data["session_data"]["session_id"], "default")
 
         # test second message with no session resumes default active skills
         messages = []
