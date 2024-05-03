@@ -340,6 +340,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             else:
                 return None
 
+        self.activate()  # mark skill_id as active, this is a catch all for all OCP skills
         return ovos_core.intent_services.IntentMatch(intent_service="OCP_intents",
                                                      intent_type=f'ocp:{match["name"]}',
                                                      intent_data=match,
@@ -365,6 +366,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         # extract the query string
         query = self.remove_voc(utterance, "Play", lang).strip()
 
+        self.activate()  # mark skill_id as active, this is a catch all for all OCP skills
         return ovos_core.intent_services.IntentMatch(intent_service="OCP_media",
                                                      intent_type=f"ocp:play",
                                                      intent_data={"media_type": media_type,
@@ -391,6 +393,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
         # extract the query string
         query = self.remove_voc(utterance, "Play", lang).strip()
+        self.activate()  # mark skill_id as active, this is a catch all for all OCP skills
         return ovos_core.intent_services.IntentMatch(intent_service="OCP_fallback",
                                                      intent_type=f"ocp:play",
                                                      intent_data={"media_type": media_type,
@@ -401,6 +404,9 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                                                      utterance=utterance)
 
     def _process_play_query(self, utterance: str, lang: str, match: dict = None):
+
+        self.activate()  # mark skill_id as active, this is a catch all for all OCP skills
+
         match = match or {}
         # if media is currently paused, empty string means "resume playback"
         if self.player_state == PlayerState.PAUSED and \
