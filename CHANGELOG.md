@@ -2,7 +2,16 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a92...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a93...HEAD)
+
+**Fixed bugs:**
+
+- bug - can not deactivate a skill inside an intent/converse [\#450](https://github.com/OpenVoiceOS/ovos-core/issues/450)
+- fix/deactivate inside intent/converse [\#451](https://github.com/OpenVoiceOS/ovos-core/pull/451) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a93](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a93) (2024-04-26)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a92...V0.0.8a93)
 
 **Closed issues:**
 
@@ -568,10 +577,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a28...V0.0.8a29)
 
-**Merged pull requests:**
-
-- refactor and improve padatious matching [\#326](https://github.com/OpenVoiceOS/ovos-core/pull/326) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a28](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a28) (2023-07-12)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a27...V0.0.8a28)
@@ -619,10 +624,6 @@
 ## [V0.0.8a23](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a23) (2023-05-29)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a22...V0.0.8a23)
-
-**Implemented enhancements:**
-
-- refactor/skill\_settings\_change [\#325](https://github.com/OpenVoiceOS/ovos-core/pull/325) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a22](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a22) (2023-05-29)
 
