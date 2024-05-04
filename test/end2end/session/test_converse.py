@@ -78,9 +78,8 @@ class TestSessions(TestCase):
 
         self.assertEqual(len(expected_messages), len(messages))
 
-        mtypes = [m.msg_type for m in messages]
-        for m in expected_messages:
-            self.assertTrue(m in mtypes)
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
 
         # verify that "session" is injected
         # (missing in utterance message) and kept in all messages
@@ -162,9 +161,8 @@ class TestSessions(TestCase):
 
         self.assertEqual(len(expected_messages), len(messages))
 
-        mtypes = [m.msg_type for m in messages]
-        for m in expected_messages:
-            self.assertTrue(m in mtypes)
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
 
         # verify that "session" is injected
         # (missing in utterance message) and kept in all messages
@@ -431,9 +429,8 @@ class TestSessions(TestCase):
 
         self.assertEqual(len(expected_messages), len(messages))
 
-        mtypes = [m.msg_type for m in messages]
-        for m in expected_messages:
-            self.assertTrue(m in mtypes)
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
 
         # verify skill is no longer in active skills
         self.assertEqual(SessionManager.default_session.active_skills[0][0], self.other_skill_id)
@@ -471,9 +468,8 @@ class TestSessions(TestCase):
 
         self.assertEqual(len(expected_messages), len(messages))
 
-        mtypes = [m.msg_type for m in messages]
-        for m in expected_messages:
-            self.assertTrue(m in mtypes)
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
 
         # verify skill is again in active skills
         self.assertEqual(SessionManager.default_session.active_skills[0][0], self.skill_id)
@@ -526,9 +522,8 @@ class TestSessions(TestCase):
 
         self.assertEqual(len(expected_messages), len(messages))
 
-        mtypes = [m.msg_type for m in messages]
-        for m in expected_messages:
-            self.assertTrue(m in mtypes)
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
 
         ######################################
         # STEP 8 - deactivate inside converse handler
@@ -565,5 +560,8 @@ class TestSessions(TestCase):
         wait_for_n_messages(len(expected_messages))
 
         self.assertEqual(len(expected_messages), len(messages))
+
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
 
 

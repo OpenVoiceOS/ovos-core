@@ -85,9 +85,8 @@ class TestFallback(TestCase):
 
         self.assertEqual(len(expected_messages), len(messages))
 
-        mtypes = [m.msg_type for m in messages]
-        for m in expected_messages:
-            self.assertTrue(m in mtypes)
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
 
         # verify that contexts are kept around
         for m in messages:
