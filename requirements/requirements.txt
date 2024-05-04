@@ -12,8 +12,8 @@ ovos-plugin-manager<0.1.0, >=0.0.25
 ovos-config~=0.0,>=0.0.13a8
 ovos-lingua-franca>=0.4.7
 ovos-backend-client~=0.1.0
-ovos-workshop<0.1.0, >=0.0.16a24
-
+#ovos-workshop<0.1.0, >=0.0.16a24
+git+https://github.com/OpenVoiceOS/ovos-workshop@refactor/skill_activation_before_events
 # provides plugins and classic machine learning framework
 ovos-classifiers<0.1.0, >=0.0.0a53
 
