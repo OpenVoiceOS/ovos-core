@@ -50,10 +50,12 @@ class TestRouting(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",  # no session
-            "intent.service.skills.activated",  # default session injected
-            f"{self.skill_id}.activate",
             f"{self.skill_id}:HelloWorldIntent",
             "mycroft.skill.handler.start",
+            "intent.service.skills.activate",
+            "intent.service.skills.activated",
+            f"{self.skill_id}.activate",
+            "ovos.session.update_default",
             "enclosure.active_skill",
             "speak",
             "mycroft.skill.handler.complete",
@@ -72,13 +74,12 @@ class TestRouting(TestCase):
         for m in messages[1:]:
             self.assertEqual(m.context["session"]["session_id"], "default")
 
-        # verify that source an destination are kept until intent trigger
-        for m in messages[:3]:
-            self.assertEqual(m.context["source"], "A")
-            self.assertEqual(m.context["destination"], "B")
-
         # verify that source and destination are swapped after intent trigger
-        self.assertEqual(messages[3].msg_type, f"{self.skill_id}:HelloWorldIntent")
-        for m in messages[3:]:
-            self.assertEqual(m.context["source"], "B")
-            self.assertEqual(m.context["destination"], "A")
+        self.assertEqual(messages[1].msg_type, f"{self.skill_id}:HelloWorldIntent")
+        for m in messages:
+            if m.msg_type in ["recognizer_loop:utterance", "ovos.session.update_default"]:
+                self.assertEqual(messages[0].context["source"], "A")
+                self.assertEqual(messages[0].context["destination"], "B")
+            else:
+                self.assertEqual(m.context["source"], "B")
+                self.assertEqual(m.context["destination"], "A")
