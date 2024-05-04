@@ -120,9 +120,8 @@ class TestSessions(TestCase):
 
         wait_for_n_messages(len(expected_messages))
 
-        mtypes = [m.msg_type for m in messages]
-        for m in expected_messages:
-            self.assertTrue(m in mtypes)
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
 
         # sanity check correct intent triggered
         self.assertEqual(messages[7].data["utterance"], "hello world")
@@ -294,9 +293,8 @@ class TestSessions(TestCase):
 
         wait_for_n_messages(len(expected_messages))
 
-        mtypes = [m.msg_type for m in messages]
-        for m in expected_messages:
-            self.assertTrue(m in mtypes)
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
 
         # sanity check correct intent triggered
 
@@ -339,9 +337,8 @@ class TestSessions(TestCase):
 
         wait_for_n_messages(len(expected_messages))
 
-        mtypes = [m.msg_type for m in messages]
-        for m in expected_messages:
-            self.assertTrue(m in mtypes)
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
 
         # confirm skill self.stop methods called
 

@@ -68,9 +68,8 @@ class TestSessions(TestCase):
 
         self.assertEqual(len(expected_messages), len(messages))
 
-        mtypes = [m.msg_type for m in messages]
-        for m in expected_messages:
-            self.assertTrue(m in mtypes)
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
 
         # verify that "session" and "lang" is injected
         # (missing in utterance message) and kept in all messages
@@ -190,9 +189,8 @@ class TestSessions(TestCase):
 
         self.assertEqual(len(expected_messages), len(messages))
 
-        mtypes = [m.msg_type for m in messages]
-        for m in expected_messages:
-            self.assertTrue(m in mtypes)
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
 
         # verify that "session" is the same in all message
         # (missing in utterance message) and kept in all messages
