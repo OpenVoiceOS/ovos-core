@@ -635,33 +635,29 @@ class TestSessions(TestCase):
         # captured utterance sent to get_response handler that is waiting
         self.assertEqual(messages[15].msg_type, f"{self.skill_id}.converse.get_response")
         self.assertEqual(messages[15].data["utterances"], ["ok"])
-
-        # converse pipeline activates the skill last_used timestamp
-        self.assertEqual(messages[16].msg_type, "intent.service.skills.activated")
-        self.assertEqual(messages[17].msg_type, f"{self.skill_id}.activate")
-        self.assertEqual(messages[18].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[16].msg_type, "ovos.session.update_default")
 
         # disable get_response for this session
-        self.assertEqual(messages[19].msg_type, "skill.converse.get_response.disable")
-        self.assertEqual(messages[20].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[17].msg_type, "skill.converse.get_response.disable")
+        self.assertEqual(messages[18].msg_type, "ovos.session.update_default")
 
         # post self.get_response intent code
-        self.assertEqual(messages[21].msg_type, "enclosure.active_skill")
-        self.assertEqual(messages[21].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[22].msg_type, "speak")
-        self.assertEqual(messages[22].data["lang"], "en-us")
-        self.assertFalse(messages[22].data["expect_response"])
-        self.assertEqual(messages[22].data["utterance"], "ok")
-        self.assertEqual(messages[22].data["meta"]["skill"], self.skill_id)
+        self.assertEqual(messages[19].msg_type, "enclosure.active_skill")
+        self.assertEqual(messages[19].data["skill_id"], self.skill_id)
+        self.assertEqual(messages[20].msg_type, "speak")
+        self.assertEqual(messages[20].data["lang"], "en-us")
+        self.assertFalse(messages[20].data["expect_response"])
+        self.assertEqual(messages[20].data["utterance"], "ok")
+        self.assertEqual(messages[20].data["meta"]["skill"], self.skill_id)
 
-        self.assertEqual(messages[23].msg_type, "mycroft.skill.handler.complete")
-        self.assertEqual(messages[23].data["name"], "TestAbortSkill.handle_test_get_response3")
+        self.assertEqual(messages[21].msg_type, "mycroft.skill.handler.complete")
+        self.assertEqual(messages[21].data["name"], "TestAbortSkill.handle_test_get_response3")
 
         # verify default session is now updated
-        self.assertEqual(messages[24].msg_type, "ovos.session.update_default")
-        self.assertEqual(messages[24].data["session_data"]["session_id"], "default")
+        self.assertEqual(messages[22].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[22].data["session_data"]["session_id"], "default")
         # test deserialization of payload
-        sess = Session.deserialize(messages[24].data["session_data"])
+        sess = Session.deserialize(messages[22].data["session_data"])
         self.assertEqual(sess.session_id, "default")
 
     def test_nested(self):
