@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a93...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a94...HEAD)
+
+**Fixed bugs:**
+
+- fix/deactivate\_in\_converse/fallback [\#452](https://github.com/OpenVoiceOS/ovos-core/pull/452) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a94](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a94) (2024-05-04)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a93...V0.0.8a94)
 
 **Fixed bugs:**
 
@@ -616,10 +624,6 @@
 ## [V0.0.8a24](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a24) (2023-06-07)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a23...V0.0.8a24)
-
-**Fixed bugs:**
-
-- fix settings filewatcher [\#327](https://github.com/OpenVoiceOS/ovos-core/pull/327) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a23](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a23) (2023-05-29)
 
