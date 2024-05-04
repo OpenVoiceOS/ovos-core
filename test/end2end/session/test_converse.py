@@ -556,16 +556,6 @@ class TestSessions(TestCase):
             "intent.service.skills.deactivated",
             f"{self.skill_id}.deactivate",
             "ovos.session.update_default",
-
-            ###########
-            # TODO - activate is called here if converse return True
-            "intent.service.skills.activate",
-            "intent.service.skills.activated",
-            f"{self.skill_id}.activate",
-            "ovos.session.update_default",
-            # /TODO - ovos-workshop PR needed
-            ###########
-
             # needs ovos-workshop PR
             "skill.converse.response",  # conversed!
             # session updated

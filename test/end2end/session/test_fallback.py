@@ -242,3 +242,60 @@ class TestFallback(TestCase):
         # test that active skills list has been updated
         for m in messages[10:]:
             self.assertEqual(m.context["session"]["active_skills"][0][0], self.skill_id)
+
+    def test_deactivate_in_fallback(self):
+        messages = []
+
+        sess = Session("123")
+        sess.activate_skill(self.skill_id)  # skill is active
+
+        def new_msg(msg):
+            nonlocal messages
+            m = Message.deserialize(msg)
+            if m.msg_type in ["ovos.skills.settings_changed", "ovos.common_play.status"]:
+                return  # skip these, only happen in 1st run
+            messages.append(m)
+            print(len(messages), msg)
+
+        def wait_for_n_messages(n):
+            nonlocal messages
+            t = time.time()
+            while len(messages) < n:
+                sleep(0.1)
+                if time.time() - t > 10:
+                    raise RuntimeError("did not get the number of expected messages under 10 seconds")
+
+        self.core.bus.on("message", new_msg)
+
+        utt = Message("fallback_deactivate")
+        self.core.bus.emit(utt)  # set internal test skill flag
+        messages = []
+
+        utt = Message("recognizer_loop:utterance",
+                      {"utterances": ["deactivate fallback"]},
+                      {"session":sess.serialize()})
+        self.core.bus.emit(utt)
+
+        expected_messages = [
+            "recognizer_loop:utterance",
+            # skill is active, so we get converse events
+            f"{self.skill_id}.converse.ping",
+            "skill.converse.pong",
+            # FallbackV2
+            "ovos.skills.fallback.ping",
+            "ovos.skills.fallback.pong",
+            # skill executing
+            f"ovos.skills.fallback.{self.skill_id}.request",
+            f"ovos.skills.fallback.{self.skill_id}.start",
+            "enclosure.active_skill",
+            "speak",
+            # deactivate skill in fallback handler
+            "intent.service.skills.deactivate",
+            "intent.service.skills.deactivated",
+            f"{self.skill_id}.deactivate",
+            # activate events suppressed
+            f"ovos.skills.fallback.{self.skill_id}.response"
+        ]
+        wait_for_n_messages(len(expected_messages))
+
+        self.assertEqual(len(expected_messages), len(messages))
