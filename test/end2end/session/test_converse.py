@@ -32,7 +32,7 @@ class TestSessions(TestCase):
         def new_msg(msg):
             nonlocal messages
             m = Message.deserialize(msg)
-            if m.msg_type in ["ovos.skills.settings_changed"]:
+            if m.msg_type in ["ovos.skills.settings_changed", "ovos.common_play.status"]:
                 return  # skip these, only happen in 1st run
             messages.append(m)
             print(len(messages), msg)
@@ -364,7 +364,6 @@ class TestSessions(TestCase):
 
         mtypes = [m.msg_type for m in messages]
         for m in expected_messages:
-            print(m)
             self.assertTrue(m in mtypes)
 
         # verify that "session" and "lang" is injected
@@ -492,4 +491,89 @@ class TestSessions(TestCase):
         self.assertEqual(len(messages[-1].data["session_data"]["active_skills"]), 2)
         self.assertEqual(messages[-1].data["session_data"]["active_skills"][0][0], self.skill_id)
 
+        ######################################
+        # STEP 7 - deactivate inside intent handler
+        # should not send activate message
+        # session should not contain skill as active
+        SessionManager.default_session = Session(session_id="default") # reset state
         messages = []
+        utt = Message("recognizer_loop:utterance",
+                      {"utterances": ["deactivate skill"]})
+        self.core.bus.emit(utt)
+
+        # confirm all expected messages are sent
+        expected_messages = [
+            "recognizer_loop:utterance",  # no session
+            "ovos-tskill-abort.openvoiceos:deactivate.intent",
+            # skill selected
+            "mycroft.skill.handler.start",
+            "intent.service.skills.activate",
+            "intent.service.skills.activated",
+            f"{self.skill_id}.activate",
+            "ovos.session.update_default",
+            # intent code
+            "intent.service.skills.deactivate",
+            "intent.service.skills.deactivated",
+            f"{self.skill_id}.deactivate",
+            "ovos.session.update_default",
+            "enclosure.active_skill",
+            "speak",  # "deactivated"
+            "mycroft.skill.handler.complete",
+            # session updated
+            "ovos.session.update_default"
+        ]
+        wait_for_n_messages(len(expected_messages))
+
+        self.assertEqual(len(expected_messages), len(messages))
+
+        mtypes = [m.msg_type for m in messages]
+        for m in expected_messages:
+            self.assertTrue(m in mtypes)
+
+        ######################################
+        # STEP 8 - deactivate inside converse handler
+        # should not send activate message
+        # session should not contain skill as active
+        # NOTE: if converse returns True, skill activated again!
+        sess = Session(session_id="default")
+        sess.activate_skill(self.skill_id)
+        utt = Message("converse_deactivate")
+        self.core.bus.emit(utt)  # set internal test skill flag
+        messages = []
+
+        utt = Message("recognizer_loop:utterance",
+                      {"utterances": ["deactivate converse"]},
+                      {"session": sess.serialize()})
+        self.core.bus.emit(utt)
+
+        expected_messages = [
+            "recognizer_loop:utterance", # converse gets it
+            f"{self.skill_id}.converse.ping",
+            "skill.converse.pong",
+            f"{self.skill_id}.converse.request",
+            # converse code
+            "intent.service.skills.deactivate",
+            "intent.service.skills.deactivated",
+            f"{self.skill_id}.deactivate",
+            "ovos.session.update_default",
+
+            ###########
+            # TODO - activate is called here if converse return True
+            "intent.service.skills.activate",
+            "intent.service.skills.activated",
+            f"{self.skill_id}.activate",
+            "ovos.session.update_default",
+            # /TODO - ovos-workshop PR needed
+            ###########
+
+            # needs ovos-workshop PR
+            "skill.converse.response",  # conversed!
+            # session updated
+            "ovos.session.update_default"
+
+        ]
+        wait_for_n_messages(len(expected_messages))
+
+        self.assertEqual(len(expected_messages), len(messages))
+
+
