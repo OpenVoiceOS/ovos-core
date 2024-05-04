@@ -133,6 +133,10 @@ class TestCommonQuery(unittest.TestCase):
                       'callback_data': {'query': 'what is the speed of light',
                                         'answer': 'answer 1'}},
              'context': qq_ans_ctxt},  # destination: audio from this message forward
+            # skill was select, make it an active skill
+            {'context': qq_ans_ctxt,
+             'data': {'skill_id': 'wiki.test', 'timeout': 5.0},
+             'type': 'intent.service.skills.activate'},
             # tell enclosure about active skill (speak method). This is the
             # skill that provided the response and may follow-up with actions
             # in a callback method
