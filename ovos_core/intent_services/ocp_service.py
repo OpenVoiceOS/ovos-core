@@ -631,7 +631,8 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         # we also need to filter video results
         results = [xtract.extract_stream(r.uri, video=False)["uri"]
                    for r in results
-                   if r.playback in [PlaybackType.AUDIO, PlaybackType.AUDIO_SERVICE]]
+                   if r.playback in [PlaybackType.AUDIO, PlaybackType.AUDIO_SERVICE]
+                   or r.media_type in OCPQuery.cast2audio]
         self.legacy_api.play(results, utterance=phrase)
 
     # NLP
@@ -807,7 +808,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             # TODO - also check inside playlists
             results = [r for r in results
                        if (isinstance(r, Playlist) and not self.use_legacy_audio)
-                       or r.playback == PlaybackType.AUDIO]
+                       or r.playback in [PlaybackType.AUDIO, PlaybackType.AUDIO_SERVICE]]
             LOG.debug(f"filtered {l1 - len(results)} non-audio results")
 
         # check if user said "play XXX video only"
