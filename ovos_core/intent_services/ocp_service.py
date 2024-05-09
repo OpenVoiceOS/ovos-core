@@ -4,14 +4,15 @@ from os.path import join, dirname
 from threading import RLock
 from typing import List, Tuple, Optional
 
+from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
+from ovos_classifiers.skovos.features import ClassifierProbaVectorizer, KeywordFeaturesVectorizer
 from padacioso import IntentContainer
 from sklearn.pipeline import FeatureUnion
 
 import ovos_core.intent_services
-from ovos_bus_client.apis.ocp import OCPInterface, OCPQuery
+from ovos_bus_client.apis.ocp import OCPInterface, OCPQuery, ClassicAudioServiceInterface
 from ovos_bus_client.message import Message
-from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
-from ovos_classifiers.skovos.features import ClassifierProbaVectorizer, KeywordFeaturesVectorizer
+from ovos_config import Configuration
 from ovos_utils import classproperty
 from ovos_utils.log import LOG
 from ovos_utils.messagebus import FakeBus
@@ -104,6 +105,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                          resources_dir=f"{dirname(__file__)}")
 
         self.ocp_api = OCPInterface(self.bus)
+        self.legacy_api = ClassicAudioServiceInterface(self.bus)
 
         self.config = config or {}
         self.search_lock = RLock()
@@ -122,6 +124,15 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.register_ocp_intents()
         # request available Stream extractor plugins from OCP
         self.bus.emit(Message("ovos.common_play.SEI.get"))
+
+    @property
+    def use_legacy_audio(self):
+        """when neither ovos-media nor old OCP are available"""
+        if self.config.get("legacy"):
+            # explicitly set in pipeline config
+            return True
+        cfg = Configuration()
+        return cfg.get("disable_ocp") and cfg.get("enable_old_audioservice")
 
     def load_classifiers(self):
 
@@ -526,7 +537,13 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                                    'origin': OCP_ID}))
 
             # ovos-PHAL-plugin-mk1 will display music icon in response to play message
-            self.ocp_api.play(results, query)
+            if self.use_legacy_audio:
+                # TODO - we need to extract streams here with ocp extractors
+                # some uris arent valid
+                results = [r.uri for r in results]
+                self.legacy_api.play(results)
+            else:
+                self.ocp_api.play(results, query)
 
     def handle_open_intent(self, message: Message):
         LOG.info("Requesting OCP homescreen")
@@ -539,30 +556,54 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.bus.emit(message.forward("ovos.common_play.like"))
 
     def handle_stop_intent(self, message: Message):
-        LOG.info("Requesting OCP to go to stop")
-        self.ocp_api.stop()
+        if self.use_legacy_audio:
+            LOG.info("Requesting Legacy AudioService to stop")
+            self.legacy_api.stop()
+        else:
+            LOG.info("Requesting OCP to stop")
+            self.ocp_api.stop()
 
     def handle_next_intent(self, message: Message):
-        LOG.info("Requesting OCP to go to next track")
-        self.ocp_api.next()
+        if self.use_legacy_audio:
+            LOG.info("Requesting Legacy AudioService to go to next track")
+            self.legacy_api.next()
+        else:
+            LOG.info("Requesting OCP to go to next track")
+            self.ocp_api.next()
 
     def handle_prev_intent(self, message: Message):
-        LOG.info("Requesting OCP to go to prev track")
-        self.ocp_api.prev()
+        if self.use_legacy_audio:
+            LOG.info("Requesting Legacy AudioService to go to prev track")
+            self.legacy_api.prev()
+        else:
+            LOG.info("Requesting OCP to go to prev track")
+            self.ocp_api.prev()
 
     def handle_pause_intent(self, message: Message):
-        LOG.info("Requesting OCP to go to pause")
-        self.ocp_api.pause()
+        if self.use_legacy_audio:
+            LOG.info("Requesting Legacy AudioService to pause")
+            self.legacy_api.pause()
+        else:
+            LOG.info("Requesting OCP to go to pause")
+            self.ocp_api.pause()
 
     def handle_resume_intent(self, message: Message):
-        LOG.info("Requesting OCP to go to resume")
-        self.ocp_api.resume()
+        if self.use_legacy_audio:
+            LOG.info("Requesting Legacy AudioService to resume")
+            self.legacy_api.resume()
+        else:
+            LOG.info("Requesting OCP to go to resume")
+            self.ocp_api.resume()
 
     def handle_search_error_intent(self, message: Message):
         self.bus.emit(message.forward("mycroft.audio.play_sound",
                                       {"uri": "snd/error.mp3"}))
-        LOG.info("Requesting OCP to stop")
-        self.ocp_api.stop()
+        if self.use_legacy_audio:
+            LOG.info("Requesting Legacy AudioService to stop")
+            self.legacy_api.stop()
+        else:
+            LOG.info("Requesting OCP to stop")
+            self.ocp_api.stop()
 
     def _do_play(self, phrase: str, results, media_type=MediaType.GENERIC):
         self.bus.emit(Message('ovos.common_play.reset'))
@@ -581,7 +622,13 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                                    'origin': OCP_ID}))
 
             # ovos-PHAL-plugin-mk1 will display music icon in response to play message
-            self.ocp_api.play(results, phrase)
+            if self.use_legacy_audio:
+                # TODO - we need to extract streams here with ocp extractors
+                # some uris arent valid
+                results = [r.uri for r in results]
+                self.legacy_api.play(results)
+            else:
+                self.ocp_api.play(results, phrase)
 
     # NLP
     @staticmethod
