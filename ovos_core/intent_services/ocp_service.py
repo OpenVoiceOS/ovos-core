@@ -13,6 +13,7 @@ import ovos_core.intent_services
 from ovos_bus_client.apis.ocp import OCPInterface, OCPQuery, ClassicAudioServiceInterface
 from ovos_bus_client.message import Message
 from ovos_config import Configuration
+from ovos_plugin_manager.ocp import load_stream_extractors
 from ovos_utils import classproperty
 from ovos_utils.log import LOG
 from ovos_utils.messagebus import FakeBus
@@ -538,10 +539,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
             # ovos-PHAL-plugin-mk1 will display music icon in response to play message
             if self.use_legacy_audio:
-                # TODO - we need to extract streams here with ocp extractors
-                # some uris arent valid
-                results = [r.uri for r in results]
-                self.legacy_api.play(results)
+                self.legacy_play(results, query)
             else:
                 self.ocp_api.play(results, query)
 
@@ -623,12 +621,18 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
             # ovos-PHAL-plugin-mk1 will display music icon in response to play message
             if self.use_legacy_audio:
-                # TODO - we need to extract streams here with ocp extractors
-                # some uris arent valid
-                results = [r.uri for r in results]
-                self.legacy_api.play(results)
+                self.legacy_play(results, phrase)
             else:
                 self.ocp_api.play(results, phrase)
+
+    def legacy_play(self, results: List[MediaEntry], phrase=""):
+        xtract = load_stream_extractors()
+        # for legacy audio service we need to do stream extraction here
+        # we also need to filter video results
+        results = [xtract.extract_stream(r.uri, video=False)["uri"]
+                   for r in results
+                   if r.playback in [PlaybackType.AUDIO, PlaybackType.AUDIO_SERVICE]]
+        self.legacy_api.play(results, utterance=phrase)
 
     # NLP
     @staticmethod
@@ -798,11 +802,12 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             video_only = True
 
         # check if user said "play XXX audio only"
-        if audio_only:
+        if audio_only or self.use_legacy_audio:
             l1 = len(results)
             # TODO - also check inside playlists
             results = [r for r in results
-                       if isinstance(r, Playlist) or r.playback == PlaybackType.AUDIO]
+                       if (isinstance(r, Playlist) and not self.use_legacy_audio)
+                       or r.playback == PlaybackType.AUDIO]
             LOG.debug(f"filtered {l1 - len(results)} non-audio results")
 
         # check if user said "play XXX video only"
