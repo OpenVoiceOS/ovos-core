@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a95...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a96...HEAD)
+
+**Implemented enhancements:**
+
+- feat/legacy\_common\_play [\#457](https://github.com/OpenVoiceOS/ovos-core/pull/457) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a96](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a96) (2024-05-10)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a95...V0.0.8a96)
 
 **Implemented enhancements:**
 
@@ -581,10 +589,6 @@
 ## [V0.0.8a30](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a30) (2023-07-12)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a29...V0.0.8a30)
-
-**Implemented enhancements:**
-
-- bump\_padacioso 0.2.1a7 [\#335](https://github.com/OpenVoiceOS/ovos-core/pull/335) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a29](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a29) (2023-07-12)
 
