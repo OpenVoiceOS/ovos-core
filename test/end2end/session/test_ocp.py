@@ -18,6 +18,7 @@ class TestOCPPipeline(TestCase):
         self.core.stop()
 
     def test_no_match(self):
+        self.assertIsNotNone(self.core.intent_service.ocp)
         messages = []
 
         def new_msg(msg):
@@ -85,6 +86,7 @@ class TestOCPPipeline(TestCase):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
     def test_radio_media_match(self):
+        self.assertIsNotNone(self.core.intent_service.ocp)
         messages = []
 
         def new_msg(msg):
@@ -152,6 +154,7 @@ class TestOCPPipeline(TestCase):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
     def test_unk_media_match(self):
+        self.assertIsNotNone(self.core.intent_service.ocp)
         messages = []
 
         def new_msg(msg):
@@ -221,6 +224,7 @@ class TestOCPPipeline(TestCase):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
     def test_skill_name_match(self):
+        self.assertIsNotNone(self.core.intent_service.ocp)
         messages = []
 
         def new_msg(msg):
