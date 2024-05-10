@@ -51,7 +51,7 @@ class IntentService:
 
     def __init__(self, bus, config=None):
         self.bus = bus
-        self.config = config or Configuration().get("intent_service", {})
+        self.config = config or Configuration().get("intents", {})
         if "padatious" not in self.config:
             self.config["padatious"] = Configuration().get("padatious", {})
 
