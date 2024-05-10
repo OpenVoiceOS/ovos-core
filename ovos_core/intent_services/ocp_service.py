@@ -179,6 +179,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.bus.on("mycroft.audio.queue_end", self._handle_legacy_audio_end)
         self.bus.on("mycroft.audio.service.pause", self._handle_legacy_audio_pause)
         self.bus.on("mycroft.audio.service.resume", self._handle_legacy_audio_resume)
+        self.bus.on("mycroft.audio.service.stop", self._handle_legacy_audio_stop)
         self.bus.emit(Message("ovos.common_play.status"))  # sync on launch
 
     def register_ocp_intents(self):
@@ -893,6 +894,11 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.player_state = PlayerState.PLAYING
         self.media_state = MediaState.LOADING_MEDIA
         self.legacy_api.play(results, utterance=phrase)
+
+    def _handle_legacy_audio_stop(self, message: Message):
+        if self.use_legacy_audio:
+            self.player_state = PlayerState.STOPPED
+            self.media_state = MediaState.NO_MEDIA
 
     def _handle_legacy_audio_pause(self, message: Message):
         if self.use_legacy_audio and self.player_state == PlayerState.PLAYING:
