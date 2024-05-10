@@ -33,5 +33,4 @@ class FakeFMLegacySkill(CommonPlaySkill):
 
     def CPS_start(self, phrase, data):
         """Handle request from Common Play System to start playback."""
-        self.speak("legacy common play test skill selected")
-        self.speak(data["uri"])
+        self.audioservice.play(data["uri"])

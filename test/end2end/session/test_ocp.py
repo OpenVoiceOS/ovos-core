@@ -155,6 +155,9 @@ class TestOCPPipeline(TestCase):
         for idx, m in enumerate(messages):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
+        play = messages[-1]
+        self.assertEqual(play.data["media"]["uri"], "https://fake_4.mp3")
+
     def test_unk_media_match(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
         self.assertFalse(self.core.intent_service.ocp.use_legacy_audio)
@@ -1080,11 +1083,8 @@ class TestLegacyCPSPipeline(TestCase):
             "intent.service.skills.activate",
             "intent.service.skills.activated",
             f"{self.skill_id}.activate",
-            # now the test callback
-            "enclosure.active_skill",
-            "speak",
-            "enclosure.active_skill",
-            "speak",
+            # skill callback code
+            "mycroft.audio.service.play"
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -1092,4 +1092,7 @@ class TestLegacyCPSPipeline(TestCase):
 
         for idx, m in enumerate(messages):
             self.assertEqual(m.msg_type, expected_messages[idx])
+
+        play = messages[-1]
+        self.assertEqual(play.data["tracks"], ["https://fake.mp3"])
 
