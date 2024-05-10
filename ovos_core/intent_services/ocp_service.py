@@ -960,7 +960,6 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         utt = message.data["query"]
         res = self.mycroft_cps.search(utt)
         if res:
-            print(8888, res)
             best = self.select_best([r[0] for r in res])
             if best:
                 callback = [r[1] for r in res if r[0].uri == best.uri][0]
