@@ -19,6 +19,7 @@ class TestOCPPipeline(TestCase):
 
     def test_no_match(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
+        self.assertFalse(self.core.intent_service.ocp.use_legacy_audio)
         messages = []
 
         def new_msg(msg):
@@ -87,6 +88,7 @@ class TestOCPPipeline(TestCase):
 
     def test_radio_media_match(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
+        self.assertFalse(self.core.intent_service.ocp.use_legacy_audio)
         messages = []
 
         def new_msg(msg):
@@ -155,6 +157,7 @@ class TestOCPPipeline(TestCase):
 
     def test_unk_media_match(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
+        self.assertFalse(self.core.intent_service.ocp.use_legacy_audio)
         messages = []
 
         def new_msg(msg):
@@ -224,6 +227,7 @@ class TestOCPPipeline(TestCase):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
     def test_skill_name_match(self):
+        self.assertFalse(self.core.intent_service.ocp.use_legacy_audio)
         self.assertIsNotNone(self.core.intent_service.ocp)
         messages = []
 
@@ -291,3 +295,72 @@ class TestOCPPipeline(TestCase):
         for idx, m in enumerate(messages):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
+    def test_legacy_match(self):
+        self.assertIsNotNone(self.core.intent_service.ocp)
+        self.core.intent_service.ocp.config = {"legacy": True}
+        self.assertTrue(self.core.intent_service.ocp.use_legacy_audio)
+        messages = []
+
+        def new_msg(msg):
+            nonlocal messages
+            m = Message.deserialize(msg)
+            if m.msg_type in ["ovos.skills.settings_changed", "gui.status.request"]:
+                return  # skip these, only happen in 1st run
+            messages.append(m)
+            print(len(messages), msg)
+
+        def wait_for_n_messages(n):
+            nonlocal messages
+            t = time.time()
+            while len(messages) < n:
+                sleep(0.1)
+                if time.time() - t > 10:
+                    raise RuntimeError("did not get the number of expected messages under 10 seconds")
+
+        self.core.bus.on("message", new_msg)
+
+        sess = Session("test-session",
+                       pipeline=[
+                           "converse",
+                           "ocp_high"
+                       ])
+        utt = Message("recognizer_loop:utterance",
+                      {"utterances": ["play some radio station"]},
+                      {"session": sess.serialize(),  # explicit
+                       })
+        self.core.bus.emit(utt)
+
+        # confirm all expected messages are sent
+        expected_messages = [
+            "recognizer_loop:utterance",
+            "ovos.common_play.status",
+            "intent.service.skills.activate",
+            "intent.service.skills.activated",
+            "ovos.common_play.activate",
+            "enclosure.active_skill",
+            "speak",
+            "ocp:play",
+            "ovos.common_play.search.start",
+            "enclosure.mouth.think",
+            "ovos.common_play.search.stop",  # any ongoing previous search
+            "ovos.common_play.query", # media type radio
+            # skill searching (radio)
+            "ovos.common_play.skill.search_start",
+            "ovos.common_play.query.response",
+            "ovos.common_play.query.response",
+            "ovos.common_play.query.response",
+            "ovos.common_play.query.response",
+            "ovos.common_play.query.response",
+            "ovos.common_play.skill.search_end",
+            "ovos.common_play.search.end",
+            # good results because of radio media type
+            "ovos.common_play.reset",
+            "add_context",  # NowPlaying context
+            'mycroft.audio.service.play'  # LEGACY api
+        ]
+        wait_for_n_messages(len(expected_messages))
+
+        self.assertEqual(len(expected_messages), len(messages))
+
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
