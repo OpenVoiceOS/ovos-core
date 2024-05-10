@@ -13,6 +13,8 @@ class TestOCPPipeline(TestCase):
     def setUp(self):
         self.skill_id = "skill-fake-fm.openvoiceos"
         self.core = get_minicroft(self.skill_id)
+        if self.core.intent_service.ocp is None:
+            self.core.intent_service._load_ocp_pipeline(force=True)
 
     def tearDown(self) -> None:
         self.core.stop()

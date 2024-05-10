@@ -108,10 +108,10 @@ class IntentService:
         self.bus.on('intent.service.padatious.entities.manifest.get',
                     self.handle_entity_manifest)
 
-    def _load_ocp_pipeline(self):
+    def _load_ocp_pipeline(self, force=False):
         """EXPERIMENTAL: this feature is not yet ready for end users"""
-        audio_enabled = Configuration().get("enable_old_audioservice", True)
-        if not audio_enabled:
+        disable_ocp = Configuration().get("disable_ocp")
+        if disable_ocp or force:
             LOG.warning("EXPERIMENTAL: the OCP pipeline is enabled!")
             try:
                 from ovos_core.intent_services.ocp_service import OCPPipelineMatcher
