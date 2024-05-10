@@ -112,8 +112,7 @@ class IntentService:
 
     def _load_ocp_pipeline(self):
         """EXPERIMENTAL: this feature is not yet ready for end users"""
-        disable_ocp = Configuration().get("disable_ocp")
-        if disable_ocp or self.config.get("experimental_ocp_pipeline", False):
+        if self.config.get("experimental_ocp_pipeline", False):
             LOG.warning("EXPERIMENTAL: the OCP pipeline is enabled!")
             try:
                 from ovos_core.intent_services.ocp_service import OCPPipelineMatcher
