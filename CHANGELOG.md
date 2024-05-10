@@ -2,7 +2,16 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a94...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a95...HEAD)
+
+**Implemented enhancements:**
+
+- feat - legacy audio service support \(OCP pipeline\) [\#455](https://github.com/OpenVoiceOS/ovos-core/issues/455)
+- feat/legacy\_audio\_api [\#456](https://github.com/OpenVoiceOS/ovos-core/pull/456) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a95](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a95) (2024-05-04)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a94...V0.0.8a95)
 
 **Fixed bugs:**
 
@@ -280,10 +289,6 @@
 ## [V0.0.8a64](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a64) (2024-01-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a63...V0.0.8a64)
-
-**Implemented enhancements:**
-
-- CommonQuery thread safety and concurrent request handling [\#329](https://github.com/OpenVoiceOS/ovos-core/pull/329) ([NeonDaniel](https://github.com/NeonDaniel))
 
 ## [V0.0.8a63](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a63) (2024-01-08)
 
@@ -589,37 +594,17 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a27...V0.0.8a28)
 
-**Merged pull requests:**
-
-- bump [\#334](https://github.com/OpenVoiceOS/ovos-core/pull/334) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a27](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a27) (2023-07-07)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a26...V0.0.8a27)
-
-**Closed issues:**
-
-- Enable GitHub Discussion. [\#333](https://github.com/OpenVoiceOS/ovos-core/issues/333)
-
-**Merged pull requests:**
-
-- Update skills-essential.txt [\#332](https://github.com/OpenVoiceOS/ovos-core/pull/332) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a26](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a26) (2023-07-04)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a25...V0.0.8a26)
 
-**Merged pull requests:**
-
-- \[padatious\] Fix thread [\#331](https://github.com/OpenVoiceOS/ovos-core/pull/331) ([goldyfruit](https://github.com/goldyfruit))
-
 ## [V0.0.8a25](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a25) (2023-07-04)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a24...V0.0.8a25)
-
-**Fixed bugs:**
-
-- hotfix/default\_cfg [\#330](https://github.com/OpenVoiceOS/ovos-core/pull/330) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a24](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a24) (2023-06-07)
 
