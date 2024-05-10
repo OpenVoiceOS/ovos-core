@@ -252,7 +252,8 @@ class IntentService:
             matchers.update({
                 "ocp_high": self.ocp.match_high,
                 "ocp_medium": self.ocp.match_medium,
-                "ocp_fallback": self.ocp.match_fallback})
+                "ocp_fallback": self.ocp.match_fallback,
+                "ocp_legacy": self.ocp.match_legacy})
         skips = skips or []
         pipeline = [k for k in session.pipeline if k not in skips]
         if any(k not in matchers for k in pipeline):

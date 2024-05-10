@@ -155,6 +155,9 @@ class TestOCPPipeline(TestCase):
         for idx, m in enumerate(messages):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
+        play = messages[-1]
+        self.assertEqual(play.data["media"]["uri"], "https://fake_4.mp3")
+
     def test_unk_media_match(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
         self.assertFalse(self.core.intent_service.ocp.use_legacy_audio)
@@ -964,3 +967,132 @@ class TestOCPPipeline(TestCase):
 
             for idx, m in enumerate(messages):
                 self.assertEqual(m.msg_type, expected_messages[idx])
+
+    def test_legacy_cps(self):
+        self.assertIsNotNone(self.core.intent_service.ocp)
+
+        self.core.intent_service.ocp.config = {"legacy_cps": True}
+
+        messages = []
+
+        def new_msg(msg):
+            nonlocal messages
+            m = Message.deserialize(msg)
+            if m.msg_type in ["ovos.skills.settings_changed", "gui.status.request"]:
+                return  # skip these, only happen in 1st run
+            messages.append(m)
+            print(len(messages), msg)
+
+        def wait_for_n_messages(n):
+            nonlocal messages
+            t = time.time()
+            while len(messages) < n:
+                sleep(0.1)
+                if time.time() - t > 10:
+                    raise RuntimeError("did not get the number of expected messages under 10 seconds")
+
+        self.core.bus.on("message", new_msg)
+
+        sess = Session("test-session",
+                       pipeline=[
+                           "ocp_legacy"
+                       ])
+        utt = Message("recognizer_loop:utterance",
+                      {"utterances": ["play rammstein"]},
+                      {"session": sess.serialize(),  # explicit
+                       })
+        self.core.bus.emit(utt)
+
+        # confirm all expected messages are sent
+        expected_messages = [
+            "recognizer_loop:utterance",
+            "ocp:legacy_cps",
+            # legacy cps api
+            "play:query",
+            "mycroft.audio.play_sound"  # error -  no results
+        ]
+        wait_for_n_messages(len(expected_messages))
+
+        self.assertEqual(len(expected_messages), len(messages))
+
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
+
+
+class TestLegacyCPSPipeline(TestCase):
+
+    def setUp(self):
+        self.skill_id = "skill-fake-fm-legacy.openvoiceos"
+        self.core = get_minicroft(self.skill_id, ocp=True)
+        self.core.intent_service.ocp.config = {"legacy_cps": True}
+
+    def tearDown(self) -> None:
+        self.core.stop()
+
+    def test_legacy_cps(self):
+        self.assertIsNotNone(self.core.intent_service.ocp)
+
+        messages = []
+
+        def new_msg(msg):
+            nonlocal messages
+            m = Message.deserialize(msg)
+            if m.msg_type in ["ovos.skills.settings_changed", "gui.status.request"]:
+                return  # skip these, only happen in 1st run
+            messages.append(m)
+            print(len(messages), msg)
+
+        def wait_for_n_messages(n):
+            nonlocal messages
+            t = time.time()
+            while len(messages) < n:
+                sleep(0.1)
+                if time.time() - t > 10:
+                    raise RuntimeError("did not get the number of expected messages under 10 seconds")
+
+        self.core.bus.on("message", new_msg)
+
+        sess = Session("test-session",
+                       pipeline=[
+                           "ocp_legacy"
+                       ])
+        utt = Message("recognizer_loop:utterance",
+                      {"utterances": ["play rammstein"]},
+                      {"session": sess.serialize(),  # explicit
+                       })
+        self.core.bus.emit(utt)
+
+        # confirm all expected messages are sent
+        expected_messages = [
+            "recognizer_loop:utterance",
+            "ocp:legacy_cps",
+            # legacy cps api
+            "play:query",
+            "play:query.response", # searching
+            "play:query.response", # report results
+            "play:start",  # skill selected
+            "mycroft.audio.service.track_info",  # check is legacy audio service is playing
+            # global stop signal
+            "mycroft.stop",
+            "ovos.common_play.stop",
+            "ovos.common_play.stop.response",
+            "skill-fake-fm-legacy.openvoiceos.stop",
+            "skill-fake-fm-legacy.openvoiceos.stop.response",
+            "mycroft.audio.service.track_info",  # check is legacy audio service is playing
+            # activate skill
+            "intent.service.skills.activate",
+            "intent.service.skills.activated",
+            f"{self.skill_id}.activate",
+            # skill callback code
+            "mycroft.audio.service.play"
+        ]
+        wait_for_n_messages(len(expected_messages))
+
+        self.assertEqual(len(expected_messages), len(messages))
+
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
+
+        play = messages[-1]
+        self.assertEqual(play.data["tracks"], ["https://fake.mp3"])
+

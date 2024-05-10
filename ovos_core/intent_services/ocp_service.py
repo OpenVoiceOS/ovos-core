@@ -1,5 +1,6 @@
 import os
 import random
+import time
 from os.path import join, dirname
 from threading import RLock
 from typing import List, Tuple, Optional
@@ -12,6 +13,7 @@ from sklearn.pipeline import FeatureUnion
 import ovos_core.intent_services
 from ovos_bus_client.apis.ocp import OCPInterface, OCPQuery, ClassicAudioServiceInterface
 from ovos_bus_client.message import Message
+from ovos_bus_client.util import wait_for_reply
 from ovos_config import Configuration
 from ovos_plugin_manager.ocp import load_stream_extractors
 from ovos_utils import classproperty
@@ -107,6 +109,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
         self.ocp_api = OCPInterface(self.bus)
         self.legacy_api = ClassicAudioServiceInterface(self.bus)
+        self.mycroft_cps = LegacyCommonPlay(self.bus)
 
         self.config = config or {}
         self.search_lock = RLock()
@@ -204,6 +207,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.bus.on("ocp:media_stop", self.handle_stop_intent)
         self.bus.on("ocp:search_error", self.handle_search_error_intent)
         self.bus.on("ocp:like_song", self.handle_like_intent)
+        self.bus.on("ocp:legacy_cps", self.handle_legacy_cps)
 
     def handle_get_SEIs(self, message: Message):
         """report available StreamExtractorIds
@@ -919,3 +923,144 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         if self.use_legacy_audio:
             self.player_state = PlayerState.STOPPED
             self.media_state = MediaState.END_OF_MEDIA
+
+    ############
+    # Legacy Mycroft CommonPlay skills
+
+    def match_legacy(self, utterances: List[str], lang: str, message: Message = None):
+        """ match legacy mycroft common play skills  (must import from deprecated mycroft module)
+        not recommended, legacy support only
+
+        legacy base class at mycroft/skills/common_play_skill.py marked for removal in ovos-core 0.1.0
+        """
+        if not self.config.get("legacy_cps"):
+            # needs to be explicitly enabled in pipeline config
+            return None
+
+        utterance = utterances[0].lower()
+
+        match = self.intent_matchers[lang].calc_intent(utterance)
+
+        if match["name"] is None:
+            return None
+        if match["name"] == "play":
+            LOG.info(f"Legacy Mycroft CommonPlay match: {match}")
+            # we dont call self.activate , the skill itself is activated on selection
+            # playback is happening outside of OCP
+            utterance = match["entities"].pop("query")
+            return ovos_core.intent_services.IntentMatch(intent_service="OCP_media",
+                                                         intent_type=f"ocp:legacy_cps",
+                                                         intent_data={"query": utterance,
+                                                                      "conf": 0.7},
+                                                         skill_id=OCP_ID,
+                                                         utterance=utterance)
+
+    def handle_legacy_cps(self, message: Message):
+        """intent handler for legacy CPS matches"""
+        utt = message.data["query"]
+        res = self.mycroft_cps.search(utt)
+        if res:
+            best = self.select_best([r[0] for r in res])
+            if best:
+                callback = [r[1] for r in res if r[0].uri == best.uri][0]
+                self.mycroft_cps.skill_play(skill_id=best.skill_id,
+                                            callback_data=callback,
+                                            phrase=utt,
+                                            message=message)
+                return
+        self.bus.emit(message.forward("mycroft.audio.play_sound",
+                                      {"uri": "snd/error.mp3"}))
+
+
+class LegacyCommonPlay:
+    """ interface for mycroft common play
+    1 - emit 'play:query'
+    2 - gather 'play:query.response' from legacy skills
+    3 - emit 'play:start' for selected skill
+
+    legacy base class at mycroft/skills/common_play_skill.py
+    marked for removal in ovos-core 0.1.0
+    """
+
+    def __init__(self, bus):
+        self.bus = bus
+        self.query_replies = {}
+        self.query_extensions = {}
+        self.waiting = False
+        self.start_ts = 0
+        self.bus.on("play:query.response", self.handle_cps_response)
+
+    def skill_play(self, skill_id: str, callback_data: dict,
+                   phrase: Optional[str] = "",
+                   message: Optional[Message] = None):
+        """tell legacy CommonPlaySkills they were selected and should handle playback"""
+        message = message or Message("ocp:legacy_cps")
+        self.bus.emit(message.forward(
+            'play:start',
+            {"skill_id": skill_id,
+             "phrase": phrase,
+             "callback_data": callback_data}
+        ))
+
+    def shutdown(self):
+        self.bus.remove("play:query.response", self.handle_cps_response)
+
+    @property
+    def cps_status(self):
+        return wait_for_reply('play:status.query',
+                              reply_type="play:status.response",
+                              bus=self.bus).data
+
+    def handle_cps_response(self, message):
+        """receive matches from legacy skills"""
+        search_phrase = message.data["phrase"]
+
+        if ("searching" in message.data and
+                search_phrase in self.query_extensions):
+            # Manage requests for time to complete searches
+            skill_id = message.data["skill_id"]
+            if message.data["searching"]:
+                # extend the timeout by N seconds
+                # IGNORED HERE, used in mycroft-playback-control skill
+                if skill_id not in self.query_extensions[search_phrase]:
+                    self.query_extensions[search_phrase].append(skill_id)
+            else:
+                # Search complete, don't wait on this skill any longer
+                if skill_id in self.query_extensions[search_phrase]:
+                    self.query_extensions[search_phrase].remove(skill_id)
+
+        elif search_phrase in self.query_replies:
+            # Collect all replies until the timeout
+            self.query_replies[message.data["phrase"]].append(message.data)
+
+    def send_query(self, phrase):
+        self.query_replies[phrase] = []
+        self.query_extensions[phrase] = []
+        self.bus.emit(Message('play:query',
+                              {"phrase": phrase}))
+
+    def get_results(self, phrase):
+        if self.query_replies.get(phrase):
+            return [self.cps2media(r) for r in self.query_replies[phrase]]
+        return []
+
+    def search(self, phrase, timeout=5):
+        self.send_query(phrase)
+        self.waiting = True
+        start_ts = time.time()
+        while self.waiting and time.time() - start_ts <= timeout:
+            time.sleep(0.2)
+        self.waiting = False
+        return self.get_results(phrase)
+
+    @staticmethod
+    def cps2media(res: dict, media_type=MediaType.GENERIC) -> Tuple[MediaEntry, dict]:
+        """convert a cps result into a modern result"""
+        entry = MediaEntry(title=res["phrase"],
+                           artist=res["skill_id"],
+                           uri=f"callback:{res['skill_id']}",
+                           media_type=media_type,
+                           playback=PlaybackType.SKILL,
+                           match_confidence=res["conf"] * 100,
+                           skill_id=res["skill_id"])
+        return entry, res['callback_data']
