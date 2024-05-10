@@ -1,7 +1,6 @@
 from typing import Optional, List
-
+from ovos_config import Configuration
 from ovos_plugin_manager.metadata_transformers import find_metadata_transformer_plugins
-from ovos_plugin_manager.templates.transformers import UtteranceTransformer
 from ovos_plugin_manager.text_transformers import find_utterance_transformer_plugins
 
 from ovos_utils.json_helper import merge_dict
@@ -11,7 +10,7 @@ from ovos_utils.log import LOG
 class UtteranceTransformersService:
 
     def __init__(self, bus, config=None):
-        self.config_core = config or {}
+        self.config_core = config or Configuration()
         self.loaded_plugins = {}
         self.has_loaded = False
         self.bus = bus
@@ -68,7 +67,7 @@ class UtteranceTransformersService:
 class MetadataTransformersService:
 
     def __init__(self, bus, config=None):
-        self.config_core = config or {}
+        self.config_core = config or Configuration()
         self.loaded_plugins = {}
         self.has_loaded = False
         self.bus = bus

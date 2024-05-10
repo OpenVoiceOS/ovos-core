@@ -49,9 +49,11 @@ class IntentService:
     querying the intent service.
     """
 
-    def __init__(self, bus):
+    def __init__(self, bus, config=None):
         self.bus = bus
-        config = Configuration()
+        self.config = config or Configuration().get("intents", {})
+        if "padatious" not in self.config:
+            self.config["padatious"] = Configuration().get("padatious", {})
 
         # Dictionary for translating a skill id to a name
         self.skill_names = {}
@@ -60,18 +62,18 @@ class IntentService:
         self.adapt_service = AdaptService()
         try:
             from ovos_core.intent_services.padatious_service import PadatiousService
-            self.padatious_service = PadatiousService(bus, config['padatious'])
+            self.padatious_service = PadatiousService(bus, self.config["padatious"])
         except ImportError:
             LOG.error(f'Failed to create padatious intent handlers, padatious not installed')
             self.padatious_service = None
-        self.padacioso_service = PadaciosoService(bus, config['padatious'])
+        self.padacioso_service = PadaciosoService(bus, self.config["padatious"])
         self.fallback = FallbackService(bus)
         self.converse = ConverseService(bus)
         self.common_qa = CommonQAService(bus)
         self.stop = StopService(bus)
         self.ocp = None
-        self.utterance_plugins = UtteranceTransformersService(bus, config=config)
-        self.metadata_plugins = MetadataTransformersService(bus, config=config)
+        self.utterance_plugins = UtteranceTransformersService(bus)
+        self.metadata_plugins = MetadataTransformersService(bus)
 
         self._load_ocp_pipeline()  # TODO - enable by default once stable
 
@@ -110,8 +112,7 @@ class IntentService:
 
     def _load_ocp_pipeline(self):
         """EXPERIMENTAL: this feature is not yet ready for end users"""
-        audio_enabled = Configuration().get("enable_old_audioservice", True)
-        if not audio_enabled:
+        if self.config.get("experimental_ocp_pipeline", False):
             LOG.warning("EXPERIMENTAL: the OCP pipeline is enabled!")
             try:
                 from ovos_core.intent_services.ocp_service import OCPPipelineMatcher

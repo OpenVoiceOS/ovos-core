@@ -21,3 +21,4 @@ ovos-messagebus~=0.0
 
 # Support OCP tests
 ovos_bus_client>=0.0.9a15
+ovos-utils>=0.1.0a16

@@ -32,6 +32,7 @@ jobs:
           pip install ./test/end2end/skill-ovos-schedule
           pip install ./test/end2end/skill-new-stop
           pip install ./test/end2end/skill-old-stop
+          pip install ./test/end2end/skill-fake-fm
     - name: Install core repo
       run: |
         pip install -e .[mycroft,deprecated]
