@@ -1,8 +1,8 @@
 # Changelog
 
-## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
+## [V0.0.8a97](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a97) (2024-05-10)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a96...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a96...V0.0.8a97)
 
 **Implemented enhancements:**
 
