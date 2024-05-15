@@ -1,0 +1,24 @@
+{
+    "stop.intent": [
+        "stop",
+        "stopp",
+        "genug (davon|)",
+        "schluss",
+        "schlu\u00df",
+        "schlie\u00dfen",
+        "ende",
+        "beenden",
+        "aufh\u00f6ren",
+        "h\u00f6r auf (damit|)",
+        "abbrechen",
+        "(brech|breche) ab",
+        "abbruch"
+    ],
+    "global_stop.intent": [
+        "alles (stoppen|schlie\u00dfen|schliessen|beenden|abbrechen)",
+        "(schlie\u00dfe|schlie\u00df|schliess|stop|stoppe|beende) alles",
+        "(schlie\u00dfe|schlie\u00df|schliess|stop|stoppe|beende) alle (programme|anwendungen|prozesse|fenster|skills)",
+        "(breche|brech) alles ab",
+        "(breche|brech) (alle|) (programme|anwendungen|prozesse|fenster|skills) ab"
+    ]
+}
