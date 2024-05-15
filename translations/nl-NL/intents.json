@@ -1,0 +1,115 @@
+{
+  "play.intent": [
+    "(speel|start|begin) {query}",
+    "zoek met (common play|ocp|ovos common play|O C P) naar {query}",
+    "zoek met (ovos|open voice os) media naar {query}",
+    "zoek {query} (in|met) (common play|ocp|ovos common play|O C P)",
+    "zoek {query} (in|met) (ovos|open voice os) media"
+  ],
+  "like_song.intent": [
+    "ik vind (dit|het) leuk",
+    "ik vind (het|dit|de)(lied|liedje|track|nummer) leuk",
+    "(goed|leuk|geweldig|tof|super|cool) (lied|liedje|track|nummer)",
+    "(dat|dit|het) is een (goed|leuk|geweldig|super|tof|cool) (lied|liedje|track|nummer)"
+  ],
+  "stop.intent": [
+    "stop",
+    "stop ermee",
+    "stop dit",
+    "Stop waar je mee bezig bent",
+    "Hou daar alsjeblieft mee op",
+    "(kun|kan) je nu stoppen",
+    "Stop met het uitvoeren van die taak",
+    "Stop de huidige actie",
+    "Stop het lopende proces",
+    "Beëindig de huidige actie",
+    "Maak er een einde aan",
+    "Ga niet verder",
+    "Stop met het uitvoeren van de huidige opdracht",
+    "Beëindig de huidige taak",
+    "Stop de huidige actie",
+    "Beëindig the current action",
+    "Annuleer de huidige taak"
+  ],
+  "next.intent": [
+    "(volgende|sla over|overslaan|skip)",
+    "(volgende|skip) (liedje|track|nummer|video|media)",
+    "(play|go to) next (music|song|track|video|media)",
+    "speel volgende",
+    "volgende",
+    "volgende (nummer|track|liedje|film|video)"
+  ],
+  "resume.intent": [
+    "(ga verder | hervat)",
+    "(hervat | ga verder met) (nummer|liedje|track|video|media)",
+    "speel"
+  ],
+  "read.intent": [
+    "lees (boek|audio boek|audioboek) {query}",
+    "lees {query}",
+    "lees {query} (boek|audio boek|audioboek)"
+  ],
+  "prev.intent": [
+    "(speel vorige| vorige) (lied|liedje|track|video|media)",
+    "(speel vorige| vorige) (lied|liedje|track|video|media)",
+    "(play previous|previous|go back)",
+    "vorige",
+    "(vorig|vorige) (nummer|track|liedje|film|video)"
+  ],
+  "global_stop.intent": [
+    "stop alles",
+    "beëindig alles",
+    "alles beëindigen",
+    "annuleer alles",
+    "stop alles",
+    "stop alles",
+    "alles stoppen",
+    "alles stoppen",
+    "stop met alles",
+    "beëindig alles",
+    "alles beëindigen",
+    "alles annuleren",
+    "alles stoppen",
+    "alles stopzetten",
+    "alles stoppen",
+    "alles stoppen",
+    "Stop nu met alles",
+    "Beëindig alle processen",
+    "Beëindig alle acties",
+    "Annuleer alle taken",
+    "Rond alle activiteiten af",
+    "Stop onmiddellijk alle acties",
+    "Stop alle lopende processen",
+    "Stop met alle acties",
+    "Stop alle huidige taken",
+    "Beëindig alle lopende acties",
+    "Annuleer alle lopende acties",
+    "Voltooi alle openstaande taken",
+    "Stop alle lopende processen",
+    "Stop alle lopende acties",
+    "Stop alle activiteiten"
+  ],
+  "pause.intent": [
+    "(pauzeer|pauze)",
+    "pauzeer (liedje|nummer|track|video|media)"
+  ],
+  "open.intent": [
+    "open (OCP|O C P|common|ovos|open voice os) (speler|mediaspeler)",
+    "open (OCP|O C P|ovos common play|common play|ovos media player|open voice os player) (beginscherm|startpagina|startscherm|homepage|homescreen|startpagina|menu)",
+    "open (OCP|O C P|ovos common play|open voice os common play|common play)",
+    "open (media|muziek|gui|video) (speler|catalogus|skills|menu)"
+  ],
+  "featured.intent": [
+    "(open|toon) (uitgelichte) {media} (catalogus|collectie|afspeellijst|playlist)",
+    "(open|toon) uitgelichte {media}"
+  ],
+  "play_favorites.intent": [
+    "(speel|start) mijn (favoriete) (tracks|nummer|nummers|muziek)",
+    "(speel|start) (favoriet|leuk gevonden|favoriete) (tracks|nummer|nummers|muzie)"
+  ],
+  "media_stop.intent": [
+    "stop",
+    "stop (spelen|afspelen|media||muziek|film|films)",
+    "stop met alles"
+  ]
+}
