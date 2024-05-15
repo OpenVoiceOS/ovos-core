@@ -1,7 +1,115 @@
 {
-    "stop.intent": [
-        "Pare com isso",
-        "Pare",
-        "Pare de fazer isso"
-    ]
+  "play.intent": [
+    "(Toca|reproduz|põe a dar) {query}",
+    "(Procura|pesquisa) (reprodutor|ocp|ovos common play) por {query}",
+    "(Procura|pesquisa) (ovos|open voice os) multimédia de {query}",
+    "(Procura|pesquisa) {query} (em|no|na) (common play|ocp|ovos common play|O C P)",
+    "(Procura|pesquisa) {query} (em|no|na) (ovos|open voice os) multimédia"
+  ],
+  "like_song.intent": [
+    "Eu gosto (disto|deste|desta|disso)",
+    "Eu gosto (deste|desta)(canção|música|faixa|som|melodia)",
+    "(Boa|gira|fantástica|espetacular|linda|lindo|fixe) (canção|música|faixa|som|melodia)",
+    "(essa|esta|esse|este) (canção|música|faixa|som|melodia) é (Boa|gira|fantástica|espetacular|linda|lindo|fixe)"
+  ],
+  "stop.intent": [
+    "(pára|pare)",
+    "(pára|pare) de fazer isso",
+    "(pára|pare) com isso",
+    "Pára o que estás a fazer",
+    "Por favor (pára|pára com isso)",
+    "(pode|podes) parar agora",
+    "(Acaba|pára) (essa tarefa|com essa tarefa)",
+    "Por favor (suspende|pausa) a (tarefa|ação) atual",
+    "(pára|pare) com o (atual|corrente|andamento) do processo",
+    "(cessa|termina) a atividade (atual|corrente)",
+    "Por favor (dá|dê) fim a (isso|isto)",
+    "(Pára|pare)o que estás a fazer",
+    "(pára|pare) (o|a|esta|este) (comando|tarefa)",
+    "Por favor (termina|termine|acaba) a tarefa atual",
+    "(pára|pare|termine) a operação atual",
+    "(cessa|cesse|termina) a ação corrente",
+    "Por favor (cancela|cancele) a tarefa atual"
+  ],
+  "next.intent": [
+    "(próximo|próxima|passa|seguinte) ",
+    "(próximo|próxima|passa|seguinte) (canção|música|faixa|som|melodia|multimédia)",
+    "(toca|reproduz|põe a dar|vai para) (a próxima|o próximo| seguinte| a seguir) (canção|música|faixa|som|melodia)",
+    "(toca|passa) a próxima",
+    "(Seguinte|próximo)",
+    "(Seguinte|próximo|próxima)  (canção|música|faixa|som|melodia|vídeo)"
+  ],
+  "resume.intent": [
+    "(volta a pôr|resume|continua)",
+    "(volta a pôr|resume|continua)(canção|música|faixa|som|melodia)",
+    "(toca|reproduz|põe a dar)"
+  ],
+  "read.intent": [
+    "(lê|lê-me) (um|uma|o|a) (livro|audiobook|história) {query}",
+    "(lê|lê-me) {query}",
+    "(lê|lê-me) {query} (livro|audiobook|história)"
+  ],
+  "prev.intent": [
+    "(volta a pôr a anterior|põe a anterior|volta atrás) (canção|música|faixa|som|melodia)",
+    "(volta a pôr a anterior|põe a anterior|volta atrás) (canção|música|faixa|som|melodia)",
+    "(volta a pôr a anterior|põe a anterior|volta atrás)",
+    "(anterior|antes dessa)",
+    "(canção|música|faixa|som|melodia) (anterior|antes dessa)"
+  ],
+  "global_stop.intent": [
+    "(pára tudo|parou tudo)",
+    "acaba com tudo",
+    "Termina com tudo",
+    "Cancela tudo",
+    "Termina tudo",
+    "(Pausa|suspende) tudo",
+    "(Aborta|abortar) tudo",
+    "(Cessa|cessar|suspender) tudo",
+    "Pára tudo",
+    "(Acaba|acabar) tudo",
+    "(Termina|terminar) com tudo",
+    "(Cancela|cancelar) tudo",
+    "(Completa|termina|completar) tudo",
+    "(pausa|pausar|suspender) tudo",
+    "(aborta|abortar) tudo",
+    "(cessa|cessar|cesse) com tudo",
+    "(Pára|pára com|parar) tudo agora",
+    "(Termina|terminar|acaba|acabar) todos os processos",
+    "(Termina|terminar|acaba|acabar) todas as operações",
+    "(cancela|cancelar) todas as tarefas",
+    "(termina|terminar|completar) todas as taredas",
+    "(suspende|pausa|suspender|pausar) todas as atividades imediatamente",
+    "(abortar|cancelar|aborta) todas as tarefas em execução",
+    "(cessa|cesse|cessar) todas as ações",
+    "(parar|pára) todas as tarefas atuais",
+    "Terminar todas as atividades em execução",
+    "Cancela todas as operações pendentes",
+    "(Termina|fecha|fechar|terminar) todas as tarefas abertas",
+    "(pausa|pausar|suspender) todos os processos em (andamento|execução)",
+    "Abortar todas as tarefas em(andamento|execução)",
+    "Cessa todas as atividades"
+  ],
+  "pause.intent": [
+    "pausa",
+    "(pausa|pausar) (canção|música|faixa|som|melodia)"
+  ],
+  "open.intent": [
+    "(Abre|abrir) (OCP|O C P|common|ovos|open voice os) (reprodutor|programa)",
+    "(abre|abrir) (OCP|O C P|ovos common play|common play|ovos media player|open voice os player) (ecrã principal|página inicial|menu)",
+    "Abrir (OCP|O C P|ovos common play|open voice os common play|common play)",
+    "(abre|abrir) (reprodutor|catálogo|aplicação|menu) (multimédia|música|gui|vídeo) "
+  ],
+  "featured.intent": [
+    "(abre|mostra|ver) (recomendado|) (catálogo|coleção|lista de){media} ",
+    "(abrir|mostrar|ver) {media} (recomendada|recomendado)"
+  ],
+  "play_favorites.intent": [
+    "(toca|tocar|põe) (a minha|o meu|as minhas|os meus) (música|faixa|canção|canções|concertos|sons) (favorita|favorito|preferido|preferida)",
+    "(toca|tocar|mete a dar|coloca a dar) (música|faixa|canção|canções|concertos|sons) (favorito|que gosto|preferida)"
+  ],
+  "media_stop.intent": [
+    "(Pára|parar)",
+    "(Pára|parar) (o|a) (música|faixa|canção|som|concertos|filme)",
+    "(pára|parar) tudo"
+  ]
 }
