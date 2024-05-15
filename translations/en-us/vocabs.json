@@ -1,0 +1,26 @@
+{
+    "video_only.voc": [
+        "do not cast to audio",
+        "don't cast to audio",
+        "no audio player",
+        "only video",
+        "video only"
+    ],
+    "Play.voc": [
+        "search",
+        "read",
+        "play",
+        "start"
+    ],
+    "audio_only.voc": [
+        "audio only",
+        "no video",
+        "only audio",
+        "only sound",
+        "sound only"
+    ],
+    "Resume.voc": [
+        "resume",
+        "unpause"
+    ]
+}

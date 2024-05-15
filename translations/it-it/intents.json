@@ -1,0 +1,9 @@
+{
+    "stop.intent": [
+        "basta",
+        "smettila",
+        "fermati",
+        "stop",
+        "piantala"
+    ]
+}
