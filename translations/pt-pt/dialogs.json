@@ -1,0 +1,14 @@
+{
+  "cant.play.dialog": [
+    "Eu não tenho a certeza de como (reproduzir|tocar) {phrase}",
+    "Desculpe, eu não sei como (reproduzir|tocar) {phrase}"
+  ],
+  "play.what.dialog": [
+    "O que devo (reproduzir|tocar) a seguir?"
+  ],
+  "just.one.moment.dialog": [
+    "Dê-me um momento",
+    "Só um segundo",
+    "Só um momento enquanto (vejo|procuro) por isso."
+  ]
+}
