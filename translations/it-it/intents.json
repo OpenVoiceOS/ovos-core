@@ -1,9 +1,115 @@
 {
-    "stop.intent": [
-        "basta",
-        "smettila",
-        "fermati",
-        "stop",
-        "piantala"
-    ]
+  "play.intent": [
+    "(riproduci|inizia) {query}",
+    "cerca (common play|ocp|ovos common play|O C P) per {query}",
+    "cerca (ovos|open voice os) media per {query}",
+    "cerca {query} in (common play|ocp|ovos common play|O C P)",
+    "cerca {query} in (ovos|open voice os) media"
+  ],
+  "like_song.intent": [
+    "mi piace (questo|questa) qui",
+    "mi piace (questa|questo)(canzone|musica|suono|concerto)",
+    "bella (canzone|musica)",
+    null
+  ],
+  "stop.intent": [
+    "basta",
+    "smettila",
+    "fermati",
+    "stop",
+    "piantala",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "next.intent": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "resume.intent": [
+    null,
+    null,
+    null
+  ],
+  "read.intent": [
+    null,
+    null,
+    null
+  ],
+  "prev.intent": [
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "global_stop.intent": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "pause.intent": [
+    null,
+    null
+  ],
+  "open.intent": [
+    null,
+    null,
+    null,
+    null
+  ],
+  "featured.intent": [
+    null,
+    null
+  ],
+  "play_favorites.intent": [
+    null,
+    null
+  ],
+  "media_stop.intent": [
+    null,
+    null,
+    null
+  ]
 }
