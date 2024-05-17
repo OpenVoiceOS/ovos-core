@@ -1,0 +1,26 @@
+{
+  "video_only.voc": [
+    "(sem|não) forçar áudio",
+    "não (transmitir|transmitas) apenas áudio",
+    "sem (o|) reprodutor de áudio",
+    "apenas video",
+    "só video"
+  ],
+  "Play.voc": [
+    "procura",
+    "lê",
+    "toca",
+    "reproduz"
+  ],
+  "audio_only.voc": [
+    "apenas audio",
+    "sem video",
+    "só audio",
+    "som apenas",
+    "(apenas|só) som"
+  ],
+  "Resume.voc": [
+    "(retoma|retomar)",
+    "continua"
+  ]
+}
