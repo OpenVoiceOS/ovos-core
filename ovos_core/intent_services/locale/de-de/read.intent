@@ -1,0 +1,3 @@
+lese (Buch|Hörbuch) {query}
+lese {query}
+lese {query} (Buch|Hörbuch)
