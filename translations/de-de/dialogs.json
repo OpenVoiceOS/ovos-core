@@ -1,0 +1,14 @@
+{
+  "cant.play.dialog": [
+    "Ich bin nicht sicher, wie man {phrase} spielt",
+    "Entschuldigung, ich weiß nicht, wie man {phrase} spielt"
+  ],
+  "play.what.dialog": [
+    "Was soll ich als nächstes spielen?"
+  ],
+  "just.one.moment.dialog": [
+    "Gib mir einen Moment",
+    "Augenblick",
+    "Einen Moment bitte, während ich danach suche"
+  ]
+}
