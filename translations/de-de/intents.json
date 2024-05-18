@@ -1,24 +1,115 @@
 {
-    "stop.intent": [
-        "stop",
-        "stopp",
-        "genug (davon|)",
-        "schluss",
-        "schlu\u00df",
-        "schlie\u00dfen",
-        "ende",
-        "beenden",
-        "aufh\u00f6ren",
-        "h\u00f6r auf (damit|)",
-        "abbrechen",
-        "(brech|breche) ab",
-        "abbruch"
-    ],
-    "global_stop.intent": [
-        "alles (stoppen|schlie\u00dfen|schliessen|beenden|abbrechen)",
-        "(schlie\u00dfe|schlie\u00df|schliess|stop|stoppe|beende) alles",
-        "(schlie\u00dfe|schlie\u00df|schliess|stop|stoppe|beende) alle (programme|anwendungen|prozesse|fenster|skills)",
-        "(breche|brech) alles ab",
-        "(breche|brech) (alle|) (programme|anwendungen|prozesse|fenster|skills) ab"
-    ]
+  "play.intent": [
+    "(abspielen|starten) {query}",
+    null,
+    null,
+    null,
+    null
+  ],
+  "like_song.intent": [
+    "ich mag (das|dieses|es)",
+    null,
+    "(gut|nett|großartig|erstaunlich|fantastisch|cool) (Lied|Musik|Track|Jam|Sound)",
+    null
+  ],
+  "stop.intent": [
+    null,
+    null,
+    null,
+    null,
+    "schluß",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "next.intent": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "resume.intent": [
+    null,
+    null,
+    null
+  ],
+  "read.intent": [
+    null,
+    null,
+    null
+  ],
+  "prev.intent": [
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "global_stop.intent": [
+    "alles (stoppen|schließen|schliessen|beenden|abbrechen)",
+    "(schließe|schließ|schliess|stop|stoppe|beende) alles",
+    null,
+    "(breche|brech) alles ab",
+    null,
+    null,
+    "alles abbrechen",
+    null,
+    "alles stoppen",
+    null,
+    "alles beenden",
+    "alles abbrechen",
+    null,
+    "alles anhalten",
+    "alles abbrechen",
+    "alles aufgeben",
+    null,
+    null,
+    "Alle Vorgänge beenden",
+    "Alle Aufgaben abbrechen",
+    null,
+    null,
+    "Alle laufenden Prozesse abbrechen",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Alle laufenden Aktionen abbrechen",
+    null
+  ],
+  "pause.intent": [
+    "Pause",
+    "Pause (Musik|Lied|Titel|Video|Medien|Wiedergabe)"
+  ],
+  "open.intent": [
+    null,
+    null,
+    null,
+    null
+  ],
+  "featured.intent": [
+    null,
+    "(öffnen | zeigen | anzeigen) vorgestellte {Medien}"
+  ],
+  "play_favorites.intent": [
+    null,
+    null
+  ],
+  "media_stop.intent": [
+    null,
+    null,
+    null
+  ]
 }
