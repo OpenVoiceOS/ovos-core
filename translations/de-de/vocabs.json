@@ -1,0 +1,26 @@
+{
+  "video_only.voc": [
+    "nicht auf Audio übertragen",
+    null,
+    null,
+    null,
+    null
+  ],
+  "Play.voc": [
+    "suche",
+    "lese",
+    "spiele",
+    "starte"
+  ],
+  "audio_only.voc": [
+    null,
+    null,
+    null,
+    null,
+    "kein Ton"
+  ],
+  "Resume.voc": [
+    "spiele weiter",
+    "Pause beenden"
+  ]
+}
