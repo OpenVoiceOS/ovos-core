@@ -1,115 +1,115 @@
 {
   "play.intent": [
     "(abspielen|starten) {query}",
-    null,
-    null,
-    null,
-    null
+    "Suche (common play|ocp|ovos common play|O C P) nach {query}",
+    "Suche in (ovos|open voice os) Medien nach {query}",
+    "Suche {query} (in) (common play|ocp|ovos common play|O C P))",
+    "Suche {query} (in) (ovos|open voice os) Medien"
   ],
   "like_song.intent": [
     "ich mag (das|dieses|es)",
-    null,
+    "ich mag (das|dieses|diese|diesen)(Lied|Musik|Track|Jam|Sound)",
     "(gut|nett|großartig|erstaunlich|fantastisch|cool) (Lied|Musik|Track|Jam|Sound)",
-    null
+    "(das|dies|es) ist ein (guter|schöner|großartiger|erstaunlicher|fantastischer|cooler) (Song|Musik|Track|Jam|Sound)"
   ],
   "stop.intent": [
-    null,
-    null,
-    null,
-    null,
+    "stopp",
+    "höre auf damit",
+    "stoppe das",
+    "Hör auf mit dem, was du tust",
     "schluß",
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null
+    "Kannst du damit aufhören",
+    "Beende diese Aufgabe",
+    "Bitte halte die aktuelle Aufgabe an",
+    "Stoppe den laufenden Prozess",
+    "Beenden Sie die aktuelle Aktivität",
+    "Mache bitte Schluss damit",
+    "Hör auf, daran zu arbeiten",
+    "Beende die Ausführung des aktuellen Befehls",
+    "Bitte beende die aktuelle Aufgabe",
+    "Stoppe den aktuellen Vorgang",
+    "Beenden Sie die aktuelle Aktion",
+    "Bitte breche die aktuelle Aufgabe ab"
   ],
   "next.intent": [
-    null,
-    null,
-    null,
-    null,
-    null,
-    null
+    "(weiter|überspringen|skippe|überspringe)",
+    "(weiter|überspringen|skippe|überspringe) (Musik|Lied|Track|Video|Medien)",
+    "(spiele|gehen zum) nächsten (Musik|Lied|Titel|Video|Medium)",
+    "spiele das nächste",
+    "das nächste",
+    "(nächstes|nächsten) (Lied|Titel|Musik|Film|Video|Melodie)"
   ],
   "resume.intent": [
-    null,
-    null,
-    null
+    "(Pause beenden| fortsetzen| weiter)",
+    "(Musik|Lied|Titel|Video|Medien|Wiedergabe) (Pause beenden|fortsetzen|fortfahren|neu starten) ",
+    "spiele"
   ],
   "read.intent": [
-    null,
-    null,
-    null
+    "lese (Buch|Hörbuch) {query}",
+    "lese {query}",
+    "lese {query} (Buch|Hörbuch)"
   ],
   "prev.intent": [
-    null,
-    null,
-    null,
-    null,
-    null
+    "(spiele vorheriges|spiele vorherigen|gehe ein) (Musik|Lied|Titel|Video|Medien) zurück",
+    "(spiele vorheriges|vorheriges) (Musik|Lied|Track|Video|Medien)",
+    "(spiele vorheriges|Vorheriges|gehe zurück)",
+    "vorheriges",
+    "(vorheriges|vorheriger) (Lied|Titel|Musik|Film|Video|Melodie)"
   ],
   "global_stop.intent": [
     "alles (stoppen|schließen|schliessen|beenden|abbrechen)",
     "(schließe|schließ|schliess|stop|stoppe|beende) alles",
-    null,
+    "beende alles",
     "(breche|brech) alles ab",
-    null,
-    null,
-    "alles abbrechen",
-    null,
-    "alles stoppen",
-    null,
-    "alles beenden",
-    "alles abbrechen",
-    null,
+    "(breche|brech) (alles) ab",
     "alles anhalten",
     "alles abbrechen",
     "alles aufgeben",
-    null,
-    null,
+    "alles stoppen",
+    "beende alles",
+    "alles beenden",
+    "alles abbrechen",
+    "alles beenden",
+    "alles anhalten",
+    "alles abbrechen",
+    "alles aufgeben",
+    "stoppe jetzt alles",
+    "Beende alle Prozesse",
     "Alle Vorgänge beenden",
     "Alle Aufgaben abbrechen",
-    null,
-    null,
+    "Alle Aktivitäten beenden",
+    "Stoppe sofort alle Aktivitäten",
     "Alle laufenden Prozesse abbrechen",
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
+    "Alle Aktionen beenden",
+    "Stoppe alle aktuellen Aufgaben",
+    "Beende alle laufenden Aktivitäten",
+    "Alle ausstehenden Vorgänge abbrechen",
+    "Alle offenen Aufgaben beenden",
+    "Stoppe alle laufenden Prozesse",
     "Alle laufenden Aktionen abbrechen",
-    null
+    "Beende alle aktiven Aktivitäten"
   ],
   "pause.intent": [
     "Pause",
     "Pause (Musik|Lied|Titel|Video|Medien|Wiedergabe)"
   ],
   "open.intent": [
-    null,
-    null,
-    null,
-    null
+    "öffne (OCP|O C P|common|ovos|open voice os) (Player|Mediaplayer)",
+    "öffne (OCP|O C P|ovos Common Play|Common Play|ovos Media Player|Voice OS Player) (Startbildschirm|Startseite|Homescreen|Startseite|Menü)",
+    "öffne (OCP|O C P|ovos Common Play|Common Play|ovos Media Player|Voice OS Player)",
+    "öffne (Medien|Musik|GUI|Video) (Player|Katalog|Skills|Menü|Wiedergabe)"
   ],
   "featured.intent": [
-    null,
+    "(öffne|zeige|zeige an) (vorgestellte|) {Medien} (Katalog|Sammlung|Wiedergabeliste)",
     "(öffnen | zeigen | anzeigen) vorgestellte {Medien}"
   ],
   "play_favorites.intent": [
-    null,
-    null
+    "(spiele|starte) meine (liebsten|schönsten) (Titel|Lied|Lieder|Musik|Jam|Jams)",
+    "(spiele|starte) (favorisierte) (Titel|Lied|Lieder|Musik|Jam|Jams)"
   ],
   "media_stop.intent": [
-    null,
-    null,
-    null
+    "stoppen",
+    "Stoppe (Wiedergabe|Medien|Medienwiedergabe|Musik|Film|Filme|Lärm)",
+    "alles stoppen"
   ]
 }
