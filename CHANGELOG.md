@@ -1,5 +1,28 @@
 # Changelog
 
+## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a98...HEAD)
+
+**Merged pull requests:**
+
+- link translations portal [\#477](https://github.com/OpenVoiceOS/ovos-core/pull/477) ([JarbasAl](https://github.com/JarbasAl))
+- de-de/translate [\#473](https://github.com/OpenVoiceOS/ovos-core/pull/473) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- pt-pt/translate-vocabs [\#470](https://github.com/OpenVoiceOS/ovos-core/pull/470) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- it-it/update intents [\#469](https://github.com/OpenVoiceOS/ovos-core/pull/469) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- italian dialogs [\#468](https://github.com/OpenVoiceOS/ovos-core/pull/468) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- nl-nl/intents [\#467](https://github.com/OpenVoiceOS/ovos-core/pull/467) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- pt-pt/intents [\#466](https://github.com/OpenVoiceOS/ovos-core/pull/466) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- fr-fr/intents [\#465](https://github.com/OpenVoiceOS/ovos-core/pull/465) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- fr-fr/add vocabs [\#464](https://github.com/OpenVoiceOS/ovos-core/pull/464) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- fr-fr/dialogs [\#463](https://github.com/OpenVoiceOS/ovos-core/pull/463) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- pt-pt/tx\_dialog\_files [\#462](https://github.com/OpenVoiceOS/ovos-core/pull/462) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- automations/translations [\#461](https://github.com/OpenVoiceOS/ovos-core/pull/461) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a98](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a98) (2024-05-14)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a97...V0.0.8a98)
+
 ## [V0.0.8a97](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a97) (2024-05-10)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a96...V0.0.8a97)
@@ -144,10 +167,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a80...V0.0.8a81)
 
-**Breaking changes:**
-
-- \[BUG\] Classic Mycroft skill inits are not calling self.initialize\(\) [\#343](https://github.com/OpenVoiceOS/ovos-core/issues/343)
-
 **Merged pull requests:**
 
 - refactor/reduce code complexity [\#427](https://github.com/OpenVoiceOS/ovos-core/pull/427) ([JarbasAl](https://github.com/JarbasAl))
@@ -206,10 +225,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a74...V0.0.8a75)
 
-**Fixed bugs:**
-
-- Can't install ovos-core and ovos-bus-client [\#344](https://github.com/OpenVoiceOS/ovos-core/issues/344)
-
 **Merged pull requests:**
 
 - Update README.md [\#411](https://github.com/OpenVoiceOS/ovos-core/pull/411) ([JarbasAl](https://github.com/JarbasAl))
@@ -217,10 +232,6 @@
 ## [V0.0.8a74](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a74) (2024-02-06)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a73...V0.0.8a74)
-
-**Closed issues:**
-
-- unittests/ skill installer class [\#348](https://github.com/OpenVoiceOS/ovos-core/issues/348)
 
 **Merged pull requests:**
 
@@ -496,7 +507,6 @@
 **Merged pull requests:**
 
 - unittests/explicit\_session + fix/codecov workflow [\#356](https://github.com/OpenVoiceOS/ovos-core/pull/356) ([JarbasAl](https://github.com/JarbasAl))
-- Update ovos-utils and ovos-workshop to latest alpha versions [\#339](https://github.com/OpenVoiceOS/ovos-core/pull/339) ([NeonDaniel](https://github.com/NeonDaniel))
 
 ## [V0.0.8a41](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a41) (2023-09-30)
 
@@ -522,45 +532,21 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a37...V0.0.8a38)
 
-**Implemented enhancements:**
-
-- feat/pipeline\_session [\#352](https://github.com/OpenVoiceOS/ovos-core/pull/352) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a37](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a37) (2023-09-22)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a36...V0.0.8a37)
-
-**Merged pull requests:**
-
-- Update README.md: Update Link [\#351](https://github.com/OpenVoiceOS/ovos-core/pull/351) ([1Maxnet1](https://github.com/1Maxnet1))
 
 ## [V0.0.8a36](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a36) (2023-09-20)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a35...V0.0.8a36)
 
-**Implemented enhancements:**
-
-- feat/active skills from Session [\#350](https://github.com/OpenVoiceOS/ovos-core/pull/350) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a35](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a35) (2023-09-19)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a34...V0.0.8a35)
 
-**Implemented enhancements:**
-
-- feat/runtime skill installer  [\#347](https://github.com/OpenVoiceOS/ovos-core/pull/347) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a34](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a34) (2023-09-08)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a33...V0.0.8a34)
-
-**Fixed bugs:**
-
-- unittests hang forever test\_event\_container.py  [\#342](https://github.com/OpenVoiceOS/ovos-core/issues/342)
-
-**Merged pull requests:**
-
-- refactor/sound\_output\_in\_ovos\_audio [\#345](https://github.com/OpenVoiceOS/ovos-core/pull/345) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a33](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a33) (2023-08-08)
 
@@ -570,21 +556,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a31...V0.0.8a32)
 
-**Implemented enhancements:**
-
-- feat/pipeline [\#336](https://github.com/OpenVoiceOS/ovos-core/pull/336) ([JarbasAl](https://github.com/JarbasAl))
-
-**Merged pull requests:**
-
-- Fix CodeCov automation [\#340](https://github.com/OpenVoiceOS/ovos-core/pull/340) ([NeonDaniel](https://github.com/NeonDaniel))
-
 ## [V0.0.8a31](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a31) (2023-07-15)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a30...V0.0.8a31)
-
-**Merged pull requests:**
-
-- Validate dependency resolution compat. [\#337](https://github.com/OpenVoiceOS/ovos-core/pull/337) ([NeonDaniel](https://github.com/NeonDaniel))
 
 ## [V0.0.8a30](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a30) (2023-07-12)
 
