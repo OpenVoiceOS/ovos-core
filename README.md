@@ -47,6 +47,8 @@ Please share your own interesting work!
 This is an open source project. We would love your help. We have prepared a [contributing](.github/CONTRIBUTING.md)
 guide to help you get started.
 
+The easiest way for anyone to contribute is to help with translations! You can help without any programming knowledge via the [translation portal](https://gitlocalize.com/users/OpenVoiceOS)
+
 If this is your first PR, or you're not sure where to get started,
 say hi in [OpenVoiceOS Chat](https://matrix.to/#/!XFpdtmgyCoPDxOMPpH:matrix.org?via=matrix.org) and a team member would
 be happy to mentor you.
