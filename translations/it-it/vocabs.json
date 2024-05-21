@@ -1,0 +1,26 @@
+{
+  "video_only.voc": [
+    "niente suono",
+    "no suono",
+    "no audio",
+    "niente audio",
+    "solo video"
+  ],
+  "Play.voc": [
+    "cerca",
+    "leggi",
+    "suona",
+    "inizia"
+  ],
+  "audio_only.voc": [
+    "solo suono",
+    "no video",
+    "solo audio",
+    "[UNUSED]",
+    "[UNUSED]"
+  ],
+  "Resume.voc": [
+    "riprendi",
+    "continua"
+  ]
+}
