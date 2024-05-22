@@ -15,7 +15,7 @@ from ovos_bus_client.apis.ocp import OCPInterface, OCPQuery, ClassicAudioService
 from ovos_bus_client.message import Message
 from ovos_bus_client.util import wait_for_reply
 from ovos_config import Configuration
-from ovos_plugin_manager.ocp import load_stream_extractors
+from ovos_plugin_manager.ocp import load_stream_extractors, available_extractors
 from ovos_utils import classproperty
 from ovos_utils.log import LOG
 from ovos_utils.messagebus import FakeBus
@@ -115,7 +115,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.search_lock = RLock()
         self.player_state = PlayerState.STOPPED.value
         self.media_state = MediaState.UNKNOWN.value
-        self.available_SEI = []
+        self._available_SEI = []
 
         self.intent_matchers = {}
         self.skill_aliases = {
@@ -209,6 +209,12 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.bus.on("ocp:like_song", self.handle_like_intent)
         self.bus.on("ocp:legacy_cps", self.handle_legacy_cps)
 
+    @property
+    def available_SEI(self):
+        if self.use_legacy_audio:
+            return available_extractors()
+        return self._available_SEI
+
     def handle_get_SEIs(self, message: Message):
         """report available StreamExtractorIds
         OCP plugins handle specific SEIs and return a real stream / extra metadata
@@ -223,7 +229,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         eg. for the youtube plugin a skill can return
           "youtube//https://youtube.com/watch?v=wChqNkd6F24"
         """
-        self.available_SEI = message.data["SEI"]
+        self._available_SEI = message.data["SEI"]
         LOG.info(f"Available stream extractor plugins: {self.available_SEI}")
 
     def handle_skill_register(self, message: Message):
@@ -933,7 +939,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
         legacy base class at mycroft/skills/common_play_skill.py marked for removal in ovos-core 0.1.0
         """
-        if not self.config.get("legacy_cps"):
+        if not self.config.get("legacy_cps", True):
             # needs to be explicitly enabled in pipeline config
             return None
 

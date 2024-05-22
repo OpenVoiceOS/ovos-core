@@ -116,7 +116,7 @@ class IntentService:
             LOG.warning("EXPERIMENTAL: the OCP pipeline is enabled!")
             try:
                 from ovos_core.intent_services.ocp_service import OCPPipelineMatcher
-                self.ocp = OCPPipelineMatcher(self.bus)
+                self.ocp = OCPPipelineMatcher(self.bus, config=self.config.get("OCP", {}))
             except ImportError:
                 LOG.error("OCPPipelineMatcher unavailable, please install ovos-utils >= 0.1.0")
 
