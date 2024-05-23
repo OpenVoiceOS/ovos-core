@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a98...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a99...HEAD)
+
+**Fixed bugs:**
+
+- fix/ocp\_pipeline\_config [\#480](https://github.com/OpenVoiceOS/ovos-core/pull/480) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a99](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a99) (2024-05-20)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a98...V0.0.8a99)
 
 **Merged pull requests:**
 
@@ -426,10 +434,6 @@
 **Implemented enhancements:**
 
 - feat: explicit message response to activate/deactivate skill [\#369](https://github.com/OpenVoiceOS/ovos-core/pull/369) ([mikejgray](https://github.com/mikejgray))
-
-**Closed issues:**
-
-- \[ENHANCEMENT\] activate\_skill and deactivate\_skill don't return a response [\#353](https://github.com/OpenVoiceOS/ovos-core/issues/353)
 
 **Merged pull requests:**
 
