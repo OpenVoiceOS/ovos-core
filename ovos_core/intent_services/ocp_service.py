@@ -5,21 +5,22 @@ from os.path import join, dirname
 from threading import RLock
 from typing import List, Tuple, Optional
 
+from ovos_bus_client.apis.ocp import OCPInterface, OCPQuery, ClassicAudioServiceInterface
+from ovos_bus_client.message import Message
+from ovos_bus_client.util import wait_for_reply
 from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
 from ovos_classifiers.skovos.features import ClassifierProbaVectorizer, KeywordFeaturesVectorizer
 from padacioso import IntentContainer
 from sklearn.pipeline import FeatureUnion
 
 import ovos_core.intent_services
-from ovos_bus_client.apis.ocp import OCPInterface, OCPQuery, ClassicAudioServiceInterface
-from ovos_bus_client.message import Message
-from ovos_bus_client.util import wait_for_reply
 from ovos_config import Configuration
 from ovos_plugin_manager.ocp import load_stream_extractors, available_extractors
 from ovos_utils import classproperty
 from ovos_utils.log import LOG
 from ovos_utils.messagebus import FakeBus
-from ovos_utils.ocp import MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID, MediaEntry, Playlist, MediaState
+from ovos_utils.ocp import (MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID,
+                            MediaEntry, Playlist, MediaState, PluginStream, dict2entry)
 from ovos_workshop.app import OVOSAbstractApplication
 
 
@@ -737,7 +738,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         # support Playlist and MediaEntry objects in tracks
         for idx, track in enumerate(results):
             if isinstance(track, dict):
-                results[idx] = MediaEntry.from_dict(track)
+                results[idx] = dict2entry(track)
 
         # ignore very low score matches
         l1 = len(results)
@@ -759,7 +760,9 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         if self.config.get("filter_SEI", True):
             # TODO - also check inside playlists
             bad_seis = [r for r in results if isinstance(r, MediaEntry) and
-                        not any(r.uri.startswith(sei) for sei in valid_starts)]
+                        not any(r.uri.startswith(sei) for sei in valid_starts)] + \
+                       [r for r in results if isinstance(r, PluginStream) and
+                        r.extractor_id not in self.available_SEI]
 
             results = [r for r in results if r not in bad_seis]
             plugs = set([s.uri.split('//')[0] for s in bad_seis if '//' in s.uri])
@@ -865,7 +868,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
         for res in results:
             if isinstance(res, dict):
-                res = MediaEntry.from_dict(res)
+                res = dict2entry(res)
             if not best or res.match_confidence > best.match_confidence:
                 best = res
                 ties = [best]
