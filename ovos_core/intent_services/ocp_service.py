@@ -584,6 +584,9 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         else:
             LOG.info("Requesting OCP to stop")
             self.ocp_api.stop()
+            # old ocp doesnt report stopped state ...
+            # TODO - remove this once proper events are emitted
+            self.player_state = PlayerState.STOPPED
 
     def handle_next_intent(self, message: Message):
         if self.use_legacy_audio:
