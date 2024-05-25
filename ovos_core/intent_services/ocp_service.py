@@ -3,7 +3,7 @@ import random
 import time
 from os.path import join, dirname
 from threading import RLock
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union
 
 from ovos_bus_client.apis.ocp import OCPInterface, OCPQuery, ClassicAudioServiceInterface
 from ovos_bus_client.message import Message
@@ -20,7 +20,7 @@ from ovos_utils import classproperty
 from ovos_utils.log import LOG
 from ovos_utils.messagebus import FakeBus
 from ovos_utils.ocp import (MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID,
-                            MediaEntry, Playlist, MediaState, PluginStream, dict2entry)
+                            MediaEntry, Playlist, MediaState, PluginStream, TrackState, dict2entry)
 from ovos_workshop.app import OVOSAbstractApplication
 
 
@@ -173,6 +173,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.bus.on("ovos.common_play.search", self.handle_search_query)
         self.bus.on("ovos.common_play.play_search", self.handle_play_search)
         self.bus.on('ovos.common_play.status.response', self.handle_player_state_update)
+        self.bus.on('ovos.common_play.track.state', self.handle_track_state_update)
         self.bus.on('ovos.common_play.SEI.get.response', self.handle_get_SEIs)
 
         self.bus.on('ovos.common_play.register_keyword', self.handle_skill_keyword_register)
@@ -184,7 +185,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.bus.on("mycroft.audio.service.pause", self._handle_legacy_audio_pause)
         self.bus.on("mycroft.audio.service.resume", self._handle_legacy_audio_resume)
         self.bus.on("mycroft.audio.service.stop", self._handle_legacy_audio_stop)
-        self.bus.emit(Message("ovos.common_play.status"))  # sync on launch
+        self.bus.emit(Message("ovos.common_play.status"))  # sync player state on launch
 
     def register_ocp_intents(self):
         intent_files = self.load_resource_files()
@@ -302,6 +303,20 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         # TODO - support for removing samples, instead of full keyword
         # we need to keep the keyword available to the classifier
         # OCPFeaturizer.ocp_keywords.deregister_entity(kw_label)
+
+    def handle_track_state_update(self, message: Message):
+        """ovos.common_play.track.state"""
+        state = message.data.get("state")
+        if state is None:
+            raise ValueError(f"Got state update message with no state: "
+                             f"{message}")
+        if isinstance(state, int):
+            state = TrackState(state)
+        if state in [TrackState.PLAYING_AUDIO, TrackState.PLAYING_AUDIOSERVICE,
+                     TrackState.PLAYING_VIDEO, TrackState.PLAYING_WEBVIEW,
+                     TrackState.PLAYING_MPRIS]:
+            self.player_state = PlayerState.PLAYING
+            LOG.info(f"OCP PlayerState: {self.player_state}")
 
     def handle_player_state_update(self, message: Message):
         """
@@ -732,14 +747,19 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         return False
 
     # search
-    def filter_results(self, results: list, phrase: str, lang: str,
-                       media_type: MediaType = MediaType.GENERIC) -> list:
-
+    def normalize_results(self, results: list) -> List[Union[MediaEntry, Playlist]]:
         # support Playlist and MediaEntry objects in tracks
         for idx, track in enumerate(results):
             if isinstance(track, dict):
-                results[idx] = dict2entry(track)
+                try:
+                    results[idx] = dict2entry(track)
+                except Exception as e:
+                    LOG.error(f"got an invalid track: {track}")
+                    results[idx] = None
+        return [r for r in results if r]
 
+    def filter_results(self, results: list, phrase: str, lang: str,
+                       media_type: MediaType = MediaType.GENERIC) -> list:
         # ignore very low score matches
         l1 = len(results)
         results = [r for r in results
@@ -811,9 +831,15 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                                      skills=skills):
             results += r["results"]
 
-        LOG.debug(f"Got {len(results)} results")
-        results = self.filter_results(results, phrase, lang, media_type)
-        LOG.debug(f"Got {len(results)} usable results")
+        results = self.normalize_results(results)
+
+        if not skills:
+            LOG.debug(f"Got {len(results)} results")
+            results = self.filter_results(results, phrase, lang, media_type)
+            LOG.debug(f"Got {len(results)} usable results")
+        else:  # no filtering if skill explicitly requested
+            LOG.debug(f"Got {len(results)} usable results from {skills}")
+
         self.bus.emit(Message("ovos.common_play.search.end"))
         return results
 
