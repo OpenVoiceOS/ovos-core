@@ -5,15 +5,15 @@ from os.path import join, dirname
 from threading import RLock
 from typing import List, Tuple, Optional, Union
 
-from ovos_bus_client.apis.ocp import OCPInterface, OCPQuery, ClassicAudioServiceInterface
-from ovos_bus_client.message import Message
-from ovos_bus_client.util import wait_for_reply
 from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
 from ovos_classifiers.skovos.features import ClassifierProbaVectorizer, KeywordFeaturesVectorizer
 from padacioso import IntentContainer
 from sklearn.pipeline import FeatureUnion
 
 import ovos_core.intent_services
+from ovos_bus_client.apis.ocp import OCPInterface, OCPQuery, ClassicAudioServiceInterface
+from ovos_bus_client.message import Message
+from ovos_bus_client.util import wait_for_reply
 from ovos_config import Configuration
 from ovos_plugin_manager.ocp import load_stream_extractors, available_extractors
 from ovos_utils import classproperty
@@ -312,9 +312,10 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                              f"{message}")
         if isinstance(state, int):
             state = TrackState(state)
-        if state in [TrackState.PLAYING_AUDIO, TrackState.PLAYING_AUDIOSERVICE,
-                     TrackState.PLAYING_VIDEO, TrackState.PLAYING_WEBVIEW,
-                     TrackState.PLAYING_MPRIS]:
+        if self.player_state != PlayerState.PLAYING and \
+                state in [TrackState.PLAYING_AUDIO, TrackState.PLAYING_AUDIOSERVICE,
+                          TrackState.PLAYING_VIDEO, TrackState.PLAYING_WEBVIEW,
+                          TrackState.PLAYING_MPRIS]:
             self.player_state = PlayerState.PLAYING
             LOG.info(f"OCP PlayerState: {self.player_state}")
 
