@@ -20,8 +20,13 @@ from ovos_utils import classproperty
 from ovos_utils.log import LOG
 from ovos_utils.messagebus import FakeBus
 from ovos_utils.ocp import (MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID,
-                            MediaEntry, Playlist, MediaState, PluginStream, TrackState, dict2entry)
+                            MediaEntry, Playlist, MediaState, TrackState)
 from ovos_workshop.app import OVOSAbstractApplication
+
+try:
+    from ovos_utils.ocp import dict2entry
+except ImportError:  # older ovos-utils
+    dict2entry = MediaEntry.from_dict
 
 
 class OCPFeaturizer:
@@ -784,9 +789,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         if self.config.get("filter_SEI", True):
             # TODO - also check inside playlists
             bad_seis = [r for r in results if isinstance(r, MediaEntry) and
-                        not any(r.uri.startswith(sei) for sei in valid_starts)] + \
-                       [r for r in results if isinstance(r, PluginStream) and
-                        r.extractor_id not in self.available_SEI]
+                        not any(r.uri.startswith(sei) for sei in valid_starts)]
 
             results = [r for r in results if r not in bad_seis]
             plugs = set([s.uri.split('//')[0] for s in bad_seis if '//' in s.uri])
