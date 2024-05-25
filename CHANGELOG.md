@@ -2,7 +2,19 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a99...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a100...HEAD)
+
+**Fixed bugs:**
+
+- fix/several\_OCP\_issues [\#481](https://github.com/OpenVoiceOS/ovos-core/pull/481) ([JarbasAl](https://github.com/JarbasAl))
+
+**Merged pull requests:**
+
+- finished [\#479](https://github.com/OpenVoiceOS/ovos-core/pull/479) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+
+## [V0.0.8a100](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a100) (2024-05-23)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a99...V0.0.8a100)
 
 **Fixed bugs:**
 
@@ -516,10 +528,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a40...V0.0.8a41)
 
-**Fixed bugs:**
-
-- unittests/session active\_skills [\#355](https://github.com/OpenVoiceOS/ovos-core/pull/355) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a40](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a40) (2023-09-30)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a39...V0.0.8a40)
@@ -527,10 +535,6 @@
 ## [V0.0.8a39](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a39) (2023-09-29)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a38...V0.0.8a39)
-
-**Implemented enhancements:**
-
-- default session managed by core [\#354](https://github.com/OpenVoiceOS/ovos-core/pull/354) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a38](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a38) (2023-09-22)
 
