@@ -1,0 +1,26 @@
+{
+  "video_only.voc": [
+    "niet naar audio casten",
+    "niet naar audio casten",
+    "geen audiospeler",
+    "alleen video",
+    "alleen video"
+  ],
+  "Play.voc": [
+    "zoek",
+    "lees",
+    "speel",
+    "start"
+  ],
+  "audio_only.voc": [
+    "alleen audio",
+    "geen video",
+    "alleen audio",
+    "alleen audio",
+    "alleen audio"
+  ],
+  "Resume.voc": [
+    "ga verder",
+    "hervat"
+  ]
+}
