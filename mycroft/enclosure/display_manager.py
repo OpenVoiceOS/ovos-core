@@ -51,7 +51,7 @@ from threading import Thread, Timer
 import os
 
 from ovos_bus_client.client import MessageBusClient
-from ovos_utils import get_ipc_directory
+from ovos_utils.signal import get_ipc_directory
 from ovos_utils.log import LOG
 
 

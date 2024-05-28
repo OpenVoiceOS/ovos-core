@@ -16,6 +16,7 @@
 times.
 """
 # backwards compat - do not delete until 0.2.0
-from ovos_bus_client.util.scheduler import repeat_time, EventScheduler, create_basic_wrapper, \
+from ovos_bus_client.util.scheduler import repeat_time, EventScheduler, \
     EventContainer, EventSchedulerInterface
+from ovos_utils.events import create_basic_wrapper
 
