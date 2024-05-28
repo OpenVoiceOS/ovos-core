@@ -1,13 +1,13 @@
 import time
 from time import sleep
-from unittest import TestCase, skip
+from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, Session
 from ..minicroft import get_minicroft
 
 
-class TestCancel(TestCase):
+class TestTransformerPlugins(TestCase):
 
     def setUp(self):
         self.skill_id = "skill-ovos-hello-world.openvoiceos"
@@ -18,24 +18,29 @@ class TestCancel(TestCase):
         self.core.stop()
 
     def test_cancel_plugin(self):
+        # test plugins loaded
+        self.assertIn('ovos-metadata-test-plugin', self.core.intent_service.metadata_plugins.loaded_plugins)
+        self.assertIn('ovos-utterance-normalizer', self.core.intent_service.utterance_plugins.loaded_plugins)
+        self.assertIn('ovos-utterance-plugin-cancel', self.core.intent_service.utterance_plugins.loaded_plugins)
+
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
         SessionManager.default_session.active_skills = [(self.skill_id, time.time())]
         SessionManager.default_session.pipeline = [
-                           "stop_high",
-                           "converse",
-                           "padatious_high",
-                           "adapt_high",
-                           "fallback_high",
-                           "stop_medium",
-                           "adapt_medium",
-                           "padatious_medium",
-                           "adapt_low",
-                           "common_qa",
-                           "fallback_medium",
-                           "fallback_low"
-                       ]
+            "stop_high",
+            "converse",
+            "padatious_high",
+            "adapt_high",
+            "fallback_high",
+            "stop_medium",
+            "adapt_medium",
+            "padatious_medium",
+            "adapt_low",
+            "common_qa",
+            "fallback_medium",
+            "fallback_low"
+        ]
         messages = []
 
         def new_msg(msg):
@@ -75,14 +80,11 @@ class TestCancel(TestCase):
         for idx, m in enumerate(messages):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
-        # verify that contexts are kept around
-        for m in messages:
-            self.assertEqual(m.context["session"]["session_id"], "default")
-
         # verify the transformer metadata was injected
         for m in messages[1:]:
-            self.assertEqual(m.context["metadata"], "test")
+            self.assertEqual(m.context["session"]["session_id"], "default")  # session
+            self.assertEqual(m.context["cancel_word"], "cancel order")  # cancel plugin
+            self.assertEqual(m.context["metadata"], "test")  # metadata plugin
 
         # verify sound
         self.assertEqual(messages[1].data["uri"], "snd/cancel.mp3")
-
