@@ -257,7 +257,8 @@ class TestIntentServiceApi(TestCase):
 
     def test_shutdown(self):
 
-        intent_service = IntentService(MockEmitter(), config={"experimental_ocp_pipeline": False})
+        intent_service = IntentService(MockEmitter(), config={"experimental_ocp_pipeline": False,
+                                                              "padatious": {"disabled": True}})
         intent_service.shutdown()
         self.assertListEqual(intent_service.bus.removed,
                              ['padatious:register_intent',
@@ -292,10 +293,10 @@ class TestIntentServiceApi(TestCase):
                               'intent.service.adapt.vocab.manifest.get',
                               'intent.service.padatious.get',
                               'intent.service.padatious.manifest.get',
-                              'intent.service.padatious.entities.manifest.get']
-                             )
+                              'intent.service.padatious.entities.manifest.get'])
 
-        intent_service = IntentService(MockEmitter(), config={"experimental_ocp_pipeline": True})
+        intent_service = IntentService(MockEmitter(), config={"experimental_ocp_pipeline": True,
+                                                              "padatious": {"disabled": True}})
         intent_service.shutdown()
         self.assertListEqual(intent_service.bus.removed,
                              ['padatious:register_intent',
@@ -355,8 +356,7 @@ class TestIntentServiceApi(TestCase):
                               'intent.service.adapt.vocab.manifest.get',
                               'intent.service.padatious.get',
                               'intent.service.padatious.manifest.get',
-                              'intent.service.padatious.entities.manifest.get']
-                             )
+                              'intent.service.padatious.entities.manifest.get'])
 
 
 class TestAdaptIntent(TestCase):

@@ -59,12 +59,16 @@ class IntentService:
 
         # TODO - replace with plugins
         self.adapt_service = AdaptService()
+        self.padatious_service = None
         try:
-            from ovos_core.intent_services.padatious_service import PadatiousService
-            self.padatious_service = PadatiousService(bus, self.config["padatious"])
+            if self.config["padatious"].get("disabled"):
+                LOG.info("padatious forcefully disabled in config")
+            else:
+                from ovos_core.intent_services.padatious_service import PadatiousService
+                self.padatious_service = PadatiousService(bus, self.config["padatious"])
         except ImportError:
             LOG.error(f'Failed to create padatious intent handlers, padatious not installed')
-            self.padatious_service = None
+
         self.padacioso_service = PadaciosoService(bus, self.config["padatious"])
         self.fallback = FallbackService(bus)
         self.converse = ConverseService(bus)
