@@ -2,7 +2,19 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a103...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a104...HEAD)
+
+**Fixed bugs:**
+
+- fix/mycroft\_compat [\#485](https://github.com/OpenVoiceOS/ovos-core/pull/485) ([JarbasAl](https://github.com/JarbasAl))
+
+**Closed issues:**
+
+- reach 75% coverage of ovos-core [\#415](https://github.com/OpenVoiceOS/ovos-core/issues/415)
+
+## [V0.0.8a104](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a104) (2024-05-28)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a103...V0.0.8a104)
 
 **Fixed bugs:**
 
@@ -501,17 +513,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a47...V0.0.8a48)
 
-**Fixed bugs:**
-
-- unittests/get\_response\_reprompting [\#363](https://github.com/OpenVoiceOS/ovos-core/pull/363) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a47](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a47) (2023-10-02)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a46...V0.0.8a47)
-
-**Fixed bugs:**
-
-- unittests/get\_response\_return\_val [\#362](https://github.com/OpenVoiceOS/ovos-core/pull/362) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a46](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a46) (2023-10-02)
 
