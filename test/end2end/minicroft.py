@@ -19,6 +19,10 @@ class MiniCroft(SkillManager):
         self.intent_service = self._register_intent_services(ocp=ocp)
         self.scheduler = EventScheduler(bus, schedule_file="/tmp/schetest.json")
 
+    def load_metadata_transformers(self, cfg):
+        self.intent_service.metadata_plugins.config = cfg
+        self.intent_service.metadata_plugins.load_plugins()
+
     def _register_intent_services(self, ocp=False):
         """Start up the all intent services and connect them as needed.
 

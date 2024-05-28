@@ -12,6 +12,7 @@ class TestCancel(TestCase):
     def setUp(self):
         self.skill_id = "skill-ovos-hello-world.openvoiceos"
         self.core = get_minicroft(self.skill_id)
+        self.core.load_metadata_transformers({"ovos-metadata-test-plugin": {}})
 
     def tearDown(self) -> None:
         self.core.stop()
@@ -77,6 +78,10 @@ class TestCancel(TestCase):
         # verify that contexts are kept around
         for m in messages:
             self.assertEqual(m.context["session"]["session_id"], "default")
+
+        # verify the transformer metadata was injected
+        for m in messages[1:]:
+            self.assertEqual(m.context["metadata"], "test")
 
         # verify sound
         self.assertEqual(messages[1].data["uri"], "snd/cancel.mp3")
