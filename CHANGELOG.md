@@ -2,7 +2,17 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a100...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a101...HEAD)
+
+**Merged pull requests:**
+
+- refactor/pipeline\_shutdown [\#484](https://github.com/OpenVoiceOS/ovos-core/pull/484) ([JarbasAl](https://github.com/JarbasAl))
+- nl-nl vocabs [\#483](https://github.com/OpenVoiceOS/ovos-core/pull/483) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- nl-nl dialogs [\#482](https://github.com/OpenVoiceOS/ovos-core/pull/482) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+
+## [V0.0.8a101](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a101) (2024-05-25)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a100...V0.0.8a101)
 
 **Fixed bugs:**
 
@@ -504,25 +514,13 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a43...V0.0.8a44)
 
-**Fixed bugs:**
-
-- unittests/fallbackV1 [\#358](https://github.com/OpenVoiceOS/ovos-core/pull/358) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a43](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a43) (2023-09-30)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a42...V0.0.8a43)
 
-**Merged pull requests:**
-
-- unittests/fallback\_service [\#357](https://github.com/OpenVoiceOS/ovos-core/pull/357) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a42](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a42) (2023-09-30)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a41...V0.0.8a42)
-
-**Merged pull requests:**
-
-- unittests/explicit\_session + fix/codecov workflow [\#356](https://github.com/OpenVoiceOS/ovos-core/pull/356) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a41](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a41) (2023-09-30)
 
