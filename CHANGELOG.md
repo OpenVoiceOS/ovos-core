@@ -2,7 +2,19 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a102...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a103...HEAD)
+
+**Fixed bugs:**
+
+- Pipeline priorities not respected [\#393](https://github.com/OpenVoiceOS/ovos-core/issues/393)
+
+**Merged pull requests:**
+
+- tests/cancel\_utterance [\#486](https://github.com/OpenVoiceOS/ovos-core/pull/486) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a103](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a103) (2024-05-28)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a102...V0.0.8a103)
 
 **Implemented enhancements:**
 
@@ -505,17 +517,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a45...V0.0.8a46)
 
-**Fixed bugs:**
-
-- unittests/get\_response [\#361](https://github.com/OpenVoiceOS/ovos-core/pull/361) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a45](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a45) (2023-10-02)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a44...V0.0.8a45)
-
-**Merged pull requests:**
-
-- unittests/skill\_self\_activation [\#360](https://github.com/OpenVoiceOS/ovos-core/pull/360) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a44](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a44) (2023-10-02)
 
