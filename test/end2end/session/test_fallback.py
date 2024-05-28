@@ -71,6 +71,7 @@ class TestFallback(TestCase):
             "ovos.session.update_default",
             
             f"ovos.skills.fallback.{self.skill_id}.response",
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
             "ovos.session.update_default"
         ]
         wait_for_n_messages(len(expected_messages))
@@ -120,8 +121,8 @@ class TestFallback(TestCase):
         self.assertEqual(messages[11].data["fallback_handler"], "UnknownSkill.handle_fallback")
 
         # verify default session is now updated
-        self.assertEqual(messages[12].msg_type, "ovos.session.update_default")
-        self.assertEqual(messages[12].data["session_data"]["session_id"], "default")
+        self.assertEqual(messages[-1].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[-1].data["session_data"]["session_id"], "default")
 
         # test second message with no session resumes default active skills
         messages = []
@@ -195,7 +196,8 @@ class TestFallback(TestCase):
             "intent.service.skills.activated",
             f"{self.skill_id}.activate",
 
-            f"ovos.skills.fallback.{self.skill_id}.response"
+            f"ovos.skills.fallback.{self.skill_id}.response",
+            "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -291,7 +293,8 @@ class TestFallback(TestCase):
             "intent.service.skills.deactivated",
             f"{self.skill_id}.deactivate",
             # activate events suppressed
-            f"ovos.skills.fallback.{self.skill_id}.response"
+            f"ovos.skills.fallback.{self.skill_id}.response",
+            "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 

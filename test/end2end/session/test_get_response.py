@@ -86,7 +86,7 @@ class TestSessions(TestCase):
             "recognizer_loop:audio_output_start",
             "recognizer_loop:audio_output_end",
             "mycroft.skill.handler.complete",  # original intent finished executing
-
+            "ovos.utterance.handled",
             # session updated at end of intent pipeline
             "ovos.session.update_default"
         ]
@@ -159,10 +159,10 @@ class TestSessions(TestCase):
         self.assertEqual(messages[19].data["name"], "TestAbortSkill.handle_test_get_response")
 
         # verify default session is now updated
-        self.assertEqual(messages[20].msg_type, "ovos.session.update_default")
-        self.assertEqual(messages[20].data["session_data"]["session_id"], "default")
+        self.assertEqual(messages[-1].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[-1].data["session_data"]["session_id"], "default")
         # test deserialization of payload
-        sess = Session.deserialize(messages[20].data["session_data"])
+        sess = Session.deserialize(messages[-1].data["session_data"])
         self.assertEqual(sess.session_id, "default")
 
     def test_with_response(self):
@@ -247,7 +247,7 @@ class TestSessions(TestCase):
             "recognizer_loop:audio_output_start",
             "recognizer_loop:audio_output_end",
             "mycroft.skill.handler.complete",  # original intent finished executing
-
+            "ovos.utterance.handled",
             # session updated at end of intent pipeline
             "ovos.session.update_default"
 
@@ -329,10 +329,10 @@ class TestSessions(TestCase):
         self.assertEqual(messages[24].data["name"], "TestAbortSkill.handle_test_get_response")
 
         # verify default session is now updated
-        self.assertEqual(messages[25].msg_type, "ovos.session.update_default")
-        self.assertEqual(messages[25].data["session_data"]["session_id"], "default")
+        self.assertEqual(messages[-1].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[-1].data["session_data"]["session_id"], "default")
         # test deserialization of payload
-        sess = Session.deserialize(messages[25].data["session_data"])
+        sess = Session.deserialize(messages[-1].data["session_data"])
         self.assertEqual(sess.session_id, "default")
 
     def test_cancel_response(self):
@@ -417,6 +417,7 @@ class TestSessions(TestCase):
             "recognizer_loop:audio_output_end",
             "mycroft.skill.handler.complete",  # original intent finished executing
 
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
             # session updated at end of intent pipeline
             "ovos.session.update_default"
 
@@ -432,7 +433,6 @@ class TestSessions(TestCase):
         # verify that "session" is injected
         # (missing in utterance message) and kept in all messages
         for m in messages[1:]:
-            print(m.msg_type, m.context["session"]["session_id"])
             self.assertEqual(m.context["session"]["session_id"], "default")
 
         # verify intent triggers
@@ -498,10 +498,10 @@ class TestSessions(TestCase):
         self.assertEqual(messages[24].data["name"], "TestAbortSkill.handle_test_get_response")
 
         # verify default session is now updated
-        self.assertEqual(messages[25].msg_type, "ovos.session.update_default")
-        self.assertEqual(messages[25].data["session_data"]["session_id"], "default")
+        self.assertEqual(messages[-1].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[-1].data["session_data"]["session_id"], "default")
         # test deserialization of payload
-        sess = Session.deserialize(messages[25].data["session_data"])
+        sess = Session.deserialize(messages[-1].data["session_data"])
         self.assertEqual(sess.session_id, "default")
 
     def test_with_reprompt(self):
@@ -585,6 +585,7 @@ class TestSessions(TestCase):
             "speak",  # speak "ok" inside intent
             "mycroft.skill.handler.complete",  # original intent finished executing
 
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
             # session updated at end of intent pipeline
             "ovos.session.update_default"
 
@@ -654,10 +655,10 @@ class TestSessions(TestCase):
         self.assertEqual(messages[21].data["name"], "TestAbortSkill.handle_test_get_response3")
 
         # verify default session is now updated
-        self.assertEqual(messages[22].msg_type, "ovos.session.update_default")
-        self.assertEqual(messages[22].data["session_data"]["session_id"], "default")
+        self.assertEqual(messages[-1].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[-1].data["session_data"]["session_id"], "default")
         # test deserialization of payload
-        sess = Session.deserialize(messages[22].data["session_data"])
+        sess = Session.deserialize(messages[-1].data["session_data"])
         self.assertEqual(sess.session_id, "default")
 
     def test_nested(self):
@@ -784,6 +785,7 @@ class TestSessions(TestCase):
 
             "mycroft.skill.handler.complete",  # original intent finished executing
 
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
             # session updated at end of intent pipeline
             "ovos.session.update_default"
 
@@ -860,4 +862,4 @@ class TestSessions(TestCase):
         self.assertEqual(messages[50].msg_type, "mycroft.skill.handler.complete")
         self.assertEqual(messages[50].data["name"], "TestAbortSkill.handle_test_get_response_cascade")
 
-        self.assertEqual(messages[51].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[-1].msg_type, "ovos.session.update_default")

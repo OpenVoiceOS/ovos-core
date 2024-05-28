@@ -61,6 +61,7 @@ class TestSessions(TestCase):
             "enclosure.active_skill",
             "speak",
             "mycroft.skill.handler.complete",
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
             "ovos.session.update_default"
         ]
         wait_for_n_messages(len(expected_messages))
@@ -106,15 +107,15 @@ class TestSessions(TestCase):
         self.assertEqual(messages[9].data["name"], "HelloWorldSkill.handle_hello_world_intent")
 
         # verify default session is now updated
-        self.assertEqual(messages[10].msg_type, "ovos.session.update_default")
-        self.assertEqual(messages[10].data["session_data"]["session_id"], "default")
+        self.assertEqual(messages[-1].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[-1].data["session_data"]["session_id"], "default")
         # test deserialization of payload
-        sess = Session.deserialize(messages[10].data["session_data"])
+        sess = Session.deserialize(messages[-1].data["session_data"])
         self.assertEqual(sess.session_id, "default")
 
         # test that active skills list has been updated
         self.assertEqual(sess.active_skills[0][0], self.skill_id)
-        self.assertEqual(messages[10].data["session_data"]["active_skills"][0][0], self.skill_id)
+        self.assertEqual(messages[-1].data["session_data"]["active_skills"][0][0], self.skill_id)
 
     def test_explicit_default_session(self):
         SessionManager.sessions = {}
@@ -167,6 +168,7 @@ class TestSessions(TestCase):
             "enclosure.active_skill",
             "speak",
             "mycroft.skill.handler.complete",
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
             "ovos.session.update_default"
         ]
         wait_for_n_messages(len(expected_messages))
@@ -216,15 +218,15 @@ class TestSessions(TestCase):
         self.assertEqual(messages[11].data["name"], "HelloWorldSkill.handle_hello_world_intent")
 
         # verify default session is now updated
-        self.assertEqual(messages[12].msg_type, "ovos.session.update_default")
-        self.assertEqual(messages[12].data["session_data"]["session_id"], "default")
+        self.assertEqual(messages[-1].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[-1].data["session_data"]["session_id"], "default")
 
         # test deserialization of payload
-        sess = Session.deserialize(messages[12].data["session_data"])
+        sess = Session.deserialize(messages[-1].data["session_data"])
         self.assertEqual(sess.session_id, "default")
 
         # test that active skills list has been updated
-        self.assertEqual(messages[12].data["session_data"]["active_skills"][0][0], self.skill_id)
+        self.assertEqual(messages[-1].data["session_data"]["active_skills"][0][0], self.skill_id)
         self.assertEqual(sess.active_skills[0][0], self.skill_id)
         self.assertNotEqual(sess.active_skills[0][1], now)
 
@@ -282,7 +284,8 @@ class TestSessions(TestCase):
             f"{self.skill_id}.activate",
             "enclosure.active_skill",
             "speak",
-            "mycroft.skill.handler.complete"
+            "mycroft.skill.handler.complete",
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 

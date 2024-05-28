@@ -70,6 +70,7 @@ class TestSessions(TestCase):
             # complete intent failure
             "mycroft.audio.play_sound",
             "complete_intent_failure",
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
             "ovos.session.update_default"
         ]
         wait_for_n_messages(len(expected_messages))
@@ -94,10 +95,11 @@ class TestSessions(TestCase):
         self.assertEqual(messages[3].msg_type, "mycroft.audio.play_sound")
         self.assertEqual(messages[3].data["uri"], "snd/error.mp3")
         self.assertEqual(messages[4].msg_type, "complete_intent_failure")
+        self.assertEqual(messages[5].msg_type, "ovos.utterance.handled")
 
         # verify default session is now updated
-        self.assertEqual(messages[5].msg_type, "ovos.session.update_default")
-        self.assertEqual(messages[5].data["session_data"]["session_id"], "default")
+        self.assertEqual(messages[-1].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[-1].data["session_data"]["session_id"], "default")
 
     @skip("TODO works if run standalone, otherwise has side effects in other tests")
     def test_complete_failure_lang_detect(self):

@@ -298,12 +298,21 @@ class IntentService:
 
         # Launch skill if not handled by the match function
         if match.intent_type:
-            # keep all original message.data and update with intent
-            # match, mycroft-core only keeps "utterances"
+            # keep all original message.data and update with intent match
             data = dict(message.data)
             data.update(match.intent_data)
+            # NOTE: message.reply to ensure correct message destination
             reply = message.reply(match.intent_type, data)
             self.bus.emit(reply)
+
+    def send_cancel_event(self, message):
+        LOG.info("utterance canceled, cancel_word:" + message.context.get("cancel_word"))
+        # play dedicated cancel sound
+        sound = Configuration().get('sounds', {}).get('cancel', "snd/cancel.mp3")
+        # NOTE: message.reply to ensure correct message destination
+        self.bus.emit(message.reply('mycroft.audio.play_sound', {"uri": sound}))
+        self.bus.emit(message.reply("ovos.utterance.cancelled"))
+        self.bus.emit(message.reply("ovos.utterance.handled"))
 
     def handle_utterance(self, message: Message):
         """Main entrypoint for handling user utterances
@@ -332,60 +341,53 @@ class IntentService:
         Args:
             message (Message): The messagebus data
         """
+        # Get utterance utterance_plugins additional context
+        message = self._handle_transformers(message)
+
+        if message.context.get("canceled"):
+            self.send_cancel_event(message)
+            return
+
+        # tag language of this utterance
+        lang = self.disambiguate_lang(message)
+
         try:
+            setup_locale(lang)
+        except Exception as e:
+            LOG.exception(f"Failed to set lingua_franca default lang to {lang}")
 
-            # Get utterance utterance_plugins additional context
-            message = self._handle_transformers(message)
+        utterances = message.data.get('utterances', [])
 
-            if message.context.get("canceled"):
-                # TODO - play dedicated sound
-                LOG.info("utterance canceled, cancel_word:" + message.context.get("cancel_word"))
-                self.bus.emit(message.reply("ovos.utterance.cancelled"))
-                return
+        stopwatch = Stopwatch()
 
-            # tag language of this utterance
-            lang = self.disambiguate_lang(message)
+        # get session
+        sess = self._validate_session(message, lang)
+        message.context["session"] = sess.serialize()
 
-            try:
-                setup_locale(lang)
-            except Exception as e:
-                LOG.exception(f"Failed to set lingua_franca default lang to {lang}")
+        # match
+        match = None
+        with stopwatch:
+            # Loop through the matching functions until a match is found.
+            for match_func in self.get_pipeline(session=sess):
+                match = match_func(utterances, lang, message)
+                if match:
+                    try:
+                        self._emit_match_message(match, message)
+                        break
+                    except:
+                        LOG.exception(f"{match_func} returned an invalid match")
+                LOG.debug(f"no match from {match_func}")
+            else:
+                # Nothing was able to handle the intent
+                # Ask politely for forgiveness for failing in this vital task
+                self.send_complete_intent_failure(message)
 
-            utterances = message.data.get('utterances', [])
+        LOG.debug(f"intent matching took: {stopwatch.time}")
 
-            stopwatch = Stopwatch()
-
-            # get session
-            sess = self._validate_session(message, lang)
-            message.context["session"] = sess.serialize()
-
-            # match
-            match = None
-            with stopwatch:
-                # Loop through the matching functions until a match is found.
-                for match_func in self.get_pipeline(session=sess):
-                    match = match_func(utterances, lang, message)
-                    if match:
-                        try:
-                            self._emit_match_message(match, message)
-                            break
-                        except:
-                            LOG.exception(f"{match_func} returned an invalid match")
-                    LOG.debug(f"no match from {match_func}")
-                else:
-                    # Nothing was able to handle the intent
-                    # Ask politely for forgiveness for failing in this vital task
-                    self.send_complete_intent_failure(message)
-
-            LOG.debug(f"intent matching took: {stopwatch.time}")
-
-            # sync any changes made to the default session, eg by ConverseService
-            if sess.session_id == "default":
-                SessionManager.sync(message)
-            return match, message.context, stopwatch
-
-        except Exception as err:
-            LOG.exception(err)
+        # sync any changes made to the default session, eg by ConverseService
+        if sess.session_id == "default":
+            SessionManager.sync(message)
+        return match, message.context, stopwatch
 
     def send_complete_intent_failure(self, message):
         """Send a message that no skill could handle the utterance.
@@ -394,8 +396,10 @@ class IntentService:
             message (Message): original message to forward from
         """
         sound = Configuration().get('sounds', {}).get('error', "snd/error.mp3")
-        self.bus.emit(message.forward('mycroft.audio.play_sound', {"uri": sound}))
-        self.bus.emit(message.forward('complete_intent_failure'))
+        # NOTE: message.reply to ensure correct message destination
+        self.bus.emit(message.reply('mycroft.audio.play_sound', {"uri": sound}))
+        self.bus.emit(message.reply('complete_intent_failure'))
+        self.bus.emit(message.reply("ovos.utterance.handled"))
 
     def handle_register_vocab(self, message):
         """Register adapt vocabulary.

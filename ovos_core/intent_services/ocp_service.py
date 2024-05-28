@@ -175,21 +175,21 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         """
         Register messagebus handlers for OCP events
         """
-        self.bus.on("ovos.common_play.search", self.handle_search_query)
-        self.bus.on("ovos.common_play.play_search", self.handle_play_search)
-        self.bus.on('ovos.common_play.status.response', self.handle_player_state_update)
-        self.bus.on('ovos.common_play.track.state', self.handle_track_state_update)
-        self.bus.on('ovos.common_play.SEI.get.response', self.handle_get_SEIs)
+        self.add_event("ovos.common_play.search", self.handle_search_query)
+        self.add_event("ovos.common_play.play_search", self.handle_play_search)
+        self.add_event('ovos.common_play.status.response', self.handle_player_state_update)
+        self.add_event('ovos.common_play.track.state', self.handle_track_state_update)
+        self.add_event('ovos.common_play.SEI.get.response', self.handle_get_SEIs)
 
-        self.bus.on('ovos.common_play.register_keyword', self.handle_skill_keyword_register)
-        self.bus.on('ovos.common_play.deregister_keyword', self.handle_skill_keyword_deregister)
-        self.bus.on('ovos.common_play.announce', self.handle_skill_register)
+        self.add_event('ovos.common_play.register_keyword', self.handle_skill_keyword_register)
+        self.add_event('ovos.common_play.deregister_keyword', self.handle_skill_keyword_deregister)
+        self.add_event('ovos.common_play.announce', self.handle_skill_register)
 
-        self.bus.on("mycroft.audio.playing_track", self._handle_legacy_audio_start)
-        self.bus.on("mycroft.audio.queue_end", self._handle_legacy_audio_end)
-        self.bus.on("mycroft.audio.service.pause", self._handle_legacy_audio_pause)
-        self.bus.on("mycroft.audio.service.resume", self._handle_legacy_audio_resume)
-        self.bus.on("mycroft.audio.service.stop", self._handle_legacy_audio_stop)
+        self.add_event("mycroft.audio.playing_track", self._handle_legacy_audio_start)
+        self.add_event("mycroft.audio.queue_end", self._handle_legacy_audio_end)
+        self.add_event("mycroft.audio.service.pause", self._handle_legacy_audio_pause)
+        self.add_event("mycroft.audio.service.resume", self._handle_legacy_audio_resume)
+        self.add_event("mycroft.audio.service.stop", self._handle_legacy_audio_stop)
         self.bus.emit(Message("ovos.common_play.status"))  # sync player state on launch
 
     def register_ocp_intents(self):
@@ -204,17 +204,17 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                     self.intent_matchers[lang].add_intent(
                         intent_name.replace(".intent", ""), samples)
 
-        self.bus.on("ocp:play", self.handle_play_intent)
-        self.bus.on("ocp:play_favorites", self.handle_play_favorites_intent)
-        self.bus.on("ocp:open", self.handle_open_intent)
-        self.bus.on("ocp:next", self.handle_next_intent)
-        self.bus.on("ocp:prev", self.handle_prev_intent)
-        self.bus.on("ocp:pause", self.handle_pause_intent)
-        self.bus.on("ocp:resume", self.handle_resume_intent)
-        self.bus.on("ocp:media_stop", self.handle_stop_intent)
-        self.bus.on("ocp:search_error", self.handle_search_error_intent)
-        self.bus.on("ocp:like_song", self.handle_like_intent)
-        self.bus.on("ocp:legacy_cps", self.handle_legacy_cps)
+        self.add_event("ocp:play", self.handle_play_intent, is_intent=True)
+        self.add_event("ocp:play_favorites", self.handle_play_favorites_intent, is_intent=True)
+        self.add_event("ocp:open", self.handle_open_intent, is_intent=True)
+        self.add_event("ocp:next", self.handle_next_intent, is_intent=True)
+        self.add_event("ocp:prev", self.handle_prev_intent, is_intent=True)
+        self.add_event("ocp:pause", self.handle_pause_intent, is_intent=True)
+        self.add_event("ocp:resume", self.handle_resume_intent, is_intent=True)
+        self.add_event("ocp:media_stop", self.handle_stop_intent, is_intent=True)
+        self.add_event("ocp:search_error", self.handle_search_error_intent, is_intent=True)
+        self.add_event("ocp:like_song", self.handle_like_intent, is_intent=True)
+        self.add_event("ocp:legacy_cps", self.handle_legacy_cps, is_intent=True)
 
     @property
     def available_SEI(self):
@@ -1015,30 +1015,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
     def shutdown(self):
         self.mycroft_cps.shutdown()
-        self.bus.remove("ovos.common_play.search", self.handle_search_query)
-        self.bus.remove("ovos.common_play.play_search", self.handle_play_search)
-        self.bus.remove('ovos.common_play.status.response', self.handle_player_state_update)
-        self.bus.remove('ovos.common_play.track.state', self.handle_track_state_update)
-        self.bus.remove('ovos.common_play.SEI.get.response', self.handle_get_SEIs)
-        self.bus.remove('ovos.common_play.register_keyword', self.handle_skill_keyword_register)
-        self.bus.remove('ovos.common_play.deregister_keyword', self.handle_skill_keyword_deregister)
-        self.bus.remove('ovos.common_play.announce', self.handle_skill_register)
-        self.bus.remove("mycroft.audio.playing_track", self._handle_legacy_audio_start)
-        self.bus.remove("mycroft.audio.queue_end", self._handle_legacy_audio_end)
-        self.bus.remove("mycroft.audio.service.pause", self._handle_legacy_audio_pause)
-        self.bus.remove("mycroft.audio.service.resume", self._handle_legacy_audio_resume)
-        self.bus.remove("mycroft.audio.service.stop", self._handle_legacy_audio_stop)
-        self.bus.remove("ocp:play", self.handle_play_intent)
-        self.bus.remove("ocp:play_favorites", self.handle_play_favorites_intent)
-        self.bus.remove("ocp:open", self.handle_open_intent)
-        self.bus.remove("ocp:next", self.handle_next_intent)
-        self.bus.remove("ocp:prev", self.handle_prev_intent)
-        self.bus.remove("ocp:pause", self.handle_pause_intent)
-        self.bus.remove("ocp:resume", self.handle_resume_intent)
-        self.bus.remove("ocp:media_stop", self.handle_stop_intent)
-        self.bus.remove("ocp:search_error", self.handle_search_error_intent)
-        self.bus.remove("ocp:like_song", self.handle_like_intent)
-        self.bus.remove("ocp:legacy_cps", self.handle_legacy_cps)
+        self.default_shutdown()  # remove events registered via self.add_event
 
 
 class LegacyCommonPlay:

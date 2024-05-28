@@ -60,6 +60,7 @@ class TestSched(TestCase):
             "mycroft.scheduler.schedule_event",
 
             "mycroft.skill.handler.complete",  # intent code end
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
             "ovos.session.update_default",  # session update (end of utterance default sync)
 
             # skill event triggering after 3 seconds

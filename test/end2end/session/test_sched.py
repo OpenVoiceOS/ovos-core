@@ -58,6 +58,7 @@ class TestSessions(TestCase):
             "speak",
             "mycroft.scheduler.schedule_event",
             "mycroft.skill.handler.complete",
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
             "ovos.session.update_default",
             # event triggering after 3 seconds
             "skill-ovos-schedule.openvoiceos:my_event",
@@ -107,30 +108,30 @@ class TestSessions(TestCase):
         self.assertEqual(messages[10].data["name"], "ScheduleSkill.handle_sched_intent")
 
         # verify default session is now updated
-        self.assertEqual(messages[11].msg_type, "ovos.session.update_default")
-        self.assertEqual(messages[11].data["session_data"]["session_id"], "default")
+        self.assertEqual(messages[12].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[12].data["session_data"]["session_id"], "default")
         # test deserialization of payload
-        sess = Session.deserialize(messages[11].data["session_data"])
+        sess = Session.deserialize(messages[12].data["session_data"])
         self.assertEqual(sess.session_id, "default")
 
         # test that active skills list has been updated
         self.assertEqual(sess.active_skills[0][0], self.skill_id)
-        self.assertEqual(messages[11].data["session_data"]["active_skills"][0][0], self.skill_id)
+        self.assertEqual(messages[12].data["session_data"]["active_skills"][0][0], self.skill_id)
 
         # ensure context in triggered event is the same from message that triggered the intent
         self.assertEqual(messages[4].msg_type, "intent.service.skills.activated")
         intent_context = messages[4].context  # when skill added to active list (last context change)
 
-        self.assertEqual(messages[12].msg_type, "skill-ovos-schedule.openvoiceos:my_event")
-        self.assertEqual(messages[12].context, intent_context)
-        self.assertEqual(messages[13].msg_type, "enclosure.active_skill")
+        self.assertEqual(messages[13].msg_type, "skill-ovos-schedule.openvoiceos:my_event")
         self.assertEqual(messages[13].context, intent_context)
-        self.assertEqual(messages[14].msg_type, "speak")
-        self.assertEqual(messages[14].data["lang"], "en-us")
-        self.assertFalse(messages[14].data["expect_response"])
-        self.assertEqual(messages[14].data["meta"]["dialog"], "trigger")
-        self.assertEqual(messages[14].data["meta"]["skill"], self.skill_id)
+        self.assertEqual(messages[14].msg_type, "enclosure.active_skill")
         self.assertEqual(messages[14].context, intent_context)
+        self.assertEqual(messages[15].msg_type, "speak")
+        self.assertEqual(messages[15].data["lang"], "en-us")
+        self.assertFalse(messages[15].data["expect_response"])
+        self.assertEqual(messages[15].data["meta"]["dialog"], "trigger")
+        self.assertEqual(messages[15].data["meta"]["skill"], self.skill_id)
+        self.assertEqual(messages[15].context, intent_context)
 
     def test_explicit_session(self):
         SessionManager.sessions = {}
@@ -180,6 +181,7 @@ class TestSessions(TestCase):
             "speak",
             "mycroft.scheduler.schedule_event",
             "mycroft.skill.handler.complete",
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
             # event triggering after 3 seconds
             "skill-ovos-schedule.openvoiceos:my_event",
             "enclosure.active_skill",
@@ -230,16 +232,16 @@ class TestSessions(TestCase):
         self.assertEqual(messages[4].msg_type, "intent.service.skills.activated")
         intent_context = messages[4].context  # when skill added to active list (last context change)
 
-        self.assertEqual(messages[10].msg_type, "skill-ovos-schedule.openvoiceos:my_event")
-        self.assertEqual(messages[10].context, intent_context)
-        self.assertEqual(messages[11].msg_type, "enclosure.active_skill")
+        self.assertEqual(messages[11].msg_type, "skill-ovos-schedule.openvoiceos:my_event")
         self.assertEqual(messages[11].context, intent_context)
-        self.assertEqual(messages[12].msg_type, "speak")
-        self.assertEqual(messages[12].data["lang"], "en-us")
-        self.assertFalse(messages[12].data["expect_response"])
-        self.assertEqual(messages[12].data["meta"]["dialog"], "trigger")
-        self.assertEqual(messages[12].data["meta"]["skill"], self.skill_id)
+        self.assertEqual(messages[12].msg_type, "enclosure.active_skill")
         self.assertEqual(messages[12].context, intent_context)
+        self.assertEqual(messages[13].msg_type, "speak")
+        self.assertEqual(messages[13].data["lang"], "en-us")
+        self.assertFalse(messages[13].data["expect_response"])
+        self.assertEqual(messages[13].data["meta"]["dialog"], "trigger")
+        self.assertEqual(messages[13].data["meta"]["skill"], self.skill_id)
+        self.assertEqual(messages[13].context, intent_context)
 
     def tearDown(self) -> None:
         self.core.stop()
