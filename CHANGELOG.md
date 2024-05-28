@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a101...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a102...HEAD)
+
+**Implemented enhancements:**
+
+- feat/ovos.utterance.handled [\#478](https://github.com/OpenVoiceOS/ovos-core/pull/478) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a102](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a102) (2024-05-28)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a101...V0.0.8a102)
 
 **Merged pull requests:**
 
@@ -508,7 +516,6 @@
 **Merged pull requests:**
 
 - unittests/skill\_self\_activation [\#360](https://github.com/OpenVoiceOS/ovos-core/pull/360) ([JarbasAl](https://github.com/JarbasAl))
-- unitests/converse [\#359](https://github.com/OpenVoiceOS/ovos-core/pull/359) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a44](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a44) (2023-10-02)
 
