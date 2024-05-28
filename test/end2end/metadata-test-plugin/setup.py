@@ -2,7 +2,7 @@
 
 from setuptools import setup
 
-META_ENTRY_POINT = f'ovos-metadata-test-plugin=metadata_test:MetadataPlugin'
+META_ENTRY_POINT = 'ovos-metadata-test-plugin=metadata_test:MetadataPlugin'
 
 setup(
     name="ovos-metadata-test-plugin",
