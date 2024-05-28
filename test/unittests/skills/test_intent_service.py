@@ -13,17 +13,14 @@
 # limitations under the License.
 #
 from unittest import TestCase, mock
-import time
 
-from ovos_workshop.intents import IntentBuilder, Intent as AdaptIntent
-from ovos_config.locale import setup_locale
-from ovos_config import Configuration
 from ovos_bus_client.message import Message
-from ovos_core.intent_services import IntentService
 from ovos_bus_client.util import get_message_lang
-from ovos_utils.log import LOG
+from ovos_config import Configuration
+from ovos_config.locale import setup_locale
+from ovos_core.intent_services import IntentService
 from ovos_core.intent_services.adapt_service import ContextManager
-
+from ovos_workshop.intents import IntentBuilder, Intent as AdaptIntent
 from test.util import base_config
 
 # Setup configurations to use with default language tests
@@ -50,7 +47,14 @@ class MockEmitter(object):
     def get_results(self):
         return self.results
 
+    def remove(self, msg_type, handler):
+        self.removed.append(msg_type)
+
+    def on(self, msg_type, handler):
+        self.removed.append(msg_type)
+
     def reset(self):
+        self.removed = []
         self.types = []
         self.results = []
 
@@ -251,9 +255,67 @@ class TestIntentServiceApi(TestCase):
         reply = get_last_message(self.intent_service.bus)
         self.assertEqual(reply.data['intent'], None)
 
+    def test_shutdown(self):
+        intent_service = IntentService(MockEmitter())
+        intent_service.shutdown()
+        self.assertEqual(intent_service.bus.removed,
+                         ['padatious:register_intent', 'padatious:register_entity',
+                          'detach_intent', 'detach_skill', 'ovos.skills.fallback.register',
+                          'ovos.skills.fallback.deregister', 'mycroft.speech.recognition.unknown',
+                          'intent.service.skills.deactivate', 'intent.service.skills.activate',
+                          'active_skill_request', 'intent.service.active_skills.get',
+                          'skill.converse.get_response.enable', 'skill.converse.get_response.disable',
+                          'question:query.response', 'common_query.question', 'ovos.common_query.pong',
+                          'ovos.skills.settings_changed', 'mycroft.stop', 'ovos.common_play.stop',
+                          'ovos.common_play.stop.ping', 'skill.converse.ping', 'ovos.common_play.converse.ping',
+                          'skill.converse.request', 'ovos.common_play.converse.request', 'ovos.common_play.activate',
+                          'ovos.common_play.deactivate', 'intent.service.skills.deactivated',
+                          'intent.service.skills.activated', 'mycroft.skill.enable_intent',
+                          'mycroft.skill.disable_intent', 'mycroft.skill.set_cross_context',
+                          'mycroft.skill.remove_cross_context', 'mycroft.skills.settings.changed',
+                          'skill.converse.get_response', 'ovos.common_play.converse.get_response',
+                          'ovos.common_play.set', 'gui.request_page_upload', 'ovos.common_play.set',
+                          'gui.request_page_upload', 'play:query.response', 'ovos.common_play.search',
+                          'ovos.common_play.play_search', 'ovos.common_play.status.response',
+                          'ovos.common_play.track.state', 'ovos.common_play.SEI.get.response',
+                          'ovos.common_play.register_keyword', 'ovos.common_play.deregister_keyword',
+                          'ovos.common_play.announce', 'mycroft.audio.playing_track', 'mycroft.audio.queue_end',
+                          'mycroft.audio.service.pause', 'mycroft.audio.service.resume', 'mycroft.audio.service.stop',
+                          'ocp:play', 'ocp:play_favorites', 'ocp:open', 'ocp:next', 'ocp:prev', 'ocp:pause',
+                          'ocp:resume', 'ocp:media_stop', 'ocp:search_error', 'ocp:like_song', 'ocp:legacy_cps',
+                          'recognizer_loop:record_begin', 'recognizer_loop:record_end',
+                          'recognizer_loop:audio_output_start', 'recognizer_loop:audio_output_end', 'ovos.session.sync',
+                          'register_vocab', 'register_intent', 'recognizer_loop:utterance', 'detach_intent',
+                          'detach_skill', 'add_context', 'remove_context', 'clear_context', 'mycroft.skills.loaded',
+                          'intent.service.intent.get', 'intent.service.skills.get', 'intent.service.adapt.get',
+                          'intent.service.adapt.manifest.get', 'intent.service.adapt.vocab.manifest.get',
+                          'intent.service.padatious.get', 'intent.service.padatious.manifest.get',
+                          'intent.service.padatious.entities.manifest.get', 'padatious:register_intent',
+                          'padatious:register_entity', 'detach_intent', 'detach_skill', 'question:query.response',
+                          'common_query.question', 'ovos.common_query.pong', 'mycroft.speech.recognition.unknown',
+                          'intent.service.skills.deactivate', 'intent.service.skills.activate', 'active_skill_request',
+                          'intent.service.active_skills.get', 'skill.converse.get_response.enable',
+                          'skill.converse.get_response.disable', 'ovos.skills.fallback.register',
+                          'ovos.skills.fallback.deregister', 'play:query.response', 'ovos.common_play.search',
+                          'ovos.common_play.play_search', 'ovos.common_play.status.response',
+                          'ovos.common_play.track.state', 'ovos.common_play.SEI.get.response',
+                          'ovos.common_play.register_keyword', 'ovos.common_play.deregister_keyword',
+                          'ovos.common_play.announce', 'mycroft.audio.playing_track', 'mycroft.audio.queue_end',
+                          'mycroft.audio.service.pause', 'mycroft.audio.service.resume', 'mycroft.audio.service.stop',
+                          'ocp:play', 'ocp:play_favorites', 'ocp:open', 'ocp:next', 'ocp:prev', 'ocp:pause',
+                          'ocp:resume', 'ocp:media_stop', 'ocp:search_error', 'ocp:like_song', 'ocp:legacy_cps',
+                          'register_vocab', 'register_intent', 'recognizer_loop:utterance', 'detach_intent',
+                          'detach_skill', 'add_context', 'remove_context', 'clear_context', 'mycroft.skills.loaded',
+                          'intent.service.intent.get', 'intent.service.skills.get', 'intent.service.adapt.get',
+                          'intent.service.adapt.manifest.get', 'intent.service.adapt.vocab.manifest.get',
+                          'intent.service.padatious.get', 'intent.service.padatious.manifest.get',
+                          'intent.service.padatious.entities.manifest.get']
+                         )
+
 
 class TestAdaptIntent(TestCase):
     """Test the AdaptIntent wrapper."""
+
     def test_named_intent(self):
         intent = AdaptIntent("CallEaglesIntent")
         self.assertEqual(intent.name, "CallEaglesIntent")
