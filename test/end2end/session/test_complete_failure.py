@@ -66,21 +66,7 @@ class TestSessions(TestCase):
             # Converse
             f"{self.skill_id}.converse.ping",
             "skill.converse.pong",
-            # FallbackV1
-            "mycroft.skills.fallback",
-            "mycroft.skill.handler.start",
-            "mycroft.skill.handler.complete",
-            "mycroft.skills.fallback.response",
 
-            "mycroft.skills.fallback",
-            "mycroft.skill.handler.start",
-            "mycroft.skill.handler.complete",
-            "mycroft.skills.fallback.response",
-
-            "mycroft.skills.fallback",
-            "mycroft.skill.handler.start",
-            "mycroft.skill.handler.complete",
-            "mycroft.skills.fallback.response",
             # complete intent failure
             "mycroft.audio.play_sound",
             "complete_intent_failure",
