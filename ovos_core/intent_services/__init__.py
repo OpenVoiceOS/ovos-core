@@ -30,7 +30,6 @@ from ovos_utils.log import LOG, deprecated, log_deprecation
 from ovos_utils.metrics import Stopwatch
 from ovos_workshop.intents import open_intent_envelope
 
-
 # Intent match response tuple containing
 # intent_service: Name of the service that matched the intent
 # intent_type: intent name (used to call intent handler over the message bus)
@@ -99,16 +98,11 @@ class IntentService:
         self.bus.on('intent.service.intent.get', self.handle_get_intent)
         self.bus.on('intent.service.skills.get', self.handle_get_skills)
         self.bus.on('intent.service.adapt.get', self.handle_get_adapt)
-        self.bus.on('intent.service.adapt.manifest.get',
-                    self.handle_adapt_manifest)
-        self.bus.on('intent.service.adapt.vocab.manifest.get',
-                    self.handle_vocab_manifest)
-        self.bus.on('intent.service.padatious.get',
-                    self.handle_get_padatious)
-        self.bus.on('intent.service.padatious.manifest.get',
-                    self.handle_padatious_manifest)
-        self.bus.on('intent.service.padatious.entities.manifest.get',
-                    self.handle_entity_manifest)
+        self.bus.on('intent.service.adapt.manifest.get', self.handle_adapt_manifest)
+        self.bus.on('intent.service.adapt.vocab.manifest.get', self.handle_vocab_manifest)
+        self.bus.on('intent.service.padatious.get', self.handle_get_padatious)
+        self.bus.on('intent.service.padatious.manifest.get', self.handle_padatious_manifest)
+        self.bus.on('intent.service.padatious.entities.manifest.get', self.handle_entity_manifest)
 
     def _load_ocp_pipeline(self):
         """EXPERIMENTAL: this feature is not yet ready for end users"""
@@ -602,6 +596,37 @@ class IntentService:
         self.bus.emit(message.reply(
             "intent.service.padatious.entities.manifest",
             {"entities": self.padacioso_service.registered_entities}))
+
+    def shutdown(self):
+        self.utterance_plugins.shutdown()
+        self.metadata_plugins.shutdown()
+        self.adapt_service.shutdown()
+        self.padacioso_service.shutdown()
+        if self.padatious_service:
+            self.padatious_service.shutdown()
+        self.common_qa.shutdown()
+        self.converse.shutdown()
+        self.fallback.shutdown()
+        if self.ocp:
+            self.ocp.shutdown()
+
+        self.bus.remove('register_vocab', self.handle_register_vocab)
+        self.bus.remove('register_intent', self.handle_register_intent)
+        self.bus.remove('recognizer_loop:utterance', self.handle_utterance)
+        self.bus.remove('detach_intent', self.handle_detach_intent)
+        self.bus.remove('detach_skill', self.handle_detach_skill)
+        self.bus.remove('add_context', self.handle_add_context)
+        self.bus.remove('remove_context', self.handle_remove_context)
+        self.bus.remove('clear_context', self.handle_clear_context)
+        self.bus.remove('mycroft.skills.loaded', self.update_skill_name_dict)
+        self.bus.remove('intent.service.intent.get', self.handle_get_intent)
+        self.bus.remove('intent.service.skills.get', self.handle_get_skills)
+        self.bus.remove('intent.service.adapt.get', self.handle_get_adapt)
+        self.bus.remove('intent.service.adapt.manifest.get', self.handle_adapt_manifest)
+        self.bus.remove('intent.service.adapt.vocab.manifest.get', self.handle_vocab_manifest)
+        self.bus.remove('intent.service.padatious.get', self.handle_get_padatious)
+        self.bus.remove('intent.service.padatious.manifest.get', self.handle_padatious_manifest)
+        self.bus.remove('intent.service.padatious.entities.manifest.get', self.handle_entity_manifest)
 
 
 def _is_old_style_keyword_message(message):

@@ -166,19 +166,6 @@ class FallbackService:
             result = self.attempt_fallback(utterances, skill_id, lang, message)
             if result:
                 return ovos_core.intent_services.IntentMatch('Fallback', None, {}, skill_id, utterances[0])
-
-        # old style deprecated fallback skill singleton class
-        LOG.debug("checking for FallbackSkillsV1")
-        msg = message.reply(
-            'mycroft.skills.fallback',
-            data={'utterance': utterances[0],
-                  'lang': lang,
-                  'fallback_range': (fb_range.start, fb_range.stop)}
-        )
-        response = self.bus.wait_for_response(msg, timeout=10)
-
-        if response and response.data['handled']:
-            return ovos_core.intent_services.IntentMatch('Fallback', None, {}, None, utterances[0])
         return None
 
     def high_prio(self, utterances, lang, message):
@@ -195,3 +182,7 @@ class FallbackService:
         """Low prio fallbacks with general matching such as chat-bot."""
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(90, 101))
+
+    def shutdown(self):
+        self.bus.remove("ovos.skills.fallback.register", self.handle_register_fallback)
+        self.bus.remove("ovos.skills.fallback.deregister", self.handle_deregister_fallback)

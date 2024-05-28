@@ -14,23 +14,20 @@
 #
 """Daemon launched at startup to handle skill activities.
 
-In this repo, you will not find an entry called mycroft-skills in the bin
-directory.  The executable gets added to the bin directory when installed
+The executable gets added to the bin directory when installed
 (see setup.py)
 """
 
-from ovos_config.locale import setup_locale
-
 from ovos_bus_client import MessageBusClient
 from ovos_bus_client.util.scheduler import EventScheduler
-from ovos_workshop.skills.api import SkillApi
+from ovos_config.locale import setup_locale
 from ovos_core.intent_services import IntentService
+from ovos_core.skill_installer import SkillsStore
 from ovos_core.skill_manager import SkillManager, on_error, on_stopping, on_ready, on_alive, on_started
 from ovos_utils import wait_for_exit_signal
 from ovos_utils.log import LOG, init_service_logger
 from ovos_utils.process_utils import reset_sigint_handler
-from ovos_core.skill_installer import SkillsStore
-from ovos_workshop.skills.fallback import FallbackSkill
+from ovos_workshop.skills.api import SkillApi
 
 
 def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
@@ -49,7 +46,9 @@ def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
     bus = MessageBusClient()
     bus.run_in_thread()
     bus.connected_event.wait()
-    _register_intent_services(bus)
+
+    intents = IntentService(bus)
+
     event_scheduler = EventScheduler(bus, autostart=False)
     event_scheduler.daemon = True
     event_scheduler.start()
@@ -68,34 +67,11 @@ def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
 
     wait_for_exit_signal()
 
-    shutdown(skill_manager, event_scheduler, osm)
+    intents.shutdown()
+    osm.shutdown()
+    skill_manager.stop()
+    event_scheduler.shutdown()
 
-
-def _register_intent_services(bus):
-    """Start up the all intent services and connect them as needed.
-
-    Args:
-        bus: messagebus client to register the services on
-    """
-    service = IntentService(bus)
-    # Register handler to trigger fallback system
-    bus.on(
-        'mycroft.skills.fallback',
-        FallbackSkill.make_intent_failure_handler(bus)
-    )
-    return service
-
-
-def shutdown(skill_manager, event_scheduler, osm):
-    LOG.info('Shutting down Skills service')
-    if event_scheduler is not None:
-        event_scheduler.shutdown()
-    # Terminate all running threads that update skills
-    if skill_manager is not None:
-        skill_manager.stop()
-        skill_manager.join()
-    if osm is not None:
-        osm.shutdown()
     LOG.info('Skills service shutdown complete!')
 
 

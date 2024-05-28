@@ -349,3 +349,8 @@ class AdaptService:
                 p for p in self.engines[lang].intent_parsers if p.name != intent_name
             ]
             self.engines[lang].intent_parsers = new_parsers
+
+    def shutdown(self):
+        for lang in self.engines:
+            parsers = self.engines[lang].intent_parsers
+            self.engines[lang].drop_intent_parser(parsers)

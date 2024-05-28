@@ -246,6 +246,12 @@ class PadaciosoService:
             if intents:
                 return max(intents, key=lambda k: k.conf)
 
+    def shutdown(self):
+        self.bus.remove('padatious:register_intent', self.register_intent)
+        self.bus.remove('padatious:register_entity', self.register_entity)
+        self.bus.remove('detach_intent', self.handle_detach_intent)
+        self.bus.remove('detach_skill', self.handle_detach_skill)
+
 
 @lru_cache(maxsize=3)  # repeat calls under different conf levels wont re-run code
 def _calc_padacioso_intent(utt, intent_container) -> \
