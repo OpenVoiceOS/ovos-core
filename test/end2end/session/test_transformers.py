@@ -4,6 +4,7 @@ from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, Session
+from ovos_core.transformers import UtteranceTransformersService, MetadataTransformersService
 from ..minicroft import get_minicroft
 
 
@@ -17,8 +18,11 @@ class TestTransformerPlugins(TestCase):
     def tearDown(self) -> None:
         self.core.stop()
 
-    def test_cancel_plugin(self):
+    def test_transformer_plugins(self):
         # test plugins loaded
+        self.assertIn('ovos-utterance-plugin-cancel', [k[0] for k in UtteranceTransformersService.find_plugins()])
+        self.assertIn('ovos-metadata-test-plugin', [k[0] for k in MetadataTransformersService.find_plugins()])
+
         self.assertIn('ovos-metadata-test-plugin', self.core.intent_service.metadata_plugins.loaded_plugins)
         self.assertIn('ovos-utterance-normalizer', self.core.intent_service.utterance_plugins.loaded_plugins)
         self.assertIn('ovos-utterance-plugin-cancel', self.core.intent_service.utterance_plugins.loaded_plugins)
