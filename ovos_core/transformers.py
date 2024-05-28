@@ -17,8 +17,12 @@ class UtteranceTransformersService:
         self.config = self.config_core.get("utterance_transformers") or {}
         self.load_plugins()
 
+    @staticmethod
+    def find_plugins():
+        return find_utterance_transformer_plugins().items()
+
     def load_plugins(self):
-        for plug_name, plug in find_utterance_transformer_plugins().items():
+        for plug_name, plug in self.find_plugins():
             if plug_name in self.config:
                 # if disabled skip it
                 if not self.config[plug_name].get("active", True):
@@ -74,8 +78,12 @@ class MetadataTransformersService:
         self.config = self.config_core.get("metadata_transformers") or {}
         self.load_plugins()
 
+    @staticmethod
+    def find_plugins():
+        return find_metadata_transformer_plugins().items()
+
     def load_plugins(self):
-        for plug_name, plug in find_metadata_transformer_plugins().items():
+        for plug_name, plug in self.find_plugins():
             if plug_name in self.config:
                 # if disabled skip it
                 if not self.config[plug_name].get("active", True):
