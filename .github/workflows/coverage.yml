@@ -27,7 +27,6 @@ jobs:
           pip install ./test/unittests/common_query/ovos_tskill_fakewiki
           pip install ./test/end2end/skill-ovos-hello-world
           pip install ./test/end2end/skill-ovos-fallback-unknown
-          pip install ./test/end2end/skill-ovos-fallback-unknownv1
           pip install ./test/end2end/skill-converse_test
           pip install ./test/end2end/skill-ovos-schedule
           pip install ./test/end2end/skill-new-stop

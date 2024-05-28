@@ -1013,6 +1013,33 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.bus.emit(message.forward("mycroft.audio.play_sound",
                                       {"uri": "snd/error.mp3"}))
 
+    def shutdown(self):
+        self.mycroft_cps.shutdown()
+        self.bus.remove("ovos.common_play.search", self.handle_search_query)
+        self.bus.remove("ovos.common_play.play_search", self.handle_play_search)
+        self.bus.remove('ovos.common_play.status.response', self.handle_player_state_update)
+        self.bus.remove('ovos.common_play.track.state', self.handle_track_state_update)
+        self.bus.remove('ovos.common_play.SEI.get.response', self.handle_get_SEIs)
+        self.bus.remove('ovos.common_play.register_keyword', self.handle_skill_keyword_register)
+        self.bus.remove('ovos.common_play.deregister_keyword', self.handle_skill_keyword_deregister)
+        self.bus.remove('ovos.common_play.announce', self.handle_skill_register)
+        self.bus.remove("mycroft.audio.playing_track", self._handle_legacy_audio_start)
+        self.bus.remove("mycroft.audio.queue_end", self._handle_legacy_audio_end)
+        self.bus.remove("mycroft.audio.service.pause", self._handle_legacy_audio_pause)
+        self.bus.remove("mycroft.audio.service.resume", self._handle_legacy_audio_resume)
+        self.bus.remove("mycroft.audio.service.stop", self._handle_legacy_audio_stop)
+        self.bus.remove("ocp:play", self.handle_play_intent)
+        self.bus.remove("ocp:play_favorites", self.handle_play_favorites_intent)
+        self.bus.remove("ocp:open", self.handle_open_intent)
+        self.bus.remove("ocp:next", self.handle_next_intent)
+        self.bus.remove("ocp:prev", self.handle_prev_intent)
+        self.bus.remove("ocp:pause", self.handle_pause_intent)
+        self.bus.remove("ocp:resume", self.handle_resume_intent)
+        self.bus.remove("ocp:media_stop", self.handle_stop_intent)
+        self.bus.remove("ocp:search_error", self.handle_search_error_intent)
+        self.bus.remove("ocp:like_song", self.handle_like_intent)
+        self.bus.remove("ocp:legacy_cps", self.handle_legacy_cps)
+
 
 class LegacyCommonPlay:
     """ interface for mycroft common play

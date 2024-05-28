@@ -293,3 +293,8 @@ class CommonQAService:
         else:
             query.answered = False
         query.completed.set()
+
+    def shutdown(self):
+        self.bus.remove('question:query.response', self.handle_query_response)
+        self.bus.remove('common_query.question', self.handle_question)
+        self.bus.remove('ovos.common_query.pong', self.handle_skill_pong)

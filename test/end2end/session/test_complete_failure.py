@@ -66,21 +66,7 @@ class TestSessions(TestCase):
             # Converse
             f"{self.skill_id}.converse.ping",
             "skill.converse.pong",
-            # FallbackV1
-            "mycroft.skills.fallback",
-            "mycroft.skill.handler.start",
-            "mycroft.skill.handler.complete",
-            "mycroft.skills.fallback.response",
 
-            "mycroft.skills.fallback",
-            "mycroft.skill.handler.start",
-            "mycroft.skill.handler.complete",
-            "mycroft.skills.fallback.response",
-
-            "mycroft.skills.fallback",
-            "mycroft.skill.handler.start",
-            "mycroft.skill.handler.complete",
-            "mycroft.skills.fallback.response",
             # complete intent failure
             "mycroft.audio.play_sound",
             "complete_intent_failure",
@@ -104,44 +90,14 @@ class TestSessions(TestCase):
         self.assertEqual(messages[2].context["skill_id"], self.skill_id)
         self.assertFalse(messages[2].data["can_handle"])
 
-        # high prio fallback
-        self.assertEqual(messages[3].msg_type, "mycroft.skills.fallback")
-        self.assertEqual(messages[3].data["fallback_range"], [0, 5])
-        self.assertEqual(messages[4].msg_type, "mycroft.skill.handler.start")
-        self.assertEqual(messages[4].data["handler"], "fallback")
-        self.assertEqual(messages[5].msg_type, "mycroft.skill.handler.complete")
-        self.assertEqual(messages[5].data["handler"], "fallback")
-        self.assertEqual(messages[6].msg_type, "mycroft.skills.fallback.response")
-        self.assertFalse(messages[6].data["handled"])
-
-        # medium prio fallback
-        self.assertEqual(messages[7].msg_type, "mycroft.skills.fallback")
-        self.assertEqual(messages[7].data["fallback_range"], [5, 90])
-        self.assertEqual(messages[8].msg_type, "mycroft.skill.handler.start")
-        self.assertEqual(messages[8].data["handler"], "fallback")
-        self.assertEqual(messages[9].msg_type, "mycroft.skill.handler.complete")
-        self.assertEqual(messages[9].data["handler"], "fallback")
-        self.assertEqual(messages[10].msg_type, "mycroft.skills.fallback.response")
-        self.assertFalse(messages[10].data["handled"])
-
-        # low prio fallback
-        self.assertEqual(messages[11].msg_type, "mycroft.skills.fallback")
-        self.assertEqual(messages[11].data["fallback_range"], [90, 101])
-        self.assertEqual(messages[12].msg_type, "mycroft.skill.handler.start")
-        self.assertEqual(messages[12].data["handler"], "fallback")
-        self.assertEqual(messages[13].msg_type, "mycroft.skill.handler.complete")
-        self.assertEqual(messages[13].data["handler"], "fallback")
-        self.assertEqual(messages[14].msg_type, "mycroft.skills.fallback.response")
-        self.assertFalse(messages[14].data["handled"])
-
         # complete intent failure
-        self.assertEqual(messages[15].msg_type, "mycroft.audio.play_sound")
-        self.assertEqual(messages[15].data["uri"], "snd/error.mp3")
-        self.assertEqual(messages[16].msg_type, "complete_intent_failure")
+        self.assertEqual(messages[3].msg_type, "mycroft.audio.play_sound")
+        self.assertEqual(messages[3].data["uri"], "snd/error.mp3")
+        self.assertEqual(messages[4].msg_type, "complete_intent_failure")
 
         # verify default session is now updated
-        self.assertEqual(messages[17].msg_type, "ovos.session.update_default")
-        self.assertEqual(messages[17].data["session_data"]["session_id"], "default")
+        self.assertEqual(messages[5].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[5].data["session_data"]["session_id"], "default")
 
     @skip("TODO works if run standalone, otherwise has side effects in other tests")
     def test_complete_failure_lang_detect(self):

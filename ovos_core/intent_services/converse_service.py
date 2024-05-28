@@ -378,3 +378,12 @@ class ConverseService:
         """
         self.bus.emit(message.reply("intent.service.active_skills.reply",
                                     {"skills": self.get_active_skills(message)}))
+
+    def shutdown(self):
+        self.bus.remove('mycroft.speech.recognition.unknown', self.reset_converse)
+        self.bus.remove('intent.service.skills.deactivate', self.handle_deactivate_skill_request)
+        self.bus.remove('intent.service.skills.activate', self.handle_activate_skill_request)
+        self.bus.remove('active_skill_request', self.handle_activate_skill_request)  # TODO backwards compat, deprecate
+        self.bus.remove('intent.service.active_skills.get', self.handle_get_active_skills)
+        self.bus.remove("skill.converse.get_response.enable", self.handle_get_response_enable)
+        self.bus.remove("skill.converse.get_response.disable", self.handle_get_response_disable)
