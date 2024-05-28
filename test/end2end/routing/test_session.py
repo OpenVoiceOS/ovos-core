@@ -59,6 +59,7 @@ class TestRouting(TestCase):
             "enclosure.active_skill",
             "speak",
             "mycroft.skill.handler.complete",
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
             "ovos.session.update_default"
         ]
         wait_for_n_messages(len(expected_messages))

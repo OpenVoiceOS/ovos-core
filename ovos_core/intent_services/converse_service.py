@@ -312,6 +312,8 @@ class ConverseService:
         Returns:
             IntentMatch if handled otherwise None.
         """
+        session = SessionManager.get(message)
+
         # we call flatten in case someone is sending the old style list of tuples
         utterances = flatten_list(utterances)
         # filter allowed skills
@@ -319,7 +321,12 @@ class ConverseService:
         # check if any skill wants to handle utterance
         for skill_id in self._collect_converse_skills(message):
             if self.converse(utterances, skill_id, lang, message):
-                return ovos_core.intent_services.IntentMatch('Converse', None, None, skill_id, utterances[0])
+                state = session.utterance_states.get(skill_id, UtteranceState.INTENT)
+                return ovos_core.intent_services.IntentMatch(intent_service='Converse',
+                                                             intent_type="ovos.utterance.handled" if state != UtteranceState.RESPONSE else None, # emit instead of intent message
+                                                             intent_data={},
+                                                             skill_id=skill_id,
+                                                             utterance=utterances[0])
         return None
 
     def handle_get_response_enable(self, message):

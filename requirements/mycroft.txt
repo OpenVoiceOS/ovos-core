@@ -1,7 +1,7 @@
 # ovos modules for compat with mycroft namespace
 ovos_PHAL<0.1.0, >=0.0.5a14
 ovos-audio~=0.0, >=0.0.2a32
-ovos-listener~=0.0, >=0.0.3a2
+#ovos-listener~=0.0, >=0.0.3a2
 ovos-gui~=0.0, >=0.0.4a5
 ovos-messagebus~=0.0
 
@@ -10,7 +10,7 @@ ovos-stt-plugin-server>=0.0.3, <0.1.0
 ovos-tts-plugin-mimic>=0.2.8, <0.3.0
 ovos-tts-plugin-server>=0.0.2a6
 
-ovos-ww-plugin-pocketsphinx~=0.1
+#ovos-ww-plugin-pocketsphinx~=0.1
 ovos-ww-plugin-precise~=0.1
 ovos-vad-plugin-webrtcvad>=0.0.1, <0.1.0
 

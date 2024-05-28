@@ -304,7 +304,6 @@ class IntentService:
             # NOTE: message.reply to ensure correct message destination
             reply = message.reply(match.intent_type, data)
             self.bus.emit(reply)
-            self.bus.emit(message.reply("ovos.utterance.handled"))
 
     def send_cancel_event(self, message):
         LOG.info("utterance canceled, cancel_word:" + message.context.get("cancel_word"))

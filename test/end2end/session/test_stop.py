@@ -115,7 +115,8 @@ class TestSessions(TestCase):
             # skill code executing
             "enclosure.active_skill",
             "speak",
-            "mycroft.skill.handler.complete"
+            "mycroft.skill.handler.complete",
+            "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
 
         wait_for_n_messages(len(expected_messages))
@@ -288,7 +289,8 @@ class TestSessions(TestCase):
             # skill code executing
             "enclosure.active_skill",
             "speak",
-            "mycroft.skill.handler.complete"
+            "mycroft.skill.handler.complete",
+            "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
 
         wait_for_n_messages(len(expected_messages))
@@ -332,7 +334,8 @@ class TestSessions(TestCase):
             "enclosure.active_skill",
             "speak",  # "utterance":"stop 123"
 
-            f"{self.new_skill_id}.stop.response",  # skill reports it stopped (new style)
+            f"{self.new_skill_id}.stop.response",  # skill reports it stopped (new style),
+            "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
 
         wait_for_n_messages(len(expected_messages))
@@ -348,7 +351,7 @@ class TestSessions(TestCase):
                 self.assertEqual(m.data["utterance"], "stop 123")
 
         # confirm "skill-new-stop" was the one that reported success
-        handler = messages[-1]
+        handler = messages[-2]
         self.assertEqual(handler.msg_type, f"{self.new_skill_id}.stop.response")
         self.assertEqual(handler.data["result"], True)
 

@@ -77,7 +77,8 @@ class TestOCPPipeline(TestCase):
             # no good results
             "ovos.common_play.reset",
             "enclosure.active_skill",
-            "speak"  # error
+            "speak",  # error,
+            "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -146,7 +147,8 @@ class TestOCPPipeline(TestCase):
             # good results because of radio media type
             "ovos.common_play.reset",
             "add_context",  # NowPlaying context
-            "ovos.common_play.play"  # OCP api
+            "ovos.common_play.play",  # OCP api,
+            "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -155,7 +157,7 @@ class TestOCPPipeline(TestCase):
         for idx, m in enumerate(messages):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
-        play = messages[-1]
+        play = messages[-2]
         self.assertEqual(play.data["media"]["uri"], "https://fake_4.mp3")
 
     def test_unk_media_match(self):
@@ -220,7 +222,8 @@ class TestOCPPipeline(TestCase):
             # no good results
             "ovos.common_play.reset",
             "enclosure.active_skill",
-            "speak"  # error
+            "speak",  # error
+            "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -289,7 +292,8 @@ class TestOCPPipeline(TestCase):
             # good results
             "ovos.common_play.reset",
             "add_context",  # NowPlaying context
-            "ovos.common_play.play"  # OCP api
+            "ovos.common_play.play",  # OCP api
+            "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -361,7 +365,8 @@ class TestOCPPipeline(TestCase):
             # good results because of radio media type
             "ovos.common_play.reset",
             "add_context",  # NowPlaying context
-            'mycroft.audio.service.play'  # LEGACY api
+            'mycroft.audio.service.play',  # LEGACY api
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -418,7 +423,8 @@ class TestOCPPipeline(TestCase):
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:pause",
-            'mycroft.audio.service.pause'  # LEGACY api
+            'mycroft.audio.service.pause',  # LEGACY api
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -474,7 +480,8 @@ class TestOCPPipeline(TestCase):
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:resume",
-            'mycroft.audio.service.resume'  # LEGACY api
+            'mycroft.audio.service.resume',  # LEGACY api
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -530,7 +537,8 @@ class TestOCPPipeline(TestCase):
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:media_stop",
-            'mycroft.audio.service.stop'  # LEGACY api
+            'mycroft.audio.service.stop',  # LEGACY api
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -586,7 +594,8 @@ class TestOCPPipeline(TestCase):
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:next",
-            'mycroft.audio.service.next'  # LEGACY api
+            'mycroft.audio.service.next',  # LEGACY api
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -640,7 +649,8 @@ class TestOCPPipeline(TestCase):
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:prev",
-            'mycroft.audio.service.prev'  # LEGACY api
+            'mycroft.audio.service.prev',  # LEGACY api
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -693,7 +703,8 @@ class TestOCPPipeline(TestCase):
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:pause",
-            'ovos.common_play.pause'
+            'ovos.common_play.pause',
+            "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -746,7 +757,8 @@ class TestOCPPipeline(TestCase):
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:resume",
-            'ovos.common_play.resume'
+            'ovos.common_play.resume',
+            "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -800,7 +812,8 @@ class TestOCPPipeline(TestCase):
             "ovos.common_play.activate",
             "ocp:media_stop",
             'ovos.common_play.stop',
-            "ovos.common_play.stop.response"
+            "ovos.common_play.stop.response",
+            "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -853,7 +866,8 @@ class TestOCPPipeline(TestCase):
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:next",
-            'ovos.common_play.next'
+            'ovos.common_play.next',
+            "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -906,7 +920,8 @@ class TestOCPPipeline(TestCase):
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:prev",
-            'ovos.common_play.previous'
+            'ovos.common_play.previous',
+            "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -959,7 +974,8 @@ class TestOCPPipeline(TestCase):
                 "recognizer_loop:utterance",
                 "ovos.common_play.status",
                 "mycroft.audio.play_sound",
-                "complete_intent_failure"
+                "complete_intent_failure",
+                "ovos.utterance.handled"  # handle_utterance returned (intent service)
             ]
             wait_for_n_messages(len(expected_messages))
 
@@ -1009,7 +1025,8 @@ class TestOCPPipeline(TestCase):
             "ocp:legacy_cps",
             # legacy cps api
             "play:query",
-            "mycroft.audio.play_sound"  # error -  no results
+            "mycroft.audio.play_sound",  # error -  no results
+            "ovos.utterance.handled",  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -1068,8 +1085,8 @@ class TestLegacyCPSPipeline(TestCase):
             "ocp:legacy_cps",
             # legacy cps api
             "play:query",
-            "play:query.response", # searching
-            "play:query.response", # report results
+            "play:query.response",  # searching
+            "play:query.response",  # report results
             "play:start",  # skill selected
             "mycroft.audio.service.track_info",  # check is legacy audio service is playing
             # global stop signal
@@ -1084,7 +1101,8 @@ class TestLegacyCPSPipeline(TestCase):
             "intent.service.skills.activated",
             f"{self.skill_id}.activate",
             # skill callback code
-            "mycroft.audio.service.play"
+            "mycroft.audio.service.play",
+            "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
 
@@ -1093,6 +1111,5 @@ class TestLegacyCPSPipeline(TestCase):
         for idx, m in enumerate(messages):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
-        play = messages[-1]
+        play = messages[-2]
         self.assertEqual(play.data["tracks"], ["https://fake.mp3"])
-

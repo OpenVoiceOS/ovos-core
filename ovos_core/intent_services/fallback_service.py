@@ -165,7 +165,11 @@ class FallbackService:
         for skill_id, prio in sorted_handlers:
             result = self.attempt_fallback(utterances, skill_id, lang, message)
             if result:
-                return ovos_core.intent_services.IntentMatch('Fallback', None, {}, skill_id, utterances[0])
+                return ovos_core.intent_services.IntentMatch(intent_service='Fallback',
+                                                             intent_type=None,
+                                                             intent_data={},
+                                                             skill_id=skill_id,
+                                                             utterance=utterances[0])
         return None
 
     def high_prio(self, utterances, lang, message):

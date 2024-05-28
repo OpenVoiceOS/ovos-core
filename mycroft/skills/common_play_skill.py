@@ -16,7 +16,7 @@ import re
 from enum import Enum, IntEnum
 from abc import ABC, abstractmethod
 from ovos_bus_client.message import Message
-from ovos_workshop.skills.mycroft_skill import MycroftSkill
+from ovos_workshop.skills import OVOSSkill
 from ovos_bus_client.apis.ocp import ClassicAudioServiceInterface as AudioService
 
 
@@ -45,7 +45,7 @@ class CPSTrackStatus(IntEnum):
     END_OF_MEDIA = 90  # playback finished, is the default state when CPS loads
 
 
-class CommonPlaySkill(MycroftSkill, ABC):
+class CommonPlaySkill(OVOSSkill, ABC):
     """ To integrate with the common play infrastructure of Mycroft
     skills should use this base class and override the two methods
     `CPS_match_query_phrase` (for checking if the skill can play the
