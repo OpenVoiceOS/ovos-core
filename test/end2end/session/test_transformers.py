@@ -17,11 +17,14 @@ class TestTransformerPlugins(TestCase):
     def tearDown(self) -> None:
         self.core.stop()
 
-    @skip("TODO - failing in github actions, not finding metadata test plugin? passes locally")
     def test_transformer_plugins(self):
         # test plugins found
-        self.assertIn('ovos-utterance-plugin-cancel', [k[0] for k in UtteranceTransformersService.find_plugins()])
-        self.assertIn('ovos-metadata-test-plugin', [k[0] for k in MetadataTransformersService.find_plugins()])
+        self.assertIn('ovos-utterance-plugin-cancel',
+                      [k[0] for k in UtteranceTransformersService.find_plugins()],
+                      UtteranceTransformersService.find_plugins())
+        self.assertIn('ovos-metadata-test-plugin',
+                      [k[0] for k in MetadataTransformersService.find_plugins()],
+                      MetadataTransformersService.find_plugins())
 
     def test_cancel(self):
 
@@ -92,11 +95,13 @@ class TestTransformerPlugins(TestCase):
         # verify sound
         self.assertEqual(messages[1].data["uri"], "snd/cancel.mp3")
 
-    @skip("TODO - failing in github actions, not finding metadata test plugin? passes locally")
     def test_meta(self):
-        self.assertNotIn('ovos-metadata-test-plugin', self.core.intent_service.metadata_plugins.loaded_plugins)
+        self.assertNotIn('ovos-metadata-test-plugin',
+                         self.core.intent_service.metadata_plugins.loaded_plugins)
         self.core.load_metadata_transformers({"ovos-metadata-test-plugin": {}})
-        self.assertIn('ovos-metadata-test-plugin', self.core.intent_service.metadata_plugins.loaded_plugins)
+        self.assertIn('ovos-metadata-test-plugin',
+                      self.core.intent_service.metadata_plugins.loaded_plugins,
+                      self.core.intent_service.metadata_plugins.find_plugins())
 
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
