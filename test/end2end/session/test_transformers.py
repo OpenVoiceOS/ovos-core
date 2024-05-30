@@ -22,15 +22,6 @@ class TestTransformerPlugins(TestCase):
         self.assertIn('ovos-utterance-plugin-cancel',
                       [k[0] for k in UtteranceTransformersService.find_plugins()],
                       UtteranceTransformersService.find_plugins())
-        # TODO: This assertion failing as nothing is loaded
-        try:
-            from metadata_test import MetadataPlugin
-            from ovos_plugin_manager.templates.transformers import MetadataTransformer
-            plugin = MetadataPlugin()
-            self.assertIsInstance(plugin, MetadataTransformer)
-        except Exception as e:
-            from ovos_utils import LOG
-            LOG.exception(e)
         self.assertIn('ovos-metadata-test-plugin',
                       [k[0] for k in MetadataTransformersService.find_plugins()],
                       MetadataTransformersService.find_plugins())
@@ -108,7 +99,6 @@ class TestTransformerPlugins(TestCase):
         self.assertNotIn('ovos-metadata-test-plugin',
                          self.core.intent_service.metadata_plugins.loaded_plugins)
         self.core.load_metadata_transformers({"ovos-metadata-test-plugin": {}})
-        # TODO: This assertion failing as nothing is loaded
         self.assertIn('ovos-metadata-test-plugin',
                       self.core.intent_service.metadata_plugins.loaded_plugins,
                       self.core.intent_service.metadata_plugins.find_plugins())
