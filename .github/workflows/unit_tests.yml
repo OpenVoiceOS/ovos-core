@@ -61,6 +61,7 @@ jobs:
           pip install ./test/end2end/skill-fake-fm
           pip install ./test/end2end/skill-fake-fm-legacy
           pip install ./test/end2end/metadata-test-plugin
+          pip list | grep metadata
       - name: Install core repo
         run: |
           pip install -e .[mycroft,deprecated]
