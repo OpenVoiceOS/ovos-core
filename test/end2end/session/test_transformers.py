@@ -23,6 +23,14 @@ class TestTransformerPlugins(TestCase):
                       [k[0] for k in UtteranceTransformersService.find_plugins()],
                       UtteranceTransformersService.find_plugins())
         # TODO: This assertion failing as nothing is loaded
+        try:
+            from metadata_test import MetadataPlugin
+            from ovos_plugin_manager.templates.transformers import MetadataTransformer
+            plugin = MetadataPlugin()
+            self.assertIsInstance(plugin, MetadataTransformer)
+        except Exception as e:
+            from ovos_utils import LOG
+            LOG.exception(e)
         self.assertIn('ovos-metadata-test-plugin',
                       [k[0] for k in MetadataTransformersService.find_plugins()],
                       MetadataTransformersService.find_plugins())
