@@ -387,16 +387,16 @@ except ImportError:
     class OCPInterface(_OIF):
 
         # needs utils 0.1.0 in ovos-bus-client
-        @staticmethod
-        def norm_tracks(tracks: list):
+        @classmethod
+        def norm_tracks(cls, tracks: list):
             """ensures a list of tracks contains only MediaEntry or Playlist items"""
             assert isinstance(tracks, list)
             # support Playlist and MediaEntry objects in tracks
             for idx, track in enumerate(tracks):
                 if isinstance(track, dict):
-                    tracks[idx] = dict2entry(track)
+                    tracks[idx] = MediaEntry.from_dict(track)
                 if isinstance(track, list) and not isinstance(track, Playlist):
-                    tracks[idx] = OCPInterface.norm_tracks(track)
+                    tracks[idx] = cls.norm_tracks(track)
                 elif not isinstance(track, MediaEntry):
                     # TODO - support string uris
                     # let it fail in next assert
@@ -418,6 +418,14 @@ except ImportError:
         ]
 
         # needs utils 0.1.0 in ovos-bus-client
+        def __init__(self, query, bus, media_type=MediaType.GENERIC, config=None):
+            LOG.debug(f"Created {media_type.name} query: {query}")
+            self.query = query
+            self.media_type = media_type
+            self.bus = bus
+            self.config = config or {}
+            self.reset()
+
         def wait(self):
             # if there is no match type defined, lets increase timeout a bit
             # since all skills need to search
