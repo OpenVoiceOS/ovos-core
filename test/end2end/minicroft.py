@@ -65,11 +65,11 @@ class MiniCroft(SkillManager):
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
 
 
-def get_minicroft(skill_id, ocp=False):
+def get_minicroft(skill_id):
     if isinstance(skill_id, str):
         skill_id = [skill_id]
     assert isinstance(skill_id, list)
-    croft1 = MiniCroft(skill_id, ocp=ocp)
+    croft1 = MiniCroft(skill_id)
     croft1.start()
     while croft1.status.state != ProcessState.READY:
         sleep(0.2)
