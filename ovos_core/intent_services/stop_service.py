@@ -27,7 +27,7 @@ class StopService:
             lang2 = lang.split("-")[0].lower()
             self._voc_cache[lang2] = {}
             for f in os.listdir(f"{base}/{lang}"):
-                with open(f"{base}/{lang}/{f}") as fi:
+                with open(f"{base}/{lang}/{f}", encoding="utf-8") as fi:
                     lines = [expand_options(l) for l in fi.read().split("\n")
                              if l.strip() and not l.startswith("#")]
                     n = f.split(".", 1)[0]
