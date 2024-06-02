@@ -2,7 +2,16 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a104...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a105...HEAD)
+
+**Merged pull requests:**
+
+- fix: explicit file encoding [\#489](https://github.com/OpenVoiceOS/ovos-core/pull/489) ([mikejgray](https://github.com/mikejgray))
+- Troubleshoot transformers test failures [\#487](https://github.com/OpenVoiceOS/ovos-core/pull/487) ([NeonDaniel](https://github.com/NeonDaniel))
+
+## [V0.0.8a105](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a105) (2024-05-28)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a104...V0.0.8a105)
 
 **Fixed bugs:**
 
@@ -497,17 +506,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a49...V0.0.8a50)
 
-**Merged pull requests:**
-
-- Delete .github/workflows/publish\_docker.yml [\#365](https://github.com/OpenVoiceOS/ovos-core/pull/365) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a49](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a49) (2023-10-03)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a48...V0.0.8a49)
-
-**Merged pull requests:**
-
-- refactor/simplify\_session [\#364](https://github.com/OpenVoiceOS/ovos-core/pull/364) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a48](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a48) (2023-10-03)
 
