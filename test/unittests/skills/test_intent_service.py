@@ -256,46 +256,7 @@ class TestIntentServiceApi(TestCase):
         self.assertEqual(reply.data['intent'], None)
 
     def test_shutdown(self):
-        intent_service = IntentService(MockEmitter(), config={"experimental_ocp_pipeline": False,
-                                                              "padatious": {"disabled": True}})
-        intent_service.shutdown()
-        self.assertEqual(intent_service.bus.removed,
-                         ['padatious:register_intent',
-                          'padatious:register_entity',
-                          'detach_intent',
-                          'detach_skill',
-                          'question:query.response',
-                          'common_query.question',
-                          'ovos.common_query.pong',
-                          'mycroft.speech.recognition.unknown',
-                          'intent.service.skills.deactivate',
-                          'intent.service.skills.activate',
-                          'active_skill_request',
-                          'intent.service.active_skills.get',
-                          'skill.converse.get_response.enable',
-                          'skill.converse.get_response.disable',
-                          'ovos.skills.fallback.register',
-                          'ovos.skills.fallback.deregister',
-                          'register_vocab',
-                          'register_intent',
-                          'recognizer_loop:utterance',
-                          'detach_intent',
-                          'detach_skill',
-                          'add_context',
-                          'remove_context',
-                          'clear_context',
-                          'mycroft.skills.loaded',
-                          'intent.service.intent.get',
-                          'intent.service.skills.get',
-                          'intent.service.adapt.get',
-                          'intent.service.adapt.manifest.get',
-                          'intent.service.adapt.vocab.manifest.get',
-                          'intent.service.padatious.get',
-                          'intent.service.padatious.manifest.get',
-                          'intent.service.padatious.entities.manifest.get'])
-
-        intent_service = IntentService(MockEmitter(), config={"experimental_ocp_pipeline": True,
-                                                              "padatious": {"disabled": True}})
+        intent_service = IntentService(MockEmitter(), config={"padatious": {"disabled": True}})
         intent_service.shutdown()
         self.assertEqual(set(intent_service.bus.removed),
                          {'active_skill_request',

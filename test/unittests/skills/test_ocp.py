@@ -8,8 +8,7 @@ from ovos_classifiers.skovos.features import ClassifierProbaVectorizer, KeywordF
 from sklearn.pipeline import FeatureUnion
 from ovos_utils.log import LOG
 from ovos_bus_client.message import Message
-from ovos_utils.ocp import MediaType
-
+from ovos_core.intent_services.ocp_service import MediaType
 
 
 class TestOCPFeaturizer(unittest.TestCase):

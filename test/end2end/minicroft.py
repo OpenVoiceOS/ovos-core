@@ -12,24 +12,24 @@ from ovos_workshop.skills.fallback import FallbackSkill
 
 
 class MiniCroft(SkillManager):
-    def __init__(self, skill_ids, ocp=False, *args, **kwargs):
+    def __init__(self, skill_ids, *args, **kwargs):
         bus = FakeBus()
         super().__init__(bus, *args, **kwargs)
         self.skill_ids = skill_ids
-        self.intent_service = self._register_intent_services(ocp=ocp)
+        self.intent_service = self._register_intent_services()
         self.scheduler = EventScheduler(bus, schedule_file="/tmp/schetest.json")
 
     def load_metadata_transformers(self, cfg):
         self.intent_service.metadata_plugins.config = cfg
         self.intent_service.metadata_plugins.load_plugins()
 
-    def _register_intent_services(self, ocp=False):
+    def _register_intent_services(self):
         """Start up the all intent services and connect them as needed.
 
         Args:
             bus: messagebus client to register the services on
         """
-        service = IntentService(self.bus, config={"experimental_ocp_pipeline": ocp})
+        service = IntentService(self.bus)
         # Register handler to trigger fallback system
         self.bus.on(
             'mycroft.skills.fallback',
@@ -65,11 +65,11 @@ class MiniCroft(SkillManager):
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
 
 
-def get_minicroft(skill_id, ocp=False):
+def get_minicroft(skill_id):
     if isinstance(skill_id, str):
         skill_id = [skill_id]
     assert isinstance(skill_id, list)
-    croft1 = MiniCroft(skill_id, ocp=ocp)
+    croft1 = MiniCroft(skill_id)
     croft1.start()
     while croft1.status.state != ProcessState.READY:
         sleep(0.2)

@@ -47,6 +47,10 @@ jobs:
         sudo apt install libfann-dev
         pip install .[lgpl]
         pytest --cov-append --cov=ovos_core --cov-report xml test/unittests/skills
+    - name: Generate coverage report with utils 0.0.38
+      run: |
+        pip install ovos-utils==0.0.38
+        pytest --cov-append --cov=ovos_core --cov-report xml test/end2end
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:

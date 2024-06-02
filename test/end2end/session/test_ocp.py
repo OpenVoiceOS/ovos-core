@@ -4,7 +4,7 @@ from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
-from ovos_utils.ocp import PlayerState, MediaState
+from ovos_core.intent_services.ocp_service import PlayerState, MediaState
 from ..minicroft import get_minicroft
 
 
@@ -12,7 +12,7 @@ class TestOCPPipeline(TestCase):
 
     def setUp(self):
         self.skill_id = "skill-fake-fm.openvoiceos"
-        self.core = get_minicroft(self.skill_id, ocp=True)
+        self.core = get_minicroft(self.skill_id)
 
     def tearDown(self) -> None:
         self.core.stop()
@@ -1040,7 +1040,7 @@ class TestLegacyCPSPipeline(TestCase):
 
     def setUp(self):
         self.skill_id = "skill-fake-fm-legacy.openvoiceos"
-        self.core = get_minicroft(self.skill_id, ocp=True)
+        self.core = get_minicroft(self.skill_id)
         self.core.intent_service.ocp.config = {"legacy_cps": True}
 
     def tearDown(self) -> None:

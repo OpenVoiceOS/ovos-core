@@ -1,27 +1,454 @@
+import inspect
 import os
 import random
 import time
+from dataclasses import dataclass
 from os.path import join, dirname
+from threading import Lock
 from threading import RLock
 from typing import List, Tuple, Optional, Union
 
+import orjson
 from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
 from ovos_classifiers.skovos.features import ClassifierProbaVectorizer, KeywordFeaturesVectorizer
 from padacioso import IntentContainer
 from sklearn.pipeline import FeatureUnion
 
 import ovos_core.intent_services
-from ovos_bus_client.apis.ocp import OCPInterface, OCPQuery, ClassicAudioServiceInterface
+from ovos_bus_client.apis.ocp import ClassicAudioServiceInterface
 from ovos_bus_client.message import Message
 from ovos_bus_client.util import wait_for_reply
 from ovos_config import Configuration
 from ovos_plugin_manager.ocp import load_stream_extractors, available_extractors
 from ovos_utils import classproperty
+from ovos_utils.gui import is_gui_connected, is_gui_running
 from ovos_utils.log import LOG
 from ovos_utils.messagebus import FakeBus
-from ovos_utils.ocp import (MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID,
-                            MediaEntry, Playlist, MediaState, TrackState)
 from ovos_workshop.app import OVOSAbstractApplication
+
+try:
+    from ovos_utils.ocp import (MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID,
+                                MediaEntry, Playlist, MediaState, TrackState)
+    from ovos_bus_client.apis.ocp import OCPInterface, OCPQuery
+except ImportError:
+    # already redefined in workshop for compat, no need to do it AGAIN
+    from ovos_workshop.decorators.ocp import (MediaType, PlaybackType, PlaybackMode, PlayerState,
+                                              MediaState, TrackState)
+    from ovos_bus_client.apis.ocp import OCPInterface as _OIF, OCPQuery as _OQ
+
+    OCP_ID = "ovos.common_play"
+
+
+    def find_mime(uri):
+        """ Determine mime type. """
+        import mimetypes
+        mime = mimetypes.guess_type(uri)
+        if mime:
+            return mime
+        else:
+            return None
+
+
+    @dataclass
+    class MediaEntry:
+        uri: str = ""
+        title: str = ""
+        artist: str = ""
+        match_confidence: int = 0  # 0 - 100
+        skill_id: str = OCP_ID
+        playback: PlaybackType = PlaybackType.UNDEFINED
+        status: TrackState = TrackState.DISAMBIGUATION
+        media_type: MediaType = MediaType.GENERIC
+        length: int = 0  # in seconds
+        image: str = ""
+        skill_icon: str = ""
+        javascript: str = ""  # to execute once webview is loaded
+
+        def update(self, entry: dict, skipkeys: list = None, newonly: bool = False):
+            """
+            Update this MediaEntry object with keys from the provided entry
+            @param entry: dict or MediaEntry object to update this object with
+            @param skipkeys: list of keys to not change
+            @param newonly: if True, only adds new keys; existing keys are unchanged
+            """
+            skipkeys = skipkeys or []
+            if isinstance(entry, MediaEntry):
+                entry = entry.as_dict
+            entry = entry or {}
+            for k, v in entry.items():
+                if k not in skipkeys and hasattr(self, k):
+                    if newonly and self.__getattribute__(k):
+                        # skip, do not replace existing values
+                        continue
+                    self.__setattr__(k, v)
+
+        @property
+        def infocard(self) -> dict:
+            """
+            Return dict data used for a UI display
+            """
+            return {
+                "duration": self.length,
+                "track": self.title,
+                "image": self.image,
+                "album": self.skill_id,
+                "source": self.skill_icon,
+                "uri": self.uri
+            }
+
+        @property
+        def mpris_metadata(self) -> dict:
+            """
+            Return dict data used by MPRIS
+            """
+            from dbus_next.service import Variant
+            meta = {"xesam:url": Variant('s', self.uri)}
+            if self.artist:
+                meta['xesam:artist'] = Variant('as', [self.artist])
+            if self.title:
+                meta['xesam:title'] = Variant('s', self.title)
+            if self.image:
+                meta['mpris:artUrl'] = Variant('s', self.image)
+            if self.length:
+                meta['mpris:length'] = Variant('d', self.length)
+            return meta
+
+        @property
+        def as_dict(self) -> dict:
+            """
+            Return a dict representation of this MediaEntry
+            """
+            # orjson handles dataclasses directly
+            return orjson.loads(orjson.dumps(self).decode("utf-8"))
+
+        @staticmethod
+        def from_dict(track: dict):
+            if track.get("playlist"):
+                kwargs = {k: v for k, v in track.items()
+                          if k in inspect.signature(Playlist).parameters}
+                playlist = Playlist(**kwargs)
+                for e in track["playlist"]:
+                    playlist.add_entry(e)
+                return playlist
+            else:
+                kwargs = {k: v for k, v in track.items()
+                          if k in inspect.signature(MediaEntry).parameters}
+                return MediaEntry(**kwargs)
+
+        @property
+        def mimetype(self) -> Optional[Tuple[Optional[str], Optional[str]]]:
+            """
+            Get the detected mimetype tuple (type, encoding) if it can be determined
+            """
+            if self.uri:
+                return find_mime(self.uri)
+
+        def __eq__(self, other):
+            if isinstance(other, MediaEntry):
+                other = other.infocard
+            # dict comparison
+            return other == self.infocard
+
+
+    @dataclass
+    class Playlist(list):
+        title: str = ""
+        position: int = 0
+        length: int = 0  # in seconds
+        image: str = ""
+        match_confidence: int = 0  # 0 - 100
+        skill_id: str = OCP_ID
+        skill_icon: str = ""
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(**kwargs)
+            list.__init__(self, *args)
+
+        @property
+        def infocard(self) -> dict:
+            """
+            Return dict data used for a UI display
+            (model shared with MediaEntry)
+            """
+            return {
+                "duration": self.length,
+                "track": self.title,
+                "image": self.image,
+                "album": self.skill_id,
+                "source": self.skill_icon,
+                "uri": ""
+            }
+
+        @staticmethod
+        def from_dict(track: dict):
+            return MediaEntry.from_dict(track)
+
+        @property
+        def as_dict(self) -> dict:
+            """
+            Return a dict representation of this MediaEntry
+            """
+            data = {
+                "title": self.title,
+                "position": self.position,
+                "length": self.length,
+                "image": self.image,
+                "match_confidence": self.match_confidence,
+                "skill_id": self.skill_id,
+                "skill_icon": self.skill_icon,
+                "playlist": [e.as_dict for e in self.entries]
+            }
+            return data
+
+        @property
+        def entries(self) -> List[MediaEntry]:
+            """
+            Return a list of MediaEntry objects in the playlist
+            """
+            entries = []
+            for e in self:
+                if isinstance(e, dict):
+                    e = MediaEntry.from_dict(e)
+                if isinstance(e, MediaEntry):
+                    entries.append(e)
+            return entries
+
+        @property
+        def current_track(self) -> Optional[MediaEntry]:
+            """
+            Return the current MediaEntry or None if the playlist is empty
+            """
+            if len(self) == 0:
+                return None
+            self._validate_position()
+            track = self[self.position]
+            if isinstance(track, dict):
+                track = MediaEntry.from_dict(track)
+            return track
+
+        @property
+        def is_first_track(self) -> bool:
+            """
+            Return `True` if the current position is the first track or if the
+            playlist is empty
+            """
+            if len(self) == 0:
+                return True
+            return self.position == 0
+
+        @property
+        def is_last_track(self) -> bool:
+            """
+            Return `True` if the current position is the last track of if the
+            playlist is empty
+            """
+            if len(self) == 0:
+                return True
+            return self.position == len(self) - 1
+
+        def goto_start(self) -> None:
+            """
+            Move to the first entry in the playlist
+            """
+            self.position = 0
+
+        def clear(self) -> None:
+            """
+            Remove all entries from the Playlist and reset the position
+            """
+            super().clear()
+            self.position = 0
+
+        def sort_by_conf(self):
+            """
+            Sort the Playlist by `match_confidence` with high confidence first
+            """
+            self.sort(
+                key=lambda k: k.match_confidence if isinstance(k, (MediaEntry, Playlist))
+                else k.get("match_confidence", 0), reverse=True)
+
+        def add_entry(self, entry: MediaEntry, index: int = -1) -> None:
+            """
+            Add an entry at the requested index
+            @param entry: MediaEntry to add to playlist
+            @param index: index to insert entry at (default -1 to append)
+            """
+            assert isinstance(index, int)
+            if index > len(self):
+                raise ValueError(f"Invalid index {index} requested, "
+                                 f"playlist only has {len(self)} entries")
+
+            if isinstance(entry, dict):
+                entry = MediaEntry.from_dict(entry)
+
+            assert isinstance(entry, (MediaEntry, Playlist))
+
+            if index == -1:
+                index = len(self)
+
+            if index < self.position:
+                self.set_position(self.position + 1)
+
+            self.insert(index, entry)
+
+        def remove_entry(self, entry: Union[int, dict, MediaEntry]) -> None:
+            """
+            Remove the requested entry from the playlist or raise a ValueError
+            @param entry: index or MediaEntry to remove from the playlist
+            """
+            if isinstance(entry, int):
+                self.pop(entry)
+                return
+            if isinstance(entry, dict):
+                entry = MediaEntry.from_dict(entry)
+            assert isinstance(entry, MediaEntry)
+            for idx, e in enumerate(self.entries):
+                if e == entry:
+                    self.pop(idx)
+                    break
+            else:
+                raise ValueError(f"entry not in playlist: {entry}")
+
+        def replace(self, new_list: List[Union[dict, MediaEntry]]) -> None:
+            """
+            Replace the contents of this Playlist with new_list
+            @param new_list: list of MediaEntry or dict objects to set this list to
+            """
+            self.clear()
+            for e in new_list:
+                self.add_entry(e)
+
+        def set_position(self, idx: int):
+            """
+            Set the position in the playlist to a specific index
+            @param idx: Index to set position to
+            """
+            self.position = idx
+            self._validate_position()
+
+        def goto_track(self, track: Union[MediaEntry, dict]) -> None:
+            """
+            Go to the requested track in the playlist
+            @param track: MediaEntry to find and go to in the playlist
+            """
+            if isinstance(track, dict):
+                track = MediaEntry.from_dict(track)
+
+            assert isinstance(track, (MediaEntry, Playlist))
+
+            if isinstance(track, MediaEntry):
+                requested_uri = track.uri
+            else:
+                requested_uri = track.title
+
+            for idx, t in enumerate(self):
+                if isinstance(t, MediaEntry):
+                    pl_entry_uri = t.uri
+                else:
+                    pl_entry_uri = t.title
+
+                if requested_uri == pl_entry_uri:
+                    self.set_position(idx)
+                    LOG.debug(f"New playlist position: {self.position}")
+                    return
+            LOG.error(f"requested track not in the playlist: {track}")
+
+        def next_track(self) -> None:
+            """
+            Go to the next track in the playlist
+            """
+            self.set_position(self.position + 1)
+
+        def prev_track(self) -> None:
+            """
+            Go to the previous track in the playlist
+            """
+            self.set_position(self.position - 1)
+
+        def _validate_position(self) -> None:
+            """
+            Make sure the current position is valid; default `position` to 0
+            """
+            if self.position < 0 or self.position >= len(self):
+                LOG.error(f"Playlist pointer is in an invalid position "
+                          f"({self.position}! Going to start of playlist")
+                self.position = 0
+
+        def __contains__(self, item):
+            if isinstance(item, dict):
+                item = MediaEntry.from_dict(item)
+            if isinstance(item, MediaEntry):
+                for e in self.entries:
+                    if e.uri == item.uri:
+                        return True
+            return False
+
+
+    class OCPInterface(_OIF):
+
+        # needs utils 0.1.0 in ovos-bus-client
+        @classmethod
+        def norm_tracks(cls, tracks: list):
+            """ensures a list of tracks contains only MediaEntry or Playlist items"""
+            assert isinstance(tracks, list)
+            # support Playlist and MediaEntry objects in tracks
+            for idx, track in enumerate(tracks):
+                if isinstance(track, dict):
+                    tracks[idx] = MediaEntry.from_dict(track)
+                if isinstance(track, list) and not isinstance(track, Playlist):
+                    tracks[idx] = cls.norm_tracks(track)
+                elif not isinstance(track, MediaEntry):
+                    # TODO - support string uris
+                    # let it fail in next assert
+                    # log all bad entries before failing
+                    LOG.error(f"Bad track, invalid type: {track}")
+            assert all(isinstance(t, (MediaEntry, Playlist)) for t in tracks)
+            return tracks
+
+
+    class OCPQuery(_OQ):
+        cast2audio = [
+            MediaType.MUSIC,
+            MediaType.PODCAST,
+            MediaType.AUDIOBOOK,
+            MediaType.RADIO,
+            MediaType.RADIO_THEATRE,
+            MediaType.VISUAL_STORY,
+            MediaType.NEWS
+        ]
+
+        # needs utils 0.1.0 in ovos-bus-client
+        def __init__(self, query, bus, media_type=MediaType.GENERIC, config=None):
+            LOG.debug(f"Created {media_type.name} query: {query}")
+            self.query = query
+            self.media_type = media_type
+            self.bus = bus
+            self.config = config or {}
+            self.reset()
+
+        def wait(self):
+            # if there is no match type defined, lets increase timeout a bit
+            # since all skills need to search
+            if self.media_type == MediaType.GENERIC:
+                timeout = self.config.get("max_timeout", 15) + 3  # timeout bonus
+            else:
+                timeout = self.config.get("max_timeout", 15)
+            while self.searching and time.time() - self.search_start <= timeout:
+                time.sleep(0.1)
+            self.searching = False
+            self.remove_events()
+
+        def reset(self):
+            self.active_skills = {}
+            self.active_skills_lock = Lock()
+            self.query_replies = []
+            self.searching = False
+            self.search_start = 0
+            self.query_timeouts = self.config.get("min_timeout", 5)
+            if self.config.get("playback_mode") in [PlaybackMode.AUDIO_ONLY]:
+                self.has_gui = False
+            else:
+                self.has_gui = is_gui_running() or is_gui_connected(self.bus)
 
 try:
     from ovos_utils.ocp import dict2entry

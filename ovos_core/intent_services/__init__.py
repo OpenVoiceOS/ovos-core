@@ -25,6 +25,7 @@ from ovos_core.intent_services.converse_service import ConverseService
 from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.padacioso_service import PadaciosoService
 from ovos_core.intent_services.stop_service import StopService
+from ovos_core.intent_services.ocp_service import OCPPipelineMatcher
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
 from ovos_utils.log import LOG, deprecated, log_deprecation
 from ovos_utils.metrics import Stopwatch
@@ -74,11 +75,9 @@ class IntentService:
         self.converse = ConverseService(bus)
         self.common_qa = CommonQAService(bus)
         self.stop = StopService(bus)
-        self.ocp = None
+        self.ocp = OCPPipelineMatcher(self.bus, config=self.config.get("OCP", {}))
         self.utterance_plugins = UtteranceTransformersService(bus)
         self.metadata_plugins = MetadataTransformersService(bus)
-
-        self._load_ocp_pipeline()  # TODO - enable by default once stable
 
         # connection SessionManager to the bus,
         # this will sync default session across all components
@@ -107,16 +106,6 @@ class IntentService:
         self.bus.on('intent.service.padatious.get', self.handle_get_padatious)
         self.bus.on('intent.service.padatious.manifest.get', self.handle_padatious_manifest)
         self.bus.on('intent.service.padatious.entities.manifest.get', self.handle_entity_manifest)
-
-    def _load_ocp_pipeline(self):
-        """EXPERIMENTAL: this feature is not yet ready for end users"""
-        if self.config.get("experimental_ocp_pipeline", False):
-            LOG.warning("EXPERIMENTAL: the OCP pipeline is enabled!")
-            try:
-                from ovos_core.intent_services.ocp_service import OCPPipelineMatcher
-                self.ocp = OCPPipelineMatcher(self.bus, config=self.config.get("OCP", {}))
-            except ImportError:
-                LOG.error("OCPPipelineMatcher unavailable, please install ovos-utils >= 0.1.0")
 
     @property
     def registered_intents(self):
