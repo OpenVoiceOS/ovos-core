@@ -2,7 +2,19 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a105...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a106...HEAD)
+
+**Closed issues:**
+
+- allow ocp pipeline with ovos-utils \<=0.0.38 [\#490](https://github.com/OpenVoiceOS/ovos-core/issues/490)
+
+**Merged pull requests:**
+
+- enable ocp with utils 0.0.38 compat [\#491](https://github.com/OpenVoiceOS/ovos-core/pull/491) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a106](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a106) (2024-06-02)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a105...V0.0.8a106)
 
 **Merged pull requests:**
 
@@ -497,10 +509,6 @@
 **Implemented enhancements:**
 
 - feat: explicit message response to activate/deactivate skill [\#369](https://github.com/OpenVoiceOS/ovos-core/pull/369) ([mikejgray](https://github.com/mikejgray))
-
-**Merged pull requests:**
-
-- unittests/get\_response\_cascade [\#366](https://github.com/OpenVoiceOS/ovos-core/pull/366) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a50](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a50) (2023-10-03)
 
