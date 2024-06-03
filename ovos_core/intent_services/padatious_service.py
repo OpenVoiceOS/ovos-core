@@ -24,6 +24,7 @@ from typing import List, Optional
 import padatious
 from padatious.match_data import MatchData as PadatiousIntent
 from ovos_config.config import Configuration
+from ovos_bus_client.session import SessionManager, Session
 from ovos_config.meta import get_xdg_base
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
@@ -39,7 +40,7 @@ class PadatiousMatcher:
     def __init__(self, service):
         self.service = service
 
-    def _match_level(self, utterances, limit, lang=None):
+    def _match_level(self, utterances, limit, lang=None, message: Optional[Message] = None):
         """Match intent and make sure a certain level of confidence is reached.
 
         Args:
@@ -51,7 +52,7 @@ class PadatiousMatcher:
         # call flatten in case someone is sending the old style list of tuples
         utterances = flatten_list(utterances)
         lang = lang or self.service.lang
-        padatious_intent = self.service.calc_intent(utterances, lang)
+        padatious_intent = self.service.calc_intent(utterances, lang, message)
         if padatious_intent is not None and padatious_intent.conf > limit:
             skill_id = padatious_intent.name.split(':')[0]
             return ovos_core.intent_services.IntentMatch(
@@ -65,7 +66,7 @@ class PadatiousMatcher:
             utterances (list of tuples): Utterances to parse, originals paired
                                          with optional normalized version.
         """
-        return self._match_level(utterances, self.service.conf_high, lang)
+        return self._match_level(utterances, self.service.conf_high, lang, message)
 
     def match_medium(self, utterances, lang=None, message=None):
         """Intent matcher for medium confidence.
@@ -74,7 +75,7 @@ class PadatiousMatcher:
             utterances (list of tuples): Utterances to parse, originals paired
                                          with optional normalized version.
         """
-        return self._match_level(utterances, self.service.conf_med, lang)
+        return self._match_level(utterances, self.service.conf_med, lang, message)
 
     def match_low(self, utterances, lang=None, message=None):
         """Intent matcher for low confidence.
@@ -83,7 +84,7 @@ class PadatiousMatcher:
             utterances (list of tuples): Utterances to parse, originals paired
                                          with optional normalized version.
         """
-        return self._match_level(utterances, self.service.conf_low, lang)
+        return self._match_level(utterances, self.service.conf_low, lang, message)
 
 
 class PadatiousService:
@@ -103,11 +104,10 @@ class PadatiousService:
         self.conf_med = self.padatious_config.get("conf_med") or 0.8
         self.conf_low = self.padatious_config.get("conf_low") or 0.5
 
-        intent_cache = self.padatious_config.get(
-            'intent_cache') or f"{xdg_data_home()}/{get_xdg_base()}/intent_cache"
-        self.containers = {
-            lang: padatious.IntentContainer(path.join(expanduser(intent_cache), lang))
-            for lang in langs}
+        intent_cache = expanduser(self.padatious_config.get('intent_cache') or
+                                  f"{xdg_data_home()}/{get_xdg_base()}/intent_cache")
+        self.containers = {lang: padatious.IntentContainer(f"{intent_cache}/{lang}")
+                           for lang in langs}
 
         self.bus.on('padatious:register_intent', self.register_intent)
         self.bus.on('padatious:register_entity', self.register_entity)
@@ -227,14 +227,7 @@ class PadatiousService:
         lang = lang.lower()
         if lang in self.containers:
             self.registered_intents.append(message.data['name'])
-            try:
-                self._register_object(message, 'intent',
-                                      self.containers[lang].add_intent)
-            except RuntimeError:
-                name = message.data.get('name', "")
-                # padacioso fails on reloading a skill, just ignore
-                if name not in self.containers[lang].intent_samples:
-                    raise
+            self._register_object(message, 'intent', self.containers[lang].add_intent)
 
     def register_entity(self, message):
         """Messagebus handler for registering entities.
@@ -249,7 +242,8 @@ class PadatiousService:
             self._register_object(message, 'entity',
                                   self.containers[lang].add_entity)
 
-    def calc_intent(self, utterances: List[str], lang: str = None) -> Optional[PadatiousIntent]:
+    def calc_intent(self, utterances: List[str], lang: str = None,
+                    message: Optional[Message] = None) -> Optional[PadatiousIntent]:
         """
         Get the best intent match for the given list of utterances. Utilizes a
         thread pool for overall faster execution. Note that this method is NOT
@@ -267,9 +261,11 @@ class PadatiousService:
 
         lang = lang or self.lang
         lang = lang.lower()
+        sess = SessionManager.get(message)
         if lang in self.containers:
             intent_container = self.containers.get(lang)
-            intents = [_calc_padatious_intent(utt, intent_container) for utt in utterances]
+            intents = [_calc_padatious_intent(utt, intent_container, sess)
+                       for utt in utterances]
             intents = [i for i in intents if i is not None]
             # select best
             if intents:
@@ -284,14 +280,25 @@ class PadatiousService:
 
 
 @lru_cache(maxsize=3)  # repeat calls under different conf levels wont re-run code
-def _calc_padatious_intent(utt, intent_container) -> Optional[PadatiousIntent]:
+def _calc_padatious_intent(utt: str,
+                           intent_container: padatious.IntentContainer,
+                           sess: Session) -> Optional[PadatiousIntent]:
     """
     Try to match an utterance to an intent in an intent_container
-    @param args: tuple of (utterance, IntentContainer)
+    @param utt: str - text to match intent against
+
     @return: matched PadatiousIntent
     """
     try:
-        intent = intent_container.calc_intent(utt)
+        matches = [m for m in intent_container.calc_intents(utt)
+                   if m.name not in sess.blacklisted_intents
+                   and m.name.split(":")[0] not in sess.blacklisted_skills]
+        if len(matches) == 0:
+            return None
+        best_match = max(matches, key=lambda x: x.conf)
+        best_matches = (
+            match for match in matches if match.conf == best_match.conf)
+        intent = min(best_matches, key=lambda x: sum(map(len, x.matches.values())))
         intent.sent = utt
         return intent
     except Exception as e:

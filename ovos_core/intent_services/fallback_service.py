@@ -22,6 +22,7 @@ from ovos_config import Configuration
 import ovos_core.intent_services
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
+from ovos_bus_client.session import SessionManager
 from ovos_workshop.skills.fallback import FallbackMode
 
 FallbackRange = namedtuple('FallbackRange', ['start', 'stop'])
@@ -124,6 +125,10 @@ class FallbackService:
         Returns:
             handled (bool): True if handled otherwise False.
         """
+        sess = SessionManager.get(message)
+        if skill_id in sess.blacklisted_skills:
+            LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{sess.session_id}'")
+            return False
         if self._fallback_allowed(skill_id):
             fb_msg = message.reply(f"ovos.skills.fallback.{skill_id}.request",
                                    {"skill_id": skill_id,

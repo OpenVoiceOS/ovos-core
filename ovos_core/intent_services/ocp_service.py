@@ -768,6 +768,11 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
     def match_high(self, utterances: List[str], lang: str, message: Message = None):
         """ exact matches only, handles playback control
         recommended after high confidence intents pipeline stage """
+        sess = SessionManager.get(message)
+        if OCP_ID in sess.blacklisted_skills:
+            LOG.debug(f"ignoring match, skill_id '{OCP_ID}' blacklisted by Session '{sess.session_id}'")
+            return
+
         if lang not in self.intent_matchers:
             return None
 

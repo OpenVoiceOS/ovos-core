@@ -172,6 +172,11 @@ class CommonQAService(OVOSAbstractApplication):
         searching = message.data.get('searching')
         answer = message.data.get('answer')
 
+        sess = SessionManager.get(message)
+        if skill_id in sess.blacklisted_skills:
+            LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{sess.session_id}'")
+            return
+
         query = self.active_queries.get(SessionManager.get(message).session_id)
         if not query:
             LOG.warning(f"Late answer received from {skill_id}, no active query for: {search_phrase}")

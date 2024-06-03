@@ -197,6 +197,8 @@ class AdaptService:
         Returns:
             Intent structure, or None if no match was found.
         """
+        sess = SessionManager.get(message)
+
         # we call flatten in case someone is sending the old style list of tuples
         utterances = flatten_list(utterances)
 
@@ -215,7 +217,9 @@ class AdaptService:
             nonlocal best_intent
             best = best_intent.get('confidence', 0.0) if best_intent else 0.0
             conf = intent.get('confidence', 0.0)
-            if best < conf:
+            skill = intent['intent_type'].split(":")[0]
+            if best < conf and intent["intent_type"] not in sess.blacklisted_intents \
+                    and skill not in sess.blacklisted_skills:
                 best_intent = intent
                 # TODO - Shouldn't Adapt do this?
                 best_intent['utterance'] = utt
