@@ -17,6 +17,7 @@ from sklearn.pipeline import FeatureUnion
 import ovos_core.intent_services
 from ovos_bus_client.apis.ocp import ClassicAudioServiceInterface
 from ovos_bus_client.message import Message
+from ovos_bus_client.session import SessionManager, Session
 from ovos_bus_client.util import wait_for_reply
 from ovos_config import Configuration
 from ovos_plugin_manager.ocp import load_stream_extractors, available_extractors
@@ -548,7 +549,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.search_lock = RLock()
         self.player_state = PlayerState.STOPPED.value
         self.media_state = MediaState.UNKNOWN.value
-        self._available_SEI = []
+        self._available_SEI = {}  # session_id: [str]
 
         self.intent_matchers = {}
         self.skill_aliases = {
@@ -643,12 +644,6 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.add_event("ocp:like_song", self.handle_like_intent, is_intent=True)
         self.add_event("ocp:legacy_cps", self.handle_legacy_cps, is_intent=True)
 
-    @property
-    def available_SEI(self):
-        if self.use_legacy_audio:
-            return available_extractors()
-        return self._available_SEI
-
     def handle_get_SEIs(self, message: Message):
         """report available StreamExtractorIds
         OCP plugins handle specific SEIs and return a real stream / extra metadata
@@ -663,8 +658,9 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         eg. for the youtube plugin a skill can return
           "youtube//https://youtube.com/watch?v=wChqNkd6F24"
         """
-        self._available_SEI = message.data["SEI"]
-        LOG.info(f"Available stream extractor plugins: {self.available_SEI}")
+        sess = SessionManager.get(message)
+        self._available_SEI[sess.session_id] = message.data["SEI"]
+        LOG.info(f"Available stream extractor plugins: {self._available_SEI[sess.session_id]}")
 
     def handle_skill_register(self, message: Message):
         """ register skill names as keywords to match their MediaType"""
@@ -1195,7 +1191,8 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         return [r for r in results if r]
 
     def filter_results(self, results: list, phrase: str, lang: str,
-                       media_type: MediaType = MediaType.GENERIC) -> list:
+                       media_type: MediaType = MediaType.GENERIC,
+                       sess: Optional[Session] = None) -> list:
         # ignore very low score matches
         l1 = len(results)
         results = [r for r in results
@@ -1210,9 +1207,13 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                        if isinstance(r, Playlist) or r.media_type == media_type]
             LOG.debug(f"filtered {l1 - len(results)} wrong MediaType results")
 
-        # filter based on available stream handlers
+        # filter based on available stream extractors
+        if self.use_legacy_audio:
+            seis = available_extractors()
+        else:
+            seis = self._available_SEI[sess.session_id]
         valid_starts = ["/", "http://", "https://", "file://"] + \
-                       [f"{sei}//" for sei in self.available_SEI]
+                       [f"{sei}//" for sei in seis]
         if self.config.get("filter_SEI", True):
             # TODO - also check inside playlists
             bad_seis = [r for r in results if isinstance(r, MediaEntry) and
