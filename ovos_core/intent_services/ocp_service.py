@@ -925,6 +925,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
     # bus api
     def handle_search_query(self, message: Message):
+        sess = SessionManager.get(message)
         utterance = message.data["utterance"].lower()
         phrase = message.data.get("query", "") or utterance
         lang = message.data.get("lang") or message.context.get("session", {}).get("lang", "en-us")
@@ -936,7 +937,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         # classify the query media type
         media_type, prob = self.classify_media(utterance, lang)
         # search common play skills
-        results = self._search(phrase, media_type, lang)
+        results = self._search(phrase, media_type, lang, sess=sess)
         best = self.select_best(results)
         results = [r.as_dict if isinstance(best, (MediaEntry, Playlist)) else r
                    for r in results]
@@ -969,8 +970,9 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             if e == media_type:
                 media_type = e
                 break
+        sess = SessionManager.get(message)
         results = self._search(query, media_type, lang,
-                               skills=skills)
+                               skills=skills, sess=sess)
 
         # tell OCP to play
         self.bus.emit(Message('ovos.common_play.reset'))
@@ -1193,6 +1195,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
     def filter_results(self, results: list, phrase: str, lang: str,
                        media_type: MediaType = MediaType.GENERIC,
                        sess: Optional[Session] = None) -> list:
+        sess = sess or SessionManager.get()
         # ignore very low score matches
         l1 = len(results)
         results = [r for r in results
@@ -1254,7 +1257,8 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         return results
 
     def _search(self, phrase: str, media_type: MediaType, lang: str,
-                skills: Optional[List[str]] = None) -> list:
+                skills: Optional[List[str]] = None,
+                sess: Optional[Session] = None) -> list:
         self.bus.emit(Message("ovos.common_play.search.start"))
         self.enclosure.mouth_think()  # animate mk1 mouth during search
 
@@ -1270,7 +1274,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
         if not skills:
             LOG.debug(f"Got {len(results)} results")
-            results = self.filter_results(results, phrase, lang, media_type)
+            results = self.filter_results(results, phrase, lang, media_type, sess=sess)
             LOG.debug(f"Got {len(results)} usable results")
         else:  # no filtering if skill explicitly requested
             LOG.debug(f"Got {len(results)} usable results from {skills}")
