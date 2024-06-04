@@ -1166,7 +1166,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         prob = round(preds[label], 3)
         LOG.info(f"OVOSCommonPlay prediction: {label} confidence: {prob}")
         LOG.debug(f"     utterance: {query}")
-        return label == "OCP", prob
+        return label == "OCP", float(prob)
 
     def _should_resume(self, phrase: str, lang: str) -> bool:
         """
