@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a106...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a107...HEAD)
+
+**Fixed bugs:**
+
+- hotfix/ensure prob is float [\#494](https://github.com/OpenVoiceOS/ovos-core/pull/494) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a107](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a107) (2024-06-02)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a106...V0.0.8a107)
 
 **Closed issues:**
 
