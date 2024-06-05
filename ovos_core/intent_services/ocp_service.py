@@ -1,6 +1,7 @@
 import inspect
 import os
 import random
+import threading
 import time
 from dataclasses import dataclass
 from os.path import join, dirname
@@ -925,7 +926,6 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
     # bus api
     def handle_search_query(self, message: Message):
-        sess = SessionManager.get(message)
         utterance = message.data["utterance"].lower()
         phrase = message.data.get("query", "") or utterance
         lang = message.data.get("lang") or message.context.get("session", {}).get("lang", "en-us")
@@ -937,7 +937,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         # classify the query media type
         media_type, prob = self.classify_media(utterance, lang)
         # search common play skills
-        results = self._search(phrase, media_type, lang, sess=sess)
+        results = self._search(phrase, media_type, lang, message=message)
         best = self.select_best(results)
         results = [r.as_dict if isinstance(best, (MediaEntry, Playlist)) else r
                    for r in results]
@@ -970,9 +970,9 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             if e == media_type:
                 media_type = e
                 break
-        sess = SessionManager.get(message)
+
         results = self._search(query, media_type, lang,
-                               skills=skills, sess=sess)
+                               skills=skills, message=message)
 
         # tell OCP to play
         self.bus.emit(Message('ovos.common_play.reset'))
@@ -1181,6 +1181,32 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         return False
 
     # search
+    def _get_available_SEIs(self, message: Optional[Message] = None, timeout=1):
+        """get the available stream extractors from OCP
+        this is tracked per Session, if needed request the info from the client"""
+        seis = []
+        if self.use_legacy_audio:
+            seis = available_extractors()
+        else:
+            sess = SessionManager.get(message)
+            if sess.session_id not in self._available_SEI:
+                ev = threading.Event()
+
+                def handle_m(m):
+                    nonlocal seis
+                    s = SessionManager.get(m)
+                    if s.session_id == sess.session_id:
+                        seis.append(m.data["SEI"])
+                        ev.set()
+
+                self.bus.on("ovos.common_play.SEI.get.response", handle_m)
+                self.bus.emit(message.forward("ovos.common_play.SEI.get"))
+                ev.wait(timeout)
+                self.bus.remove("ovos.common_play.SEI.get.response", handle_m)
+            else:
+                seis = self._available_SEI.get(sess.session_id, [])
+        return seis
+
     def normalize_results(self, results: list) -> List[Union[MediaEntry, Playlist]]:
         # support Playlist and MediaEntry objects in tracks
         for idx, track in enumerate(results):
@@ -1194,8 +1220,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
     def filter_results(self, results: list, phrase: str, lang: str,
                        media_type: MediaType = MediaType.GENERIC,
-                       sess: Optional[Session] = None) -> list:
-        sess = sess or SessionManager.get()
+                       message: Optional[Message] = None) -> list:
         # ignore very low score matches
         l1 = len(results)
         results = [r for r in results
@@ -1211,10 +1236,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             LOG.debug(f"filtered {l1 - len(results)} wrong MediaType results")
 
         # filter based on available stream extractors
-        if self.use_legacy_audio:
-            seis = available_extractors()
-        else:
-            seis = self._available_SEI[sess.session_id]
+        seis = self._get_available_SEIs(message)
         valid_starts = ["/", "http://", "https://", "file://"] + \
                        [f"{sei}//" for sei in seis]
         if self.config.get("filter_SEI", True):
@@ -1258,7 +1280,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
     def _search(self, phrase: str, media_type: MediaType, lang: str,
                 skills: Optional[List[str]] = None,
-                sess: Optional[Session] = None) -> list:
+                message: Optional[Message] = None) -> list:
         self.bus.emit(Message("ovos.common_play.search.start"))
         self.enclosure.mouth_think()  # animate mk1 mouth during search
 
@@ -1274,7 +1296,8 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
         if not skills:
             LOG.debug(f"Got {len(results)} results")
-            results = self.filter_results(results, phrase, lang, media_type, sess=sess)
+            results = self.filter_results(results, phrase, lang, media_type,
+                                          message=message)
             LOG.debug(f"Got {len(results)} usable results")
         else:  # no filtering if skill explicitly requested
             LOG.debug(f"Got {len(results)} usable results from {skills}")
