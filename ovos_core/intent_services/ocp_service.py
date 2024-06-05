@@ -661,7 +661,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         """
         sess = SessionManager.get(message)
         self._available_SEI[sess.session_id] = message.data["SEI"]
-        LOG.info(f"Available stream extractor plugins: {self._available_SEI[sess.session_id]}")
+        LOG.info(f"Session: {sess.session_id} Available stream extractor plugins: {self._available_SEI[sess.session_id]}")
 
     def handle_skill_register(self, message: Message):
         """ register skill names as keywords to match their MediaType"""
@@ -1196,7 +1196,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                     nonlocal seis
                     s = SessionManager.get(m)
                     if s.session_id == sess.session_id:
-                        seis.append(m.data["SEI"])
+                        seis = m.data["SEI"]
                         ev.set()
 
                 self.bus.on("ovos.common_play.SEI.get.response", handle_m)
