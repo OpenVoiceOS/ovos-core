@@ -458,6 +458,12 @@ except ImportError:  # older ovos-utils
     dict2entry = MediaEntry.from_dict
 
 
+@dataclass
+class PlaybackCapabilities:
+    available_extractors: List[str]
+    ocp_available: bool
+
+
 class OCPFeaturizer:
     # ignore_list accounts for "noise" keywords in the csv file
     ocp_keywords = KeywordFeaturesVectorizer(ignore_list=["play", "stop"])
@@ -550,7 +556,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.search_lock = RLock()
         self.player_state = PlayerState.STOPPED.value
         self.media_state = MediaState.UNKNOWN.value
-        self._available_SEI = {}  # session_id: [str]
+        self.ocp_sessions = {}  # session_id: PlaybackCapabilities
 
         self.intent_matchers = {}
         self.skill_aliases = {
@@ -608,7 +614,6 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.add_event("ovos.common_play.play_search", self.handle_play_search)
         self.add_event('ovos.common_play.status.response', self.handle_player_state_update)
         self.add_event('ovos.common_play.track.state', self.handle_track_state_update)
-        self.add_event('ovos.common_play.SEI.get.response', self.handle_get_SEIs)
 
         self.add_event('ovos.common_play.register_keyword', self.handle_skill_keyword_register)
         self.add_event('ovos.common_play.deregister_keyword', self.handle_skill_keyword_deregister)
@@ -644,24 +649,6 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.add_event("ocp:search_error", self.handle_search_error_intent, is_intent=True)
         self.add_event("ocp:like_song", self.handle_like_intent, is_intent=True)
         self.add_event("ocp:legacy_cps", self.handle_legacy_cps, is_intent=True)
-
-    def handle_get_SEIs(self, message: Message):
-        """report available StreamExtractorIds
-        OCP plugins handle specific SEIs and return a real stream / extra metadata
-
-        this moves parsing to playback time instead of search time
-
-        SEIs are identifiers of the format "{SEI}//{uri}"
-        that might be present in media results
-
-        seis are NOT uris, a uri comes after {SEI}//
-
-        eg. for the youtube plugin a skill can return
-          "youtube//https://youtube.com/watch?v=wChqNkd6F24"
-        """
-        sess = SessionManager.get(message)
-        self._available_SEI[sess.session_id] = message.data["SEI"]
-        LOG.info(f"Session: {sess.session_id} Available stream extractor plugins: {self._available_SEI[sess.session_id]}")
 
     def handle_skill_register(self, message: Message):
         """ register skill names as keywords to match their MediaType"""
@@ -992,7 +979,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                                    'origin': OCP_ID}))
 
             # ovos-PHAL-plugin-mk1 will display music icon in response to play message
-            if self.use_legacy_audio:
+            if self.is_legacy(message):
                 self.legacy_play(results, query)
             else:
                 self.ocp_api.play(results, query)
@@ -1008,7 +995,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.bus.emit(message.forward("ovos.common_play.like"))
 
     def handle_stop_intent(self, message: Message):
-        if self.use_legacy_audio:
+        if self.is_legacy(message):
             LOG.info("Requesting Legacy AudioService to stop")
             self.legacy_api.stop()
         else:
@@ -1019,7 +1006,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             self.player_state = PlayerState.STOPPED
 
     def handle_next_intent(self, message: Message):
-        if self.use_legacy_audio:
+        if self.is_legacy(message):
             LOG.info("Requesting Legacy AudioService to go to next track")
             self.legacy_api.next()
         else:
@@ -1027,7 +1014,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             self.ocp_api.next()
 
     def handle_prev_intent(self, message: Message):
-        if self.use_legacy_audio:
+        if self.is_legacy(message):
             LOG.info("Requesting Legacy AudioService to go to prev track")
             self.legacy_api.prev()
         else:
@@ -1035,7 +1022,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             self.ocp_api.prev()
 
     def handle_pause_intent(self, message: Message):
-        if self.use_legacy_audio:
+        if self.is_legacy(message):
             LOG.info("Requesting Legacy AudioService to pause")
             self.legacy_api.pause()
         else:
@@ -1043,7 +1030,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             self.ocp_api.pause()
 
     def handle_resume_intent(self, message: Message):
-        if self.use_legacy_audio:
+        if self.is_legacy(message):
             LOG.info("Requesting Legacy AudioService to resume")
             self.legacy_api.resume()
         else:
@@ -1053,7 +1040,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
     def handle_search_error_intent(self, message: Message):
         self.bus.emit(message.forward("mycroft.audio.play_sound",
                                       {"uri": "snd/error.mp3"}))
-        if self.use_legacy_audio:
+        if self.is_legacy(message):
             LOG.info("Requesting Legacy AudioService to stop")
             self.legacy_api.stop()
         else:
@@ -1181,31 +1168,31 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         return False
 
     # search
-    def _get_available_SEIs(self, message: Optional[Message] = None, timeout=1):
+    def _get_ocp_capabilities(self, message: Message, timeout=1) -> PlaybackCapabilities:
         """get the available stream extractors from OCP
         this is tracked per Session, if needed request the info from the client"""
-        seis = []
-        if self.use_legacy_audio:
-            seis = available_extractors()
-        else:
-            sess = SessionManager.get(message)
-            if sess.session_id not in self._available_SEI:
+        sess = SessionManager.get(message)
+        if sess.session_id not in self.ocp_sessions:
+            data = PlaybackCapabilities(available_extractors=available_extractors(),
+                                        ocp_available=False)
+            if not self.config.get("legacy"):  # force legacy audio in config
                 ev = threading.Event()
 
                 def handle_m(m):
-                    nonlocal seis
                     s = SessionManager.get(m)
                     if s.session_id == sess.session_id:
-                        seis = m.data["SEI"]
+                        data.available_extractors = m.data["SEI"]
+                        data.ocp_available = True
                         ev.set()
+                        LOG.info(f"Session: {sess.session_id} Available stream extractor plugins: {m.data['SEI']}")
 
                 self.bus.on("ovos.common_play.SEI.get.response", handle_m)
                 self.bus.emit(message.forward("ovos.common_play.SEI.get"))
                 ev.wait(timeout)
                 self.bus.remove("ovos.common_play.SEI.get.response", handle_m)
-            else:
-                seis = self._available_SEI.get(sess.session_id, [])
-        return seis
+            self.ocp_sessions[sess.session_id] = data
+
+        return self.ocp_sessions[sess.session_id]
 
     def normalize_results(self, results: list) -> List[Union[MediaEntry, Playlist]]:
         # support Playlist and MediaEntry objects in tracks
@@ -1236,9 +1223,9 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             LOG.debug(f"filtered {l1 - len(results)} wrong MediaType results")
 
         # filter based on available stream extractors
-        seis = self._get_available_SEIs(message)
+        capabilities = self._get_ocp_capabilities(message)
         valid_starts = ["/", "http://", "https://", "file://"] + \
-                       [f"{sei}//" for sei in seis]
+                       [f"{sei}//" for sei in capabilities.available_extractors]
         if self.config.get("filter_SEI", True):
             # TODO - also check inside playlists
             bad_seis = [r for r in results if isinstance(r, MediaEntry) and
@@ -1261,11 +1248,11 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             video_only = True
 
         # check if user said "play XXX audio only"
-        if audio_only or self.use_legacy_audio:
+        if audio_only or not capabilities.ocp_available:
             l1 = len(results)
             # TODO - also check inside playlists
             results = [r for r in results
-                       if (isinstance(r, Playlist) and not self.use_legacy_audio)
+                       if (isinstance(r, Playlist) and capabilities.ocp_available)
                        or r.playback == PlaybackType.AUDIO]
             LOG.debug(f"filtered {l1 - len(results)} non-audio results")
 
@@ -1375,14 +1362,10 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
     ##################
     # Legacy Audio subsystem API
-    @property
-    def use_legacy_audio(self):
-        """when neither ovos-media nor old OCP are available"""
-        if self.config.get("legacy"):
-            # explicitly set in pipeline config
-            return True
-        cfg = Configuration()
-        return cfg.get("disable_ocp") and cfg.get("enable_old_audioservice")
+    def is_legacy(self, message: Message) -> bool:
+        """check if a given Session is using OCP or the legacy audio system"""
+        capabilities = self._get_ocp_capabilities(message)
+        return not capabilities.ocp_available
 
     def legacy_play(self, results: List[MediaEntry], phrase=""):
         xtract = load_stream_extractors()
@@ -1397,27 +1380,27 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.legacy_api.play(results, utterance=phrase)
 
     def _handle_legacy_audio_stop(self, message: Message):
-        if self.use_legacy_audio:
+        if self.is_legacy(message):
             self.player_state = PlayerState.STOPPED
             self.media_state = MediaState.NO_MEDIA
 
     def _handle_legacy_audio_pause(self, message: Message):
-        if self.use_legacy_audio and self.player_state == PlayerState.PLAYING:
+        if self.is_legacy(message) and self.player_state == PlayerState.PLAYING:
             self.player_state = PlayerState.PAUSED
             self.media_state = MediaState.LOADED_MEDIA
 
     def _handle_legacy_audio_resume(self, message: Message):
-        if self.use_legacy_audio and self.player_state == PlayerState.PAUSED:
+        if self.is_legacy(message) and self.player_state == PlayerState.PAUSED:
             self.player_state = PlayerState.PLAYING
             self.media_state = MediaState.LOADED_MEDIA
 
     def _handle_legacy_audio_start(self, message: Message):
-        if self.use_legacy_audio:
+        if self.is_legacy(message):
             self.player_state = PlayerState.PLAYING
             self.media_state = MediaState.LOADED_MEDIA
 
     def _handle_legacy_audio_end(self, message: Message):
-        if self.use_legacy_audio:
+        if self.is_legacy(message):
             self.player_state = PlayerState.STOPPED
             self.media_state = MediaState.END_OF_MEDIA
 
