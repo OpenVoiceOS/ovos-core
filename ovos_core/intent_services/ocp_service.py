@@ -17,7 +17,7 @@ from sklearn.pipeline import FeatureUnion
 
 import ovos_core.intent_services
 from ovos_bus_client.apis.ocp import ClassicAudioServiceInterface
-from ovos_bus_client.message import Message
+from ovos_bus_client.message import Message, dig_for_message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import wait_for_reply
 from ovos_plugin_manager.ocp import load_stream_extractors, available_extractors
@@ -872,7 +872,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         player = self.get_player(message)
         # if media is currently paused, empty string means "resume playback"
         if player.player_state == PlayerState.PAUSED and \
-                self._should_resume(utterance, lang):
+                self._should_resume(utterance, lang, message=message):
             return ovos_core.intent_services.IntentMatch(intent_service="OCP_intents",
                                                          intent_type=f"ocp:resume",
                                                          intent_data=match,
@@ -1212,6 +1212,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                         LOG.info(f"Session: {player.session_id} Available stream extractor plugins: {m.data['SEI']}")
 
                 self.bus.on("ovos.common_play.SEI.get.response", handle_m)
+                message = message or dig_for_message() or Message("")  # get message.context to forward
                 self.bus.emit(message.forward("ovos.common_play.SEI.get"))
                 ev.wait(timeout)
                 self.bus.remove("ovos.common_play.SEI.get.response", handle_m)
