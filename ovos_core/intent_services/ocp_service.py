@@ -29,7 +29,7 @@ from ovos_workshop.app import OVOSAbstractApplication
 
 try:
     from ovos_utils.ocp import (MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID,
-                                MediaEntry, Playlist, MediaState, TrackState, LoopState)
+                                MediaEntry, Playlist, MediaState, TrackState)
     from ovos_bus_client.apis.ocp import OCPInterface, OCPQuery
 except ImportError:
     # already redefined in workshop for compat, no need to do it AGAIN
@@ -465,17 +465,7 @@ class OCPPlayerProxy:
     ocp_available: bool
     player_state: PlayerState = PlayerState.STOPPED
     media_state: MediaState = MediaState.UNKNOWN
-    loop_state: LoopState = LoopState.NONE
     media_type: MediaType = MediaType.GENERIC
-    playback_type: PlaybackType = PlaybackType.UNDEFINED
-
-    @property
-    def is_playing(self):
-        return (self.player_state != PlayerState.STOPPED.value or
-                self.media_state not in [MediaState.NO_MEDIA.value,
-                                         MediaState.UNKNOWN.value,
-                                         MediaState.LOADED_MEDIA.value,
-                                         MediaState.END_OF_MEDIA.value])
 
 
 class OCPFeaturizer:
@@ -760,10 +750,18 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         @param message: Message providing new "state" data
         """
         player = self.get_player(message)
-        player.player_state = message.data.get("player_state") or player.player_state
-        player.media_state = message.data.get("media_state") or player.media_state
-        player.media_type = message.data.get("media_type") or player.media_type
-        player.playback_type = message.data.get("playback_type") or player.playback_type
+        pstate = message.data.get("player_state")
+        mstate = message.data.get("media_state")
+        mtype = message.data.get("media_type")
+        if pstate is not None:
+            player.player_state = PlayerState(pstate)
+            LOG.debug(f"Session: {player.session_id} PlayerState: {player.player_state}")
+        if mstate is not None:
+            player.media_state = MediaState(mstate)
+            LOG.debug(f"Session: {player.session_id} MediaState: {player.media_state}")
+        if mtype is not None:
+            player.media_type = MediaType(pstate)
+            LOG.debug(f"Session: {player.session_id} MediaType: {player.media_type}")
         self.update_player_proxy(player)
 
     # pipeline
@@ -792,7 +790,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             LOG.debug("Ignoring like_song intent, current media is not MediaType.MUSIC")
             return None
 
-        if match["name"] not in ["open", "play_favorites"] and not player.is_playing:
+        if match["name"] not in ["open", "play_favorites"] and player.player_state == PlayerState.STOPPED:
             LOG.info(f'Ignoring OCP intent match {match["name"]}, OCP Virtual Player is not active')
             # next / previous / pause / resume not targeted
             # at OCP if playback is not happening / paused
