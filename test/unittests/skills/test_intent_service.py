@@ -302,7 +302,6 @@ class TestIntentServiceApi(TestCase):
                           'ocp:prev',
                           'ocp:resume',
                           'ocp:search_error',
-                          'ovos.common_play.SEI.get.response',
                           'ovos.common_play.activate',
                           'ovos.common_play.announce',
                           'ovos.common_play.converse.get_response',
