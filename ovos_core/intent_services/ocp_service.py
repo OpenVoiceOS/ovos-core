@@ -750,9 +750,9 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         @param message: Message providing new "state" data
         """
         player = self.get_player(message)
-        pstate = message.data.get("player_state")
-        mstate = message.data.get("media_state")
-        mtype = message.data.get("media_type")
+        pstate: int = message.data.get("player_state")
+        mstate: int = message.data.get("media_state")
+        mtype: int = message.data.get("media_type")
         if pstate is not None:
             player.player_state = PlayerState(pstate)
             LOG.debug(f"Session: {player.session_id} PlayerState: {player.player_state}")
