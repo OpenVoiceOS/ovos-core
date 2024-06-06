@@ -1013,11 +1013,9 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         else:
             LOG.info("Requesting OCP to stop")
             self.ocp_api.stop()
-            # old ocp doesnt report stopped state ...
-            # TODO - remove this once proper events are emitted
-            player = self.get_player(message)
-            player.player_state = PlayerState.STOPPED
-            self.update_player_proxy(player)
+        player = self.get_player(message)
+        player.player_state = PlayerState.STOPPED
+        self.update_player_proxy(player)
 
     def handle_next_intent(self, message: Message):
         player = self.get_player(message)
@@ -1045,6 +1043,9 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         else:
             LOG.info("Requesting OCP to go to pause")
             self.ocp_api.pause()
+        player = self.get_player(message)
+        player.player_state = PlayerState.PAUSED
+        self.update_player_proxy(player)
 
     def handle_resume_intent(self, message: Message):
         player = self.get_player(message)
@@ -1054,6 +1055,9 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         else:
             LOG.info("Requesting OCP to go to resume")
             self.ocp_api.resume()
+        player = self.get_player(message)
+        player.player_state = PlayerState.PLAYING
+        self.update_player_proxy(player)
 
     def handle_search_error_intent(self, message: Message):
         self.bus.emit(message.forward("mycroft.audio.play_sound",

@@ -4,7 +4,7 @@ from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
-from ovos_core.intent_services.ocp_service import PlayerState, MediaState
+from ovos_core.intent_services.ocp_service import PlayerState, MediaState, OCPPlayerProxy
 from ..minicroft import get_minicroft
 
 
@@ -19,7 +19,6 @@ class TestOCPPipeline(TestCase):
 
     def test_no_match(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
-        self.assertFalse(self.core.intent_service.ocp.use_legacy_audio)
         messages = []
 
         def new_msg(msg):
@@ -45,6 +44,9 @@ class TestOCPPipeline(TestCase):
                            "converse",
                            "ocp_high"
                        ])
+        self.core.intent_service.ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
+            session_id=sess.session_id, available_extractors=[], ocp_available=True,
+            player_state=PlayerState.STOPPED, media_state=MediaState.NO_MEDIA)
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["play unknown thing"]},
                       {"session": sess.serialize(),  # explicit
@@ -89,7 +91,6 @@ class TestOCPPipeline(TestCase):
 
     def test_radio_media_match(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
-        self.assertFalse(self.core.intent_service.ocp.use_legacy_audio)
         messages = []
 
         def new_msg(msg):
@@ -115,6 +116,9 @@ class TestOCPPipeline(TestCase):
                            "converse",
                            "ocp_high"
                        ])
+        self.core.intent_service.ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
+            session_id=sess.session_id, available_extractors=[], ocp_available=True,
+            player_state=PlayerState.STOPPED, media_state=MediaState.NO_MEDIA)
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["play some radio station"]},
                       {"session": sess.serialize(),  # explicit
@@ -162,7 +166,6 @@ class TestOCPPipeline(TestCase):
 
     def test_unk_media_match(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
-        self.assertFalse(self.core.intent_service.ocp.use_legacy_audio)
         messages = []
 
         def new_msg(msg):
@@ -188,6 +191,9 @@ class TestOCPPipeline(TestCase):
                            "converse",
                            "ocp_high"
                        ])
+        self.core.intent_service.ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
+            session_id=sess.session_id, available_extractors=[], ocp_available=True,
+            player_state=PlayerState.STOPPED, media_state=MediaState.NO_MEDIA)
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["play the alien movie"]},
                       {"session": sess.serialize(),  # explicit
@@ -233,7 +239,6 @@ class TestOCPPipeline(TestCase):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
     def test_skill_name_match(self):
-        self.assertFalse(self.core.intent_service.ocp.use_legacy_audio)
         self.assertIsNotNone(self.core.intent_service.ocp)
         messages = []
 
@@ -260,6 +265,9 @@ class TestOCPPipeline(TestCase):
                            "converse",
                            "ocp_high"
                        ])
+        self.core.intent_service.ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
+            session_id=sess.session_id, available_extractors=[], ocp_available=True,
+            player_state=PlayerState.STOPPED, media_state=MediaState.NO_MEDIA)
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["play Fake FM"]},  # auto derived from skill class name in this case
                       {"session": sess.serialize(),
@@ -305,9 +313,7 @@ class TestOCPPipeline(TestCase):
     def test_legacy_match(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
         self.core.intent_service.ocp.config = {"legacy": True}
-        self.core.intent_service.ocp.player_state = PlayerState.STOPPED
-        self.core.intent_service.ocp.media_state = MediaState.NO_MEDIA
-        self.assertTrue(self.core.intent_service.ocp.use_legacy_audio)
+
         messages = []
 
         def new_msg(msg):
@@ -333,6 +339,11 @@ class TestOCPPipeline(TestCase):
                            "converse",
                            "ocp_high"
                        ])
+
+        self.core.intent_service.ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
+            session_id=sess.session_id, available_extractors=[], ocp_available=False,
+            player_state=PlayerState.STOPPED, media_state=MediaState.NO_MEDIA)
+
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["play some radio station"]},
                       {"session": sess.serialize(),  # explicit
@@ -375,15 +386,13 @@ class TestOCPPipeline(TestCase):
         for idx, m in enumerate(messages):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
-        self.assertEqual(self.core.intent_service.ocp.player_state, PlayerState.PLAYING)
-        self.assertEqual(self.core.intent_service.ocp.media_state, MediaState.LOADING_MEDIA)
+        ocp = self.core.intent_service.ocp.ocp_sessions[sess.session_id]
+        self.assertEqual(ocp.player_state, PlayerState.PLAYING)
+        self.assertEqual(ocp.media_state, MediaState.LOADING_MEDIA)
 
     def test_legacy_pause(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
         self.core.intent_service.ocp.config = {"legacy": True}
-        self.core.intent_service.ocp.player_state = PlayerState.PLAYING
-        self.core.intent_service.ocp.media_state = MediaState.LOADED_MEDIA
-        self.assertTrue(self.core.intent_service.ocp.use_legacy_audio)
         messages = []
 
         def new_msg(msg):
@@ -409,6 +418,10 @@ class TestOCPPipeline(TestCase):
                            "converse",
                            "ocp_high"
                        ])
+        self.core.intent_service.ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
+            session_id=sess.session_id, available_extractors=[], ocp_available=False,
+            player_state=PlayerState.PLAYING, media_state=MediaState.LOADED_MEDIA)
+
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["pause"]},
                       {"session": sess.serialize(),  # explicit
@@ -433,14 +446,13 @@ class TestOCPPipeline(TestCase):
         for idx, m in enumerate(messages):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
-        self.assertEqual(self.core.intent_service.ocp.player_state, PlayerState.PAUSED)
+        ocp = self.core.intent_service.ocp.ocp_sessions[sess.session_id]
+        self.assertEqual(ocp.player_state, PlayerState.PAUSED)
 
     def test_legacy_resume(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
         self.core.intent_service.ocp.config = {"legacy": True}
-        self.core.intent_service.ocp.player_state = PlayerState.PAUSED
-        self.core.intent_service.ocp.media_state = MediaState.LOADED_MEDIA
-        self.assertTrue(self.core.intent_service.ocp.use_legacy_audio)
+
         messages = []
 
         def new_msg(msg):
@@ -466,6 +478,10 @@ class TestOCPPipeline(TestCase):
                            "converse",
                            "ocp_high"
                        ])
+
+        self.core.intent_service.ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
+            session_id=sess.session_id, available_extractors=[], ocp_available=False,
+            player_state=PlayerState.PAUSED, media_state=MediaState.LOADED_MEDIA)
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["resume"]},
                       {"session": sess.serialize(),  # explicit
@@ -490,14 +506,12 @@ class TestOCPPipeline(TestCase):
         for idx, m in enumerate(messages):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
-        self.assertEqual(self.core.intent_service.ocp.player_state, PlayerState.PLAYING)
+        ocp = self.core.intent_service.ocp.ocp_sessions[sess.session_id]
+        self.assertEqual(ocp.player_state, PlayerState.PLAYING)
 
     def test_legacy_stop(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
         self.core.intent_service.ocp.config = {"legacy": True}
-        self.core.intent_service.ocp.player_state = PlayerState.PLAYING
-        self.core.intent_service.ocp.media_state = MediaState.LOADED_MEDIA
-        self.assertTrue(self.core.intent_service.ocp.use_legacy_audio)
         messages = []
 
         def new_msg(msg):
@@ -523,6 +537,11 @@ class TestOCPPipeline(TestCase):
                            "converse",
                            "ocp_high"
                        ])
+
+        self.core.intent_service.ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
+            session_id=sess.session_id, available_extractors=[], ocp_available=False,
+            player_state=PlayerState.PLAYING, media_state=MediaState.LOADED_MEDIA)
+
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["stop"]},
                       {"session": sess.serialize(),  # explicit
@@ -547,14 +566,12 @@ class TestOCPPipeline(TestCase):
         for idx, m in enumerate(messages):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
-        self.assertEqual(self.core.intent_service.ocp.player_state, PlayerState.STOPPED)
+        ocp = self.core.intent_service.ocp.ocp_sessions[sess.session_id]
+        self.assertEqual(ocp.player_state, PlayerState.STOPPED)
 
     def test_legacy_next(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
         self.core.intent_service.ocp.config = {"legacy": True}
-        self.core.intent_service.ocp.player_state = PlayerState.PLAYING
-        self.core.intent_service.ocp.media_state = MediaState.LOADED_MEDIA
-        self.assertTrue(self.core.intent_service.ocp.use_legacy_audio)
         messages = []
 
         def new_msg(msg):
@@ -580,6 +597,11 @@ class TestOCPPipeline(TestCase):
                            "converse",
                            "ocp_high"
                        ])
+
+        self.core.intent_service.ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
+            session_id=sess.session_id, available_extractors=[], ocp_available=False,
+            player_state=PlayerState.PLAYING, media_state=MediaState.LOADED_MEDIA)
+
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["next"]},
                       {"session": sess.serialize(),  # explicit
@@ -607,9 +629,6 @@ class TestOCPPipeline(TestCase):
     def test_legacy_prev(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
         self.core.intent_service.ocp.config = {"legacy": True}
-        self.core.intent_service.ocp.player_state = PlayerState.PLAYING
-        self.core.intent_service.ocp.media_state = MediaState.LOADED_MEDIA
-        self.assertTrue(self.core.intent_service.ocp.use_legacy_audio)
         messages = []
 
         def new_msg(msg):
@@ -635,6 +654,9 @@ class TestOCPPipeline(TestCase):
                            "converse",
                            "ocp_high"
                        ])
+        self.core.intent_service.ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
+            session_id=sess.session_id, available_extractors=[], ocp_available=False,
+            player_state=PlayerState.PLAYING, media_state=MediaState.LOADED_MEDIA)
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["previous"]},
                       {"session": sess.serialize(),  # explicit
@@ -661,9 +683,6 @@ class TestOCPPipeline(TestCase):
 
     def test_pause(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
-        self.core.intent_service.ocp.player_state = PlayerState.PLAYING
-        self.core.intent_service.ocp.media_state = MediaState.LOADED_MEDIA
-        self.assertFalse(self.core.intent_service.ocp.use_legacy_audio)
         messages = []
 
         def new_msg(msg):
@@ -689,6 +708,9 @@ class TestOCPPipeline(TestCase):
                            "converse",
                            "ocp_high"
                        ])
+        self.core.intent_service.ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
+            session_id=sess.session_id, available_extractors=[], ocp_available=True,
+            player_state=PlayerState.PLAYING, media_state=MediaState.LOADED_MEDIA)
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["pause"]},
                       {"session": sess.serialize(),  # explicit
@@ -715,9 +737,6 @@ class TestOCPPipeline(TestCase):
 
     def test_resume(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
-        self.core.intent_service.ocp.player_state = PlayerState.PAUSED
-        self.core.intent_service.ocp.media_state = MediaState.LOADED_MEDIA
-        self.assertFalse(self.core.intent_service.ocp.use_legacy_audio)
         messages = []
 
         def new_msg(msg):
@@ -743,6 +762,10 @@ class TestOCPPipeline(TestCase):
                            "converse",
                            "ocp_high"
                        ])
+
+        self.core.intent_service.ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
+            session_id=sess.session_id, available_extractors=[], ocp_available=True,
+            player_state=PlayerState.PAUSED, media_state=MediaState.LOADED_MEDIA)
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["resume"]},
                       {"session": sess.serialize(),  # explicit
@@ -769,9 +792,6 @@ class TestOCPPipeline(TestCase):
 
     def test_stop(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
-        self.core.intent_service.ocp.player_state = PlayerState.PLAYING
-        self.core.intent_service.ocp.media_state = MediaState.LOADED_MEDIA
-        self.assertFalse(self.core.intent_service.ocp.use_legacy_audio)
         messages = []
 
         def new_msg(msg):
@@ -797,6 +817,9 @@ class TestOCPPipeline(TestCase):
                            "converse",
                            "ocp_high"
                        ])
+        self.core.intent_service.ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
+            session_id=sess.session_id, available_extractors=[], ocp_available=True,
+            player_state=PlayerState.PLAYING, media_state=MediaState.LOADED_MEDIA)
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["stop"]},
                       {"session": sess.serialize(),  # explicit
@@ -824,9 +847,6 @@ class TestOCPPipeline(TestCase):
 
     def test_next(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
-        self.core.intent_service.ocp.player_state = PlayerState.PLAYING
-        self.core.intent_service.ocp.media_state = MediaState.LOADED_MEDIA
-        self.assertFalse(self.core.intent_service.ocp.use_legacy_audio)
         messages = []
 
         def new_msg(msg):
@@ -852,6 +872,9 @@ class TestOCPPipeline(TestCase):
                            "converse",
                            "ocp_high"
                        ])
+        self.core.intent_service.ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
+            session_id=sess.session_id, available_extractors=[], ocp_available=True,
+            player_state=PlayerState.PLAYING, media_state=MediaState.LOADED_MEDIA)
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["next"]},
                       {"session": sess.serialize(),  # explicit
@@ -878,9 +901,6 @@ class TestOCPPipeline(TestCase):
 
     def test_prev(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
-        self.core.intent_service.ocp.player_state = PlayerState.PLAYING
-        self.core.intent_service.ocp.media_state = MediaState.LOADED_MEDIA
-        self.assertFalse(self.core.intent_service.ocp.use_legacy_audio)
         messages = []
 
         def new_msg(msg):
@@ -906,6 +926,9 @@ class TestOCPPipeline(TestCase):
                            "converse",
                            "ocp_high"
                        ])
+        self.core.intent_service.ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
+            session_id=sess.session_id, available_extractors=[], ocp_available=True,
+            player_state=PlayerState.PLAYING, media_state=MediaState.LOADED_MEDIA)
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["previous"]},
                       {"session": sess.serialize(),  # explicit
@@ -932,8 +955,6 @@ class TestOCPPipeline(TestCase):
 
     def test_status_matches_not_playing(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
-        self.core.intent_service.ocp.player_state = PlayerState.STOPPED
-        self.core.intent_service.ocp.media_state = MediaState.NO_MEDIA
 
         def new_msg(msg):
             nonlocal messages
@@ -958,6 +979,10 @@ class TestOCPPipeline(TestCase):
                            "converse",
                            "ocp_high"
                        ])
+
+        self.core.intent_service.ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
+            session_id=sess.session_id, available_extractors=[], ocp_available=True,
+            player_state=PlayerState.STOPPED, media_state=MediaState.NO_MEDIA)
 
         # wont match unless PlayerState.Playing
         for t in ["pause", "resume", "stop", "next", "previous"]:
