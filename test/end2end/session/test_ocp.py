@@ -5,6 +5,7 @@ from unittest import TestCase
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
 from ovos_core.intent_services.ocp_service import PlayerState, MediaState, OCPPlayerProxy
+from ovos_plugin_manager.ocp import available_extractors
 from ..minicroft import get_minicroft
 
 
@@ -88,6 +89,132 @@ class TestOCPPipeline(TestCase):
 
         for idx, m in enumerate(messages):
             self.assertEqual(m.msg_type, expected_messages[idx])
+
+    def test_player_info(self):
+        self.assertIsNotNone(self.core.intent_service.ocp)
+        messages = []
+
+        def new_msg(msg):
+            nonlocal messages
+            m = Message.deserialize(msg)
+            if m.msg_type in ["ovos.skills.settings_changed", "gui.status.request"]:
+                return  # skip these, only happen in 1st run
+            messages.append(m)
+            print(len(messages), msg)
+
+        def wait_for_n_messages(n):
+            nonlocal messages
+            t = time.time()
+            while len(messages) < n:
+                sleep(0.1)
+                if time.time() - t > 10:
+                    raise RuntimeError("did not get the number of expected messages under 10 seconds")
+
+        self.core.bus.on("message", new_msg)
+
+        sess = Session("test-session", pipeline=["ocp_high"])
+        if sess.session_id in self.core.intent_service.ocp.ocp_sessions:
+            self.core.intent_service.ocp.ocp_sessions.pop(sess.session_id)
+
+        utt = Message("recognizer_loop:utterance",
+                      {"utterances": ["play something"]},
+                      {"session": sess.serialize(),  # explicit
+                       })
+        self.core.bus.emit(utt)
+
+        # confirm all expected messages are sent
+        expected_messages = [
+            "recognizer_loop:utterance",
+            "ovos.common_play.status",
+            "ovos.common_play.SEI.get",  # request player info
+            # no response
+            "intent.service.skills.activate",
+            "intent.service.skills.activated",
+            "ovos.common_play.activate",
+            "enclosure.active_skill",
+            "speak",
+            "ocp:play",
+            "ovos.common_play.search.start",
+            "enclosure.mouth.think",
+            "ovos.common_play.search.stop",  # any ongoing previous search
+            "ovos.common_play.query",
+            "ovos.common_play.skill.search_start",
+            "ovos.common_play.query.response",
+            "ovos.common_play.query.response",
+            "ovos.common_play.query.response",
+            "ovos.common_play.query.response",
+            "ovos.common_play.query.response",
+            "ovos.common_play.skill.search_end",
+            "ovos.common_play.search.end",
+            "ovos.common_play.reset",
+            "enclosure.active_skill",
+            "speak",  # nothing to play
+            "ovos.utterance.handled"  # handle_utterance returned (intent service)
+        ]
+        wait_for_n_messages(len(expected_messages))
+
+        self.assertEqual(len(expected_messages), len(messages))
+
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
+
+        self.assertFalse(self.core.intent_service.ocp.ocp_sessions[sess.session_id].ocp_available)
+        self.assertEqual(self.core.intent_service.ocp.ocp_sessions[sess.session_id].available_extractors,
+                         available_extractors())  # stream extractors handled in core before returning result
+
+        # now test with OCP response
+        messages = []
+
+        def on_get(m):
+            # response that OCP would emit if available
+            self.core.bus.emit(m.response(data={"SEI": ["test"]}))
+
+        self.core.bus.on("ovos.common_play.SEI.get", on_get)
+
+        if sess.session_id in self.core.intent_service.ocp.ocp_sessions:
+            self.core.intent_service.ocp.ocp_sessions.pop(sess.session_id)
+
+        self.core.bus.emit(utt)
+
+        # confirm all expected messages are sent
+        expected_messages = [
+            "recognizer_loop:utterance",
+            "ovos.common_play.status",
+            "ovos.common_play.SEI.get",  # request player info
+            "ovos.common_play.SEI.get.response",  # OCP response
+            "intent.service.skills.activate",
+            "intent.service.skills.activated",
+            "ovos.common_play.activate",
+            "enclosure.active_skill",
+            "speak",
+            "ocp:play",
+            "ovos.common_play.search.start",
+            "enclosure.mouth.think",
+            "ovos.common_play.search.stop",  # any ongoing previous search
+            "ovos.common_play.query",
+            "ovos.common_play.skill.search_start",
+            "ovos.common_play.query.response",
+            "ovos.common_play.query.response",
+            "ovos.common_play.query.response",
+            "ovos.common_play.query.response",
+            "ovos.common_play.query.response",
+            "ovos.common_play.skill.search_end",
+            "ovos.common_play.search.end",
+            "ovos.common_play.reset",
+            "enclosure.active_skill",
+            "speak",  # nothing to play
+            "ovos.utterance.handled"  # handle_utterance returned (intent service)
+        ]
+        wait_for_n_messages(len(expected_messages))
+
+        self.assertEqual(len(expected_messages), len(messages))
+
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
+
+        self.assertTrue(self.core.intent_service.ocp.ocp_sessions[sess.session_id].ocp_available)
+        self.assertEqual(self.core.intent_service.ocp.ocp_sessions[sess.session_id].available_extractors,
+                         ["test"])
 
     def test_radio_media_match(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
