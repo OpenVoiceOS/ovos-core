@@ -216,6 +216,19 @@ class TestOCPPipeline(TestCase):
         self.assertEqual(self.core.intent_service.ocp.ocp_sessions[sess.session_id].available_extractors,
                          ["test"])
 
+        # test OCP player state sync
+        self.assertEqual(self.core.intent_service.ocp.ocp_sessions[sess.session_id].player_state,
+                         PlayerState.STOPPED)
+        messages = []
+        utt = Message("ovos.common_play.status.response",
+                      {"player_state": PlayerState.PLAYING.value},
+                      {"session": sess.serialize(),  # explicit
+                       })
+        self.core.bus.emit(utt)
+
+        self.assertEqual(self.core.intent_service.ocp.ocp_sessions[sess.session_id].player_state,
+                         PlayerState.PLAYING)
+
     def test_radio_media_match(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
         messages = []
