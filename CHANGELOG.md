@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a107...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a108...HEAD)
+
+**Fixed bugs:**
+
+- fix/ocp\_per\_session [\#495](https://github.com/OpenVoiceOS/ovos-core/pull/495) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a108](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a108) (2024-06-04)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a107...V0.0.8a108)
 
 **Fixed bugs:**
 
@@ -513,10 +521,6 @@
 ## [V0.0.8a51](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a51) (2023-10-07)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a50...V0.0.8a51)
-
-**Implemented enhancements:**
-
-- feat: explicit message response to activate/deactivate skill [\#369](https://github.com/OpenVoiceOS/ovos-core/pull/369) ([mikejgray](https://github.com/mikejgray))
 
 ## [V0.0.8a50](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a50) (2023-10-03)
 
