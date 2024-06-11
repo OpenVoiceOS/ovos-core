@@ -1146,7 +1146,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             X = featurizer.transform([query])
             preds = clf.predict_labels(X)[0]
             label = max(preds, key=preds.get)
-            prob = float(round(preds[label], 3))
+            prob = round(float(preds[label]), 3)
             LOG.info(f"OVOSCommonPlay MediaType prediction: {label} confidence: {prob}")
             LOG.debug(f"     utterance: {query}")
             if prob < self.config.get("classifier_threshold", 0.4):
@@ -1171,7 +1171,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         X = featurizer.transform([query])
         preds = clf.predict_labels(X)[0]
         label = max(preds, key=preds.get)
-        prob = round(preds[label], 3)
+        prob = round(float(preds[label]), 3)
         LOG.info(f"OVOSCommonPlay prediction: {label} confidence: {prob}")
         LOG.debug(f"     utterance: {query}")
         return label == "OCP", float(prob)
