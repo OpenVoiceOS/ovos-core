@@ -22,5 +22,14 @@
   "Resume.voc": [
     "(retoma|retomar)",
     "continua"
+  ],
+  "QuestionWord.voc": [
+    "quem",
+    "quê",
+    "como",
+    "(porque|porquê)",
+    "quando",
+    "pergunta",
+    "(diz-me|fala-me) sobre"
   ]
 }
