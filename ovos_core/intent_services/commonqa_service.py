@@ -110,9 +110,10 @@ class CommonQAService:
         if len(utterance.split(" ")) < 3:
             return False
         # skip utterances meant for common play
-        if self.voc_match(utterance, "common_play", lang):
+        if self.voc_match(utterance, "Play", lang):
             return False
-        return True
+        # require a "question word"
+        return self.voc_match(utterance, "QuestionWord", lang)
 
     def match(self, utterances: str, lang: str, message: Message):
         """
