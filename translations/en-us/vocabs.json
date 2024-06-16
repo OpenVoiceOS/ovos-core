@@ -22,5 +22,14 @@
     "Resume.voc": [
         "resume",
         "unpause"
+    ],
+    "QuestionWord.voc": [
+        "who",
+        "what",
+        "how",
+        "why",
+        "when",
+        "question",
+        "tell me about"
     ]
 }
