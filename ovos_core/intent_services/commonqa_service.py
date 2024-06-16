@@ -1,20 +1,18 @@
-import re
 import time
 from dataclasses import dataclass
-from itertools import chain
+from os.path import dirname
 from threading import Event
 from typing import Dict
 
-from ovos_bus_client.apis.enclosure import EnclosureAPI
-from ovos_bus_client.message import Message
-from ovos_bus_client.session import SessionManager
 from ovos_classifiers.opm.heuristics import BM25MultipleChoiceSolver
-from ovos_utils import flatten_list
-from ovos_utils.log import LOG
 
 import ovos_core.intent_services
+from ovos_bus_client.message import Message
+from ovos_bus_client.session import SessionManager
 from ovos_config.config import Configuration
-from ovos_workshop.resource_files import CoreResources
+from ovos_utils import flatten_list
+from ovos_utils.log import LOG
+from ovos_workshop.app import OVOSAbstractApplication
 
 
 @dataclass
@@ -33,13 +31,13 @@ class Query:
     selected_skill: str = ""
 
 
-class CommonQAService:
+class CommonQAService(OVOSAbstractApplication):
     def __init__(self, bus):
-        self.bus = bus
-        self.skill_id = "common_query.openvoiceos"  # fake skill
+        super().__init__(bus=bus,
+                         skill_id="common_query.openvoiceos",
+                         resources_dir=f"{dirname(__file__)}")
         self.active_queries: Dict[str, Query] = dict()
-        self.enclosure = EnclosureAPI(self.bus, self.skill_id)
-        self._vocabs = {}
+
         self.common_query_skills = None
         config = Configuration().get('skills', {}).get("common_query") or dict()
         self._extension_time = config.get('extension_time') or 3
@@ -47,9 +45,9 @@ class CommonQAService:
         self._min_wait = config.get('min_response_wait') or 2
         self._max_time = config.get('max_response_wait') or 6  # regardless of extensions
         self.untier = BM25MultipleChoiceSolver()  # TODO - allow plugin from config
-        self.bus.on('question:query.response', self.handle_query_response)
-        self.bus.on('common_query.question', self.handle_question)
-        self.bus.on('ovos.common_query.pong', self.handle_skill_pong)
+        self.add_event('question:query.response', self.handle_query_response)
+        self.add_event('common_query.question', self.handle_question)
+        self.add_event('ovos.common_query.pong', self.handle_skill_pong)
         self.bus.emit(Message("ovos.common_query.ping"))  # gather any skills that already loaded
 
     def handle_skill_pong(self, message: Message):
@@ -60,45 +58,6 @@ class CommonQAService:
             self.common_query_skills.append(message.data["skill_id"])
             LOG.debug("Detected CommonQuery skill: " + message.data["skill_id"])
 
-    def voc_match(self, utterance: str, voc_filename: str, lang: str,
-                  exact: bool = False) -> bool:
-        """
-        Determine if the given utterance contains the vocabulary provided.
-
-        By default, the method checks if the utterance contains the given vocab
-        thereby allowing the user to say things like "yes, please" and still
-        match against "Yes.voc" containing only "yes". An exact match can be
-        requested.
-
-        Args:
-            utterance (str): Utterance to be tested
-            voc_filename (str): Name of vocabulary file (e.g. 'yes' for
-                                'res/text/en-us/yes.voc')
-            lang (str): Language code, defaults to self.lang
-            exact (bool): Whether the vocab must exactly match the utterance
-
-        Returns:
-            bool: True if the utterance has the given vocabulary it
-        """
-        match = False
-
-        if lang not in self._vocabs:
-            resources = CoreResources(language=lang)
-            vocab = resources.load_vocabulary_file(voc_filename)
-            self._vocabs[lang] = list(chain(*vocab))
-
-        if utterance:
-            if exact:
-                # Check for exact match
-                match = any(i.strip() == utterance
-                            for i in self._vocabs[lang])
-            else:
-                # Check for matches against complete words
-                match = any([re.match(r'.*\b' + i + r'\b.*', utterance)
-                             for i in self._vocabs[lang]])
-
-        return match
-
     def is_question_like(self, utterance: str, lang: str):
         """
         Check if the input utterance looks like a question for CommonQuery
@@ -108,9 +67,11 @@ class CommonQAService:
         """
         # skip utterances with less than 3 words
         if len(utterance.split(" ")) < 3:
+            LOG.debug("utterance has less than 3 words, doesnt look like a question")
             return False
         # skip utterances meant for common play
         if self.voc_match(utterance, "Play", lang):
+            LOG.debug("utterance has 'playback' keywords, doesnt look like a question")
             return False
         # require a "question word"
         return self.voc_match(utterance, "QuestionWord", lang)
@@ -154,7 +115,8 @@ class CommonQAService:
                 answered, skill_id = self.handle_question(message)
                 if answered:
                     match = ovos_core.intent_services.IntentMatch(intent_service='CommonQuery',
-                                                                  intent_type="ovos.utterance.handled", # emit instead of intent message
+                                                                  intent_type="ovos.utterance.handled",
+                                                                  # emit instead of intent message
                                                                   intent_data={},
                                                                   skill_id=skill_id,
                                                                   utterance=utterance)
@@ -295,8 +257,3 @@ class CommonQAService:
         else:
             query.answered = False
         query.completed.set()
-
-    def shutdown(self):
-        self.bus.remove('question:query.response', self.handle_query_response)
-        self.bus.remove('common_query.question', self.handle_question)
-        self.bus.remove('ovos.common_query.pong', self.handle_skill_pong)
