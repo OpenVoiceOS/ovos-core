@@ -2,7 +2,19 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a109...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a110...HEAD)
+
+**Merged pull requests:**
+
+- de-de/translate [\#501](https://github.com/OpenVoiceOS/ovos-core/pull/501) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- fr-fr/translate [\#500](https://github.com/OpenVoiceOS/ovos-core/pull/500) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- it-it/translate [\#499](https://github.com/OpenVoiceOS/ovos-core/pull/499) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- polish [\#476](https://github.com/OpenVoiceOS/ovos-core/pull/476) ([krawc](https://github.com/krawc))
+- de-de/missing\_intent [\#475](https://github.com/OpenVoiceOS/ovos-core/pull/475) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+
+## [V0.0.8a110](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a110) (2024-06-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a109...V0.0.8a110)
 
 **Fixed bugs:**
 
@@ -485,30 +497,13 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a55...V0.0.8a56)
 
-**Fixed bugs:**
-
-- fix lang detect [\#379](https://github.com/OpenVoiceOS/ovos-core/pull/379) ([JarbasAl](https://github.com/JarbasAl))
-
-**Closed issues:**
-
-- 'Session' object has no attribute 'valid\_languages' [\#378](https://github.com/OpenVoiceOS/ovos-core/issues/378)
-
 ## [V0.0.8a55](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a55) (2023-10-19)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a54...V0.0.8a55)
 
-**Fixed bugs:**
-
-- unittests/message\_routing [\#374](https://github.com/OpenVoiceOS/ovos-core/pull/374) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a54](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a54) (2023-10-19)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a53...V0.0.8a54)
-
-**Merged pull requests:**
-
-- fix unittests for ovos-utils==0.0.36a9 [\#375](https://github.com/OpenVoiceOS/ovos-core/pull/375) ([JarbasAl](https://github.com/JarbasAl))
-- unittests/event\_scheduler [\#373](https://github.com/OpenVoiceOS/ovos-core/pull/373) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a53](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a53) (2023-10-13)
 
@@ -517,10 +512,6 @@
 ## [V0.0.8a52](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a52) (2023-10-12)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a51...V0.0.8a52)
-
-**Fixed bugs:**
-
-- fix/get\_response\_not\_ponging [\#372](https://github.com/OpenVoiceOS/ovos-core/pull/372) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a51](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a51) (2023-10-07)
 
