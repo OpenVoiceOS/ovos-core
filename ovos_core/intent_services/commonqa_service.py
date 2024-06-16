@@ -257,3 +257,6 @@ class CommonQAService(OVOSAbstractApplication):
         else:
             query.answered = False
         query.completed.set()
+
+    def shutdown(self):
+        self.default_shutdown()  # remove events registered via self.add_event
