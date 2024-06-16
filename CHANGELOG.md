@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a108...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a109...HEAD)
+
+**Fixed bugs:**
+
+- improve common\_qa/OCP conflicts [\#497](https://github.com/OpenVoiceOS/ovos-core/pull/497) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a109](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a109) (2024-06-07)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a108...V0.0.8a109)
 
 **Fixed bugs:**
 
@@ -505,10 +513,6 @@
 ## [V0.0.8a53](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a53) (2023-10-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a52...V0.0.8a53)
-
-**Implemented enhancements:**
-
-- Refactor/converse messages [\#371](https://github.com/OpenVoiceOS/ovos-core/pull/371) ([emphasize](https://github.com/emphasize))
 
 ## [V0.0.8a52](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a52) (2023-10-12)
 
