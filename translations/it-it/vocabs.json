@@ -22,5 +22,14 @@
   "Resume.voc": [
     "riprendi",
     "continua"
+  ],
+  "QuestionWord.voc": [
+    "chi",
+    "cosa",
+    "come",
+    "perché",
+    "quando",
+    "chiedi",
+    "dimmi"
   ]
 }
