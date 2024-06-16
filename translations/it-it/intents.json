@@ -1,16 +1,16 @@
 {
   "play.intent": [
-    "(riproduci|inizia) {query}",
-    "cerca (common play|ocp|ovos common play|O C P) per {query}",
-    "cerca (ovos|open voice os) media per {query}",
-    "cerca {query} in (common play|ocp|ovos common play|O C P)",
-    "cerca {query} in (ovos|open voice os) media"
+    "(riproduci|metti|racconta)(mi|) {query}",
+    "fammi (vedere|sentire|ascoltare) {query}",
+    "cerca media {query}",
+    "cerca {query} in ovos",
+    "[UNUSED]"
   ],
   "like_song.intent": [
-    "mi piace (questo|questa) qui",
+    "mi piace",
     "mi piace (questa|questo)(canzone|musica|suono|concerto)",
     "bella (canzone|musica)",
-    null
+    "[UNUSED]"
   ],
   "stop.intent": [
     "basta",
@@ -18,98 +18,98 @@
     "fermati",
     "stop",
     "piantala",
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]"
   ],
   "next.intent": [
-    null,
-    null,
-    null,
-    null,
-    null,
-    null
+    "salta",
+    "(salta|vai|) (alla prossima|al prossimo|) (canzone|video)",
+    "passa",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]"
   ],
   "resume.intent": [
-    null,
-    null,
-    null
+    "riprendi",
+    "[UNUSED]",
+    "suona"
   ],
   "read.intent": [
-    null,
-    null,
-    null
+    "leggi(mi|) (il libro|l'audiolibro|la storia) (di|su|) {query}",
+    "(leggi|racconta)(mi|) {query}",
+    "[UNUSED]"
   ],
   "prev.intent": [
-    null,
-    null,
-    null,
-    null,
-    null
+    "metti quella prima",
+    "quella prima",
+    "torna indietro",
+    "[UNUSED]",
+    "[UNUSED]"
   ],
   "global_stop.intent": [
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null
+    "ferma tutto",
+    "smetti tutto",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]"
   ],
   "pause.intent": [
-    null,
-    null
+    "pausa",
+    "metti in pausa"
   ],
   "open.intent": [
-    null,
-    null,
-    null,
-    null
+    "apri il lettore",
+    "lancia il lettore",
+    "[UNUSED]",
+    "[UNUSED]"
   ],
   "featured.intent": [
-    null,
-    null
+    "apri i favoriti",
+    "[UNUSED]"
   ],
   "play_favorites.intent": [
-    null,
-    null
+    "lancia i favoriti",
+    "metti i (miei) favoriti"
   ],
   "media_stop.intent": [
-    null,
-    null,
-    null
+    "(stop|basta|ferma)",
+    "(ferma|spegni|chiudi) (la musica|il film|il libro|la storia)",
+    "(ferma|spegni|chiudi) tutto"
   ]
 }
