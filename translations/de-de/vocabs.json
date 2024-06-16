@@ -22,5 +22,14 @@
   "Resume.voc": [
     "spiele weiter",
     "Pause beenden"
+  ],
+  "QuestionWord.voc": [
+    "wer",
+    "was",
+    "wie",
+    "warum",
+    "wann",
+    "Frage",
+    "Erzähl mir von"
   ]
 }
