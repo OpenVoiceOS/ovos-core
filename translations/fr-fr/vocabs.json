@@ -22,5 +22,14 @@
   "Resume.voc": [
     "reprend",
     "reprend"
+  ],
+  "QuestionWord.voc": [
+    "qui",
+    "quel",
+    "comment",
+    "pourquoi",
+    "quand",
+    "qu'est-ce que",
+    "dis m'en plus au sujet"
   ]
 }
