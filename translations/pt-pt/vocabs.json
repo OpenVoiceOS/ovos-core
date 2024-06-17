@@ -18,10 +18,10 @@
     "podcasts"
   ],
   "Play.voc": [
-    "procura",
-    "lê",
-    "toca",
-    "reproduz"
+    "(procura|procurar)",
+    "(lê|ler)",
+    "(toca|tocar)",
+    "(reproduz|reproduzir)"
   ],
   "audio_only.voc": [
     "apenas audio",
@@ -59,12 +59,12 @@
     "resposta meridiana sensorial autónoma"
   ],
   "DocumentaryKeyword.voc": [
-    "documentario",
-    "documentarios"
+    "documentário",
+    "documentários"
   ],
   "SeriesKeyword.voc": [
     "serie",
-    "programa televisivo",
+    "programa (televisivo|de televisão)",
     "episódio",
     "episódios"
   ],
@@ -87,7 +87,7 @@
   ],
   "Resume.voc": [
     "(retoma|retomar)",
-    "continua"
+    "(continua|continuar)"
   ],
   "ComicBookKeyword.voc": [
     "animação",
@@ -120,13 +120,13 @@
   "AudioBookKeyword.voc": [
     "livro",
     "livros",
-    "lê",
-    "audiolivro",
-    "audiolivros",
+    "(lê|ler)",
+    "(audiolivro|audio livro)",
+    "(audiolivros|audio livros)",
     "(narrar|narração)"
   ],
   "SilentKeyword.voc": [
-    "silencioso"
+    "mudo"
   ],
   "ShortKeyword.voc": [
     "(curta|curto)"
