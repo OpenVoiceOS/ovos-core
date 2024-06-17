@@ -22,6 +22,7 @@ from ovos_config import Configuration
 import ovos_core.intent_services
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
+from ovos_bus_client.session import SessionManager
 from ovos_workshop.skills.fallback import FallbackMode
 
 FallbackRange = namedtuple('FallbackRange', ['start', 'stop'])
@@ -82,9 +83,11 @@ class FallbackService:
         skill_ids = []  # skill_ids that already answered to ping
         fallback_skills = []  # skill_ids that want to handle fallback
 
+        sess = SessionManager.get(message)
         # filter skills outside the fallback_range
         in_range = [s for s, p in self.registered_fallbacks.items()
-                    if fb_range.start < p <= fb_range.stop]
+                    if fb_range.start < p <= fb_range.stop
+                    and s not in sess.blacklisted_skills]
         skill_ids += [s for s in self.registered_fallbacks if s not in in_range]
 
         def handle_ack(msg):
@@ -97,18 +100,19 @@ class FallbackService:
                 LOG.info(f"{skill_id} will NOT try to handle fallback")
             skill_ids.append(skill_id)
 
-        self.bus.on("ovos.skills.fallback.pong", handle_ack)
+        if in_range:  # no need to search if no skills available
+            self.bus.on("ovos.skills.fallback.pong", handle_ack)
 
-        LOG.info("checking for FallbackSkillsV2 candidates")
-        # wait for all skills to acknowledge they want to answer fallback queries
-        self.bus.emit(message.forward("ovos.skills.fallback.ping",
-                                      message.data))
-        start = time.time()
-        while not all(s in skill_ids for s in self.registered_fallbacks) \
-                and time.time() - start <= 0.5:
-            time.sleep(0.02)
+            LOG.info("checking for FallbackSkillsV2 candidates")
+            # wait for all skills to acknowledge they want to answer fallback queries
+            self.bus.emit(message.forward("ovos.skills.fallback.ping",
+                                          message.data))
+            start = time.time()
+            while not all(s in skill_ids for s in self.registered_fallbacks) \
+                    and time.time() - start <= 0.5:
+                time.sleep(0.02)
 
-        self.bus.remove("ovos.skills.fallback.pong", handle_ack)
+            self.bus.remove("ovos.skills.fallback.pong", handle_ack)
         return fallback_skills
 
     def attempt_fallback(self, utterances, skill_id, lang, message):
@@ -124,6 +128,10 @@ class FallbackService:
         Returns:
             handled (bool): True if handled otherwise False.
         """
+        sess = SessionManager.get(message)
+        if skill_id in sess.blacklisted_skills:
+            LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{sess.session_id}'")
+            return False
         if self._fallback_allowed(skill_id):
             fb_msg = message.reply(f"ovos.skills.fallback.{skill_id}.request",
                                    {"skill_id": skill_id,
@@ -158,11 +166,15 @@ class FallbackService:
         message.data["utterances"] = utterances  # all transcripts
         message.data["lang"] = lang
 
+        sess = SessionManager.get(message)
         # new style bus api
         fallbacks = [(k, v) for k, v in self.registered_fallbacks.items()
                      if k in self._collect_fallback_skills(message, fb_range)]
         sorted_handlers = sorted(fallbacks, key=operator.itemgetter(1))
         for skill_id, prio in sorted_handlers:
+            if skill_id in sess.blacklisted_skills:
+                LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{sess.session_id}'")
+                continue
             result = self.attempt_fallback(utterances, skill_id, lang, message)
             if result:
                 return ovos_core.intent_services.IntentMatch(intent_service='Fallback',

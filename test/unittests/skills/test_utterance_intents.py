@@ -83,8 +83,7 @@ class UtteranceIntentMatchingTest(unittest.TestCase):
 
         # fuzzy match - failure case
         intent = intent_service.calc_intent("this test", "en-US")
-        self.assertEqual(intent.conf, 0.0)
-        self.assertTrue(intent.name is None)
+        self.assertIsNone(intent)
 
         # regex match
         intent = intent_service.calc_intent("tell me about Mycroft", "en-US")
@@ -94,8 +93,7 @@ class UtteranceIntentMatchingTest(unittest.TestCase):
         # fuzzy regex match - failure case
         utterance = "tell me everything about Mycroft"
         intent = intent_service.calc_intent(utterance, "en-US")
-        self.assertEqual(intent.conf, 0.0)
-        self.assertTrue(intent.name is None)
+        self.assertIsNone(intent)
 
     def test_padacioso_fuzz_intent(self):
         intent_service = self.get_service(regex_only=True, fuzz=True)

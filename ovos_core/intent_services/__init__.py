@@ -360,6 +360,12 @@ class IntentService:
             for match_func in self.get_pipeline(session=sess):
                 match = match_func(utterances, lang, message)
                 if match:
+                    if match.skill_id and match.skill_id in sess.blacklisted_skills:
+                        LOG.debug(f"ignoring match, skill_id '{match.skill_id}' blacklisted by Session '{sess.session_id}'")
+                        continue
+                    if match.intent_type and match.intent_type in sess.blacklisted_intents:
+                        LOG.debug(f"ignoring match, intent '{match.intent_type}' blacklisted by Session '{sess.session_id}'")
+                        continue
                     try:
                         self._emit_match_message(match, message)
                         break

@@ -320,6 +320,9 @@ class ConverseService:
         self._check_converse_timeout(message)
         # check if any skill wants to handle utterance
         for skill_id in self._collect_converse_skills(message):
+            if skill_id in session.blacklisted_skills:
+                LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{session.session_id}'")
+                continue
             if self.converse(utterances, skill_id, lang, message):
                 state = session.utterance_states.get(skill_id, UtteranceState.INTENT)
                 return ovos_core.intent_services.IntentMatch(intent_service='Converse',
