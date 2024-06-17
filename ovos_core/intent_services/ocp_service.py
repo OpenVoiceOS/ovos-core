@@ -468,81 +468,6 @@ class OCPPlayerProxy:
     media_type: MediaType = MediaType.GENERIC
 
 
-class OCPFeaturizer:
-    # ignore_list accounts for "noise" keywords in the csv file
-    ocp_keywords = KeywordFeaturesVectorizer(ignore_list=["play", "stop"])
-    # defined at training time
-    _clf_labels = ['ad_keyword', 'album_name', 'anime_genre', 'anime_name', 'anime_streaming_service',
-                   'artist_name', 'asmr_keyword', 'asmr_trigger', 'audio_genre', 'audiobook_narrator',
-                   'audiobook_streaming_service', 'book_author', 'book_genre', 'book_name',
-                   'bw_movie_name', 'cartoon_genre', 'cartoon_name', 'cartoon_streaming_service',
-                   'comic_name', 'comic_streaming_service', 'comics_genre', 'country_name',
-                   'documentary_genre', 'documentary_name', 'documentary_streaming_service',
-                   'film_genre', 'film_studio', 'game_genre', 'game_name', 'gaming_console_name',
-                   'generic_streaming_service', 'hentai_name', 'hentai_streaming_service',
-                   'media_type_adult', 'media_type_adult_audio', 'media_type_anime', 'media_type_audio',
-                   'media_type_audiobook', 'media_type_bts', 'media_type_bw_movie', 'media_type_cartoon',
-                   'media_type_documentary', 'media_type_game', 'media_type_hentai', 'media_type_movie',
-                   'media_type_music', 'media_type_news', 'media_type_podcast', 'media_type_radio',
-                   'media_type_radio_theatre', 'media_type_short_film', 'media_type_silent_movie',
-                   'media_type_sound', 'media_type_trailer', 'media_type_tv', 'media_type_video',
-                   'media_type_video_episodes', 'media_type_visual_story', 'movie_actor',
-                   'movie_director', 'movie_name', 'movie_streaming_service', 'music_genre',
-                   'music_streaming_service', 'news_provider', 'news_streaming_service',
-                   'play_verb_audio', 'play_verb_video', 'playback_device', 'playlist_name',
-                   'podcast_genre', 'podcast_name', 'podcast_streaming_service', 'podcaster',
-                   'porn_film_name', 'porn_genre', 'porn_streaming_service', 'pornstar_name',
-                   'radio_drama_actor', 'radio_drama_genre', 'radio_drama_name', 'radio_program',
-                   'radio_program_name', 'radio_streaming_service', 'radio_theatre_company',
-                   'radio_theatre_streaming_service', 'record_label', 'series_name',
-                   'short_film_name', 'shorts_streaming_service', 'silent_movie_name',
-                   'song_name', 'sound_name', 'soundtrack_keyword', 'tv_channel', 'tv_genre',
-                   'tv_streaming_service', 'video_genre', 'video_streaming_service', 'youtube_channel']
-
-    def __init__(self, base_clf=None):
-        self.clf_feats = None
-        if base_clf:
-            if isinstance(base_clf, str):
-                clf_path = f"{dirname(__file__)}/models/{base_clf}.clf"
-                assert os.path.isfile(clf_path)
-                base_clf = SklearnOVOSClassifier.from_file(clf_path)
-            self.clf_feats = ClassifierProbaVectorizer(base_clf)
-        for l in self._clf_labels:  # no samples, just to ensure featurizer has right number of feats
-            self.ocp_keywords.register_entity(l, [])
-
-    @classmethod
-    def load_csv(cls, entity_csvs: list):
-        for csv in entity_csvs or []:
-            if not os.path.isfile(csv):
-                # check for bundled files
-                if os.path.isfile(f"{dirname(__file__)}/models/{csv}"):
-                    csv = f"{dirname(__file__)}/models/{csv}"
-                else:
-                    LOG.error(f"Requested OCP entities file does not exist? {csv}")
-                    continue
-            OCPFeaturizer.ocp_keywords.load_entities(csv)
-            LOG.info(f"Loaded OCP keywords: {csv}")
-
-    @classproperty
-    def labels(cls):
-        """
-        in V0 classifier using synth dataset - this is tied to the classifier model"""
-        return cls._clf_labels
-
-    def transform(self, X):
-        if self.clf_feats:
-            vec = FeatureUnion([
-                ("kw", self.ocp_keywords),
-                ("clf", self.clf_feats)
-            ])
-            return vec.transform(X)
-        return self.ocp_keywords.transform(X)
-
-    @classmethod
-    def extract_entities(cls, utterance) -> dict:
-        return cls.ocp_keywords._transformer.wordlist.extract(utterance)
-
-
 class OCPPipelineMatcher(OVOSAbstractApplication):
     intents = ["play.intent", "open.intent", "media_stop.intent",
                "next.intent", "prev.intent", "pause.intent", "play_favorites.intent",
@@ -573,25 +498,30 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.bus.emit(Message("ovos.common_play.SEI.get"))
 
     def load_classifiers(self):
-
         # warm up the featurizer so intent matches faster (lazy loaded)
         if self.entity_csvs:
             OCPFeaturizer.load_csv(self.entity_csvs)
             OCPFeaturizer.extract_entities("UNLEASH THE AUTOMATONS")
 
-        b = f"{dirname(__file__)}/models"
-        # lang agnostic classifiers
-        c = SklearnOVOSClassifier.from_file(f"{b}/media_ocp_kw_small.clf")
-        self._media_clf = (c, OCPFeaturizer())
-        c = SklearnOVOSClassifier.from_file(f"{b}/binary_ocp_kw_small.clf")
-        self._binary_clf = (c, OCPFeaturizer())
+        if self.config.get("experimental_binary_classifier", True):  # ocp_medium
+            LOG.info("Using experimental OCP binary classifier")
+            # TODO - train a single multilingual model instead of this
+            b = f"{dirname(__file__)}/models"
+            c = SklearnOVOSClassifier.from_file(f"{b}/binary_ocp_kw_small.clf")
+            self._binary_clf = (c, OCPFeaturizer())
+            # lang specific classifiers (english only for now)
+            c = SklearnOVOSClassifier.from_file(f"{b}/binary_ocp_cv2_kw_medium.clf")
+            self._binary_en_clf = (c, OCPFeaturizer("binary_ocp_cv2_small"))
 
-        # lang specific classifiers
-        # (english only for now)
-        c = SklearnOVOSClassifier.from_file(f"{b}/media_ocp_cv2_kw_medium.clf")
-        self._media_en_clf = (c, OCPFeaturizer("media_ocp_cv2_medium"))
-        c = SklearnOVOSClassifier.from_file(f"{b}/binary_ocp_cv2_kw_medium.clf")
-        self._binary_en_clf = (c, OCPFeaturizer("binary_ocp_cv2_small"))
+        if self.config.get("experimental_media_classifier", True):
+            LOG.info("Using experimental OCP media type classifier")
+            # TODO - train a single multilingual model instead of this
+            b = f"{dirname(__file__)}/models"
+            c = SklearnOVOSClassifier.from_file(f"{b}/media_ocp_kw_small.clf")
+            self._media_clf = (c, OCPFeaturizer())
+            # lang specific classifiers (english only for now)
+            c = SklearnOVOSClassifier.from_file(f"{b}/media_ocp_cv2_kw_medium.clf")
+            self._media_en_clf = (c, OCPFeaturizer("media_ocp_cv2_medium"))
 
     def load_resource_files(self):
         intents = {}
@@ -1078,110 +1008,115 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             self.ocp_api.stop()
 
     # NLP
-    @staticmethod
-    def label2media(label: str) -> MediaType:
-        if isinstance(label, MediaType):
-            return label
-        if label == "ad":
-            mt = MediaType.AUDIO_DESCRIPTION
-        elif label == "adult":
-            mt = MediaType.ADULT
-        elif label == "adult_asmr":
-            mt = MediaType.ADULT_AUDIO
-        elif label == "anime":
-            mt = MediaType.ANIME
-        elif label == "audio":
-            mt = MediaType.AUDIO
-        elif label == "asmr":
-            mt = MediaType.ASMR
-        elif label == "audiobook":
-            mt = MediaType.AUDIOBOOK
-        elif label == "bts":
-            mt = MediaType.BEHIND_THE_SCENES
-        elif label == "bw_movie":
-            mt = MediaType.BLACK_WHITE_MOVIE
-        elif label == "cartoon":
-            mt = MediaType.CARTOON
-        elif label == "comic":
-            mt = MediaType.VISUAL_STORY
-        elif label == "documentary":
-            mt = MediaType.DOCUMENTARY
-        elif label == "game":
-            mt = MediaType.GAME
-        elif label == "hentai":
-            mt = MediaType.HENTAI
-        elif label == "movie":
-            mt = MediaType.MOVIE
-        elif label == "music":
-            mt = MediaType.MUSIC
-        elif label == "news":
-            mt = MediaType.NEWS
-        elif label == "podcast":
-            mt = MediaType.PODCAST
-        elif label == "radio":
-            mt = MediaType.RADIO
-        elif label == "radio_drama":
-            mt = MediaType.RADIO_THEATRE
-        elif label == "series":
-            mt = MediaType.VIDEO_EPISODES
-        elif label == "short_film":
-            mt = MediaType.SHORT_FILM
-        elif label == "silent_movie":
-            mt = MediaType.SILENT_MOVIE
-        elif label == "trailer":
-            mt = MediaType.TRAILER
-        elif label == "tv_channel":
-            mt = MediaType.TV
-        elif label == "video":
-            mt = MediaType.VIDEO
-        else:
-            LOG.error(f"bad label {label}")
-            mt = MediaType.GENERIC
-        return mt
+    def voc_match_media(self, query: str, lang: str) -> Tuple[MediaType, float]:
+        # simplistic approach via voc_match, works anywhere
+        # and it's easy to localize, but isn't very accurate
+        if self.voc_match(query, "MusicKeyword", lang=lang):
+            # NOTE - before movie to handle "{movie_name} soundtrack"
+            return MediaType.MUSIC, 0.6
+        elif self.voc_match(query, "MovieKeyword", lang=lang):
+            if self.voc_match(query, "ShortKeyword", lang=lang):
+                return MediaType.SHORT_FILM, 0.7
+            elif self.voc_match(query, "SilentKeyword", lang=lang):
+                return MediaType.SILENT_MOVIE, 0.7
+            elif self.voc_match(query, "BWKeyword", lang=lang):
+                return MediaType.BLACK_WHITE_MOVIE, 0.7
+            return MediaType.MOVIE, 0.6
+        elif self.voc_match(query, "DocumentaryKeyword", lang=lang):
+            return MediaType.DOCUMENTARY, 0.6
+        elif self.voc_match(query, "AudioBookKeyword", lang=lang):
+            return MediaType.AUDIOBOOK, 0.6
+        elif self.voc_match(query, "NewsKeyword", lang=lang):
+            return MediaType.NEWS, 0.6
+        elif self.voc_match(query, "AnimeKeyword", lang=lang):
+            return MediaType.ANIME, 0.6
+        elif self.voc_match(query, "CartoonKeyword", lang=lang):
+            return MediaType.CARTOON, 0.6
+        elif self.voc_match(query, "PodcastKeyword", lang=lang):
+            return MediaType.PODCAST, 0.6
+        elif self.voc_match(query, "TVKeyword", lang=lang):
+            return MediaType.TV, 0.6
+        elif self.voc_match(query, "SeriesKeyword", lang=lang):
+            return MediaType.VIDEO_EPISODES, 0.6
+        elif self.voc_match(query, "AudioDramaKeyword", lang=lang):
+            # NOTE - before "radio" to allow "radio theatre"
+            return MediaType.RADIO_THEATRE, 0.6
+        elif self.voc_match(query, "RadioKeyword", lang=lang):
+            return MediaType.RADIO, 0.6
+        elif self.voc_match(query, "ComicBookKeyword", lang=lang):
+            return MediaType.VISUAL_STORY, 0.4
+        elif self.voc_match(query, "GameKeyword", lang=lang):
+            return MediaType.GAME, 0.4
+        elif self.voc_match(query, "ADKeyword", lang=lang):
+            return MediaType.AUDIO_DESCRIPTION, 0.4
+        elif self.voc_match(query, "ASMRKeyword", lang=lang):
+            return MediaType.ASMR, 0.4
+        elif self.voc_match(query, "AdultKeyword", lang=lang):
+            if self.voc_match(query, "CartoonKeyword", lang=lang) or \
+                    self.voc_match(query, "AnimeKeyword", lang=lang) or \
+                    self.voc_match(query, "HentaiKeyword", lang=lang):
+                return MediaType.HENTAI, 0.4
+            elif self.voc_match(query, "AudioKeyword", lang=lang) or \
+                    self.voc_match(query, "ASMRKeyword", lang=lang):
+                return MediaType.ADULT_AUDIO, 0.4
+            return MediaType.ADULT, 0.4
+        elif self.voc_match(query, "HentaiKeyword", lang=lang):
+            return MediaType.HENTAI, 0.4
+        elif self.voc_match(query, "VideoKeyword", lang=lang):
+            return MediaType.VIDEO, 0.4
+        elif self.voc_match(query, "AudioKeyword", lang=lang):
+            return MediaType.AUDIO, 0.4
+        return MediaType.GENERIC, 0.0
 
     def classify_media(self, query: str, lang: str) -> Tuple[MediaType, float]:
         """ determine what media type is being requested """
+        # using a trained classifier (Experimental)
+        if self.config.get("experimental_media_classifier", True):
+            try:
+                if lang.startswith("en"):
+                    clf: SklearnOVOSClassifier = self._media_en_clf[0]
+                    featurizer: OCPFeaturizer = self._media_en_clf[1]
+                else:
+                    clf: SklearnOVOSClassifier = self._media_clf[0]
+                    featurizer: OCPFeaturizer = self._media_clf[1]
+                X = featurizer.transform([query])
+                preds = clf.predict_labels(X)[0]
+                label = max(preds, key=preds.get)
+                prob = float(round(preds[label], 3))
+                LOG.info(f"OVOSCommonPlay MediaType prediction: {label} confidence: {prob}")
+                LOG.debug(f"     utterance: {query}")
+                if prob < self.config.get("classifier_threshold", 0.4):
+                    LOG.info("ignoring MediaType classifier, low confidence prediction")
+                    return MediaType.GENERIC, prob
+                else:
+                    return OCPFeaturizer.label2media(label), prob
+            except:
+                LOG.exception(f"OCP classifier exception: {query}")
+        return self.voc_match_media(query, lang)
 
-        if lang.startswith("en"):
-            clf: SklearnOVOSClassifier = self._media_en_clf[0]
-            featurizer: OCPFeaturizer = self._media_en_clf[1]
-        else:
-            clf: SklearnOVOSClassifier = self._media_clf[0]
-            featurizer: OCPFeaturizer = self._media_clf[1]
-
-        try:
-            X = featurizer.transform([query])
-            preds = clf.predict_labels(X)[0]
-            label = max(preds, key=preds.get)
-            prob = float(round(preds[label], 3))
-            LOG.info(f"OVOSCommonPlay MediaType prediction: {label} confidence: {prob}")
-            LOG.debug(f"     utterance: {query}")
-            if prob < self.config.get("classifier_threshold", 0.4):
-                LOG.info("ignoring MediaType classifier, low confidence prediction")
-                return MediaType.GENERIC, prob
-            else:
-                return self.label2media(label), prob
-        except:
-            LOG.exception(f"OCP classifier exception: {query}")
-            return MediaType.GENERIC, 0.0
-
-    def is_ocp_query(self, query: str, lang: str) -> Tuple[MediaType, float]:
+    def is_ocp_query(self, query: str, lang: str) -> Tuple[bool, float]:
         """ determine if a playback question is being asked"""
+        if self.config.get("experimental_binary_classifier", True):
+            try:
+                # TODO - train a single multilingual classifier
+                if lang.startswith("en"):
+                    clf: SklearnOVOSClassifier = self._binary_en_clf[0]
+                    featurizer: OCPFeaturizer = self._binary_en_clf[1]
+                else:
+                    clf: SklearnOVOSClassifier = self._binary_clf[0]
+                    featurizer: OCPFeaturizer = self._binary_clf[1]
 
-        if lang.startswith("en"):
-            clf: SklearnOVOSClassifier = self._binary_en_clf[0]
-            featurizer: OCPFeaturizer = self._binary_en_clf[1]
-        else:
-            clf: SklearnOVOSClassifier = self._binary_clf[0]
-            featurizer: OCPFeaturizer = self._binary_clf[1]
-
-        X = featurizer.transform([query])
-        preds = clf.predict_labels(X)[0]
-        label = max(preds, key=preds.get)
-        prob = round(preds[label], 3)
-        LOG.info(f"OVOSCommonPlay prediction: {label} confidence: {prob}")
-        LOG.debug(f"     utterance: {query}")
-        return label == "OCP", float(prob)
+                X = featurizer.transform([query])
+                preds = clf.predict_labels(X)[0]
+                label = max(preds, key=preds.get)
+                prob = round(preds[label], 3)
+                LOG.info(f"OVOSCommonPlay prediction: {label} confidence: {prob}")
+                LOG.debug(f"     utterance: {query}")
+                return label == "OCP", float(prob)
+            except:
+                LOG.exception("OCP binary classifier failure")
+        m, p = self.voc_match_media(query, lang)
+        return m != MediaType.GENERIC, p
 
     def _should_resume(self, phrase: str, lang: str, message: Optional[Message] = None) -> bool:
         """
@@ -1600,3 +1535,141 @@ class LegacyCommonPlay:
                            match_confidence=res["conf"] * 100,
                            skill_id=res["skill_id"])
         return entry, res['callback_data']
+
+
+class OCPFeaturizer:
+    """used by the experimental media type classifier,
+    API should be considered unstable"""
+    # ignore_list accounts for "noise" keywords in the csv file
+    ocp_keywords = KeywordFeaturesVectorizer(ignore_list=["play", "stop"])
+    # defined at training time
+    _clf_labels = ['ad_keyword', 'album_name', 'anime_genre', 'anime_name', 'anime_streaming_service',
+                   'artist_name', 'asmr_keyword', 'asmr_trigger', 'audio_genre', 'audiobook_narrator',
+                   'audiobook_streaming_service', 'book_author', 'book_genre', 'book_name',
+                   'bw_movie_name', 'cartoon_genre', 'cartoon_name', 'cartoon_streaming_service',
+                   'comic_name', 'comic_streaming_service', 'comics_genre', 'country_name',
+                   'documentary_genre', 'documentary_name', 'documentary_streaming_service',
+                   'film_genre', 'film_studio', 'game_genre', 'game_name', 'gaming_console_name',
+                   'generic_streaming_service', 'hentai_name', 'hentai_streaming_service',
+                   'media_type_adult', 'media_type_adult_audio', 'media_type_anime', 'media_type_audio',
+                   'media_type_audiobook', 'media_type_bts', 'media_type_bw_movie', 'media_type_cartoon',
+                   'media_type_documentary', 'media_type_game', 'media_type_hentai', 'media_type_movie',
+                   'media_type_music', 'media_type_news', 'media_type_podcast', 'media_type_radio',
+                   'media_type_radio_theatre', 'media_type_short_film', 'media_type_silent_movie',
+                   'media_type_sound', 'media_type_trailer', 'media_type_tv', 'media_type_video',
+                   'media_type_video_episodes', 'media_type_visual_story', 'movie_actor',
+                   'movie_director', 'movie_name', 'movie_streaming_service', 'music_genre',
+                   'music_streaming_service', 'news_provider', 'news_streaming_service',
+                   'play_verb_audio', 'play_verb_video', 'playback_device', 'playlist_name',
+                   'podcast_genre', 'podcast_name', 'podcast_streaming_service', 'podcaster',
+                   'porn_film_name', 'porn_genre', 'porn_streaming_service', 'pornstar_name',
+                   'radio_drama_actor', 'radio_drama_genre', 'radio_drama_name', 'radio_program',
+                   'radio_program_name', 'radio_streaming_service', 'radio_theatre_company',
+                   'radio_theatre_streaming_service', 'record_label', 'series_name',
+                   'short_film_name', 'shorts_streaming_service', 'silent_movie_name',
+                   'song_name', 'sound_name', 'soundtrack_keyword', 'tv_channel', 'tv_genre',
+                   'tv_streaming_service', 'video_genre', 'video_streaming_service', 'youtube_channel']
+
+    def __init__(self, base_clf=None):
+        self.clf_feats = None
+        if base_clf:
+            if isinstance(base_clf, str):
+                clf_path = f"{dirname(__file__)}/models/{base_clf}.clf"
+                assert os.path.isfile(clf_path)
+                base_clf = SklearnOVOSClassifier.from_file(clf_path)
+            self.clf_feats = ClassifierProbaVectorizer(base_clf)
+        for l in self._clf_labels:  # no samples, just to ensure featurizer has right number of feats
+            self.ocp_keywords.register_entity(l, [])
+
+    @classmethod
+    def load_csv(cls, entity_csvs: list):
+        for csv in entity_csvs or []:
+            if not os.path.isfile(csv):
+                # check for bundled files
+                if os.path.isfile(f"{dirname(__file__)}/models/{csv}"):
+                    csv = f"{dirname(__file__)}/models/{csv}"
+                else:
+                    LOG.error(f"Requested OCP entities file does not exist? {csv}")
+                    continue
+            OCPFeaturizer.ocp_keywords.load_entities(csv)
+            LOG.info(f"Loaded OCP keywords: {csv}")
+
+    @classproperty
+    def labels(cls):
+        """
+        in V0 classifier using synth dataset - this is tied to the classifier model"""
+        return cls._clf_labels
+
+    @staticmethod
+    def label2media(label: str) -> MediaType:
+        if isinstance(label, MediaType):
+            return label
+        if label == "ad":
+            mt = MediaType.AUDIO_DESCRIPTION
+        elif label == "adult":
+            mt = MediaType.ADULT
+        elif label == "adult_asmr":
+            mt = MediaType.ADULT_AUDIO
+        elif label == "anime":
+            mt = MediaType.ANIME
+        elif label == "audio":
+            mt = MediaType.AUDIO
+        elif label == "asmr":
+            mt = MediaType.ASMR
+        elif label == "audiobook":
+            mt = MediaType.AUDIOBOOK
+        elif label == "bts":
+            mt = MediaType.BEHIND_THE_SCENES
+        elif label == "bw_movie":
+            mt = MediaType.BLACK_WHITE_MOVIE
+        elif label == "cartoon":
+            mt = MediaType.CARTOON
+        elif label == "comic":
+            mt = MediaType.VISUAL_STORY
+        elif label == "documentary":
+            mt = MediaType.DOCUMENTARY
+        elif label == "game":
+            mt = MediaType.GAME
+        elif label == "hentai":
+            mt = MediaType.HENTAI
+        elif label == "movie":
+            mt = MediaType.MOVIE
+        elif label == "music":
+            mt = MediaType.MUSIC
+        elif label == "news":
+            mt = MediaType.NEWS
+        elif label == "podcast":
+            mt = MediaType.PODCAST
+        elif label == "radio":
+            mt = MediaType.RADIO
+        elif label == "radio_drama":
+            mt = MediaType.RADIO_THEATRE
+        elif label == "series":
+            mt = MediaType.VIDEO_EPISODES
+        elif label == "short_film":
+            mt = MediaType.SHORT_FILM
+        elif label == "silent_movie":
+            mt = MediaType.SILENT_MOVIE
+        elif label == "trailer":
+            mt = MediaType.TRAILER
+        elif label == "tv_channel":
+            mt = MediaType.TV
+        elif label == "video":
+            mt = MediaType.VIDEO
+        else:
+            LOG.error(f"bad label {label}")
+            mt = MediaType.GENERIC
+        return mt
+
+    def transform(self, X):
+        if self.clf_feats:
+            vec = FeatureUnion([
+                ("kw", self.ocp_keywords),
+                ("clf", self.clf_feats)
+            ])
+            return vec.transform(X)
+        return self.ocp_keywords.transform(X)
+
+    @classmethod
+    def extract_entities(cls, utterance) -> dict:
+        return cls.ocp_keywords._transformer.wordlist.extract(utterance)
