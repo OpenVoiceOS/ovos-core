@@ -6,6 +6,17 @@
     "apenas video",
     "só video"
   ],
+  "AudioKeyword.voc": [
+    "audio",
+    "som"
+  ],
+  "HentaiKeyword.voc": [
+    "hentai"
+  ],
+  "PodcastKeyword.voc": [
+    "podcast",
+    "podcasts"
+  ],
   "Play.voc": [
     "procura",
     "lê",
@@ -19,9 +30,83 @@
     "som apenas",
     "(apenas|só) som"
   ],
+  "NewsKeyword.voc": [
+    "noticias"
+  ],
+  "GameKeyword.voc": [
+    "jogo"
+  ],
+  "ADKeyword.voc": [
+    "audio descrição",
+    "descrição do filme"
+  ],
+  "TrailerKeyword.voc": [
+    "trailer"
+  ],
+  "MovieKeyword.voc": [
+    "[UNUSED]",
+    "filme"
+  ],
+  "CartoonKeyword.voc": [
+    "desenhos animados",
+    "(bonecos|bonecada|macacada)"
+  ],
+  "VideoKeyword.voc": [
+    "video"
+  ],
+  "ASMRKeyword.voc": [
+    "ASMR",
+    "resposta meridiana sensorial autónoma"
+  ],
+  "DocumentaryKeyword.voc": [
+    "documentario",
+    "documentarios"
+  ],
+  "SeriesKeyword.voc": [
+    "serie",
+    "programa televisivo",
+    "episódio",
+    "episódios"
+  ],
+  "BWKeyword.voc": [
+    "preto e branco",
+    "monocromáticos"
+  ],
+  "AdultKeyword.voc": [
+    "porno",
+    "maiores de 18",
+    "pornografia"
+  ],
+  "RadioKeyword.voc": [
+    "radio",
+    "radio da internet"
+  ],
+  "AudioDramaKeyword.voc": [
+    "drama",
+    "teatro"
+  ],
   "Resume.voc": [
     "(retoma|retomar)",
     "continua"
+  ],
+  "ComicBookKeyword.voc": [
+    "animação",
+    "banda desenhada",
+    "história visual"
+  ],
+  "TVKeyword.voc": [
+    "TV",
+    "televisão",
+    "canal"
+  ],
+  "AnimeKeyword.voc": [
+    "anime"
+  ],
+  "MusicKeyword.voc": [
+    "musica",
+    "canção",
+    "banda sonora",
+    "[UNUSED]"
   ],
   "QuestionWord.voc": [
     "quem",
@@ -31,5 +116,19 @@
     "quando",
     "pergunta",
     "(diz-me|fala-me) sobre"
+  ],
+  "AudioBookKeyword.voc": [
+    "livro",
+    "livros",
+    "lê",
+    "audiolivro",
+    "audiolivros",
+    "(narrar|narração)"
+  ],
+  "SilentKeyword.voc": [
+    "silencioso"
+  ],
+  "ShortKeyword.voc": [
+    "(curta|curto)"
   ]
 }
