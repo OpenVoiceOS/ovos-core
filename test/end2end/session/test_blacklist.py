@@ -297,3 +297,94 @@ class TestOCP(TestCase):
 
         for idx, m in enumerate(messages):
             self.assertEqual(m.msg_type, expected_messages[idx])
+
+
+class TestFallback(TestCase):
+
+    def setUp(self):
+        self.skill_id = "skill-ovos-fallback-unknown.openvoiceos"
+        self.core = get_minicroft(self.skill_id)
+
+    def tearDown(self) -> None:
+        self.core.stop()
+
+    def test_fallback(self):
+        SessionManager.sessions = {}
+        SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
+        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.pipeline = [
+            "fallback_high"
+        ]
+        messages = []
+
+        def new_msg(msg):
+            nonlocal messages
+            m = Message.deserialize(msg)
+            if m.msg_type in ["ovos.skills.settings_changed",
+                              "ovos.common_play.status"]:
+                return  # skip these, only happen in 1st run
+            messages.append(m)
+            print(len(messages), msg)
+
+        def wait_for_n_messages(n):
+            nonlocal messages
+            t = time.time()
+            while len(messages) < n:
+                sleep(0.1)
+                if time.time() - t > 10:
+                    raise RuntimeError("did not get the number of expected messages under 10 seconds")
+
+        self.core.bus.on("message", new_msg)
+
+        sess = Session("123")
+        utt = Message("recognizer_loop:utterance",
+                      {"utterances": ["invalid"]},
+                      {"session": sess.serialize()})
+        self.core.bus.emit(utt)
+
+        # confirm all expected messages are sent
+        expected_messages = [
+            "recognizer_loop:utterance",
+            # FallbackV2
+            "ovos.skills.fallback.ping",
+            "ovos.skills.fallback.pong",
+            # skill executing
+            f"ovos.skills.fallback.{self.skill_id}.request",
+            f"ovos.skills.fallback.{self.skill_id}.start",
+            "enclosure.active_skill",
+            "speak",
+            # activated only after skill return True
+            "intent.service.skills.activate",
+            "intent.service.skills.activated",
+            f"{self.skill_id}.activate",
+            f"ovos.skills.fallback.{self.skill_id}.response",
+            "ovos.utterance.handled"
+        ]
+        wait_for_n_messages(len(expected_messages))
+
+        self.assertEqual(len(expected_messages), len(messages))
+
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
+
+        messages = []
+        sess.blacklisted_skills = [self.skill_id]
+        utt = Message("recognizer_loop:utterance",
+                      {"utterances": ["invalid"]},
+                      {"session": sess.serialize()})
+        self.core.bus.emit(utt)
+
+        # confirm intent failure
+        expected_messages = [
+            "recognizer_loop:utterance",
+            "mycroft.audio.play_sound",
+            "complete_intent_failure",
+            "ovos.utterance.handled"
+        ]
+        wait_for_n_messages(len(expected_messages))
+
+        self.assertEqual(len(expected_messages), len(messages))
+
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
+
