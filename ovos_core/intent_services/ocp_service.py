@@ -1024,6 +1024,8 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             return MediaType.MOVIE, 0.6
         elif self.voc_match(query, "DocumentaryKeyword", lang=lang):
             return MediaType.DOCUMENTARY, 0.6
+        elif self.voc_match(query, "AudioBookKeyword", lang=lang):
+            return MediaType.AUDIOBOOK, 0.6
         elif self.voc_match(query, "NewsKeyword", lang=lang):
             return MediaType.NEWS, 0.6
         elif self.voc_match(query, "AnimeKeyword", lang=lang):

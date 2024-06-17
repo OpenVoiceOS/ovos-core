@@ -41,6 +41,73 @@ class TestOCPFeaturizer(unittest.TestCase):
         self.assertEqual(result, 'mock_transform_result')
 
 
+class TestOCPPipelineNoClassifierMatcher(unittest.TestCase):
+
+    def setUp(self):
+        config = {
+            "experimental_media_classifier": False,
+            "experimental_binary_classifier": False,
+            "entity_csvs": [
+                os.path.dirname(ovos_core.intent_services.ocp_service.__file__) + "/models/ocp_entities_v0.csv"
+            ]}
+        self.ocp = OCPPipelineMatcher(config=config)
+
+    def test_match_high(self):
+        result = self.ocp.match_high(["play metallica"], "en-us")
+        self.assertIsNotNone(result)
+        self.assertEqual(result.intent_service, 'OCP_intents')
+        self.assertEqual(result.intent_type, 'ocp:play')
+
+    def test_match_high_with_invalid_input(self):
+        result = self.ocp.match_high(["put on some music"], "en-us")
+        self.assertIsNone(result)
+
+    def test_match_medium(self):
+        result = self.ocp.match_medium(["put on some movie"], "en-us")
+        self.assertIsNotNone(result)
+        self.assertEqual(result.intent_service, 'OCP_media')
+        self.assertEqual(result.intent_type, 'ocp:play')
+
+    def test_match_medium_with_invalid_input(self):
+        result = self.ocp.match_medium(["i wanna hear metallica"], "en-us")
+        self.assertIsNone(result)
+
+    def test_match_fallback(self):
+        result = self.ocp.match_fallback(["i want music"], "en-us")
+        self.assertIsNotNone(result)
+        self.assertEqual(result.intent_service, 'OCP_fallback')
+        self.assertEqual(result.intent_type, 'ocp:play')
+
+    def test_match_fallback_with_invalid_input(self):
+        result = self.ocp.match_fallback(["do the thing"], "en-us")
+        self.assertIsNone(result)
+
+    def test_predict(self):
+        self.assertTrue(self.ocp.is_ocp_query("play a song", "en-us")[0])
+        self.assertTrue(self.ocp.is_ocp_query("play a movie", "en-us")[0])
+        self.assertTrue(self.ocp.is_ocp_query("play a podcast", "en-us")[0])
+        self.assertFalse(self.ocp.is_ocp_query("tell me a joke", "en-us")[0])
+        self.assertFalse(self.ocp.is_ocp_query("who are you", "en-us")[0])
+        self.assertFalse(self.ocp.is_ocp_query("you suck", "en-us")[0])
+
+    def test_predict_prob(self):
+        noise = "hglisjerhksrtjhdgsf"
+        self.assertEqual(self.ocp.classify_media(f"play {noise} music", "en-us")[0], MediaType.MUSIC)
+        self.assertIsInstance(self.ocp.classify_media(f"play music {noise}", "en-us")[1], float)
+        self.assertEqual(self.ocp.classify_media(f"play {noise} movie soundtrack", "en-us")[0], MediaType.MUSIC)
+        self.assertEqual(self.ocp.classify_media(f"play movie {noise}", "en-us")[0], MediaType.MOVIE)
+        self.assertEqual(self.ocp.classify_media(f"play silent {noise} movie", "en-us")[0], MediaType.SILENT_MOVIE)
+        self.assertEqual(self.ocp.classify_media(f"play {noise} black and white movie", "en-us")[0],
+                         MediaType.BLACK_WHITE_MOVIE)
+        self.assertEqual(self.ocp.classify_media(f"play short {noise} film", "en-us")[0], MediaType.SHORT_FILM)
+        self.assertEqual(self.ocp.classify_media(f"play cartoons {noise}", "en-us")[0], MediaType.CARTOON)
+        self.assertEqual(self.ocp.classify_media(f"play {noise} episode", "en-us")[0], MediaType.VIDEO_EPISODES)
+        self.assertEqual(self.ocp.classify_media(f"play {noise} podcast", "en-us")[0], MediaType.PODCAST)
+        self.assertEqual(self.ocp.classify_media(f"play {noise} book", "en-us")[0], MediaType.AUDIOBOOK)
+        self.assertEqual(self.ocp.classify_media(f"play radio {noise} FM", "en-us")[0], MediaType.RADIO)
+        self.assertEqual(self.ocp.classify_media(f"read {noise}", "en-us")[0], MediaType.AUDIOBOOK)
+
+
 class TestOCPPipelineMatcher(unittest.TestCase):
 
     def setUp(self):

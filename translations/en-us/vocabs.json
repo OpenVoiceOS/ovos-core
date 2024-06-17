@@ -14,7 +14,8 @@
         "hentai"
     ],
     "PodcastKeyword.voc": [
-        "podcast"
+        "podcast",
+        "podcasts"
     ],
     "Play.voc": [
         "search",
@@ -47,7 +48,8 @@
         "film"
     ],
     "CartoonKeyword.voc": [
-        "cartoon"
+        "cartoon",
+        "cartoons"
     ],
     "VideoKeyword.voc": [
         "video"
@@ -117,8 +119,10 @@
     ],
     "AudioBookKeyword.voc": [
         "book",
+        "books",
         "read",
         "audiobook",
+        "audiobooks",
         "narrate"
     ],
     "SilentKeyword.voc": [
