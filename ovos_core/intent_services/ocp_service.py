@@ -768,11 +768,6 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
     def match_high(self, utterances: List[str], lang: str, message: Message = None):
         """ exact matches only, handles playback control
         recommended after high confidence intents pipeline stage """
-        sess = SessionManager.get(message)
-        if OCP_ID in sess.blacklisted_skills:
-            LOG.debug(f"ignoring match, skill_id '{OCP_ID}' blacklisted by Session '{sess.session_id}'")
-            return
-
         if lang not in self.intent_matchers:
             return None
 
@@ -940,7 +935,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         media_type, prob = self.classify_media(utterance, lang)
         # search common play skills
         results = self._search(phrase, media_type, lang, message=message)
-        best = self.select_best(results)
+        best = self.select_best(results, message)
         results = [r.as_dict if isinstance(best, (MediaEntry, Playlist)) else r
                    for r in results]
         if isinstance(best, (MediaEntry, Playlist)):
@@ -984,7 +979,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                                     "media_type": media_type})
         else:
             LOG.debug(f"Playing {len(results)} results for: {query}")
-            best = self.select_best(results)
+            best = self.select_best(results, message)
             LOG.debug(f"OCP Best match: {best}")
             results = [r for r in results if r.as_dict != best.as_dict]
             results.insert(0, best)
@@ -1366,7 +1361,10 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         LOG.debug(f'Returning {len(results)} search results')
         return results
 
-    def select_best(self, results: list) -> MediaEntry:
+    def select_best(self, results: list, message: Message) -> MediaEntry:
+
+        sess = SessionManager.get(message)
+
         # Look at any replies that arrived before the timeout
         # Find response(s) with the highest confidence
         best = None
@@ -1375,6 +1373,9 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         for res in results:
             if isinstance(res, dict):
                 res = dict2entry(res)
+            if res.skill_id in sess.blacklisted_skills:
+                LOG.debug(f"ignoring match, skill_id '{res.skill_id}' blacklisted by Session '{sess.session_id}'")
+                continue
             if not best or res.match_confidence > best.match_confidence:
                 best = res
                 ties = [best]
@@ -1481,7 +1482,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         utt = message.data["query"]
         res = self.mycroft_cps.search(utt)
         if res:
-            best = self.select_best([r[0] for r in res])
+            best = self.select_best([r[0] for r in res], message)
             if best:
                 callback = [r[1] for r in res if r[0].uri == best.uri][0]
                 self.mycroft_cps.skill_play(skill_id=best.skill_id,
