@@ -271,9 +271,8 @@ def _calc_padacioso_intent(utt: str,
     """
     try:
         intents = [i for i in intent_container.calc_intents(utt)
-                   if i is not None and i.get("name")]
-        intents = [i for i in intents
-                   if i["name"] not in sess.blacklisted_intents
+                   if i is not None
+                   and i["name"] not in sess.blacklisted_intents
                    and i["name"].split(":")[0] not in sess.blacklisted_skills]
         if len(intents) == 0:
             return None
