@@ -892,10 +892,12 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
         self.speak_dialog("just.one.moment")
 
+        sess = SessionManager.get(message)
         # if a skill was explicitly requested, search it first
         valid_skills = [
             skill_id for skill_id, samples in self.skill_aliases.items()
-            if any(s.lower() in utterance for s in samples)
+            if skill_id not in sess.blacklisted_skills and
+               any(s.lower() in utterance for s in samples)
         ]
         if valid_skills:
             LOG.info(f"OCP specific skill names matched: {valid_skills}")
@@ -980,6 +982,11 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         else:
             LOG.debug(f"Playing {len(results)} results for: {query}")
             best = self.select_best(results, message)
+            if best is None:
+                self.speak_dialog("cant.play",
+                                  data={"phrase": query,
+                                        "media_type": media_type})
+                return
             LOG.debug(f"OCP Best match: {best}")
             results = [r for r in results if r.as_dict != best.as_dict]
             results.insert(0, best)
@@ -1388,8 +1395,11 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             # TODO: Ask user to pick between ties or do it automagically
         else:
             selected = best
-        LOG.info(f"OVOSCommonPlay selected: {selected.skill_id} - {selected.match_confidence}")
-        LOG.debug(str(selected))
+        if selected:
+            LOG.info(f"OVOSCommonPlay selected: {selected.skill_id} - {selected.match_confidence}")
+            LOG.debug(str(selected))
+        else:
+            LOG.error("No valid OCP matches")
         return selected
 
     ##################
