@@ -10,6 +10,8 @@ from ovos_utils.messagebus import FakeBus
 from ovos_utils.process_utils import ProcessState
 from ovos_workshop.skills.fallback import FallbackSkill
 
+LOG.set_level("DEBUG")
+
 
 class MiniCroft(SkillManager):
     def __init__(self, skill_ids, *args, **kwargs):

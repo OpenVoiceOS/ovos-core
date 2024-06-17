@@ -388,3 +388,94 @@ class TestFallback(TestCase):
         for idx, m in enumerate(messages):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
+
+class TestCommonQuery(TestCase):
+
+    def setUp(self):
+        self.skill_id = "ovos-skill-fakewiki.openvoiceos"
+        self.core = get_minicroft(self.skill_id)
+        # self.core.intent_service.common_qa.common_query_skills = [self.skill_id]
+
+    def tearDown(self) -> None:
+        self.core.stop()
+
+    def test_common_qa(self):
+        SessionManager.sessions = {}
+        SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
+        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.pipeline = ["common_qa"]
+        messages = []
+
+        def new_msg(msg):
+            nonlocal messages
+            m = Message.deserialize(msg)
+            if m.msg_type in ["ovos.skills.settings_changed",
+                              "ovos.common_play.status"]:
+                return  # skip these, only happen in 1st run
+            messages.append(m)
+            print(len(messages), msg)
+
+        def wait_for_n_messages(n):
+            nonlocal messages
+            t = time.time()
+            while len(messages) < n:
+                sleep(0.1)
+                if time.time() - t > 10:
+                    raise RuntimeError("did not get the number of expected messages under 10 seconds")
+
+        self.core.bus.on("message", new_msg)
+
+        sess = Session("123",
+                       blacklisted_skills=[],
+                       pipeline=["common_qa"])
+        utt = Message("recognizer_loop:utterance",
+                      {"utterances": ["what is the speed of light"]},
+                      {"session": sess.serialize()})
+        self.core.bus.emit(utt)
+
+        # confirm all expected messages are sent
+        expected_messages = [
+            "recognizer_loop:utterance",
+            "enclosure.mouth.think",
+            "question:query",
+            "question:query.response",  # searching
+            "question:query.response",  # response
+            "enclosure.mouth.reset",
+            "question:action",
+            "intent.service.skills.activate",
+            "intent.service.skills.activated",
+            f"{self.skill_id}.activate",
+            "enclosure.active_skill",
+            "speak",  # answer
+            "enclosure.active_skill",
+            "speak",  # callback
+            "mycroft.skill.handler.complete",
+            "ovos.utterance.handled"
+        ]
+        wait_for_n_messages(len(expected_messages))
+
+        self.assertEqual(len(expected_messages), len(messages))
+
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
+
+        messages = []
+        sess.blacklisted_skills = [self.skill_id]
+        utt = Message("recognizer_loop:utterance",
+                      {"utterances": ["invalid"]},
+                      {"session": sess.serialize()})
+        self.core.bus.emit(utt)
+
+        # confirm intent failure
+        expected_messages = [
+            "recognizer_loop:utterance",
+            "mycroft.audio.play_sound",
+            "complete_intent_failure",
+            "ovos.utterance.handled"
+        ]
+        wait_for_n_messages(len(expected_messages))
+
+        self.assertEqual(len(expected_messages), len(messages))
+
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
