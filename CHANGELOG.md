@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a111...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a112...HEAD)
+
+**Implemented enhancements:**
+
+- refactor/alt\_classifier [\#502](https://github.com/OpenVoiceOS/ovos-core/pull/502) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a112](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a112) (2024-06-17)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a111...V0.0.8a112)
 
 **Implemented enhancements:**
 
@@ -316,7 +324,6 @@
 
 **Fixed bugs:**
 
-- Unable to blacklist skills or change the fallback priority [\#383](https://github.com/OpenVoiceOS/ovos-core/issues/383)
 - fix: blacklisted skills [\#424](https://github.com/OpenVoiceOS/ovos-core/pull/424) ([JarbasAl](https://github.com/JarbasAl))
 
 **Merged pull requests:**
