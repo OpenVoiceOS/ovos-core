@@ -498,27 +498,30 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.bus.emit(Message("ovos.common_play.SEI.get"))
 
     def load_classifiers(self):
-        if self.config.get("experimental_classifier", True):
-            LOG.info("Using experimental OCP media type classifier")
-            # warm up the featurizer so intent matches faster (lazy loaded)
-            if self.entity_csvs:
-                OCPFeaturizer.load_csv(self.entity_csvs)
-                OCPFeaturizer.extract_entities("UNLEASH THE AUTOMATONS")
+        # warm up the featurizer so intent matches faster (lazy loaded)
+        if self.entity_csvs:
+            OCPFeaturizer.load_csv(self.entity_csvs)
+            OCPFeaturizer.extract_entities("UNLEASH THE AUTOMATONS")
 
+        if self.config.get("experimental_binary_classifier", True):  # ocp_medium
+            LOG.info("Using experimental OCP binary classifier")
             # TODO - train a single multilingual model instead of this
             b = f"{dirname(__file__)}/models"
-            # lang agnostic classifiers
-            c = SklearnOVOSClassifier.from_file(f"{b}/media_ocp_kw_small.clf")
-            self._media_clf = (c, OCPFeaturizer())
             c = SklearnOVOSClassifier.from_file(f"{b}/binary_ocp_kw_small.clf")
             self._binary_clf = (c, OCPFeaturizer())
-
-            # lang specific classifiers
-            # (english only for now)
-            c = SklearnOVOSClassifier.from_file(f"{b}/media_ocp_cv2_kw_medium.clf")
-            self._media_en_clf = (c, OCPFeaturizer("media_ocp_cv2_medium"))
+            # lang specific classifiers (english only for now)
             c = SklearnOVOSClassifier.from_file(f"{b}/binary_ocp_cv2_kw_medium.clf")
             self._binary_en_clf = (c, OCPFeaturizer("binary_ocp_cv2_small"))
+
+        if self.config.get("experimental_media_classifier", True):
+            LOG.info("Using experimental OCP media type classifier")
+            # TODO - train a single multilingual model instead of this
+            b = f"{dirname(__file__)}/models"
+            c = SklearnOVOSClassifier.from_file(f"{b}/media_ocp_kw_small.clf")
+            self._media_clf = (c, OCPFeaturizer())
+            # lang specific classifiers (english only for now)
+            c = SklearnOVOSClassifier.from_file(f"{b}/media_ocp_cv2_kw_medium.clf")
+            self._media_en_clf = (c, OCPFeaturizer("media_ocp_cv2_medium"))
 
     def load_resource_files(self):
         intents = {}
@@ -1066,15 +1069,14 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
     def classify_media(self, query: str, lang: str) -> Tuple[MediaType, float]:
         """ determine what media type is being requested """
         # using a trained classifier (Experimental)
-        if self.config.get("experimental_classifier"):
-            if lang.startswith("en"):
-                clf: SklearnOVOSClassifier = self._media_en_clf[0]
-                featurizer: OCPFeaturizer = self._media_en_clf[1]
-            else:
-                clf: SklearnOVOSClassifier = self._media_clf[0]
-                featurizer: OCPFeaturizer = self._media_clf[1]
-
+        if self.config.get("experimental_media_classifier", True):
             try:
+                if lang.startswith("en"):
+                    clf: SklearnOVOSClassifier = self._media_en_clf[0]
+                    featurizer: OCPFeaturizer = self._media_en_clf[1]
+                else:
+                    clf: SklearnOVOSClassifier = self._media_clf[0]
+                    featurizer: OCPFeaturizer = self._media_clf[1]
                 X = featurizer.transform([query])
                 preds = clf.predict_labels(X)[0]
                 label = max(preds, key=preds.get)
@@ -1092,25 +1094,27 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
     def is_ocp_query(self, query: str, lang: str) -> Tuple[bool, float]:
         """ determine if a playback question is being asked"""
-        if not self.config.get("experimental_classifier"):
-            m, p = self.voc_match_media(query, lang)
-            return m != MediaType.GENERIC, p
+        if self.config.get("experimental_binary_classifier", True):
+            try:
+                # TODO - train a single multilingual classifier
+                if lang.startswith("en"):
+                    clf: SklearnOVOSClassifier = self._binary_en_clf[0]
+                    featurizer: OCPFeaturizer = self._binary_en_clf[1]
+                else:
+                    clf: SklearnOVOSClassifier = self._binary_clf[0]
+                    featurizer: OCPFeaturizer = self._binary_clf[1]
 
-        # TODO - train a single multilingual classifier
-        if lang.startswith("en"):
-            clf: SklearnOVOSClassifier = self._binary_en_clf[0]
-            featurizer: OCPFeaturizer = self._binary_en_clf[1]
-        else:
-            clf: SklearnOVOSClassifier = self._binary_clf[0]
-            featurizer: OCPFeaturizer = self._binary_clf[1]
-
-        X = featurizer.transform([query])
-        preds = clf.predict_labels(X)[0]
-        label = max(preds, key=preds.get)
-        prob = round(preds[label], 3)
-        LOG.info(f"OVOSCommonPlay prediction: {label} confidence: {prob}")
-        LOG.debug(f"     utterance: {query}")
-        return label == "OCP", float(prob)
+                X = featurizer.transform([query])
+                preds = clf.predict_labels(X)[0]
+                label = max(preds, key=preds.get)
+                prob = round(preds[label], 3)
+                LOG.info(f"OVOSCommonPlay prediction: {label} confidence: {prob}")
+                LOG.debug(f"     utterance: {query}")
+                return label == "OCP", float(prob)
+            except:
+                LOG.exception("OCP binary classifier failure")
+        m, p = self.voc_match_media(query, lang)
+        return m != MediaType.GENERIC, p
 
     def _should_resume(self, phrase: str, lang: str, message: Optional[Message] = None) -> bool:
         """

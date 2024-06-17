@@ -1,14 +1,15 @@
 import os.path
 import unittest
 from unittest.mock import patch, Mock
-import ovos_core.intent_services.ocp_service
-from ovos_core.intent_services.ocp_service import OCPFeaturizer, OCPPipelineMatcher
-from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
-from ovos_classifiers.skovos.features import ClassifierProbaVectorizer, KeywordFeaturesVectorizer
+
+from ovos_classifiers.skovos.features import ClassifierProbaVectorizer
 from sklearn.pipeline import FeatureUnion
-from ovos_utils.log import LOG
+
+import ovos_core.intent_services.ocp_service
 from ovos_bus_client.message import Message
 from ovos_core.intent_services.ocp_service import MediaType
+from ovos_core.intent_services.ocp_service import OCPFeaturizer, OCPPipelineMatcher
+from ovos_utils.log import LOG
 
 
 class TestOCPFeaturizer(unittest.TestCase):
@@ -40,13 +41,15 @@ class TestOCPFeaturizer(unittest.TestCase):
         self.assertEqual(result, 'mock_transform_result')
 
 
-
 class TestOCPPipelineMatcher(unittest.TestCase):
 
     def setUp(self):
-        config = {"entity_csvs": [
-            os.path.dirname(ovos_core.intent_services.ocp_service.__file__) + "/models/ocp_entities_v0.csv"
-        ]}
+        config = {
+            "experimental_media_classifier": True,
+            "experimental_binary_classifier": True,
+            "entity_csvs": [
+                os.path.dirname(ovos_core.intent_services.ocp_service.__file__) + "/models/ocp_entities_v0.csv"
+            ]}
         self.ocp = OCPPipelineMatcher(config=config)
 
     def test_match_high(self):
@@ -114,7 +117,6 @@ class TestOCPPipelineMatcher(unittest.TestCase):
         }))
         # should be MOVIE not MUSIC  TODO fix me
         self.assertEqual(self.ocp.classify_media("play klownevilus", "en-us")[0], MediaType.MOVIE)
-
 
 
 if __name__ == '__main__':
