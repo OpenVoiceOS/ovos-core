@@ -177,7 +177,7 @@ class AdaptService:
             return match
         return None
 
-    @lru_cache(maxsize=3)
+    @lru_cache(maxsize=3)  # NOTE - message is a string because of this
     def match_intent(self, utterances: Tuple[str],
                            lang: Optional[str] = None,
                            message: Optional[str] = None):
@@ -197,6 +197,9 @@ class AdaptService:
         Returns:
             Intent structure, or None if no match was found.
         """
+
+        if message:
+            message = Message.deserialize(message)
         sess = SessionManager.get(message)
 
         # we call flatten in case someone is sending the old style list of tuples
@@ -224,8 +227,6 @@ class AdaptService:
                 # TODO - Shouldn't Adapt do this?
                 best_intent['utterance'] = utt
 
-        if message:
-            message = Message.deserialize(message)
         sess = SessionManager.get(message)
         for utt in utterances:
             try:
