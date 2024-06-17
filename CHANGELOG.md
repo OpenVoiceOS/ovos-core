@@ -2,7 +2,19 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a110...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a111...HEAD)
+
+**Implemented enhancements:**
+
+- feat/blacklist\_from\_session [\#492](https://github.com/OpenVoiceOS/ovos-core/pull/492) ([JarbasAl](https://github.com/JarbasAl))
+
+**Fixed bugs:**
+
+- standalone skills dont respect blacklist [\#493](https://github.com/OpenVoiceOS/ovos-core/issues/493)
+
+## [V0.0.8a111](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a111) (2024-06-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a110...V0.0.8a111)
 
 **Merged pull requests:**
 
@@ -484,14 +496,6 @@
 ## [V0.0.8a57](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a57) (2023-12-15)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a56...V0.0.8a57)
-
-**Fixed bugs:**
-
-- fix/2-letter-langcode-handling [\#381](https://github.com/OpenVoiceOS/ovos-core/pull/381) ([JarbasAl](https://github.com/JarbasAl))
-
-**Closed issues:**
-
--  ignoring stt\_lang, en is not in enabled languages: \['fr-fr', 'fr-fr', 'en-us'\] [\#380](https://github.com/OpenVoiceOS/ovos-core/issues/380)
 
 ## [V0.0.8a56](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a56) (2023-12-07)
 
