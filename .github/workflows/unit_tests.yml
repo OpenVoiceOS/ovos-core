@@ -34,7 +34,7 @@ jobs:
     strategy:
       max-parallel: 3
       matrix:
-        python-version: ["3.11"]
+        python-version: [3.9]
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
