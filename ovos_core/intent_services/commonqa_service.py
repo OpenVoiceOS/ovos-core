@@ -133,7 +133,9 @@ class CommonQAService(OVOSAbstractApplication):
                       replies=[], extensions=[],
                       query_time=time.time(), timeout_time=time.time() + self._max_time,
                       responses_gathered=Event(), completed=Event(),
-                      answered=False, queried_skills=[])
+                      answered=False,
+                      queried_skills=[s for s in sess.blacklisted_skills
+                                      if s in self.common_query_skills])  # dont wait for these
         assert query.responses_gathered.is_set() is False
         assert query.completed.is_set() is False
         self.active_queries[sess.session_id] = query
@@ -226,6 +228,7 @@ class CommonQAService(OVOSAbstractApplication):
         handler can perform any additional actions.
         @param message: question:query.response Message with `phrase` data
         """
+        sess = SessionManager.get(message)
         query = self.active_queries.get(SessionManager.get(message).session_id)
         LOG.info(f'Check responses with {len(query.replies)} replies')
         search_phrase = message.data.get('phrase', "")
@@ -238,6 +241,8 @@ class CommonQAService(OVOSAbstractApplication):
         best = None
         ties = []
         for response in query.replies:
+            if response["skill_id"] in sess.blacklisted_skills:
+                continue
             if not best or response['conf'] > best['conf']:
                 best = response
                 ties = [response]
