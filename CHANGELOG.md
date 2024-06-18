@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a113...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a114...HEAD)
+
+**Fixed bugs:**
+
+- improve\_fallback\_timeout [\#506](https://github.com/OpenVoiceOS/ovos-core/pull/506) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a114](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a114) (2024-06-18)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a113...V0.0.8a114)
 
 **Implemented enhancements:**
 
@@ -492,10 +500,6 @@
 ## [V0.0.8a60](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a60) (2023-12-29)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a59...V0.0.8a60)
-
-**Merged pull requests:**
-
-- Update requirements.txt [\#387](https://github.com/OpenVoiceOS/ovos-core/pull/387) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a59](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a59) (2023-12-29)
 
