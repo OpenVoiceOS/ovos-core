@@ -2,7 +2,20 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a112...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a113...HEAD)
+
+**Implemented enhancements:**
+
+- feat/more\_qwords [\#505](https://github.com/OpenVoiceOS/ovos-core/pull/505) ([JarbasAl](https://github.com/JarbasAl))
+
+**Merged pull requests:**
+
+- pt-pt/improvements [\#504](https://github.com/OpenVoiceOS/ovos-core/pull/504) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- pt-pt/translate [\#503](https://github.com/OpenVoiceOS/ovos-core/pull/503) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+
+## [V0.0.8a113](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a113) (2024-06-17)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a112...V0.0.8a113)
 
 **Implemented enhancements:**
 
@@ -488,17 +501,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a58...V0.0.8a59)
 
-**Merged pull requests:**
-
-- Update requirements.txt [\#386](https://github.com/OpenVoiceOS/ovos-core/pull/386) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a58](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a58) (2023-12-29)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a57...V0.0.8a58)
-
-**Merged pull requests:**
-
-- Update requirements.txt [\#384](https://github.com/OpenVoiceOS/ovos-core/pull/384) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a57](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a57) (2023-12-15)
 
