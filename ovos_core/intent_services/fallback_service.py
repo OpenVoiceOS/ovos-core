@@ -140,7 +140,8 @@ class FallbackService:
                                     "lang": lang})
             result = self.bus.wait_for_response(fb_msg,
                                                 f"ovos.skills.fallback.{skill_id}.response",
-                                                timeout=self.fallback_config.get("timeout", 15))
+                                                timeout=self.fallback_config.get("timeout", 10))
+            print(result, 666)
             if result and 'error' in result.data:
                 error_msg = result.data['error']
                 LOG.error(f"{skill_id}: {error_msg}")
