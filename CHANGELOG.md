@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a114...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a115...HEAD)
+
+**Merged pull requests:**
+
+- de-de/translate [\#507](https://github.com/OpenVoiceOS/ovos-core/pull/507) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+
+## [V0.0.8a115](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a115) (2024-06-18)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a114...V0.0.8a115)
 
 **Fixed bugs:**
 
@@ -492,10 +500,6 @@
 ## [V0.0.8a61](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a61) (2023-12-30)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a60...V0.0.8a61)
-
-**Fixed bugs:**
-
-- defaults/do\_not\_force\_transformer\_plugins [\#388](https://github.com/OpenVoiceOS/ovos-core/pull/388) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a60](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a60) (2023-12-29)
 
