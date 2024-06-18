@@ -139,13 +139,22 @@ class FallbackService:
                                     "utterance": utterances[0],  # backwards compat, we send all transcripts now
                                     "lang": lang})
             result = self.bus.wait_for_response(fb_msg,
-                                                f"ovos.skills.fallback.{skill_id}.response")
+                                                f"ovos.skills.fallback.{skill_id}.response",
+                                                timeout=self.fallback_config.get("max_skill_runtime", 10))
             if result and 'error' in result.data:
                 error_msg = result.data['error']
                 LOG.error(f"{skill_id}: {error_msg}")
                 return False
             elif result is not None:
                 return result.data.get('result', False)
+            else:
+                # abort any ongoing fallback
+                # if skill crashed or returns False, all good
+                # if it is just taking a long time, more than 1 fallback would end up answering
+                self.bus.emit(message.forward("ovos.skills.fallback.force_timeout",
+                                              {"skill_id": skill_id}))
+                LOG.warning(f"{skill_id} took too long to answer, "
+                            f'increasing "max_skill_runtime" in mycroft.conf might help alleviate this issue')
         return False
 
     def _fallback_range(self, utterances, lang, message, fb_range):
@@ -168,8 +177,9 @@ class FallbackService:
 
         sess = SessionManager.get(message)
         # new style bus api
+        available_skills = self._collect_fallback_skills(message, fb_range)
         fallbacks = [(k, v) for k, v in self.registered_fallbacks.items()
-                     if k in self._collect_fallback_skills(message, fb_range)]
+                     if k in available_skills]
         sorted_handlers = sorted(fallbacks, key=operator.itemgetter(1))
         for skill_id, prio in sorted_handlers:
             if skill_id in sess.blacklisted_skills:
