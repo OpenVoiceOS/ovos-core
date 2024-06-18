@@ -140,7 +140,7 @@ class FallbackService:
                                     "lang": lang})
             result = self.bus.wait_for_response(fb_msg,
                                                 f"ovos.skills.fallback.{skill_id}.response",
-                                                timeout=self.fallback_config.get("timeout", 10))
+                                                timeout=self.fallback_config.get("max_skill_runtime", 10))
             if result and 'error' in result.data:
                 error_msg = result.data['error']
                 LOG.error(f"{skill_id}: {error_msg}")
@@ -154,7 +154,7 @@ class FallbackService:
                 self.bus.emit(message.forward("ovos.skills.fallback.force_timeout",
                                               {"skill_id": skill_id}))
                 LOG.warning(f"{skill_id} took too long to answer, "
-                            f'increasing "timeout" in mycroft.conf might help alleviate this issue')
+                            f'increasing "max_skill_runtime" in mycroft.conf might help alleviate this issue')
         return False
 
     def _fallback_range(self, utterances, lang, message, fb_range):
