@@ -318,7 +318,6 @@ class TestFallbackTimeout(TestCase):
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
         SessionManager.default_session.pipeline = [
-            "fallback_high",
             "fallback_medium",
             "fallback_low"
         ]
@@ -351,9 +350,6 @@ class TestFallbackTimeout(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             # FallbackV2
-            "ovos.skills.fallback.ping",
-            "ovos.skills.fallback.pong",
-            "ovos.skills.fallback.pong",
             "ovos.skills.fallback.ping",
             "ovos.skills.fallback.pong",
             "ovos.skills.fallback.pong",

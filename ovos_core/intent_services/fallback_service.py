@@ -141,7 +141,6 @@ class FallbackService:
             result = self.bus.wait_for_response(fb_msg,
                                                 f"ovos.skills.fallback.{skill_id}.response",
                                                 timeout=self.fallback_config.get("timeout", 10))
-            print(result, 666)
             if result and 'error' in result.data:
                 error_msg = result.data['error']
                 LOG.error(f"{skill_id}: {error_msg}")
@@ -178,8 +177,9 @@ class FallbackService:
 
         sess = SessionManager.get(message)
         # new style bus api
+        available_skills = self._collect_fallback_skills(message, fb_range)
         fallbacks = [(k, v) for k, v in self.registered_fallbacks.items()
-                     if k in self._collect_fallback_skills(message, fb_range)]
+                     if k in available_skills]
         sorted_handlers = sorted(fallbacks, key=operator.itemgetter(1))
         for skill_id, prio in sorted_handlers:
             if skill_id in sess.blacklisted_skills:

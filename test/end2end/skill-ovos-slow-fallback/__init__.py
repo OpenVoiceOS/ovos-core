@@ -8,6 +8,7 @@ class SlowFallbackSkill(FallbackSkill):
 
     @fallback_handler(priority=20)
     def handle_fallback(self, message):
-        time.sleep(20)
+        while True:  # busy skill
+            time.sleep(0.1)
         self.speak("SLOW")
         return True
