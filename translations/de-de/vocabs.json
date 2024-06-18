@@ -6,6 +6,17 @@
     "nur Video",
     "nur Video"
   ],
+  "AudioKeyword.voc": [
+    "Audio",
+    "Klang\nSound"
+  ],
+  "HentaiKeyword.voc": [
+    "hentai"
+  ],
+  "PodcastKeyword.voc": [
+    "Podcast",
+    "Podcast"
+  ],
   "Play.voc": [
     "suche",
     "lese",
@@ -19,9 +30,83 @@
     "nur Ton",
     "kein Ton"
   ],
+  "NewsKeyword.voc": [
+    "News\nNachrichten"
+  ],
+  "GameKeyword.voc": [
+    "Game\nSpiel\nSpiele"
+  ],
+  "ADKeyword.voc": [
+    "Audiobeschreibung",
+    "Filmbeschreibung"
+  ],
+  "TrailerKeyword.voc": [
+    "Trailer"
+  ],
+  "MovieKeyword.voc": [
+    "Movie",
+    "Film"
+  ],
+  "CartoonKeyword.voc": [
+    "Cartoon\nZeichentrickfilm",
+    "Cartoons\nZeichentrickfilme"
+  ],
+  "VideoKeyword.voc": [
+    "Video"
+  ],
+  "ASMRKeyword.voc": [
+    "ASMR",
+    "unabhängige sensorische Meridianreaktion\nautonomous sensory meridian response"
+  ],
+  "DocumentaryKeyword.voc": [
+    "Dokumentarfilm\nDokumentation",
+    "Dokumentarfilme\nDokumentationen"
+  ],
+  "SeriesKeyword.voc": [
+    "Serie\nSerien",
+    "Fernsehsendung\nTV Show",
+    "Folge\nEpisode",
+    "Folgen\nEpisoden"
+  ],
+  "BWKeyword.voc": [
+    "schwarzweiß",
+    "monochrom"
+  ],
+  "AdultKeyword.voc": [
+    "Porn\nPorno\nSexfilm",
+    "18 plus",
+    "Pornographie"
+  ],
+  "RadioKeyword.voc": [
+    "Radio",
+    "Internetradio"
+  ],
+  "AudioDramaKeyword.voc": [
+    "Drama",
+    "Theater"
+  ],
   "Resume.voc": [
     "spiele weiter",
     "Pause beenden"
+  ],
+  "ComicBookKeyword.voc": [
+    "animierter Comic",
+    "Comic",
+    "visuelle Geschichte"
+  ],
+  "TVKeyword.voc": [
+    "Fernsehen\nTV",
+    "Fernsehen",
+    "Kanal"
+  ],
+  "AnimeKeyword.voc": [
+    "Anime"
+  ],
+  "MusicKeyword.voc": [
+    "Musik\nmusic",
+    "Lied\nSong",
+    "Soundtrack",
+    "sound track"
   ],
   "QuestionWord.voc": [
     "wer",
@@ -30,6 +115,22 @@
     "warum",
     "wann",
     "Frage",
-    "Erzähl mir von"
+    "Erzähl mir von",
+    "welche",
+    "wessen"
+  ],
+  "AudioBookKeyword.voc": [
+    "Buch",
+    "Bücher",
+    "lesen",
+    "Hörbuch",
+    "Hörbücher",
+    "erzählen"
+  ],
+  "SilentKeyword.voc": [
+    "still"
+  ],
+  "ShortKeyword.voc": [
+    "kurz"
   ]
 }
