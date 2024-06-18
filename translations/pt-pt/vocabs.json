@@ -110,12 +110,14 @@
   ],
   "QuestionWord.voc": [
     "quem",
-    "quê",
+    "(quê|o que|que é)",
     "como",
     "(porque|porquê)",
     "quando",
     "pergunta",
-    "(diz-me|fala-me) sobre"
+    "(diz-me|fala-me) sobre",
+    "qual",
+    "de quem"
   ],
   "AudioBookKeyword.voc": [
     "livro",
