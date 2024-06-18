@@ -115,7 +115,9 @@
         "why",
         "when",
         "question",
-        "tell me about"
+        "tell me about",
+        "which",
+        "whose"
     ],
     "AudioBookKeyword.voc": [
         "book",
