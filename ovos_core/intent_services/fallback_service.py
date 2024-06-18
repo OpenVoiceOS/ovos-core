@@ -139,13 +139,22 @@ class FallbackService:
                                     "utterance": utterances[0],  # backwards compat, we send all transcripts now
                                     "lang": lang})
             result = self.bus.wait_for_response(fb_msg,
-                                                f"ovos.skills.fallback.{skill_id}.response")
+                                                f"ovos.skills.fallback.{skill_id}.response",
+                                                timeout=self.fallback_config.get("timeout", 15))
             if result and 'error' in result.data:
                 error_msg = result.data['error']
                 LOG.error(f"{skill_id}: {error_msg}")
                 return False
             elif result is not None:
                 return result.data.get('result', False)
+            else:
+                #
+                # https://github.com/OpenVoiceOS/ovos-core/issues/389
+                # if skill crashed or returns False, all good
+                # if it is just taking a long time, more than 1 fallback will end up answering
+                # TODO - abort responses somehow? @killable_intents decorator?
+                LOG.error(f"{skill_id} took too long to answer, you may still receive it's delayed answer")
+                LOG.warning('increasing "timeout" in mycroft.conf might help alleviate this issue')
         return False
 
     def _fallback_range(self, utterances, lang, message, fb_range):
