@@ -285,8 +285,13 @@ class IntentService:
             # ensure skill_id is present in message.context
             message.context["skill_id"] = match.skill_id
 
+        if match.intent_type is True:
+            # utterance fully handled
+            reply = message.reply("ovos.utterance.handled",
+                                  {"skill_id": match.skill_id})
+            self.bus.emit(reply)
         # Launch skill if not handled by the match function
-        if match.intent_type:
+        elif match.intent_type:
             # keep all original message.data and update with intent match
             data = dict(message.data)
             data.update(match.intent_data)
