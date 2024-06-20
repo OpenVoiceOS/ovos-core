@@ -105,6 +105,7 @@ class ConverseService:
             self.bus.emit(message)
             # update activation counter
             self._consecutive_activations[skill_id] += 1
+            return session
 
     def _activate_allowed(self, skill_id, source_skill=None):
         """Checks if a skill_id is allowed to jump to the front of active skills list

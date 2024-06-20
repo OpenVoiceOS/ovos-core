@@ -107,11 +107,10 @@ class TestSessions(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             # skill selected
-            f"{self.skill_id}:OldWorldIntent",
-            "mycroft.skill.handler.start",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             f"{self.skill_id}.activate",
+            f"{self.skill_id}:OldWorldIntent",
+            "mycroft.skill.handler.start",
             # skill code executing
             "enclosure.active_skill",
             "speak",
@@ -125,7 +124,7 @@ class TestSessions(TestCase):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
         # sanity check correct intent triggered
-        self.assertEqual(messages[7].data["utterance"], "hello world")
+        self.assertEqual(messages[-3].data["utterance"], "hello world")
 
         # test that active skills list has been updated
         sess = Session.deserialize(messages[-1].context["session"])
@@ -281,11 +280,10 @@ class TestSessions(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             # skill selected
-            f"{self.new_skill_id}:NewWorldIntent",
-            "mycroft.skill.handler.start",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             f"{self.new_skill_id}.activate",
+            f"{self.new_skill_id}:NewWorldIntent",
+            "mycroft.skill.handler.start",
             # skill code executing
             "enclosure.active_skill",
             "speak",

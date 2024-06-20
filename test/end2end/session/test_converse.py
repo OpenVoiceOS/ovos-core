@@ -59,14 +59,12 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",  # no session
+            "intent.service.skills.activated",
+            f"{self.skill_id}.activate",
             # skill selected
             f"{self.skill_id}:converse_off.intent",
             # skill triggering
             "mycroft.skill.handler.start",
-            "intent.service.skills.activate",
-            "intent.service.skills.activated",
-            f"{self.skill_id}.activate",
-            "ovos.session.update_default",
             # intent code executing
             "enclosure.active_skill",
             "speak",
@@ -88,31 +86,22 @@ class TestSessions(TestCase):
             self.assertEqual(m.context["session"]["session_id"], "default")
             self.assertEqual(m.context["lang"], "en-us")
 
+        # verify skill is activated
+        self.assertEqual(messages[1].msg_type, "intent.service.skills.activated")
+        self.assertEqual(messages[1].data["skill_id"], self.skill_id)
+        self.assertEqual(messages[2].msg_type, f"{self.skill_id}.activate")
         # verify intent triggers
-        self.assertEqual(messages[1].msg_type, f"{self.skill_id}:converse_off.intent")
-        # verify skill_id is now present in every message.context
+        self.assertEqual(messages[3].msg_type, f"{self.skill_id}:converse_off.intent")
+        # verify skill_id is present in every message.context
         for m in messages[1:]:
             self.assertEqual(m.context["skill_id"], self.skill_id)
 
-        self.assertEqual(messages[2].msg_type, "mycroft.skill.handler.start")
-        self.assertEqual(messages[2].data["name"], "TestAbortSkill.handle_converse_off")
-        # verify skill is activated
-        self.assertEqual(messages[3].msg_type, "intent.service.skills.activate")
-        self.assertEqual(messages[3].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[4].msg_type, "intent.service.skills.activated")
-        self.assertEqual(messages[4].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[5].msg_type, f"{self.skill_id}.activate")
-        self.assertEqual(messages[6].msg_type, "ovos.session.update_default")
         # verify intent execution
-        self.assertEqual(messages[7].msg_type, "enclosure.active_skill")
-        self.assertEqual(messages[7].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[8].msg_type, "speak")
-        self.assertEqual(messages[8].data["lang"], "en-us")
-        self.assertFalse(messages[8].data["expect_response"])
-        self.assertEqual(messages[8].data["meta"]["skill"], self.skill_id)
-        self.assertEqual(messages[9].msg_type, "mycroft.skill.handler.complete")
-        self.assertEqual(messages[9].data["name"], "TestAbortSkill.handle_converse_off")
-        self.assertEqual(messages[10].msg_type, "ovos.utterance.handled")
+        self.assertEqual(messages[4].msg_type, "mycroft.skill.handler.start")
+        self.assertEqual(messages[4].data["name"], "TestAbortSkill.handle_converse_off")
+        self.assertEqual(messages[-3].msg_type, "mycroft.skill.handler.complete")
+        self.assertEqual(messages[-3].data["name"], "TestAbortSkill.handle_converse_off")
+        self.assertEqual(messages[-2].msg_type, "ovos.utterance.handled")
         # verify default session is now updated
         self.assertEqual(messages[-1].msg_type, "ovos.session.update_default")
         self.assertEqual(messages[-1].data["session_data"]["session_id"], "default")
@@ -143,13 +132,10 @@ class TestSessions(TestCase):
             f"{self.skill_id}.converse.request",
             "skill.converse.response",  # does not want to converse
             # skill selected
-            f"{self.other_skill_id}:HelloWorldIntent",
-            "mycroft.skill.handler.start",
-            # skill activated
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             f"{self.other_skill_id}.activate",
-            "ovos.session.update_default",
+            f"{self.other_skill_id}:HelloWorldIntent",
+            "mycroft.skill.handler.start",
             # skill executing
             "enclosure.active_skill",
             "speak",
@@ -187,35 +173,25 @@ class TestSessions(TestCase):
         self.assertEqual(messages[4].data["skill_id"], self.skill_id)
         self.assertFalse(messages[4].data["result"])  # does not want to converse
 
+        # verify skill is activated
+        self.assertEqual(messages[5].msg_type, "intent.service.skills.activated")
+        self.assertEqual(messages[5].data["skill_id"], self.other_skill_id)
+        self.assertEqual(messages[6].msg_type, f"{self.other_skill_id}.activate")
         # verify intent triggers
-        self.assertEqual(messages[5].msg_type, f"{self.other_skill_id}:HelloWorldIntent")
-        # verify skill_id is now present in every message.context
+        self.assertEqual(messages[7].msg_type, f"{self.other_skill_id}:HelloWorldIntent")
+        # verify skill_id is present in every message.context
         for m in messages[5:]:
             self.assertEqual(m.context["skill_id"], self.other_skill_id)
 
-        self.assertEqual(messages[6].msg_type, "mycroft.skill.handler.start")
-        self.assertEqual(messages[6].data["name"], "HelloWorldSkill.handle_hello_world_intent")
-
-        # verify skill is activated
-        self.assertEqual(messages[7].msg_type, "intent.service.skills.activate")
-        self.assertEqual(messages[7].data["skill_id"], self.other_skill_id)
-        self.assertEqual(messages[8].msg_type, "intent.service.skills.activated")
-        self.assertEqual(messages[8].data["skill_id"], self.other_skill_id)
-        self.assertEqual(messages[9].msg_type, f"{self.other_skill_id}.activate")
-        self.assertEqual(messages[10].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[8].msg_type, "mycroft.skill.handler.start")
+        self.assertEqual(messages[8].data["name"], "HelloWorldSkill.handle_hello_world_intent")
 
         # verify intent execution
-        self.assertEqual(messages[11].msg_type, "enclosure.active_skill")
-        self.assertEqual(messages[11].data["skill_id"], self.other_skill_id)
-        self.assertEqual(messages[12].msg_type, "speak")
-        self.assertEqual(messages[12].data["lang"], "en-us")
-        self.assertFalse(messages[12].data["expect_response"])
-        self.assertEqual(messages[12].data["meta"]["skill"], self.other_skill_id)
-        self.assertEqual(messages[13].msg_type, "mycroft.skill.handler.complete")
-        self.assertEqual(messages[13].data["name"], "HelloWorldSkill.handle_hello_world_intent")
+        self.assertEqual(messages[-3].msg_type, "mycroft.skill.handler.complete")
+        self.assertEqual(messages[-3].data["name"], "HelloWorldSkill.handle_hello_world_intent")
 
         # verify default session is now updated
-        self.assertEqual(messages[14].msg_type, "ovos.utterance.handled")
+        self.assertEqual(messages[-2].msg_type, "ovos.utterance.handled")
         self.assertEqual(messages[-1].msg_type, "ovos.session.update_default")
         self.assertEqual(messages[-1].data["session_data"]["session_id"], "default")
         # test deserialization of payload
@@ -249,11 +225,8 @@ class TestSessions(TestCase):
             f"{self.skill_id}.converse.request",
             "skill.converse.response",  # does not want to converse
             # skill selected
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             f"{self.skill_id}.activate",
-            "ovos.session.update_default",
-
             f"{self.skill_id}:converse_on.intent",
             # skill executing
             "mycroft.skill.handler.start",
@@ -294,35 +267,26 @@ class TestSessions(TestCase):
         self.assertEqual(messages[6].data["skill_id"], self.skill_id)
         self.assertFalse(messages[6].data["result"])  # do not want to converse
 
+        # verify skill is activated by intent service (intent pipeline matched)
+        self.assertEqual(messages[7].msg_type, "intent.service.skills.activated")
+        self.assertEqual(messages[7].data["skill_id"], self.skill_id)
+        self.assertEqual(messages[8].msg_type, f"{self.skill_id}.activate")
+
         # verify intent triggers
-        self.assertEqual(messages[7].msg_type, f"{self.skill_id}:converse_on.intent")
+        self.assertEqual(messages[9].msg_type, f"{self.skill_id}:converse_on.intent")
         # verify skill_id is now present in every message.context
         for m in messages[7:]:
             self.assertEqual(m.context["skill_id"], self.skill_id)
 
         # verify intent execution
-        self.assertEqual(messages[8].msg_type, "mycroft.skill.handler.start")
-        self.assertEqual(messages[8].data["name"], "TestAbortSkill.handle_converse_on")
+        self.assertEqual(messages[10].msg_type, "mycroft.skill.handler.start")
+        self.assertEqual(messages[10].data["name"], "TestAbortSkill.handle_converse_on")
 
-        # verify skill is activated by intent service (intent pipeline matched)
-        self.assertEqual(messages[9].msg_type, "intent.service.skills.activate")
-        self.assertEqual(messages[9].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[10].msg_type, "intent.service.skills.activated")
-        self.assertEqual(messages[10].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[11].msg_type, f"{self.skill_id}.activate")
-        self.assertEqual(messages[12].msg_type, "ovos.session.update_default")
-
-        self.assertEqual(messages[13].msg_type, "enclosure.active_skill")
-        self.assertEqual(messages[13].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[14].msg_type, "speak")
-        self.assertEqual(messages[14].data["lang"], "en-us")
-        self.assertFalse(messages[14].data["expect_response"])
-        self.assertEqual(messages[14].data["meta"]["skill"], self.skill_id)
-        self.assertEqual(messages[15].msg_type, "mycroft.skill.handler.complete")
-        self.assertEqual(messages[15].data["name"], "TestAbortSkill.handle_converse_on")
+        self.assertEqual(messages[-3].msg_type, "mycroft.skill.handler.complete")
+        self.assertEqual(messages[-3].data["name"], "TestAbortSkill.handle_converse_on")
 
         # verify default session is now updated
-        self.assertEqual(messages[16].msg_type, "ovos.utterance.handled")
+        self.assertEqual(messages[-2].msg_type, "ovos.utterance.handled")
         self.assertEqual(messages[-1].msg_type, "ovos.session.update_default")
         self.assertEqual(messages[-1].data["session_data"]["session_id"], "default")
         # test deserialization of payload
@@ -507,13 +471,11 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",  # no session
+            "intent.service.skills.activated",
+            f"{self.skill_id}.activate",
             "ovos-tskill-abort.openvoiceos:deactivate.intent",
             # skill selected
             "mycroft.skill.handler.start",
-            "intent.service.skills.activate",
-            "intent.service.skills.activated",
-            f"{self.skill_id}.activate",
-            "ovos.session.update_default",
             # intent code
             "intent.service.skills.deactivate",
             "intent.service.skills.deactivated",

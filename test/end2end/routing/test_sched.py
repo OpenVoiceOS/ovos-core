@@ -47,14 +47,10 @@ class TestSched(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",  # no session
-            f"{self.skill_id}:ScheduleIntent",  # intent trigger
-            "mycroft.skill.handler.start",  # intent code start
-
-            "intent.service.skills.activate",  # request (from workshop)
             "intent.service.skills.activated",  # response (from core)
             f"{self.skill_id}.activate",  # skill callback
-            "ovos.session.update_default",  # session update (active skill list ync)
-
+            f"{self.skill_id}:ScheduleIntent",  # intent trigger
+            "mycroft.skill.handler.start",  # intent code start
             "enclosure.active_skill",
             "speak",
             "mycroft.scheduler.schedule_event",
@@ -72,16 +68,18 @@ class TestSched(TestCase):
 
         self.assertEqual(len(expected_messages), len(messages))
 
-        mtypes = [m.msg_type for m in messages]
-        for m in expected_messages:
-            self.assertTrue(m in mtypes)
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
 
         # verify that source and destination are swapped after intent trigger
-        self.assertEqual(messages[1].msg_type, f"{self.skill_id}:ScheduleIntent")
+        self.assertEqual(messages[3].msg_type, f"{self.skill_id}:ScheduleIntent")
         for m in messages:
-            if m.msg_type in ["recognizer_loop:utterance", "ovos.session.update_default"]:
+            # messages FOR ovos-core
+            if m.msg_type in ["recognizer_loop:utterance",
+                              "ovos.session.update_default"]:
                 self.assertEqual(messages[0].context["source"], "A")
                 self.assertEqual(messages[0].context["destination"], "B")
+            # messages FROM ovos-core
             else:
                 self.assertEqual(m.context["source"], "B")
                 self.assertEqual(m.context["destination"], "A")
