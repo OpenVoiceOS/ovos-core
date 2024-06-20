@@ -58,12 +58,11 @@ class TestOCPPipeline(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
+            "ocp:play",
             "enclosure.active_skill",
             "speak",
-            "ocp:play",
             "ovos.common_play.search.start",
             "enclosure.mouth.think",
             "ovos.common_play.search.stop",  # any ongoing previous search
@@ -128,12 +127,11 @@ class TestOCPPipeline(TestCase):
             "ovos.common_play.status",
             "ovos.common_play.SEI.get",  # request player info
             # no response
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
+            "ocp:play",
             "enclosure.active_skill",
             "speak",
-            "ocp:play",
             "ovos.common_play.search.start",
             "enclosure.mouth.think",
             "ovos.common_play.search.stop",  # any ongoing previous search
@@ -182,12 +180,11 @@ class TestOCPPipeline(TestCase):
             "ovos.common_play.status",
             "ovos.common_play.SEI.get",  # request player info
             "ovos.common_play.SEI.get.response",  # OCP response
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
+            "ocp:play",
             "enclosure.active_skill",
             "speak",
-            "ocp:play",
             "ovos.common_play.search.start",
             "enclosure.mouth.think",
             "ovos.common_play.search.stop",  # any ongoing previous search
@@ -269,12 +266,11 @@ class TestOCPPipeline(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
+            "ocp:play",
             "enclosure.active_skill",
             "speak",
-            "ocp:play",
             "ovos.common_play.search.start",
             "enclosure.mouth.think",
             "ovos.common_play.search.stop",  # any ongoing previous search
@@ -344,12 +340,11 @@ class TestOCPPipeline(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
+            "ocp:play",
             "enclosure.active_skill",
             "speak",
-            "ocp:play",
             "ovos.common_play.search.start",
             "enclosure.mouth.think",
             "ovos.common_play.search.stop",  # any ongoing previous search
@@ -418,12 +413,11 @@ class TestOCPPipeline(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
+            "ocp:play",
             "enclosure.active_skill",
             "speak",
-            "ocp:play",
             "ovos.common_play.search.start",
             "enclosure.mouth.think",
             "ovos.common_play.search.stop",  # any ongoing previous search
@@ -494,12 +488,11 @@ class TestOCPPipeline(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
+            "ocp:play",
             "enclosure.active_skill",
             "speak",
-            "ocp:play",
             "ovos.common_play.search.start",
             "enclosure.mouth.think",
             "ovos.common_play.search.stop",  # any ongoing previous search
@@ -572,7 +565,6 @@ class TestOCPPipeline(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:pause",
@@ -632,7 +624,6 @@ class TestOCPPipeline(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:resume",
@@ -692,7 +683,6 @@ class TestOCPPipeline(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:media_stop",
@@ -752,7 +742,6 @@ class TestOCPPipeline(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:next",
@@ -807,7 +796,6 @@ class TestOCPPipeline(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:prev",
@@ -861,7 +849,6 @@ class TestOCPPipeline(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:pause",
@@ -916,7 +903,6 @@ class TestOCPPipeline(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:resume",
@@ -970,7 +956,6 @@ class TestOCPPipeline(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:media_stop",
@@ -1025,7 +1010,6 @@ class TestOCPPipeline(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:next",
@@ -1079,7 +1063,6 @@ class TestOCPPipeline(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:prev",
@@ -1187,6 +1170,8 @@ class TestOCPPipeline(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",
+            "intent.service.skills.activated",
+            "ovos.common_play.activate",
             "ocp:legacy_cps",
             # legacy cps api
             "play:query",
@@ -1247,6 +1232,8 @@ class TestLegacyCPSPipeline(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",
+            "intent.service.skills.activated",
+            "ovos.common_play.activate",
             "ocp:legacy_cps",
             # legacy cps api
             "play:query",
