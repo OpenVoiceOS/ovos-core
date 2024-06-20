@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a116...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a117...HEAD)
+
+**Fixed bugs:**
+
+- fix/activation\_session [\#511](https://github.com/OpenVoiceOS/ovos-core/pull/511) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a117](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a117) (2024-06-20)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a116...V0.0.8a117)
 
 **Merged pull requests:**
 
@@ -484,7 +492,6 @@
 
 **Fixed bugs:**
 
-- Padacioso fails when a skill with entities is reloaded [\#394](https://github.com/OpenVoiceOS/ovos-core/issues/394)
 - Deregister any entities when a skill is detached. Fixes \#394 [\#395](https://github.com/OpenVoiceOS/ovos-core/pull/395) ([lbt](https://github.com/lbt))
 
 **Merged pull requests:**
