@@ -2,7 +2,17 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a115...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a116...HEAD)
+
+**Merged pull requests:**
+
+- cleanup/explicit\_utterance\_handled\_message [\#510](https://github.com/OpenVoiceOS/ovos-core/pull/510) ([JarbasAl](https://github.com/JarbasAl))
+- pt-br/translate [\#509](https://github.com/OpenVoiceOS/ovos-core/pull/509) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- nl-nl/translate [\#508](https://github.com/OpenVoiceOS/ovos-core/pull/508) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+
+## [V0.0.8a116](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a116) (2024-06-18)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a115...V0.0.8a116)
 
 **Merged pull requests:**
 
@@ -121,10 +131,6 @@
 ## [V0.0.8a104](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a104) (2024-05-28)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a103...V0.0.8a104)
-
-**Fixed bugs:**
-
-- Pipeline priorities not respected [\#393](https://github.com/OpenVoiceOS/ovos-core/issues/393)
 
 **Merged pull requests:**
 
@@ -468,10 +474,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a64...V0.0.8a65)
 
-**Implemented enhancements:**
-
-- feat/stop\_per\_session [\#391](https://github.com/OpenVoiceOS/ovos-core/pull/391) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a64](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a64) (2024-01-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a63...V0.0.8a64)
@@ -492,10 +494,6 @@
 ## [V0.0.8a62](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a62) (2023-12-31)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a61...V0.0.8a62)
-
-**Fixed bugs:**
-
-- error\_handling/very\_large\_utterances [\#392](https://github.com/OpenVoiceOS/ovos-core/pull/392) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a61](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a61) (2023-12-30)
 
