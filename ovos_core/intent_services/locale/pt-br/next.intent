@@ -1,0 +1,6 @@
+(próxima|próximo) (canção|faixa|música|filme|vídeo|som)
+(próxima|próximo|seguinte)
+(próxima|pule) (a|o) (música|canção|faixa|vídeo|mídia)
+(próxima|seguinte|pule)
+(toque|ponha) (a|o) (próxima|próximo) (música|canção|faixa|vídeo|mídia)
+toque (a|o) (próxima|próximo|seguinte)
