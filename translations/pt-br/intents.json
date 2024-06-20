@@ -1,0 +1,115 @@
+{
+  "play.intent": [
+    "(toque|inicie) {query}",
+    "procure (em|com) (common play|ocp|ovos common play|O C P) por {query}",
+    "procure (em|entre) mídias (ovos|open voice os) por {query}",
+    "procure {query} (em/com) (common play|ocp|ovos common play|O C P)",
+    "procure {query} (em|entre) mídias (ovos|open voice os)"
+  ],
+  "like_song.intent": [
+    "eu gosto (desse|dessa|deste|desta)",
+    "eu gosto (desse|dessa|deste|desta) (música|canção|faixa|som)",
+    "(música|canção|faixa|som) (boa|legal|ótima|incrível|da hora|maneira) ",
+    "(esta|este|essa|esse) (música|canção|faixa|som) é (boa|legal|ótima|incrível|da hora|maneira) "
+  ],
+  "stop.intent": [
+    "pare",
+    "pare com isso",
+    "pare com isso",
+    "Pare o que está fazendo",
+    "Por favor pare",
+    "Poderia parar agora",
+    "Cancele (essa|esta|a) tarefa",
+    "Por favor cancele (essa|esta|a) ação",
+    "Pare de processar",
+    "Interrompa (essa|esta|a) atividade",
+    "Por favor termine",
+    "Pare de processar",
+    "Pare de executar (esse|este|o) comando",
+    "Por favor termine (essa|esta|a) tarefa",
+    "Pare (essa|esta|a) operação",
+    "Interrompa (essa|esta|a) ação",
+    "Por favor cancele (essa|esta|a) tarefa"
+  ],
+  "next.intent": [
+    "(próxima|seguinte|pule)",
+    "(próxima|pule) (a|o) (música|canção|faixa|vídeo|mídia)",
+    "(toque|ponha) (a|o) (próxima|próximo) (música|canção|faixa|vídeo|mídia)",
+    "toque (a|o) (próxima|próximo|seguinte)",
+    "(próxima|próximo|seguinte)",
+    "(próxima|próximo) (canção|faixa|música|filme|vídeo|som)"
+  ],
+  "resume.intent": [
+    "(recomece|continue)",
+    "(recomece|retome|continue|reinicie) (a|o) (música|canção|faixa|vídeo|mídia|som|reprodução)",
+    "toque"
+  ],
+  "read.intent": [
+    "leia o (livro|audiobook) {query}",
+    "leia {query}",
+    "leia {query} (livro|audiobook)"
+  ],
+  "prev.intent": [
+    "(toque|) (o|a|) (último|última|) (música|canção|faixa|vídeo|mídia) (anterior|)",
+    "(toque|) (o|a|) (último|última|) (música|canção|faixa|vídeo|mídia) (anterior|)",
+    "(toque|) (o|a|) (anterior|última|último|volte)",
+    "anterior",
+    "(última|último) (canção|faixa|música|filme|vídeo|som) (anterior|)"
+  ],
+  "global_stop.intent": [
+    "pare (todos|todas)",
+    "termine (todos|todas)",
+    "termine (todos|todas)",
+    "cancele (todos|todas)",
+    "finalize (todos|todas)",
+    "interrompa (todos|todas)",
+    "aborte (todos|todas)",
+    "cesse (todos|todas)",
+    "pare tudo",
+    "termine tudo",
+    "termine tudo",
+    "cancele tudo",
+    "finalize tudo",
+    "interrompa tudo",
+    "aborte tudo",
+    "cesse tudo",
+    "Pare tudo agora",
+    "Termine todos os processos",
+    "Termine todas as operações",
+    "Cancele todas as tarefas",
+    "Finalize todas as atividades",
+    "Pare todas as atividades imediatamente",
+    "Aborte todos os processos",
+    "Cesse todas as ações",
+    "Pare todas as tarefas correntes",
+    "Termine todas as atividades correntes",
+    "Cancele todas as operações pendentes",
+    "Finalize todas as tarefas em aberto",
+    "Pare tudo que está em processo",
+    "Aborte todas as ações correntes",
+    "Cesse todas as atividades em aberto"
+  ],
+  "pause.intent": [
+    "Pause",
+    "Pause (a|o) (música|canção|faixa|vídeo|mídia|reprodução)"
+  ],
+  "open.intent": [
+    "Abra o (OCP|O C P|common|ovos|open voice os) (player|media player)",
+    "Abra (o|a) (tela|página|menu) do (OCP|O C P|ovos common play|common play|ovos media player|open voice os player) ",
+    "Abra o (OCP|O C P|ovos common play|open voice os common play|common play)",
+    "Abra (o|a) (player|catálogo|lista|menu|reprodutor) de (mídia|música|vídeo) "
+  ],
+  "featured.intent": [
+    "(abra|mostre) (o|a) (catálogo|coleção|playlist|lista) de {media} (em destaque|)",
+    "(abra|mostre) {media} em destaque"
+  ],
+  "play_favorites.intent": [
+    "(toque|inicie) (o|a|os|as) (meu|minha|meus|minhas) (faixa|faixas|canção|canções|música|músicas) (favorita|favorito|preferido|preferida|favoritas|favoritos|preferidos|preferidas)",
+    "(toque|inicie) (o|a|os|as) (faixa|faixas|canção|canções|música|músicas) (favorita|favorito|preferido|preferida|favoritas|favoritos|preferidos|preferidas)"
+  ],
+  "media_stop.intent": [
+    "pare",
+    "pare (o|a) (reprodução|mídia|música|filme|filmes|ruído)",
+    "pare tudo"
+  ]
+}
