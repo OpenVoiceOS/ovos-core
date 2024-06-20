@@ -6,6 +6,17 @@
     "niente audio",
     "solo video"
   ],
+  "AudioKeyword.voc": [
+    "audio",
+    "suono"
+  ],
+  "HentaiKeyword.voc": [
+    "hentai"
+  ],
+  "PodcastKeyword.voc": [
+    "podcast",
+    "podcast"
+  ],
   "Play.voc": [
     "cerca",
     "leggi",
@@ -19,9 +30,83 @@
     "[UNUSED]",
     "[UNUSED]"
   ],
+  "NewsKeyword.voc": [
+    "notizie"
+  ],
+  "GameKeyword.voc": [
+    "gioco"
+  ],
+  "ADKeyword.voc": [
+    "descrizione audio",
+    "descrizione video"
+  ],
+  "TrailerKeyword.voc": [
+    "trailer"
+  ],
+  "MovieKeyword.voc": [
+    "film",
+    "film"
+  ],
+  "CartoonKeyword.voc": [
+    "cartone animato",
+    "cartoni animati"
+  ],
+  "VideoKeyword.voc": [
+    "video"
+  ],
+  "ASMRKeyword.voc": [
+    "ASMR",
+    "[UNUSED]"
+  ],
+  "DocumentaryKeyword.voc": [
+    "documentario",
+    "documentari"
+  ],
+  "SeriesKeyword.voc": [
+    "serie",
+    "serie",
+    "episodio",
+    "puntata"
+  ],
+  "BWKeyword.voc": [
+    "bianco e nero",
+    "monocromatico"
+  ],
+  "AdultKeyword.voc": [
+    "porno",
+    "pornografia",
+    "[UNUSED]"
+  ],
+  "RadioKeyword.voc": [
+    "radio",
+    "internet radio"
+  ],
+  "AudioDramaKeyword.voc": [
+    "dramma",
+    "teatro"
+  ],
   "Resume.voc": [
     "riprendi",
     "continua"
+  ],
+  "ComicBookKeyword.voc": [
+    "fumetto",
+    "giornalino",
+    "[UNUSED]"
+  ],
+  "TVKeyword.voc": [
+    "TV",
+    "televisione",
+    "canale"
+  ],
+  "AnimeKeyword.voc": [
+    "anime"
+  ],
+  "MusicKeyword.voc": [
+    "musica",
+    "canzone",
+    "traccia audio",
+    "[UNUSED]"
   ],
   "QuestionWord.voc": [
     "chi",
@@ -30,6 +115,22 @@
     "perché",
     "quando",
     "chiedi",
-    "dimmi"
+    "dimmi",
+    "quale",
+    "di chi"
+  ],
+  "AudioBookKeyword.voc": [
+    "libro",
+    "libri",
+    "leggi",
+    "audiolibro",
+    "audiolibri",
+    "racconta"
+  ],
+  "SilentKeyword.voc": [
+    "zitto"
+  ],
+  "ShortKeyword.voc": [
+    "corto"
   ]
 }
