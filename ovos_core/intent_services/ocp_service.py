@@ -816,8 +816,6 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                                                              skill_id=OCP_ID,
                                                              utterance=utterance)
 
-        self.speak_dialog("just.one.moment")
-
         sess = SessionManager.get(message)
         # if a skill was explicitly requested, search it first
         valid_skills = [
@@ -884,6 +882,9 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
     # intent handlers
     def handle_play_intent(self, message: Message):
+
+        self.speak_dialog("just.one.moment")
+
         lang = message.data["lang"]
         query = message.data["query"]
         media_type = message.data["media_type"]
