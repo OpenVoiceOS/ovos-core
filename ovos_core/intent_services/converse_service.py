@@ -1,15 +1,15 @@
 import time
 from threading import Event
+
+import ovos_core.intent_services
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, UtteranceState
+from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_config.locale import setup_locale
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
-from ovos_bus_client.util import get_message_lang
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
-
-import ovos_core.intent_services
 
 
 class ConverseService:
@@ -215,7 +215,7 @@ class ConverseService:
         # include all skills in get_response state
         want_converse = [skill_id for skill_id, state in session.utterance_states.items()
                          if state == UtteranceState.RESPONSE]
-        skill_ids += want_converse # dont wait for these pong answers (optimization)
+        skill_ids += want_converse  # dont wait for these pong answers (optimization)
 
         active_skills = self.get_active_skills()
 
@@ -230,11 +230,11 @@ class ConverseService:
 
             # validate the converse pong
             if all((skill_id not in want_converse,
-                   msg.data.get("can_handle", True),
-                   skill_id in active_skills)):
+                    msg.data.get("can_handle", True),
+                    skill_id in active_skills)):
                 want_converse.append(skill_id)
 
-            if skill_id not in skill_ids: # track which answer we got
+            if skill_id not in skill_ids:  # track which answer we got
                 skill_ids.append(skill_id)
 
             if all(s in skill_ids for s in active_skills):
@@ -326,7 +326,8 @@ class ConverseService:
             if self.converse(utterances, skill_id, lang, message):
                 state = session.utterance_states.get(skill_id, UtteranceState.INTENT)
                 return ovos_core.intent_services.IntentMatch(intent_service='Converse',
-                                                             intent_type="ovos.utterance.handled" if state != UtteranceState.RESPONSE else None, # emit instead of intent message
+                                                             intent_type=state != UtteranceState.RESPONSE,
+                                                             # intent_type == True -> emit "ovos.utterance.handled"
                                                              intent_data={},
                                                              skill_id=skill_id,
                                                              utterance=utterances[0])

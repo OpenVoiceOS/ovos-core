@@ -115,8 +115,7 @@ class CommonQAService(OVOSAbstractApplication):
                 answered, skill_id = self.handle_question(message)
                 if answered:
                     match = ovos_core.intent_services.IntentMatch(intent_service='CommonQuery',
-                                                                  intent_type="ovos.utterance.handled",
-                                                                  # emit instead of intent message
+                                                                  intent_type=True,
                                                                   intent_data={},
                                                                   skill_id=skill_id,
                                                                   utterance=utterance)

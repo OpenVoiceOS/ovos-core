@@ -145,7 +145,7 @@ class StopService:
             # emit a global stop, full stop anything OVOS is doing
             self.bus.emit(message.reply("mycroft.stop", {}))
             return ovos_core.intent_services.IntentMatch(intent_service='Stop',
-                                                         intent_type="ovos.utterance.handled",
+                                                         intent_type=True,
                                                          intent_data={"conf": conf},
                                                          skill_id=None,
                                                          utterance=utterance)
@@ -159,7 +159,7 @@ class StopService:
 
                 if self.stop_skill(skill_id, message):
                     return ovos_core.intent_services.IntentMatch(intent_service='Stop',
-                                                                 intent_type="ovos.utterance.handled",
+                                                                 intent_type=True,
                                                                  intent_data={"conf": conf},
                                                                  skill_id=skill_id,
                                                                  utterance=utterance)
@@ -227,7 +227,7 @@ class StopService:
 
             if self.stop_skill(skill_id, message):
                 return ovos_core.intent_services.IntentMatch(intent_service='Stop',
-                                                             intent_type="ovos.utterance.handled",
+                                                             intent_type=True,
                                                              # emit instead of intent message
                                                              intent_data={"conf": conf},
                                                              skill_id=skill_id, utterance=utterance)
@@ -235,7 +235,7 @@ class StopService:
         # emit a global stop, full stop anything OVOS is doing
         self.bus.emit(message.reply("mycroft.stop", {}))
         return ovos_core.intent_services.IntentMatch(intent_service='Stop',
-                                                     intent_type="ovos.utterance.handled",
+                                                     intent_type=True,
                                                      # emit instead of intent message {"conf": conf},
                                                      intent_data={},
                                                      skill_id=None,
