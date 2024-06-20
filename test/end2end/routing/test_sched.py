@@ -81,7 +81,6 @@ class TestSched(TestCase):
                 self.assertEqual(messages[0].context["destination"], "B")
             # messages FROM ovos-core
             else:
-                print(m.serialize())
                 self.assertEqual(m.context["source"], "B")
                 self.assertEqual(m.context["destination"], "A")
 
