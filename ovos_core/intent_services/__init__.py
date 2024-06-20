@@ -292,6 +292,15 @@ class IntentService:
             self.bus.emit(reply)
         # Launch skill if not handled by the match function
         elif match.intent_type:
+            # let's activate the skill BEFORE the intent is triggered
+            # to ensure an accurate Session
+            # NOTE: this was previously done async by the skill,
+            #   but then the skill was missing from Session.active_skills
+            sess = self.converse.activate_skill(message=message,
+                                                skill_id=match.skill_id)
+            if sess:
+                message.context["session"] = sess.serialize()
+
             # keep all original message.data and update with intent match
             data = dict(message.data)
             data.update(match.intent_data)
