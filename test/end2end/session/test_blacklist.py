@@ -58,11 +58,10 @@ class TestSessions(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             # skill selected
-            f"{self.skill_id}:HelloWorldIntent",
-            "mycroft.skill.handler.start",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             f"{self.skill_id}.activate",
+            f"{self.skill_id}:HelloWorldIntent",
+            "mycroft.skill.handler.start",
             # skill code executing
             "enclosure.active_skill",
             "speak",
@@ -76,7 +75,7 @@ class TestSessions(TestCase):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
         # sanity check correct intent triggered
-        self.assertEqual(messages[7].data["meta"]["dialog"], "hello.world")
+        self.assertEqual(messages[-3].data["meta"]["dialog"], "hello.world")
 
         ########################################
         # skill in blacklist
@@ -176,12 +175,11 @@ class TestOCP(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
+            "ocp:play",
             "enclosure.active_skill",
             "speak",
-            "ocp:play",
             "ovos.common_play.search.start",
             "enclosure.mouth.think",
             "ovos.common_play.search.stop",  # any ongoing previous search
@@ -222,12 +220,11 @@ class TestOCP(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
+            "ocp:play",
             "enclosure.active_skill",
             "speak",
-            "ocp:play",
             "ovos.common_play.search.start",
             "enclosure.mouth.think",
             "ovos.common_play.search.stop",  # any ongoing previous search
@@ -267,12 +264,11 @@ class TestOCP(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activate",
             "intent.service.skills.activated",
             "ovos.common_play.activate",
+            "ocp:play",
             "enclosure.active_skill",
             "speak",
-            "ocp:play",
             "ovos.common_play.search.start",
             "enclosure.mouth.think",
             "ovos.common_play.search.stop",  # any ongoing previous search
