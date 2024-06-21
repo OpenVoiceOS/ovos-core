@@ -59,7 +59,7 @@ class IntentService:
         self.skill_names = {}
 
         # TODO - replace with plugins
-        self.adapt_service = AdaptService()
+        self.adapt_service = AdaptService(config=self.config.get("adapt", {}))
         self.padatious_service = None
         try:
             if self.config["padatious"].get("disabled"):
