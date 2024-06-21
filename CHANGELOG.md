@@ -2,7 +2,20 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a117...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a118...HEAD)
+
+**Closed issues:**
+
+- Stable Dependencies for 0.0.8 Release [\#488](https://github.com/OpenVoiceOS/ovos-core/issues/488)
+
+**Merged pull requests:**
+
+- refactor/less\_patches [\#513](https://github.com/OpenVoiceOS/ovos-core/pull/513) ([JarbasAl](https://github.com/JarbasAl))
+- added terms in Italian [\#512](https://github.com/OpenVoiceOS/ovos-core/pull/512) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+
+## [V0.0.8a118](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a118) (2024-06-20)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a117...V0.0.8a118)
 
 **Fixed bugs:**
 
@@ -442,10 +455,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a69...V0.0.8a70)
 
-**Implemented enhancements:**
-
-- ocp pipeline [\#396](https://github.com/OpenVoiceOS/ovos-core/pull/396) ([NeonJarbas](https://github.com/NeonJarbas))
-
 ## [V0.0.8a69](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a69) (2024-01-24)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a68...V0.0.8a69)
@@ -489,10 +498,6 @@
 ## [V0.0.8a63](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a63) (2024-01-08)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a62...V0.0.8a63)
-
-**Fixed bugs:**
-
-- Deregister any entities when a skill is detached. Fixes \#394 [\#395](https://github.com/OpenVoiceOS/ovos-core/pull/395) ([lbt](https://github.com/lbt))
 
 **Merged pull requests:**
 
