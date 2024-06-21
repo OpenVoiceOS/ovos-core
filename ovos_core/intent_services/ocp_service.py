@@ -23,12 +23,14 @@ from typing import List, Tuple, Optional, Union
 
 import ovos_core.intent_services
 from ovos_workshop.app import OVOSAbstractApplication
-from ovos_workshop.backwards_compat import MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID, \
-    MediaEntry, Playlist, MediaState, TrackState, dict2entry
 
 try:
+    from ovos_utils.ocp import MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID, \
+        MediaEntry, Playlist, MediaState, TrackState, dict2entry
     from ovos_bus_client.apis.ocp import OCPInterface, OCPQuery
 except ImportError:
+    from ovos_workshop.backwards_compat import MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID, \
+        MediaEntry, Playlist, MediaState, TrackState, dict2entry
     from ovos_bus_client.apis.ocp import OCPInterface as _OIF, OCPQuery as _OQ
 
 
