@@ -11,7 +11,7 @@ from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import wait_for_reply
 from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
 from ovos_classifiers.skovos.features import ClassifierProbaVectorizer, KeywordFeaturesVectorizer
-from ovos_plugin_manager.ocp import load_stream_extractors, available_extractors
+from ovos_plugin_manager.ocp import available_extractors
 from ovos_utils import classproperty
 from ovos_utils.gui import is_gui_connected, is_gui_running
 from ovos_utils.log import LOG
@@ -26,11 +26,11 @@ from ovos_workshop.app import OVOSAbstractApplication
 
 try:
     from ovos_utils.ocp import MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID, \
-        MediaEntry, Playlist, MediaState, TrackState, dict2entry
+        MediaEntry, Playlist, MediaState, TrackState, dict2entry, PluginStream
     from ovos_bus_client.apis.ocp import OCPInterface, OCPQuery
 except ImportError:
     from ovos_workshop.backwards_compat import MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID, \
-        MediaEntry, Playlist, MediaState, TrackState, dict2entry
+        MediaEntry, Playlist, MediaState, TrackState, dict2entry, PluginStream
     from ovos_bus_client.apis.ocp import OCPInterface as _OIF, OCPQuery as _OQ
 
 
@@ -982,15 +982,22 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
     # Legacy Audio subsystem API
     def legacy_play(self, results: List[MediaEntry], phrase="",
                     message: Optional[Message] = None):
-        xtract = load_stream_extractors()
-        # for legacy audio service we need to do stream extraction here
-        # we also need to filter video results
-        results = [xtract.extract_stream(r.uri, video=False)["uri"]
-                   for r in results
-                   if r.playback == PlaybackType.AUDIO
-                   or r.media_type in OCPQuery.cast2audio]
+        res = []
+        for r in results:
+            if not (r.playback == PlaybackType.AUDIO or r.media_type in OCPQuery.cast2audio):
+                # we need to filter video results
+                continue
+            if isinstance(r, Playlist):
+                # get internal entries from the playlist
+                for e in r.entries:
+                    res.append(e.uri)
+            elif isinstance(r, MediaEntry):
+                res.append(r.uri)
+            elif isinstance(r, PluginStream):
+                # for legacy audio service we need to do stream extraction here
+                res.append(r.extract_uri(video=False))
 
-        self.legacy_api.play(results, utterance=phrase)
+        self.legacy_api.play(res, utterance=phrase)
 
         player = self.get_player(message)
         player.player_state = PlayerState.PLAYING
