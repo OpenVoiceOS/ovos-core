@@ -60,9 +60,9 @@ class AdaptService:
         self.max_words = 50  # if an utterance contains more words than this, don't attempt to match
 
         # TODO sanitize config option
-        self.conf_high = self.config.get("conf_high") or 0.8
-        self.conf_med = self.config.get("conf_med") or 0.5
-        self.conf_low = self.config.get("conf_low") or 0.3
+        self.conf_high = self.config.get("conf_high") or 0.7
+        self.conf_med = self.config.get("conf_med") or 0.45
+        self.conf_low = self.config.get("conf_low") or 0.25
 
     @property
     def context_keywords(self):
@@ -145,7 +145,7 @@ class AdaptService:
                                          with optional normalized version.
         """
         match = self.match_intent(tuple(utterances), lang, message.serialize())
-        if match and match.intent_data.get("confidence", 0.0) > self.conf_high:
+        if match and match.intent_data.get("confidence", 0.0) >= self.conf_high:
             return match
         return None
 
@@ -159,7 +159,7 @@ class AdaptService:
                                          with optional normalized version.
         """
         match = self.match_intent(tuple(utterances), lang, message.serialize())
-        if match and match.intent_data.get("confidence", 0.0) > self.conf_med:
+        if match and match.intent_data.get("confidence", 0.0) >= self.conf_med:
             return match
         return None
 
@@ -173,7 +173,7 @@ class AdaptService:
                                          with optional normalized version.
         """
         match = self.match_intent(tuple(utterances), lang, message.serialize())
-        if match and match.intent_data.get("confidence", 0.0) > self.conf_low:
+        if match and match.intent_data.get("confidence", 0.0) >= self.conf_low:
             return match
         return None
 
@@ -227,7 +227,6 @@ class AdaptService:
                 # TODO - Shouldn't Adapt do this?
                 best_intent['utterance'] = utt
 
-        sess = SessionManager.get(message)
         for utt in utterances:
             try:
                 intents = [i for i in self.engines[lang].determine_intent(
