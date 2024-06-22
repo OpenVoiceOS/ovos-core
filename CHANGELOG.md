@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a119...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a120...HEAD)
+
+**Fixed bugs:**
+
+- fix/adapt\_config [\#515](https://github.com/OpenVoiceOS/ovos-core/pull/515) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a120](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a120) (2024-06-21)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a119...V0.0.8a120)
 
 **Fixed bugs:**
 
