@@ -13,19 +13,20 @@
 # limitations under the License.
 #
 from collections import namedtuple
-
+from typing import Tuple, Callable
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_config.locale import setup_locale, get_valid_languages, get_full_lang_code
+
 from ovos_core.intent_services.adapt_service import AdaptService
 from ovos_core.intent_services.commonqa_service import CommonQAService
 from ovos_core.intent_services.converse_service import ConverseService
 from ovos_core.intent_services.fallback_service import FallbackService
+from ovos_core.intent_services.ocp_service import OCPPipelineMatcher
 from ovos_core.intent_services.padacioso_service import PadaciosoService
 from ovos_core.intent_services.stop_service import StopService
-from ovos_core.intent_services.ocp_service import OCPPipelineMatcher
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
 from ovos_utils.log import LOG, deprecated, log_deprecation
 from ovos_utils.metrics import Stopwatch
@@ -59,7 +60,7 @@ class IntentService:
         self.skill_names = {}
 
         # TODO - replace with plugins
-        self.adapt_service = AdaptService()
+        self.adapt_service = AdaptService(config=self.config.get("adapt", {}))
         self.padatious_service = None
         try:
             if self.config["padatious"].get("disabled"):
@@ -198,7 +199,7 @@ class IntentService:
 
         return default_lang
 
-    def get_pipeline(self, skips=None, session=None):
+    def get_pipeline(self, skips=None, session=None) -> Tuple[str, Callable]:
         """return a list of matcher functions ordered by priority
         utterances will be sent to each matcher in order until one can handle the utterance
         the list can be configured in mycroft.conf under intents.pipeline,
@@ -248,7 +249,7 @@ class IntentService:
                         f"filtered {[k for k in pipeline if k not in matchers]}")
             pipeline = [k for k in pipeline if k in matchers]
         LOG.debug(f"Session pipeline: {pipeline}")
-        return [matchers[k] for k in pipeline]
+        return [(k, matchers[k]) for k in pipeline]
 
     def _validate_session(self, message, lang):
         # get session
@@ -373,9 +374,10 @@ class IntentService:
         match = None
         with stopwatch:
             # Loop through the matching functions until a match is found.
-            for match_func in self.get_pipeline(session=sess):
+            for pipeline, match_func in self.get_pipeline(session=sess):
                 match = match_func(utterances, lang, message)
                 if match:
+                    LOG.info(f"{pipeline} match: {match}")
                     if match.skill_id and match.skill_id in sess.blacklisted_skills:
                         LOG.debug(f"ignoring match, skill_id '{match.skill_id}' blacklisted by Session '{sess.session_id}'")
                         continue
@@ -509,11 +511,11 @@ class IntentService:
         sess = SessionManager.get(message)
 
         # Loop through the matching functions until a match is found.
-        for match_func in self.get_pipeline(skips=["converse",
-                                                   "fallback_high",
-                                                   "fallback_medium",
-                                                   "fallback_low"],
-                                            session=sess):
+        for pipeline, match_func in self.get_pipeline(skips=["converse",
+                                                             "fallback_high",
+                                                             "fallback_medium",
+                                                             "fallback_low"],
+                                                      session=sess):
             match = match_func([utterance], lang, message)
             if match:
                 if match.intent_type:

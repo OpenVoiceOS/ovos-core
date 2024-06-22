@@ -803,7 +803,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
         return self.ocp_sessions[sess.session_id]
 
-    def normalize_results(self, results: list) -> List[Union[MediaEntry, Playlist]]:
+    def normalize_results(self, results: list) -> List[Union[MediaEntry, Playlist, PluginStream]]:
         # support Playlist and MediaEntry objects in tracks
         for idx, track in enumerate(results):
             if isinstance(track, dict):
@@ -944,7 +944,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         LOG.debug(f'Returning {len(results)} search results')
         return results
 
-    def select_best(self, results: list, message: Message) -> MediaEntry:
+    def select_best(self, results: list, message: Message) -> Union[MediaEntry, Playlist, PluginStream]:
 
         sess = SessionManager.get(message)
 
@@ -980,7 +980,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
     ##################
     # Legacy Audio subsystem API
-    def legacy_play(self, results: List[MediaEntry], phrase="",
+    def legacy_play(self, results: List[Union[MediaEntry, Playlist, PluginStream]], phrase="",
                     message: Optional[Message] = None):
         res = []
         for r in results:
