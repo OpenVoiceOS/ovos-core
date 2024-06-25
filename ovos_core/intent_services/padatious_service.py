@@ -118,6 +118,9 @@ class PadatiousService:
         self.finished_training_event = Event()
         self.finished_initial_train = False
 
+        self.train_delay = self.padatious_config.get('train_delay', 4)
+        self.train_time = get_time() + self.train_delay
+
         self.registered_intents = []
         self.registered_entities = []
         self.max_words = 50  # if an utterance contains more words than this, don't attempt to match
@@ -130,7 +133,7 @@ class PadatiousService:
             message (Message): optional triggering message
         """
         self.finished_training_event.clear()
-        padatious_single_thread = self.padatious_config.get('single_thread', False)
+        padatious_single_thread = self.padatious_config.get('single_thread', True)
         if message is None:
             single_thread = padatious_single_thread
         else:
@@ -149,7 +152,13 @@ class PadatiousService:
         """Wait for minimum time between training and start training."""
         if not self.finished_initial_train:
             return
-        self.train()
+        sleep(self.train_delay)
+        if self.train_time < 0.0:
+            return
+
+        if self.train_time <= get_time() + 0.01:
+            self.train_time = -1.0
+            self.train()
 
     def __detach_intent(self, intent_name):
         """ Remove an intent if it has been registered.
@@ -205,6 +214,7 @@ class PadatiousService:
 
         register_func(name, samples)
 
+        self.train_time = get_time() + self.train_delay
         self.wait_and_train()
 
     def register_intent(self, message):
