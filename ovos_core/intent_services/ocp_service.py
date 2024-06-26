@@ -527,6 +527,10 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
     # intent handlers
     def handle_play_intent(self, message: Message):
 
+        if not len(self.skill_aliases):  # skill_id registered when skills load
+            self.speak_dialog("no.media.skills")
+            return
+
         self.speak_dialog("just.one.moment")
 
         lang = message.data["lang"]
