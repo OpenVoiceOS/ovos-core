@@ -133,6 +133,9 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.skill_aliases = {
             # "skill_id": ["names"]
         }
+        self.media2skill = {
+            m: [] for m in MediaType
+        }
         self.entity_csvs = self.config.get("entity_csvs", [])  # user defined keyword csv files
         self.load_classifiers()
 
@@ -241,6 +244,14 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         aliases = message.data.get("aliases", [display_name])
         LOG.info(f"Registering OCP Keyword for {skill_id} : {aliases}")
         self.skill_aliases[skill_id] = aliases
+
+        for idx, m in enumerate(media):
+            try:
+                m = self._normalize_media_enum(m)
+                self.media2skill[m].append(skill_id)
+                media[idx] = m
+            except:
+                LOG.error(f"{skill_id} reported an invalid media_type: {m}")
 
         # TODO - review below and add missing
         # set bias in classifier
@@ -525,6 +536,16 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.bus.emit(message.forward("ovos.common_play.liked_tracks.play"))
 
     # intent handlers
+    @staticmethod
+    def _normalize_media_enum(m: Union[int, MediaType]):
+        if isinstance(m, MediaType):
+            return m
+        # convert int to enum
+        for e in MediaType:
+            if e == m:
+                return e
+        raise ValueError(f"{m} is not a valid media type")
+
     def handle_play_intent(self, message: Message):
 
         if not len(self.skill_aliases):  # skill_id registered when skills load
@@ -539,12 +560,6 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         skills = message.data.get("skills", [])
 
         # search common play skills
-        # convert int to enum
-        for e in MediaType:
-            if e == media_type:
-                media_type = e
-                break
-
         results = self._search(query, media_type, lang,
                                skills=skills, message=message)
 
@@ -906,9 +921,11 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         return results
 
     def _execute_query(self, phrase: str,
-                       media_type: MediaType = MediaType.GENERIC,
+                       media_type: MediaType = Union[int, MediaType.GENERIC],
                        skills: Optional[List[str]] = None) -> list:
         """ actually send the search to OCP skills"""
+        media_type = self._normalize_media_enum(media_type)
+
         with self.search_lock:
             # stop any search still happening
             self.bus.emit(Message("ovos.common_play.search.stop"))
@@ -919,10 +936,18 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             results = []
             if skills:
                 for skill_id in skills:
+                    if skill_id not in self.media2skill[media_type]:
+                        LOG.debug(f"{skill_id} can't handle {media_type} queries")
+                        continue
                     LOG.debug(f"Searching OCP Skill: {skill_id}")
                     query.send(skill_id)
                     query.wait()
                     results += query.results
+
+            if not len(self.media2skill[media_type]):
+                LOG.info(f"No skills available to handle {media_type} queries, "
+                         f"forcing MediaType.GENERIC")
+                media_type = MediaType.GENERIC
 
             # search all skills
             if not results:
