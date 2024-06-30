@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a120...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a121...HEAD)
+
+**Fixed bugs:**
+
+- fix/no\_media\_skills [\#517](https://github.com/OpenVoiceOS/ovos-core/pull/517) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a121](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a121) (2024-06-22)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a120...V0.0.8a121)
 
 **Fixed bugs:**
 
@@ -418,10 +426,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a76...V0.0.8a77)
 
-**Merged pull requests:**
-
-- Update skills-essential.txt [\#401](https://github.com/OpenVoiceOS/ovos-core/pull/401) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a76](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a76) (2024-02-24)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a75...V0.0.8a76)
@@ -498,10 +502,6 @@
 ## [V0.0.8a66](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a66) (2024-01-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a65...V0.0.8a66)
-
-**Merged pull requests:**
-
-- Update MANIFEST.in [\#400](https://github.com/OpenVoiceOS/ovos-core/pull/400) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a65](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a65) (2024-01-13)
 
