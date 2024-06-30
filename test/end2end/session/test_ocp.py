@@ -347,16 +347,10 @@ class TestOCPPipeline(TestCase):
             "speak",
             "ovos.common_play.search.start",
             "enclosure.mouth.think",
-            "ovos.common_play.search.stop",  # any ongoing previous search
-            "ovos.common_play.query",  # movie media type search
-            # no skills want to search
-            "ovos.common_play.query",  # generic media type fallback
+            "ovos.common_play.search.stop",  # stop any ongoing previous search
+            "ovos.common_play.query",  # generic media type, no movie skills available
             # skill searching (generic)
             "ovos.common_play.skill.search_start",
-            "ovos.common_play.query.response",
-            "ovos.common_play.query.response",
-            "ovos.common_play.query.response",
-            "ovos.common_play.query.response",
             "ovos.common_play.query.response",
             "ovos.common_play.skill.search_end",
             "ovos.common_play.search.end",
