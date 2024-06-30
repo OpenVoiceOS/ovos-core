@@ -921,7 +921,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         return results
 
     def _execute_query(self, phrase: str,
-                       media_type: MediaType = Union[int, MediaType.GENERIC],
+                       media_type: MediaType = Union[int, MediaType],
                        skills: Optional[List[str]] = None) -> list:
         """ actually send the search to OCP skills"""
         media_type = self._normalize_media_enum(media_type)
