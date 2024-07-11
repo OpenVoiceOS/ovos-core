@@ -20,7 +20,7 @@
   "Play.voc": [
     "zoek",
     "lees",
-    "speel",
+    "(speel | play)",
     "start"
   ],
   "audio_only.voc": [
