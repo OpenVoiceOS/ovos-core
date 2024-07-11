@@ -6,6 +6,17 @@
     "uniquement la vidéo",
     "vidéo seulement"
   ],
+  "AudioKeyword.voc": [
+    "audio",
+    "son"
+  ],
+  "HentaiKeyword.voc": [
+    "hentai"
+  ],
+  "PodcastKeyword.voc": [
+    "podcast",
+    "podcasts"
+  ],
   "Play.voc": [
     "cherche",
     "lis",
@@ -19,9 +30,83 @@
     "uniquement le son",
     "son seulement"
   ],
+  "NewsKeyword.voc": [
+    "nouvelles"
+  ],
+  "GameKeyword.voc": [
+    "jeu"
+  ],
+  "ADKeyword.voc": [
+    "déscription du audio",
+    "description du film"
+  ],
+  "TrailerKeyword.voc": [
+    "bande-annonce"
+  ],
+  "MovieKeyword.voc": [
+    "film",
+    "film"
+  ],
+  "CartoonKeyword.voc": [
+    "dessin animé",
+    "les dessins animés"
+  ],
+  "VideoKeyword.voc": [
+    "vidéo"
+  ],
+  "ASMRKeyword.voc": [
+    "ASMR",
+    "réponse du méridien sensorielle autonome"
+  ],
+  "DocumentaryKeyword.voc": [
+    "documentaire",
+    "documentaires"
+  ],
+  "SeriesKeyword.voc": [
+    "série",
+    "émission de télévision",
+    "épisode",
+    "épisodes"
+  ],
+  "BWKeyword.voc": [
+    "noir et blanc",
+    "monochrome"
+  ],
+  "AdultKeyword.voc": [
+    "porno",
+    "18 ans et plus",
+    "pornographie"
+  ],
+  "RadioKeyword.voc": [
+    "radio",
+    "radio Internet"
+  ],
+  "AudioDramaKeyword.voc": [
+    "drame",
+    "théâtre"
+  ],
   "Resume.voc": [
     "reprend",
     "reprend"
+  ],
+  "ComicBookKeyword.voc": [
+    "bande dessinée animée",
+    "bande dessinée",
+    "histoire visuelle"
+  ],
+  "TVKeyword.voc": [
+    "TV",
+    "télévision",
+    "chaîne"
+  ],
+  "AnimeKeyword.voc": [
+    "anime"
+  ],
+  "MusicKeyword.voc": [
+    "musique",
+    "chanson",
+    "bande sonore",
+    "bande sonore"
   ],
   "QuestionWord.voc": [
     "qui",
@@ -30,6 +115,22 @@
     "pourquoi",
     "quand",
     "qu'est-ce que",
-    "dis m'en plus au sujet"
+    "dis m'en plus au sujet",
+    "quel",
+    "dont"
+  ],
+  "AudioBookKeyword.voc": [
+    "livre",
+    "livres",
+    "lis",
+    "livre audio",
+    "livres audio",
+    "narre"
+  ],
+  "SilentKeyword.voc": [
+    "silence"
+  ],
+  "ShortKeyword.voc": [
+    "court"
   ]
 }
