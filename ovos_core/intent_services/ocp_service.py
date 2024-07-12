@@ -588,9 +588,9 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             # ovos-PHAL-plugin-mk1 will display music icon in response to play message
             player = self.get_player(message)
             if not player.ocp_available:
-                self.legacy_play(results, query)
+                self.legacy_play(results, query, message=message)
             else:
-                self.ocp_api.play(results, query)
+                self.ocp_api.play(results, query, source_message=message)
 
     def handle_open_intent(self, message: Message):
         LOG.info("Requesting OCP homescreen")
@@ -606,10 +606,10 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         player = self.get_player(message)
         if not player.ocp_available:
             LOG.info("Requesting Legacy AudioService to stop")
-            self.legacy_api.stop()
+            self.legacy_api.stop(source_message=message)
         else:
             LOG.info("Requesting OCP to stop")
-            self.ocp_api.stop()
+            self.ocp_api.stop(source_message=message)
         player = self.get_player(message)
         player.player_state = PlayerState.STOPPED
         self.update_player_proxy(player)
@@ -618,28 +618,28 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         player = self.get_player(message)
         if not player.ocp_available:
             LOG.info("Requesting Legacy AudioService to go to next track")
-            self.legacy_api.next()
+            self.legacy_api.next(source_message=message)
         else:
             LOG.info("Requesting OCP to go to next track")
-            self.ocp_api.next()
+            self.ocp_api.next(source_message=message)
 
     def handle_prev_intent(self, message: Message):
         player = self.get_player(message)
         if not player.ocp_available:
             LOG.info("Requesting Legacy AudioService to go to prev track")
-            self.legacy_api.prev()
+            self.legacy_api.prev(source_message=message)
         else:
             LOG.info("Requesting OCP to go to prev track")
-            self.ocp_api.prev()
+            self.ocp_api.prev(source_message=message)
 
     def handle_pause_intent(self, message: Message):
         player = self.get_player(message)
         if not player.ocp_available:
             LOG.info("Requesting Legacy AudioService to pause")
-            self.legacy_api.pause()
+            self.legacy_api.pause(source_message=message)
         else:
             LOG.info("Requesting OCP to go to pause")
-            self.ocp_api.pause()
+            self.ocp_api.pause(source_message=message)
         player = self.get_player(message)
         player.player_state = PlayerState.PAUSED
         self.update_player_proxy(player)
@@ -648,10 +648,10 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         player = self.get_player(message)
         if not player.ocp_available:
             LOG.info("Requesting Legacy AudioService to resume")
-            self.legacy_api.resume()
+            self.legacy_api.resume(source_message=message)
         else:
             LOG.info("Requesting OCP to go to resume")
-            self.ocp_api.resume()
+            self.ocp_api.resume(source_message=message)
         player = self.get_player(message)
         player.player_state = PlayerState.PLAYING
         self.update_player_proxy(player)
@@ -662,10 +662,10 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         player = self.get_player(message)
         if not player.ocp_available:
             LOG.info("Requesting Legacy AudioService to stop")
-            self.legacy_api.stop()
+            self.legacy_api.stop(source_message=message)
         else:
             LOG.info("Requesting OCP to stop")
-            self.ocp_api.stop()
+            self.ocp_api.stop(source_message=message)
 
     # NLP
     def voc_match_media(self, query: str, lang: str) -> Tuple[MediaType, float]:
@@ -1026,7 +1026,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                 # for legacy audio service we need to do stream extraction here
                 res.append(r.extract_uri(video=False))
 
-        self.legacy_api.play(res, utterance=phrase)
+        self.legacy_api.play(res, utterance=phrase, source_message=message)
 
         player = self.get_player(message)
         player.player_state = PlayerState.PLAYING
