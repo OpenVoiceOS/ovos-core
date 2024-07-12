@@ -564,7 +564,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                                skills=skills, message=message)
 
         # tell OCP to play
-        self.bus.emit(Message('ovos.common_play.reset'))
+        self.bus.emit(message.forward('ovos.common_play.reset'))
         if not results:
             self.speak_dialog("cant.play",
                               data={"phrase": query,
@@ -580,10 +580,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             LOG.debug(f"OCP Best match: {best}")
             results = [r for r in results if r.as_dict != best.as_dict]
             results.insert(0, best)
-            self.bus.emit(Message('add_context',
-                                  {'context': "Playing",
-                                   'word': "",
-                                   'origin': OCP_ID}))
+            self.set_context("Playing", origin=OCP_ID)
 
             # ovos-PHAL-plugin-mk1 will display music icon in response to play message
             player = self.get_player(message)
@@ -896,7 +893,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
     def _search(self, phrase: str, media_type: MediaType, lang: str,
                 skills: Optional[List[str]] = None,
                 message: Optional[Message] = None) -> list:
-        self.bus.emit(Message("ovos.common_play.search.start"))
+        self.bus.emit(message.reply("ovos.common_play.search.start"))
         self.enclosure.mouth_think()  # animate mk1 mouth during search
 
         # Now we place a query on the messsagebus for anyone who wants to
@@ -904,7 +901,8 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         results = []
         for r in self._execute_query(phrase,
                                      media_type=media_type,
-                                     skills=skills):
+                                     skills=skills,
+                                     message=message):
             results += r["results"]
 
         results = self.normalize_results(results)
@@ -917,18 +915,19 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         else:  # no filtering if skill explicitly requested
             LOG.debug(f"Got {len(results)} usable results from {skills}")
 
-        self.bus.emit(Message("ovos.common_play.search.end"))
+        self.bus.emit(message.reply("ovos.common_play.search.end"))
         return results
 
     def _execute_query(self, phrase: str,
                        media_type: MediaType = Union[int, MediaType],
-                       skills: Optional[List[str]] = None) -> list:
+                       skills: Optional[List[str]] = None,
+                       message: Optional[Message] = None) -> list:
         """ actually send the search to OCP skills"""
         media_type = self._normalize_media_enum(media_type)
 
         with self.search_lock:
             # stop any search still happening
-            self.bus.emit(Message("ovos.common_play.search.stop"))
+            self.bus.emit(message.reply("ovos.common_play.search.stop"))
 
             query = OCPQuery(query=phrase, media_type=media_type,
                              config=self.config, bus=self.bus)
@@ -940,7 +939,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
                         LOG.debug(f"{skill_id} can't handle {media_type} queries")
                         continue
                     LOG.debug(f"Searching OCP Skill: {skill_id}")
-                    query.send(skill_id)
+                    query.send(skill_id, source_message=message)
                     query.wait()
                     results += query.results
 
