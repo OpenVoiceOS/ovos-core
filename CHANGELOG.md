@@ -2,7 +2,20 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a121...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a122...HEAD)
+
+**Fixed bugs:**
+
+- fix/ocp\_api\_context [\#524](https://github.com/OpenVoiceOS/ovos-core/pull/524) ([JarbasAl](https://github.com/JarbasAl))
+
+**Merged pull requests:**
+
+- fr-fr/translate [\#522](https://github.com/OpenVoiceOS/ovos-core/pull/522) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- Updated dialogs and vocabs NL [\#520](https://github.com/OpenVoiceOS/ovos-core/pull/520) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+
+## [V0.0.8a122](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a122) (2024-06-30)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a121...V0.0.8a122)
 
 **Fixed bugs:**
 
@@ -312,10 +325,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a88...V0.0.8a89)
 
-**Merged pull requests:**
-
-- Update ovos-messagebus requirement from \>=0.0.4a6,~=0.0 to ~=0.0 in /requirements [\#406](https://github.com/OpenVoiceOS/ovos-core/pull/406) ([dependabot[bot]](https://github.com/apps/dependabot))
-
 ## [V0.0.8a88](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a88) (2024-04-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a87...V0.0.8a88)
@@ -479,25 +488,13 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a68...V0.0.8a69)
 
-**Implemented enhancements:**
-
-- add "ovos.utterance.cancelled" event [\#404](https://github.com/OpenVoiceOS/ovos-core/pull/404) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a68](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a68) (2024-01-24)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a67...V0.0.8a68)
 
-**Fixed bugs:**
-
-- fix/credentials\_leaking\_in\_logs [\#403](https://github.com/OpenVoiceOS/ovos-core/pull/403) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a67](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a67) (2024-01-24)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a66...V0.0.8a67)
-
-**Merged pull requests:**
-
-- add adapt match levels [\#402](https://github.com/OpenVoiceOS/ovos-core/pull/402) ([emphasize](https://github.com/emphasize))
 
 ## [V0.0.8a66](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a66) (2024-01-13)
 
