@@ -66,6 +66,7 @@ jobs:
       - name: Install core repo
         run: |
           pip install -e .[mycroft,deprecated]
+          pip install git+https://github.com/OpenVoiceOS/OVOS-workshop@fix/killable_converse
       - name: Run unittests
         run: |
           pytest --cov=ovos_core --cov-report xml test/unittests
