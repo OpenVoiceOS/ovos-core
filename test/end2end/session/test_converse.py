@@ -546,9 +546,9 @@ class TestTimeOut(TestCase):
     def tearDown(self) -> None:
         self.core.stop()
 
-    def test_no_session(self):
+    def test_kill(self):
         messages = []
-        sess = Session("123")
+        sess = Session("123", pipeline=["converse"])
         sess.activate_skill(self.skill_id)
 
         def new_msg(msg):
