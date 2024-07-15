@@ -1,6 +1,7 @@
+from unittest import TestCase
+
 import time
 from time import sleep
-from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, Session
@@ -22,10 +23,10 @@ class TestSessions(TestCase):
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
         SessionManager.default_session.lang = "en-us"
         SessionManager.default_session.pipeline = [
-                           "converse",
-                           "padatious_high",
-                           "adapt_high"
-                       ]
+            "converse",
+            "padatious_high",
+            "adapt_high"
+        ]
 
         messages = []
 
@@ -462,7 +463,7 @@ class TestSessions(TestCase):
         # STEP 7 - deactivate inside intent handler
         # should not send activate message
         # session should not contain skill as active
-        SessionManager.default_session = Session(session_id="default") # reset state
+        SessionManager.default_session = Session(session_id="default")  # reset state
         messages = []
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["deactivate skill"]})
@@ -512,7 +513,7 @@ class TestSessions(TestCase):
         self.core.bus.emit(utt)
 
         expected_messages = [
-            "recognizer_loop:utterance", # converse gets it
+            "recognizer_loop:utterance",  # converse gets it
             f"{self.skill_id}.converse.ping",
             "skill.converse.pong",
             f"{self.skill_id}.converse.request",
@@ -536,3 +537,65 @@ class TestSessions(TestCase):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
 
+class TestTimeOut(TestCase):
+
+    def setUp(self):
+        self.skill_id = "ovos-skill-slow-fallback.openvoiceos"
+        self.core = get_minicroft([self.skill_id])
+
+    def tearDown(self) -> None:
+        self.core.stop()
+
+    def test_no_session(self):
+        messages = []
+        sess = Session("123")
+        sess.activate_skill(self.skill_id)
+
+        def new_msg(msg):
+            nonlocal messages
+            m = Message.deserialize(msg)
+            if m.msg_type in ["ovos.skills.settings_changed", "ovos.common_play.status"]:
+                return  # skip these, only happen in 1st run
+            messages.append(m)
+            print(len(messages), msg)
+
+        def wait_for_n_messages(n):
+            nonlocal messages
+            t = time.time()
+            while len(messages) < n:
+                sleep(0.1)
+                if time.time() - t > 10:
+                    raise RuntimeError("did not get the number of expected messages under 10 seconds")
+
+        self.core.bus.on("message", new_msg)
+
+        utt = Message("recognizer_loop:utterance",
+                      {"utterances": ["hang forever in converse"]},
+                      {"session": sess.serialize()})
+        self.core.bus.emit(utt)
+
+        # confirm all expected messages are sent
+        expected_messages = [
+            "recognizer_loop:utterance",  # no session
+            f"{self.skill_id}.converse.ping",  # default session injected
+            "skill.converse.pong",
+            f"{self.skill_id}.converse.request",
+
+            # skill hangs forever here and never gets to emit a response
+
+            "ovos.skills.converse.force_timeout",  # killed by core
+            "skill.converse.response",
+            f"{self.skill_id}.converse.killed",
+
+            "mycroft.audio.play_sound",
+            "complete_intent_failure",
+            "ovos.utterance.handled"  # handle_utterance returned (intent service)
+
+        ]
+
+        wait_for_n_messages(len(expected_messages))
+
+        self.assertEqual(len(expected_messages), len(messages))
+
+        for idx, m in enumerate(messages):
+            self.assertEqual(m.msg_type, expected_messages[idx])
