@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a122...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a123...HEAD)
+
+**Fixed bugs:**
+
+- fix/killable\_converse [\#523](https://github.com/OpenVoiceOS/ovos-core/pull/523) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a123](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a123) (2024-07-12)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a122...V0.0.8a123)
 
 **Fixed bugs:**
 
@@ -471,10 +479,6 @@
 ## [V0.0.8a72](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a72) (2024-02-04)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a71...V0.0.8a72)
-
-**Fixed bugs:**
-
-- fix/ocp\_keywords [\#410](https://github.com/OpenVoiceOS/ovos-core/pull/410) ([NeonJarbas](https://github.com/NeonJarbas))
 
 ## [V0.0.8a71](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a71) (2024-02-02)
 
