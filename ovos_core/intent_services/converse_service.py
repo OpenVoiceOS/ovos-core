@@ -293,13 +293,22 @@ class ConverseService:
                                          {"utterances": utterances,
                                           "lang": lang})
             result = self.bus.wait_for_response(converse_msg,
-                                                'skill.converse.response')
+                                                'skill.converse.response',
+                                                timeout=self.config.get("max_skill_runtime", 10))
             if result and 'error' in result.data:
                 error_msg = result.data['error']
                 LOG.error(f"{skill_id}: {error_msg}")
                 return False
             elif result is not None:
                 return result.data.get('result', False)
+            else:
+                # abort any ongoing converse
+                # if skill crashed or returns False, all good
+                # if it is just taking a long time, more than 1 skill would end up answering
+                self.bus.emit(message.forward("ovos.skills.converse.force_timeout",
+                                              {"skill_id": skill_id}))
+                LOG.warning(f"{skill_id} took too long to answer, "
+                            f'increasing "max_skill_runtime" in mycroft.conf might help alleviate this issue')
         return False
 
     def converse_with_skills(self, utterances, lang, message):
