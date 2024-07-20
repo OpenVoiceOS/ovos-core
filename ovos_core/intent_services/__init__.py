@@ -12,39 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from collections import namedtuple
 from typing import Tuple, Callable
+
+from ovos_adapt.opm import AdaptPipeline as AdaptService
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_config.locale import setup_locale, get_valid_languages, get_full_lang_code
+from ovos_utils.log import LOG, deprecated, log_deprecation
+from ovos_utils.metrics import Stopwatch
+from ovos_workshop.intents import open_intent_envelope
+from padacioso.opm import PadaciosoPipeline as PadaciosoService
 
-from ovos_core.intent_services.adapt_service import AdaptService
 from ovos_core.intent_services.commonqa_service import CommonQAService
 from ovos_core.intent_services.converse_service import ConverseService
 from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.ocp_service import OCPPipelineMatcher
-from ovos_core.intent_services.padacioso_service import PadaciosoService
 from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
-from ovos_utils.log import LOG, deprecated, log_deprecation
-from ovos_utils.metrics import Stopwatch
-from ovos_workshop.intents import open_intent_envelope
-
-# Intent match response tuple containing
-# intent_service: Name of the service that matched the intent
-# intent_type: intent name (used to call intent handler over the message bus)
-# intent_data: data provided by the intent match
-# skill_id: the skill this handler belongs to
-IntentMatch = namedtuple('IntentMatch',
-                         ['intent_service', 'intent_type',
-                          'intent_data', 'skill_id', 'utterance']
-                         )
+from ovos_plugin_manager.templates.pipeline import IntentMatch
 
 
 class IntentService:
-    """Mycroft intent service. parses utterances using a variety of systems.
+    """OVOS intent service. parses utterances using a variety of systems.
 
     The intent service also provides the internal API for registering and
     querying the intent service.
@@ -66,7 +57,7 @@ class IntentService:
             if self.config["padatious"].get("disabled"):
                 LOG.info("padatious forcefully disabled in config")
             else:
-                from ovos_core.intent_services.padatious_service import PadatiousService
+                from ovos_padatious.opm import PadatiousPipeline as PadatiousService
                 self.padatious_service = PadatiousService(bus, self.config["padatious"])
         except ImportError:
             LOG.error(f'Failed to create padatious intent handlers, padatious not installed')
@@ -379,10 +370,12 @@ class IntentService:
                 if match:
                     LOG.info(f"{pipeline} match: {match}")
                     if match.skill_id and match.skill_id in sess.blacklisted_skills:
-                        LOG.debug(f"ignoring match, skill_id '{match.skill_id}' blacklisted by Session '{sess.session_id}'")
+                        LOG.debug(
+                            f"ignoring match, skill_id '{match.skill_id}' blacklisted by Session '{sess.session_id}'")
                         continue
                     if match.intent_type and match.intent_type in sess.blacklisted_intents:
-                        LOG.debug(f"ignoring match, intent '{match.intent_type}' blacklisted by Session '{sess.session_id}'")
+                        LOG.debug(
+                            f"ignoring match, intent '{match.intent_type}' blacklisted by Session '{sess.session_id}'")
                         continue
                     try:
                         self._emit_match_message(match, message)

@@ -48,6 +48,9 @@ jobs:
           sudo apt-get update
           sudo apt install python3-dev swig libssl-dev portaudio19-dev libpulse-dev
           python -m pip install build wheel
+      - name: Install adapt from github while waiting for release - TODO Remove me
+        run: |
+          pip install git+https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin
       - name: Install test dependencies
         run: |
           pip install -r requirements/tests.txt
@@ -81,6 +84,7 @@ jobs:
       - name: Install padatious
         run: |
           sudo apt install libfann-dev
+          pip install git+https://github.com/OpenVoiceOS/ovos-padatious-pipeline-plugin
           pip install .[lgpl]
       - name: Run unittests with padatious
         run: |

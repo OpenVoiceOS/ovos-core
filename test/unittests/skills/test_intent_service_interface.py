@@ -1,6 +1,6 @@
 import unittest
 
-from adapt.intent import IntentBuilder
+from ovos_adapt.intent import IntentBuilder
 from mycroft.skills.intent_service_interface import IntentServiceInterface
 
 
