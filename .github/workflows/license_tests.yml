@@ -24,6 +24,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt install python3-dev swig libssl-dev libfann-dev portaudio19-dev libpulse-dev
+      - name: Install from github while waiting for release - TODO Remove me
+        run: |
+          pip install git+https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin
+          pip install git+https://github.com/OpenVoiceOS/ovos-padatious-pipeline-plugin
       - name: Install core repo
         run: |
           pip install .[mycroft,lgpl,skills-essential]

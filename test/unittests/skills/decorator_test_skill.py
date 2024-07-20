@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from adapt.intent import IntentBuilder
+from ovos_adapt.intent import IntentBuilder
 
 from ovos_workshop.skills.ovos import OVOSSkill
 from ovos_workshop.decorators import intent_handler, intent_file_handler

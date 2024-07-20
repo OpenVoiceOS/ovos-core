@@ -21,7 +21,7 @@ from datetime import datetime
 from os.path import join, dirname, abspath
 from unittest.mock import MagicMock, patch
 
-from adapt.intent import IntentBuilder
+from ovos_adapt.intent import IntentBuilder
 from ovos_config import Configuration
 
 from mycroft.skills.skill_data import (load_regex_from_file, load_regex,
