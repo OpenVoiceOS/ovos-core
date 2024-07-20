@@ -1,13 +1,11 @@
 import os
 import random
 import threading
+import time
 from dataclasses import dataclass
 from os.path import join, dirname
 from threading import RLock
 from typing import List, Tuple, Optional, Union
-
-import time
-from padacioso import IntentContainer
 
 from ovos_bus_client.apis.ocp import ClassicAudioServiceInterface
 from ovos_bus_client.apis.ocp import OCPInterface, OCPQuery
@@ -15,13 +13,14 @@ from ovos_bus_client.message import Message, dig_for_message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import wait_for_reply
 from ovos_plugin_manager.ocp import available_extractors
-from ovos_plugin_manager.templates.pipeline import IntentMatch
+from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
 from ovos_utils import classproperty
 from ovos_utils.log import LOG
 from ovos_utils.messagebus import FakeBus
 from ovos_utils.ocp import MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID, \
     MediaEntry, Playlist, MediaState, TrackState, dict2entry, PluginStream
 from ovos_workshop.app import OVOSAbstractApplication
+from padacioso import IntentContainer
 
 
 @dataclass
@@ -35,14 +34,15 @@ class OCPPlayerProxy:
     media_type: MediaType = MediaType.GENERIC
 
 
-class OCPPipelineMatcher(OVOSAbstractApplication):
+class OCPPipelineMatcher(PipelinePlugin, OVOSAbstractApplication):
     intents = ["play.intent", "open.intent", "media_stop.intent",
                "next.intent", "prev.intent", "pause.intent", "play_favorites.intent",
                "resume.intent", "like_song.intent"]
 
     def __init__(self, bus=None, config=None):
-        super().__init__(skill_id=OCP_ID, bus=bus or FakeBus(),
-                         resources_dir=f"{dirname(__file__)}")
+        OVOSAbstractApplication.__init__(
+            self, bus=bus or FakeBus(), skill_id=OCP_ID, resources_dir=f"{dirname(__file__)}")
+        PipelinePlugin.__init__(self, config)
 
         self.ocp_api = OCPInterface(self.bus)
         self.legacy_api = ClassicAudioServiceInterface(self.bus)

@@ -4,12 +4,11 @@ from os.path import dirname
 from threading import Event
 from typing import Dict, Optional
 
-from ovos_config.config import Configuration
-
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
+from ovos_config.config import Configuration
 from ovos_plugin_manager.solvers import find_multiple_choice_solver_plugins
-from ovos_plugin_manager.templates.pipeline import IntentMatch
+from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
 from ovos_workshop.app import OVOSAbstractApplication
@@ -31,11 +30,12 @@ class Query:
     selected_skill: str = ""
 
 
-class CommonQAService(OVOSAbstractApplication):
-    def __init__(self, bus, config: Optional[Dict] = None):
-        super().__init__(bus=bus,
-                         skill_id="common_query.openvoiceos",
-                         resources_dir=f"{dirname(__file__)}")
+class CommonQAService(PipelinePlugin, OVOSAbstractApplication):
+    def __init__(self, bus, config=None):
+        OVOSAbstractApplication.__init__(
+            self, bus=bus, skill_id="common_query.openvoiceos",
+            resources_dir=f"{dirname(__file__)}")
+        PipelinePlugin.__init__(self, config)
         self.active_queries: Dict[str, Query] = dict()
 
         self.common_query_skills = []

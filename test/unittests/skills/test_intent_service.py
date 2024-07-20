@@ -19,7 +19,7 @@ from ovos_bus_client.util import get_message_lang
 from ovos_config import Configuration
 from ovos_config.locale import setup_locale
 from ovos_core.intent_services import IntentService
-from ovos_core.intent_services.adapt_service import ContextManager
+from ovos_adapt.opm import ContextManager
 from ovos_workshop.intents import IntentBuilder, Intent as AdaptIntent
 from test.util import base_config
 

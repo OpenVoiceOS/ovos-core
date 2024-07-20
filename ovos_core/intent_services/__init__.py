@@ -13,18 +13,19 @@
 # limitations under the License.
 #
 from typing import Tuple, Callable
+
+from ovos_adapt.opm import AdaptPipeline as AdaptService
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_config.locale import setup_locale, get_valid_languages, get_full_lang_code
+from padacioso.opm import PadaciosoPipeline as PadaciosoService
 
-from ovos_core.intent_services.adapt_service import AdaptService
 from ovos_core.intent_services.commonqa_service import CommonQAService
 from ovos_core.intent_services.converse_service import ConverseService
 from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.ocp_service import OCPPipelineMatcher
-from ovos_core.intent_services.padacioso_service import PadaciosoService
 from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
 from ovos_utils.log import LOG, deprecated, log_deprecation
@@ -56,7 +57,7 @@ class IntentService:
             if self.config["padatious"].get("disabled"):
                 LOG.info("padatious forcefully disabled in config")
             else:
-                from ovos_core.intent_services.padatious_service import PadatiousService
+                from ovos_padatious.opm import PadatiousPipeline as PadatiousService
                 self.padatious_service = PadatiousService(bus, self.config["padatious"])
         except ImportError:
             LOG.error(f'Failed to create padatious intent handlers, padatious not installed')

@@ -57,6 +57,14 @@ def required(requirements_file):
 with open(os.path.join(BASEDIR, "README.md"), "r") as f:
     long_description = f.read()
 
+PLUGIN_ENTRY_POINT = [
+    'ovos-converse-pipeline-plugin=ovos_core.intent_services.converse_service:ConverseService',
+    'ovos-fallback-pipeline-plugin=ovos_core.intent_services.fallback_service:FallbackService',
+    'ovos-ocp-pipeline-plugin=ovos_core.intent_services.ocp_service:OCPPipelineMatcher',
+    'ovos-stop-pipeline-plugin=ovos_core.intent_services.stop_service:StopService',
+    'ovos-common-query-pipeline-plugin=ovos_core.intent_services.commonqa_service:CommonQAService'
+]
+
 
 setup(
     name='ovos-core',
@@ -87,6 +95,7 @@ setup(
         "License :: OSI Approved :: Apache Software License",
     ],
     entry_points={
+        'opm.pipeline': PLUGIN_ENTRY_POINT,
         'console_scripts': [
             'ovos-core=ovos_core.__main__:main',
             # TODO - remove below console_scripts in 0.1.0 (backwards compat)

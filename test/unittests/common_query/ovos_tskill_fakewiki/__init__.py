@@ -1,4 +1,4 @@
-from adapt.intent import IntentBuilder
+from ovos_adapt.intent import IntentBuilder
 
 from ovos_workshop.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel
 from mycroft.skills.core import intent_handler
