@@ -16,7 +16,7 @@
 from ovos_adapt.context import ContextManagerFrame
 from ovos_adapt.engine import IntentDeterminationEngine
 from ovos_workshop.intents import IntentBuilder, Intent
-from ovos_core.intent_services.adapt_service import ContextManager, AdaptService
+from ovos_adapt.opm import ContextManager, AdaptPipeline as AdaptService
 
 
 class AdaptIntent(IntentBuilder):
