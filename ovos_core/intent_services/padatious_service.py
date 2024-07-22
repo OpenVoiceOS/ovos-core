@@ -30,7 +30,7 @@ from ovos_utils import flatten_list
 from ovos_utils.log import LOG
 from ovos_utils.xdg_utils import xdg_data_home
 
-import ovos_core.intent_services
+from ovos_plugin_manager.templates.pipeline import IntentMatch
 from ovos_bus_client.message import Message
 
 
@@ -55,7 +55,7 @@ class PadatiousMatcher:
         padatious_intent = self.service.calc_intent(utterances, lang, message)
         if padatious_intent is not None and padatious_intent.conf > limit:
             skill_id = padatious_intent.name.split(':')[0]
-            return ovos_core.intent_services.IntentMatch(
+            return IntentMatch(
                 'Padatious', padatious_intent.name,
                 padatious_intent.matches, skill_id, padatious_intent.sent)
 

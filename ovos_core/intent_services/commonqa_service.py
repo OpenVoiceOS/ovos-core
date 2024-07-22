@@ -2,17 +2,17 @@ import time
 from dataclasses import dataclass
 from os.path import dirname
 from threading import Event
-from typing import Dict
+from typing import Dict, Optional
 
 from ovos_classifiers.opm.heuristics import BM25MultipleChoiceSolver
 
-import ovos_core.intent_services
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_config.config import Configuration
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
 from ovos_workshop.app import OVOSAbstractApplication
+from ovos_plugin_manager.templates.pipeline import IntentMatch
 
 
 @dataclass
@@ -76,7 +76,7 @@ class CommonQAService(OVOSAbstractApplication):
         # require a "question word"
         return self.voc_match(utterance, "QuestionWord", lang)
 
-    def match(self, utterances: str, lang: str, message: Message):
+    def match(self, utterances: str, lang: str, message: Message) -> Optional[IntentMatch]:
         """
         Send common query request and select best response
 
@@ -114,11 +114,11 @@ class CommonQAService(OVOSAbstractApplication):
                 message.data["utterance"] = utterance
                 answered, skill_id = self.handle_question(message)
                 if answered:
-                    match = ovos_core.intent_services.IntentMatch(intent_service='CommonQuery',
-                                                                  intent_type=True,
-                                                                  intent_data={},
-                                                                  skill_id=skill_id,
-                                                                  utterance=utterance)
+                    match = IntentMatch(intent_service='CommonQuery',
+                                        intent_type=True,
+                                        intent_data={},
+                                        skill_id=skill_id,
+                                        utterance=utterance)
                 break
         return match
 

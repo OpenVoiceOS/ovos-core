@@ -21,7 +21,7 @@ from sklearn.pipeline import FeatureUnion
 from threading import Lock, RLock
 from typing import List, Tuple, Optional, Union
 
-import ovos_core.intent_services
+from ovos_plugin_manager.templates.pipeline import IntentMatch
 from ovos_workshop.app import OVOSAbstractApplication
 
 try:
@@ -350,7 +350,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         self.update_player_proxy(player)
 
     # pipeline
-    def match_high(self, utterances: List[str], lang: str, message: Message = None):
+    def match_high(self, utterances: List[str], lang: str, message: Message = None) -> Optional[IntentMatch]:
         """ exact matches only, handles playback control
         recommended after high confidence intents pipeline stage """
         if lang not in self.intent_matchers:
@@ -385,13 +385,13 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             else:
                 return None
 
-        return ovos_core.intent_services.IntentMatch(intent_service="OCP_intents",
-                                                     intent_type=f'ocp:{match["name"]}',
-                                                     intent_data=match,
-                                                     skill_id=OCP_ID,
-                                                     utterance=utterance)
+        return IntentMatch(intent_service="OCP_intents",
+                           intent_type=f'ocp:{match["name"]}',
+                           intent_data=match,
+                           skill_id=OCP_ID,
+                           utterance=utterance)
 
-    def match_medium(self, utterances: List[str], lang: str, message: Message = None):
+    def match_medium(self, utterances: List[str], lang: str, message: Message = None) -> Optional[IntentMatch]:
         """ match a utterance via classifiers,
         recommended before common_qa pipeline stage"""
         utterance = utterances[0].lower()
@@ -410,17 +410,17 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         # extract the query string
         query = self.remove_voc(utterance, "Play", lang).strip()
 
-        return ovos_core.intent_services.IntentMatch(intent_service="OCP_media",
-                                                     intent_type=f"ocp:play",
-                                                     intent_data={"media_type": media_type,
-                                                                  "entities": ents,
-                                                                  "query": query,
-                                                                  "is_ocp_conf": bconf,
-                                                                  "conf": confidence},
-                                                     skill_id=OCP_ID,
-                                                     utterance=utterance)
+        return IntentMatch(intent_service="OCP_media",
+                           intent_type=f"ocp:play",
+                           intent_data={"media_type": media_type,
+                                        "entities": ents,
+                                        "query": query,
+                                        "is_ocp_conf": bconf,
+                                        "conf": confidence},
+                           skill_id=OCP_ID,
+                           utterance=utterance)
 
-    def match_fallback(self, utterances: List[str], lang: str, message: Message = None):
+    def match_fallback(self, utterances: List[str], lang: str, message: Message = None) -> Optional[IntentMatch]:
         """ match an utterance via presence of known OCP keywords,
         recommended before fallback_low pipeline stage"""
         utterance = utterances[0].lower()
@@ -437,39 +437,39 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         # extract the query string
         query = self.remove_voc(utterance, "Play", lang).strip()
 
-        return ovos_core.intent_services.IntentMatch(intent_service="OCP_fallback",
-                                                     intent_type=f"ocp:play",
-                                                     intent_data={"media_type": media_type,
-                                                                  "entities": ents,
-                                                                  "query": query,
-                                                                  "conf": float(confidence)},
-                                                     skill_id=OCP_ID,
-                                                     utterance=utterance)
+        return IntentMatch(intent_service="OCP_fallback",
+                           intent_type=f"ocp:play",
+                           intent_data={"media_type": media_type,
+                                        "entities": ents,
+                                        "query": query,
+                                        "conf": float(confidence)},
+                           skill_id=OCP_ID,
+                           utterance=utterance)
 
     def _process_play_query(self, utterance: str, lang: str, match: dict = None,
-                            message: Optional[Message] = None):
+                            message: Optional[Message] = None) -> Optional[IntentMatch]:
 
         match = match or {}
         player = self.get_player(message)
         # if media is currently paused, empty string means "resume playback"
         if player.player_state == PlayerState.PAUSED and \
                 self._should_resume(utterance, lang, message=message):
-            return ovos_core.intent_services.IntentMatch(intent_service="OCP_intents",
-                                                         intent_type=f"ocp:resume",
-                                                         intent_data=match,
-                                                         skill_id=OCP_ID,
-                                                         utterance=utterance)
+            return IntentMatch(intent_service="OCP_intents",
+                               intent_type=f"ocp:resume",
+                               intent_data=match,
+                               skill_id=OCP_ID,
+                               utterance=utterance)
 
         if not utterance:
             # user just said "play", we are missing the search query
             phrase = self.get_response("play.what", num_retries=2)
             if not phrase:
                 # let the error intent handler take action
-                return ovos_core.intent_services.IntentMatch(intent_service="OCP_intents",
-                                                             intent_type=f"ocp:search_error",
-                                                             intent_data=match,
-                                                             skill_id=OCP_ID,
-                                                             utterance=utterance)
+                return IntentMatch(intent_service="OCP_intents",
+                                  intent_type=f"ocp:search_error",
+                                  intent_data=match,
+                                  skill_id=OCP_ID,
+                                  utterance=utterance)
 
         sess = SessionManager.get(message)
         # if a skill was explicitly requested, search it first
@@ -489,18 +489,18 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
         ents = OCPFeaturizer.extract_entities(utterance)
 
-        return ovos_core.intent_services.IntentMatch(intent_service="OCP_intents",
-                                                     intent_type=f"ocp:play",
-                                                     intent_data={"media_type": media_type,
-                                                                  "query": query,
-                                                                  "entities": ents,
-                                                                  "skills": valid_skills,
-                                                                  "conf": match["conf"],
-                                                                  "media_conf": float(conf),
-                                                                  # "results": results,
-                                                                  "lang": lang},
-                                                     skill_id=OCP_ID,
-                                                     utterance=utterance)
+        return IntentMatch(intent_service="OCP_intents",
+                           intent_type=f"ocp:play",
+                           intent_data={"media_type": media_type,
+                                        "query": query,
+                                        "entities": ents,
+                                        "skills": valid_skills,
+                                        "conf": match["conf"],
+                                        "media_conf": float(conf),
+                                        # "results": results,
+                                        "lang": lang},
+                           skill_id=OCP_ID,
+                           utterance=utterance)
 
     # bus api
     def handle_search_query(self, message: Message):
@@ -1070,7 +1070,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
     ############
     # Legacy Mycroft CommonPlay skills
 
-    def match_legacy(self, utterances: List[str], lang: str, message: Message = None):
+    def match_legacy(self, utterances: List[str], lang: str, message: Message = None) -> Optional[IntentMatch]:
         """ match legacy mycroft common play skills  (must import from deprecated mycroft module)
         not recommended, legacy support only
 
@@ -1089,12 +1089,12 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         if match["name"] == "play":
             LOG.info(f"Legacy Mycroft CommonPlay match: {match}")
             utterance = match["entities"].pop("query")
-            return ovos_core.intent_services.IntentMatch(intent_service="OCP_media",
-                                                         intent_type=f"ocp:legacy_cps",
-                                                         intent_data={"query": utterance,
-                                                                      "conf": 0.7},
-                                                         skill_id=OCP_ID,
-                                                         utterance=utterance)
+            return IntentMatch(intent_service="OCP_media",
+                               intent_type=f"ocp:legacy_cps",
+                               intent_data={"query": utterance,
+                                            "conf": 0.7},
+                               skill_id=OCP_ID,
+                               utterance=utterance)
 
     def handle_legacy_cps(self, message: Message):
         """intent handler for legacy CPS matches"""

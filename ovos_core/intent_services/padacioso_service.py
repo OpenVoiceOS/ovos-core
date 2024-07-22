@@ -1,5 +1,4 @@
 """Intent service wrapping padacioso."""
-import concurrent.futures
 from functools import lru_cache
 from os.path import isfile
 from typing import List, Optional
@@ -10,7 +9,8 @@ from ovos_utils import flatten_list
 from ovos_utils.log import LOG
 from padacioso import IntentContainer as FallbackIntentContainer
 
-import ovos_core.intent_services
+
+from ovos_plugin_manager.templates.pipeline import IntentMatch
 from ovos_bus_client.message import Message
 
 
@@ -92,7 +92,7 @@ class PadaciosoService:
         padacioso_intent = self.calc_intent(utterances, lang, message)
         if padacioso_intent is not None and padacioso_intent.conf > limit:
             skill_id = padacioso_intent.name.split(':')[0]
-            return ovos_core.intent_services.IntentMatch(
+            return IntentMatch(
                 'Padacioso', padacioso_intent.name,
                 padacioso_intent.matches, skill_id, padacioso_intent.sent)
 

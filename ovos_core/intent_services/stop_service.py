@@ -3,7 +3,7 @@ import re
 from os.path import dirname
 from threading import Event
 
-import ovos_core.intent_services
+from typing import Optional, List
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_config.config import Configuration
@@ -11,6 +11,7 @@ from ovos_utils import flatten_list
 from ovos_utils.bracket_expansion import expand_options
 from ovos_utils.log import LOG
 from ovos_utils.parse import match_one
+from ovos_plugin_manager.templates.pipeline import IntentMatch
 
 
 class StopService:
@@ -41,7 +42,7 @@ class StopService:
         """
         return Configuration().get("skills", {}).get("stop") or {}
 
-    def get_active_skills(self, message=None):
+    def get_active_skills(self, message: Optional[Message]=None):
         """Active skill ids ordered by converse priority
         this represents the order in which stop will be called
 
@@ -51,7 +52,7 @@ class StopService:
         session = SessionManager.get(message)
         return [skill[0] for skill in session.active_skills]
 
-    def _collect_stop_skills(self, message):
+    def _collect_stop_skills(self, message: Message):
         """use the messagebus api to determine which skills can stop
         This includes all skills and external applications"""
 
@@ -95,7 +96,7 @@ class StopService:
         self.bus.remove("skill.stop.pong", handle_ack)
         return want_stop or active_skills
 
-    def stop_skill(self, skill_id, message):
+    def stop_skill(self, skill_id: str, message: Message):
         """Tell a skill to stop anything it's doing,
         taking into account the message Session
 
@@ -115,7 +116,7 @@ class StopService:
         elif result is not None:
             return result.data.get('result', False)
 
-    def match_stop_high(self, utterances, lang, message):
+    def match_stop_high(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
         """If utterance is an exact match for "stop" , run before intent stage
 
         Args:
@@ -144,7 +145,7 @@ class StopService:
         if is_global_stop:
             # emit a global stop, full stop anything OVOS is doing
             self.bus.emit(message.reply("mycroft.stop", {}))
-            return ovos_core.intent_services.IntentMatch(intent_service='Stop',
+            return IntentMatch(intent_service='Stop',
                                                          intent_type=True,
                                                          intent_data={"conf": conf},
                                                          skill_id=None,
@@ -158,14 +159,14 @@ class StopService:
                     continue
 
                 if self.stop_skill(skill_id, message):
-                    return ovos_core.intent_services.IntentMatch(intent_service='Stop',
+                    return IntentMatch(intent_service='Stop',
                                                                  intent_type=True,
                                                                  intent_data={"conf": conf},
                                                                  skill_id=skill_id,
                                                                  utterance=utterance)
         return None
 
-    def match_stop_medium(self, utterances, lang, message):
+    def match_stop_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
         """ if "stop" intent is in the utterance,
         but it contains additional words not in .intent files
 
@@ -193,7 +194,7 @@ class StopService:
 
         return self.match_stop_low(utterances, lang, message)
 
-    def match_stop_low(self, utterances, lang, message):
+    def match_stop_low(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
         """ before fallback_low , fuzzy match stop intent
 
         Args:
@@ -226,7 +227,7 @@ class StopService:
                 continue
 
             if self.stop_skill(skill_id, message):
-                return ovos_core.intent_services.IntentMatch(intent_service='Stop',
+                return IntentMatch(intent_service='Stop',
                                                              intent_type=True,
                                                              # emit instead of intent message
                                                              intent_data={"conf": conf},
@@ -234,7 +235,7 @@ class StopService:
 
         # emit a global stop, full stop anything OVOS is doing
         self.bus.emit(message.reply("mycroft.stop", {}))
-        return ovos_core.intent_services.IntentMatch(intent_service='Stop',
+        return IntentMatch(intent_service='Stop',
                                                      intent_type=True,
                                                      # emit instead of intent message {"conf": conf},
                                                      intent_data={},
