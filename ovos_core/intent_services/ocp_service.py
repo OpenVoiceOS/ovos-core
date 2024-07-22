@@ -490,7 +490,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         ents = OCPFeaturizer.extract_entities(utterance)
 
         return IntentMatch(intent_service="OCP_intents",
-                           intent_type=f"ocp:play",
+                           intent_type="ocp:play",
                            intent_data={"media_type": media_type,
                                         "query": query,
                                         "entities": ents,
