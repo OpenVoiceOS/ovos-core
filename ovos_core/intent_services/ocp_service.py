@@ -411,7 +411,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         query = self.remove_voc(utterance, "Play", lang).strip()
 
         return IntentMatch(intent_service="OCP_media",
-                           intent_type=f"ocp:play",
+                           intent_type="ocp:play",
                            intent_data={"media_type": media_type,
                                         "entities": ents,
                                         "query": query,
