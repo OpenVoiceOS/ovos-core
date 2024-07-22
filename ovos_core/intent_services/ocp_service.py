@@ -466,7 +466,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             if not phrase:
                 # let the error intent handler take action
                 return IntentMatch(intent_service="OCP_intents",
-                                  intent_type=f"ocp:search_error",
+                                  intent_type="ocp:search_error",
                                   intent_data=match,
                                   skill_id=OCP_ID,
                                   utterance=utterance)
