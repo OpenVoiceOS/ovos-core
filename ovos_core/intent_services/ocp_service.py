@@ -1090,7 +1090,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             LOG.info(f"Legacy Mycroft CommonPlay match: {match}")
             utterance = match["entities"].pop("query")
             return IntentMatch(intent_service="OCP_media",
-                               intent_type=f"ocp:legacy_cps",
+                               intent_type="ocp:legacy_cps",
                                intent_data={"query": utterance,
                                             "conf": 0.7},
                                skill_id=OCP_ID,
