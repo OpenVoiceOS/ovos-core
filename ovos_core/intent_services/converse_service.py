@@ -1,7 +1,7 @@
-import time
 from threading import Event
+from typing import Optional
 
-import ovos_core.intent_services
+import time
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, UtteranceState
 from ovos_bus_client.util import get_message_lang
@@ -10,6 +10,8 @@ from ovos_config.locale import setup_locale
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
+
+from ovos_plugin_manager.templates.pipeline import IntentMatch
 
 
 class ConverseService:
@@ -311,7 +313,7 @@ class ConverseService:
                             f'increasing "max_skill_runtime" in mycroft.conf might help alleviate this issue')
         return False
 
-    def converse_with_skills(self, utterances, lang, message):
+    def converse_with_skills(self, utterances, lang, message) -> Optional[IntentMatch]:
         """Give active skills a chance at the utterance
 
         Args:
@@ -335,12 +337,12 @@ class ConverseService:
                 continue
             if self.converse(utterances, skill_id, lang, message):
                 state = session.utterance_states.get(skill_id, UtteranceState.INTENT)
-                return ovos_core.intent_services.IntentMatch(intent_service='Converse',
-                                                             intent_type=state != UtteranceState.RESPONSE,
-                                                             # intent_type == True -> emit "ovos.utterance.handled"
-                                                             intent_data={},
-                                                             skill_id=skill_id,
-                                                             utterance=utterances[0])
+                return IntentMatch(intent_service='Converse',
+                                   intent_type=state != UtteranceState.RESPONSE,
+                                   # intent_type == True -> emit "ovos.utterance.handled"
+                                   intent_data={},
+                                   skill_id=skill_id,
+                                   utterance=utterances[0])
         return None
 
     def handle_get_response_enable(self, message):

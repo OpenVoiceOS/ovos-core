@@ -15,15 +15,16 @@
 """Intent service for Mycroft's fallback system."""
 import operator
 from collections import namedtuple
+from typing import Optional
 
 import time
+from ovos_bus_client.session import SessionManager
 from ovos_config import Configuration
-
-import ovos_core.intent_services
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
-from ovos_bus_client.session import SessionManager
 from ovos_workshop.skills.fallback import FallbackMode
+
+from ovos_plugin_manager.templates.pipeline import IntentMatch
 
 FallbackRange = namedtuple('FallbackRange', ['start', 'stop'])
 
@@ -157,7 +158,7 @@ class FallbackService:
                             f'increasing "max_skill_runtime" in mycroft.conf might help alleviate this issue')
         return False
 
-    def _fallback_range(self, utterances, lang, message, fb_range):
+    def _fallback_range(self, utterances, lang, message, fb_range) -> Optional[IntentMatch]:
         """Send fallback request for a specified priority range.
 
         Args:
@@ -187,24 +188,24 @@ class FallbackService:
                 continue
             result = self.attempt_fallback(utterances, skill_id, lang, message)
             if result:
-                return ovos_core.intent_services.IntentMatch(intent_service='Fallback',
-                                                             intent_type=None,
-                                                             intent_data={},
-                                                             skill_id=skill_id,
-                                                             utterance=utterances[0])
+                return IntentMatch(intent_service='Fallback',
+                                   intent_type=None,
+                                   intent_data={},
+                                   skill_id=skill_id,
+                                   utterance=utterances[0])
         return None
 
-    def high_prio(self, utterances, lang, message):
+    def high_prio(self, utterances, lang, message) -> Optional[IntentMatch]:
         """Pre-padatious fallbacks."""
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(0, 5))
 
-    def medium_prio(self, utterances, lang, message):
+    def medium_prio(self, utterances, lang, message) -> Optional[IntentMatch]:
         """General fallbacks."""
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(5, 90))
 
-    def low_prio(self, utterances, lang, message):
+    def low_prio(self, utterances, lang, message) -> Optional[IntentMatch]:
         """Low prio fallbacks with general matching such as chat-bot."""
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(90, 101))

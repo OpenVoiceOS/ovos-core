@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from collections import namedtuple
 from typing import Tuple, Callable
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
@@ -31,20 +30,11 @@ from ovos_core.transformers import MetadataTransformersService, UtteranceTransfo
 from ovos_utils.log import LOG, deprecated, log_deprecation
 from ovos_utils.metrics import Stopwatch
 from ovos_workshop.intents import open_intent_envelope
-
-# Intent match response tuple containing
-# intent_service: Name of the service that matched the intent
-# intent_type: intent name (used to call intent handler over the message bus)
-# intent_data: data provided by the intent match
-# skill_id: the skill this handler belongs to
-IntentMatch = namedtuple('IntentMatch',
-                         ['intent_service', 'intent_type',
-                          'intent_data', 'skill_id', 'utterance']
-                         )
+from ovos_plugin_manager.templates.pipeline import IntentMatch
 
 
 class IntentService:
-    """Mycroft intent service. parses utterances using a variety of systems.
+    """OVOS intent service. parses utterances using a variety of systems.
 
     The intent service also provides the internal API for registering and
     querying the intent service.

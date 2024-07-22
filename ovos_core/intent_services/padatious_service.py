@@ -13,25 +13,22 @@
 # limitations under the License.
 #
 """Intent service wrapping padatious."""
-import concurrent.futures
 from functools import lru_cache
-from os import path
 from os.path import expanduser, isfile
 from threading import Event
-from time import time as get_time, sleep
 from typing import List, Optional
 
 import padatious
-from padatious.match_data import MatchData as PadatiousIntent
-from ovos_config.config import Configuration
+from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, Session
+from ovos_config.config import Configuration
 from ovos_config.meta import get_xdg_base
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
 from ovos_utils.xdg_utils import xdg_data_home
+from padatious.match_data import MatchData as PadatiousIntent
 
-import ovos_core.intent_services
-from ovos_bus_client.message import Message
+from ovos_plugin_manager.templates.pipeline import IntentMatch
 
 
 class PadatiousMatcher:
@@ -55,7 +52,7 @@ class PadatiousMatcher:
         padatious_intent = self.service.calc_intent(utterances, lang, message)
         if padatious_intent is not None and padatious_intent.conf > limit:
             skill_id = padatious_intent.name.split(':')[0]
-            return ovos_core.intent_services.IntentMatch(
+            return IntentMatch(
                 'Padatious', padatious_intent.name,
                 padatious_intent.matches, skill_id, padatious_intent.sent)
 
