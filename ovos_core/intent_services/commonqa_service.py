@@ -1,17 +1,17 @@
-import time
 from dataclasses import dataclass
 from os.path import dirname
 from threading import Event
 from typing import Dict, Optional
 
-from ovos_classifiers.opm.heuristics import BM25MultipleChoiceSolver
-
+import time
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
+from ovos_classifiers.opm.heuristics import BM25MultipleChoiceSolver
 from ovos_config.config import Configuration
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
 from ovos_workshop.app import OVOSAbstractApplication
+
 from ovos_plugin_manager.templates.pipeline import IntentMatch
 
 

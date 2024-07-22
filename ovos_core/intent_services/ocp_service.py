@@ -1,28 +1,28 @@
-from os.path import join, dirname
-
 import os
 import random
 import threading
-import time
 from dataclasses import dataclass
+from os.path import join, dirname
+from threading import Lock, RLock
+from typing import List, Tuple, Optional, Union
+
+import time
 from ovos_bus_client.apis.ocp import ClassicAudioServiceInterface
 from ovos_bus_client.message import Message, dig_for_message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import wait_for_reply
 from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
 from ovos_classifiers.skovos.features import ClassifierProbaVectorizer, KeywordFeaturesVectorizer
-from ovos_plugin_manager.ocp import available_extractors
 from ovos_utils import classproperty
 from ovos_utils.gui import is_gui_connected, is_gui_running
 from ovos_utils.log import LOG
 from ovos_utils.messagebus import FakeBus
+from ovos_workshop.app import OVOSAbstractApplication
 from padacioso import IntentContainer
 from sklearn.pipeline import FeatureUnion
-from threading import Lock, RLock
-from typing import List, Tuple, Optional, Union
 
+from ovos_plugin_manager.ocp import available_extractors
 from ovos_plugin_manager.templates.pipeline import IntentMatch
-from ovos_workshop.app import OVOSAbstractApplication
 
 try:
     from ovos_utils.ocp import MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID, \

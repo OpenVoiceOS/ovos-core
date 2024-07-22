@@ -1,7 +1,7 @@
-import time
 from threading import Event
+from typing import Optional
 
-from ovos_plugin_manager.templates.pipeline import IntentMatch
+import time
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, UtteranceState
 from ovos_bus_client.util import get_message_lang
@@ -10,6 +10,8 @@ from ovos_config.locale import setup_locale
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
+
+from ovos_plugin_manager.templates.pipeline import IntentMatch
 
 
 class ConverseService:

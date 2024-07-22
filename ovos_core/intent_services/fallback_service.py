@@ -18,14 +18,13 @@ from collections import namedtuple
 from typing import Optional
 
 import time
+from ovos_bus_client.session import SessionManager
 from ovos_config import Configuration
-
-
-from ovos_plugin_manager.templates.pipeline import IntentMatch
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
-from ovos_bus_client.session import SessionManager
 from ovos_workshop.skills.fallback import FallbackMode
+
+from ovos_plugin_manager.templates.pipeline import IntentMatch
 
 FallbackRange = namedtuple('FallbackRange', ['start', 'stop'])
 

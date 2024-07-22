@@ -13,19 +13,19 @@
 # limitations under the License.
 #
 """An intent parsing service using the Adapt parser."""
-from threading import Lock
 from functools import lru_cache
+from threading import Lock
 from typing import List, Tuple, Optional
 
 from adapt.engine import IntentDeterminationEngine
-from ovos_config.config import Configuration
 from ovos_bus_client.message import Message
-
-from ovos_plugin_manager.templates.pipeline import IntentMatch
 from ovos_bus_client.session import IntentContextManager as ContextManager, \
     SessionManager
+from ovos_config.config import Configuration
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
+
+from ovos_plugin_manager.templates.pipeline import IntentMatch
 
 
 def _entity_skill_id(skill_id):

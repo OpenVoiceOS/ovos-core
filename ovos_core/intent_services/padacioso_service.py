@@ -3,15 +3,14 @@ from functools import lru_cache
 from os.path import isfile
 from typing import List, Optional
 
-from ovos_config.config import Configuration
+from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, Session
+from ovos_config.config import Configuration
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
 from padacioso import IntentContainer as FallbackIntentContainer
 
-
 from ovos_plugin_manager.templates.pipeline import IntentMatch
-from ovos_bus_client.message import Message
 
 
 class PadaciosoIntent:

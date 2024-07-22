@@ -2,8 +2,8 @@ import os
 import re
 from os.path import dirname
 from threading import Event
-
 from typing import Optional, List
+
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_config.config import Configuration
@@ -11,6 +11,7 @@ from ovos_utils import flatten_list
 from ovos_utils.bracket_expansion import expand_options
 from ovos_utils.log import LOG
 from ovos_utils.parse import match_one
+
 from ovos_plugin_manager.templates.pipeline import IntentMatch
 
 
