@@ -455,7 +455,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         if player.player_state == PlayerState.PAUSED and \
                 self._should_resume(utterance, lang, message=message):
             return IntentMatch(intent_service="OCP_intents",
-                               intent_type=f"ocp:resume",
+                               intent_type="ocp:resume",
                                intent_data=match,
                                skill_id=OCP_ID,
                                utterance=utterance)
