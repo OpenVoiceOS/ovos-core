@@ -2,7 +2,17 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a123...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a124...HEAD)
+
+**Merged pull requests:**
+
+- improve\_typing [\#528](https://github.com/OpenVoiceOS/ovos-core/pull/528) ([JarbasAl](https://github.com/JarbasAl))
+- Updated Vocabs NL [\#526](https://github.com/OpenVoiceOS/ovos-core/pull/526) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- Updated NL dialogs [\#525](https://github.com/OpenVoiceOS/ovos-core/pull/525) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+
+## [V0.0.8a124](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a124) (2024-07-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a123...V0.0.8a124)
 
 **Fixed bugs:**
 
@@ -48,10 +58,6 @@
 ## [V0.0.8a119](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a119) (2024-06-21)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a118...V0.0.8a119)
-
-**Closed issues:**
-
-- Stable Dependencies for 0.0.8 Release [\#488](https://github.com/OpenVoiceOS/ovos-core/issues/488)
 
 **Merged pull requests:**
 
@@ -456,17 +462,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a74...V0.0.8a75)
 
-**Merged pull requests:**
-
-- Update README.md [\#411](https://github.com/OpenVoiceOS/ovos-core/pull/411) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a74](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a74) (2024-02-06)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a73...V0.0.8a74)
-
-**Merged pull requests:**
-
-- test: skill\_installer tests [\#412](https://github.com/OpenVoiceOS/ovos-core/pull/412) ([mikejgray](https://github.com/mikejgray))
 
 ## [V0.0.8a73](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a73) (2024-02-06)
 
