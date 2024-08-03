@@ -45,13 +45,16 @@ class CommonQAService(OVOSAbstractApplication):
         self._max_time = config.get('max_response_wait') or 6  # regardless of extensions
         reranker_module = config.get("reranker", "ovos-choice-solver-bm25")  # default to BM25 from ovos-classifiers
         self.reranker = None
-        for name, plug in find_multiple_choice_solver_plugins().items():
-            if name == reranker_module:
-                self.reranker = plug()
-                LOG.info(f"CommonQuery ReRanker: {name}")
-                break
-        else:
-            LOG.info("No CommonQuery ReRanker loaded!")
+        try:
+            for name, plug in find_multiple_choice_solver_plugins().items():
+                if name == reranker_module:
+                    self.reranker = plug()
+                    LOG.info(f"CommonQuery ReRanker: {name}")
+                    break
+            else:
+                LOG.info("No CommonQuery ReRanker loaded!")
+        except Exception as e:
+            LOG.error(f"Failed to load ReRanker plugin: {e}")
         self.add_event('question:query.response', self.handle_query_response)
         self.add_event('common_query.question', self.handle_question)
         self.add_event('ovos.common_query.pong', self.handle_skill_pong)
