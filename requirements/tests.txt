@@ -19,6 +19,9 @@ ovos-listener~=0.0, >=0.0.3a2
 ovos-gui~=0.0, >=0.0.2
 ovos-messagebus~=0.0
 
+# provides plugins and classic machine learning framework
+ovos-classifiers<0.1.0, >=0.0.0a53
+
 # Support OCP tests
 ovos_bus_client>=0.0.9a15
 ovos-utils>=0.1.0a16
