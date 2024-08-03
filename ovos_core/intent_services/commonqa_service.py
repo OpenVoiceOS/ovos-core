@@ -10,7 +10,7 @@ from ovos_config.config import Configuration
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
 from ovos_workshop.app import OVOSAbstractApplication
-
+from ovos_plugin_manager.solvers import find_multiple_choice_solver_plugins
 from ovos_plugin_manager.templates.pipeline import IntentMatch
 
 
@@ -31,28 +31,27 @@ class Query:
 
 
 class CommonQAService(OVOSAbstractApplication):
-    def __init__(self, bus):
+    def __init__(self, bus, config: Optional[Dict] = None):
         super().__init__(bus=bus,
                          skill_id="common_query.openvoiceos",
                          resources_dir=f"{dirname(__file__)}")
         self.active_queries: Dict[str, Query] = dict()
 
         self.common_query_skills = None
-        config = Configuration().get('skills', {}).get("common_query") or dict()
+        config = config or Configuration().get('intents', {}).get("common_query") or dict()
         self._extension_time = config.get('extension_time') or 3
         CommonQAService._EXTENSION_TIME = self._extension_time
         self._min_wait = config.get('min_response_wait') or 2
         self._max_time = config.get('max_response_wait') or 6  # regardless of extensions
-        try:
-            from ovos_classifiers.opm.heuristics import BM25MultipleChoiceSolver
-            reranker = BM25MultipleChoiceSolver()  # TODO - allow plugin from config
-        except Exception as e:
-            LOG.error(f"Failed to load CommonQuery ReRanker: {e}")
-            reranker = None
-        if reranker:
-            self.reranker = reranker
+        reranker_module = config.get("reranker", "ovos-choice-solver-bm25")  # default to BM25 from ovos-classifiers
+        self.reranker = None
+        for name, plug in find_multiple_choice_solver_plugins().items():
+            if name == reranker_module:
+                self.reranker = plug()
+                LOG.info(f"CommonQuery ReRanker: {name}")
+                break
         else:
-            self.reranker = None
+            LOG.info("No CommonQuery ReRanker loaded!")
         self.add_event('question:query.response', self.handle_query_response)
         self.add_event('common_query.question', self.handle_question)
         self.add_event('ovos.common_query.pong', self.handle_skill_pong)

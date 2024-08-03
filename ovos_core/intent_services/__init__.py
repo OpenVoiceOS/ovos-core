@@ -64,7 +64,7 @@ class IntentService:
         self.padacioso_service = PadaciosoService(bus, self.config["padatious"])
         self.fallback = FallbackService(bus)
         self.converse = ConverseService(bus)
-        self.common_qa = CommonQAService(bus)
+        self.common_qa = CommonQAService(bus, self.config.get("common_query"))
         self.stop = StopService(bus)
         self.ocp = OCPPipelineMatcher(self.bus, config=self.config.get("OCP", {}))
         self.utterance_plugins = UtteranceTransformersService(bus)
