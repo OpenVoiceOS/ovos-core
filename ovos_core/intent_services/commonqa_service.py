@@ -6,7 +6,6 @@ from typing import Dict, Optional
 import time
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
-from ovos_classifiers.opm.heuristics import BM25MultipleChoiceSolver
 from ovos_config.config import Configuration
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
@@ -44,7 +43,16 @@ class CommonQAService(OVOSAbstractApplication):
         CommonQAService._EXTENSION_TIME = self._extension_time
         self._min_wait = config.get('min_response_wait') or 2
         self._max_time = config.get('max_response_wait') or 6  # regardless of extensions
-        self.untier = BM25MultipleChoiceSolver()  # TODO - allow plugin from config
+        try:
+            from ovos_classifiers.opm.heuristics import BM25MultipleChoiceSolver
+            reranker = BM25MultipleChoiceSolver()  # TODO - allow plugin from config
+        except Exception as e:
+            LOG.error(f"Failed to load CommonQuery ReRanker: {e}")
+            reranker = None
+        if reranker:
+            self.reranker = reranker
+        else:
+            self.reranker = None
         self.add_event('question:query.response', self.handle_query_response)
         self.add_event('common_query.question', self.handle_question)
         self.add_event('ovos.common_query.pong', self.handle_skill_pong)
@@ -253,9 +261,13 @@ class CommonQAService(OVOSAbstractApplication):
                 tied_ids = [m["skill_id"] for m in ties]
                 LOG.info(f"Tied skills: {tied_ids}")
                 answers = {m["answer"]: m for m in ties}
-                best_ans = self.untier.select_answer(query.query,
-                                                     list(answers.keys()),
-                                                     {"lang": query.lang})
+                if self.reranker is None:
+                    # random pick, no re-ranker available
+                    best_ans = list(answers.keys())[0]
+                else:
+                    best_ans = self.reranker.select_answer(query.query,
+                                                           list(answers.keys()),
+                                                           {"lang": query.lang})
                 best = answers[best_ans]
 
             LOG.info('Handling with: ' + str(best['skill_id']))

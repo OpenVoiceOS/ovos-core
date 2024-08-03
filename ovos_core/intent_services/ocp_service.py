@@ -11,8 +11,6 @@ from ovos_bus_client.apis.ocp import ClassicAudioServiceInterface
 from ovos_bus_client.message import Message, dig_for_message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import wait_for_reply
-from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
-from ovos_classifiers.skovos.features import ClassifierProbaVectorizer, KeywordFeaturesVectorizer
 from ovos_utils import classproperty
 from ovos_utils.gui import is_gui_connected, is_gui_running
 from ovos_utils.log import LOG
@@ -151,6 +149,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             OCPFeaturizer.extract_entities("UNLEASH THE AUTOMATONS")
 
         if self.config.get("experimental_binary_classifier", True):  # ocp_medium
+            from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
             LOG.info("Using experimental OCP binary classifier")
             # TODO - train a single multilingual model instead of this
             b = f"{dirname(__file__)}/models"
@@ -161,6 +160,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             self._binary_en_clf = (c, OCPFeaturizer("binary_ocp_cv2_small"))
 
         if self.config.get("experimental_media_classifier", True):
+            from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
             LOG.info("Using experimental OCP media type classifier")
             # TODO - train a single multilingual model instead of this
             b = f"{dirname(__file__)}/models"
@@ -729,6 +729,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         """ determine what media type is being requested """
         # using a trained classifier (Experimental)
         if self.config.get("experimental_media_classifier", True):
+            from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
             try:
                 if lang.startswith("en"):
                     clf: SklearnOVOSClassifier = self._media_en_clf[0]
@@ -754,6 +755,7 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
     def is_ocp_query(self, query: str, lang: str) -> Tuple[bool, float]:
         """ determine if a playback question is being asked"""
         if self.config.get("experimental_binary_classifier", True):
+            from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
             try:
                 # TODO - train a single multilingual classifier
                 if lang.startswith("en"):
@@ -1214,8 +1216,7 @@ class LegacyCommonPlay:
 class OCPFeaturizer:
     """used by the experimental media type classifier,
     API should be considered unstable"""
-    # ignore_list accounts for "noise" keywords in the csv file
-    ocp_keywords = KeywordFeaturesVectorizer(ignore_list=["play", "stop"])
+    ocp_keywords = None
     # defined at training time
     _clf_labels = ['ad_keyword', 'album_name', 'anime_genre', 'anime_name', 'anime_streaming_service',
                    'artist_name', 'asmr_keyword', 'asmr_trigger', 'audio_genre', 'audiobook_narrator',
@@ -1246,6 +1247,11 @@ class OCPFeaturizer:
 
     def __init__(self, base_clf=None):
         self.clf_feats = None
+        from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
+        from ovos_classifiers.skovos.features import ClassifierProbaVectorizer, KeywordFeaturesVectorizer
+        if OCPFeaturizer.ocp_keywords is None:
+            # ignore_list accounts for "noise" keywords in the csv file
+            OCPFeaturizer.ocp_keywords = KeywordFeaturesVectorizer(ignore_list=["play", "stop"])
         if base_clf:
             if isinstance(base_clf, str):
                 clf_path = f"{dirname(__file__)}/models/{base_clf}.clf"
