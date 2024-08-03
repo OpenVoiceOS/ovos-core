@@ -253,6 +253,8 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             except:
                 LOG.error(f"{skill_id} reported an invalid media_type: {m}")
 
+        if OCPFeaturizer.ocp_keywords is None:
+            return
         # TODO - review below and add missing
         # set bias in classifier
         # aliases -> {type}_streaming_service bias
@@ -281,6 +283,8 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
     def handle_skill_keyword_register(self, message: Message):
         """ register skill provided keywords """
+        if OCPFeaturizer.ocp_keywords is None:
+            return
         skill_id = message.data["skill_id"]
         kw_label = message.data["label"]
         media = message.data["media_type"]
@@ -1263,6 +1267,8 @@ class OCPFeaturizer:
 
     @classmethod
     def load_csv(cls, entity_csvs: list):
+        if OCPFeaturizer.ocp_keywords is None:
+            return
         for csv in entity_csvs or []:
             if not os.path.isfile(csv):
                 # check for bundled files
