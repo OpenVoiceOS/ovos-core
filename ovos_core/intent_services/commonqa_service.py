@@ -1,17 +1,18 @@
+import time
 from dataclasses import dataclass
 from os.path import dirname
 from threading import Event
 from typing import Dict, Optional
 
-import time
+from ovos_config.config import Configuration
+
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
-from ovos_config.config import Configuration
+from ovos_plugin_manager.solvers import find_multiple_choice_solver_plugins
+from ovos_plugin_manager.templates.pipeline import IntentMatch
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
 from ovos_workshop.app import OVOSAbstractApplication
-from ovos_plugin_manager.solvers import find_multiple_choice_solver_plugins
-from ovos_plugin_manager.templates.pipeline import IntentMatch
 
 
 @dataclass
@@ -55,6 +56,7 @@ class CommonQAService(OVOSAbstractApplication):
                 LOG.info("No CommonQuery ReRanker loaded!")
         except Exception as e:
             LOG.error(f"Failed to load ReRanker plugin: {e}")
+        self.ignore_scores = config.get("ignore_skill_scores", False) and self.reranker is not None
         self.add_event('question:query.response', self.handle_query_response)
         self.add_event('common_query.question', self.handle_question)
         self.add_event('ovos.common_query.pong', self.handle_skill_pong)
@@ -252,24 +254,34 @@ class CommonQAService(OVOSAbstractApplication):
         for response in query.replies:
             if response["skill_id"] in sess.blacklisted_skills:
                 continue
-            if not best or response['conf'] > best['conf']:
+            if not self.ignore_scores:
+                if not best or response['conf'] > best['conf']:
+                    best = response
+                    ties = [response]
+                elif response['conf'] == best['conf']:
+                    ties.append(response)
+            else:
                 best = response
-                ties = [response]
-            elif response['conf'] == best['conf']:
+                # let's rerank all answers and ignore skill self-reported confidence
                 ties.append(response)
 
         if best:
             if len(ties) > 1:
                 tied_ids = [m["skill_id"] for m in ties]
-                LOG.info(f"Tied skills: {tied_ids}")
+                LOG.debug(f"Tied skills: {tied_ids}")
                 answers = {m["answer"]: m for m in ties}
                 if self.reranker is None:
+                    LOG.debug("No ReRanker available, selecting randomly")
                     # random pick, no re-ranker available
                     best_ans = list(answers.keys())[0]
                 else:
-                    best_ans = self.reranker.select_answer(query.query,
-                                                           list(answers.keys()),
-                                                           {"lang": query.lang})
+                    reranked = self.reranker.rerank(query.query,
+                                                    list(answers.keys()),
+                                                    lang=query.lang)
+                    for score, ans in reranked:
+                        LOG.info(f"ReRanked score: {score} - {answers[ans]}")
+                    best_ans = reranked[0][1]
+
                 best = answers[best_ans]
 
             LOG.info('Handling with: ' + str(best['skill_id']))
