@@ -2,7 +2,16 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a124...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a125...HEAD)
+
+**Implemented enhancements:**
+
+- feat - CommonQuery Disambiguation [\#436](https://github.com/OpenVoiceOS/ovos-core/issues/436)
+- feat/reranker+optional\_ovos\_classifiers [\#529](https://github.com/OpenVoiceOS/ovos-core/pull/529) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a125](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a125) (2024-07-22)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a124...V0.0.8a125)
 
 **Merged pull requests:**
 
@@ -195,10 +204,6 @@
 **Fixed bugs:**
 
 - fix/mycroft\_compat [\#485](https://github.com/OpenVoiceOS/ovos-core/pull/485) ([JarbasAl](https://github.com/JarbasAl))
-
-**Closed issues:**
-
-- reach 75% coverage of ovos-core [\#415](https://github.com/OpenVoiceOS/ovos-core/issues/415)
 
 ## [V0.0.8a104](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a104) (2024-05-28)
 
@@ -469,10 +474,6 @@
 ## [V0.0.8a73](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a73) (2024-02-06)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a72...V0.0.8a73)
-
-**Merged pull requests:**
-
-- license dance [\#413](https://github.com/OpenVoiceOS/ovos-core/pull/413) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a72](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a72) (2024-02-04)
 
