@@ -11,8 +11,6 @@ from ovos_bus_client.apis.ocp import ClassicAudioServiceInterface
 from ovos_bus_client.message import Message, dig_for_message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import wait_for_reply
-from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
-from ovos_classifiers.skovos.features import ClassifierProbaVectorizer, KeywordFeaturesVectorizer
 from ovos_utils import classproperty
 from ovos_utils.gui import is_gui_connected, is_gui_running
 from ovos_utils.log import LOG
@@ -146,11 +144,16 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
     def load_classifiers(self):
         # warm up the featurizer so intent matches faster (lazy loaded)
-        if self.entity_csvs:
-            OCPFeaturizer.load_csv(self.entity_csvs)
-            OCPFeaturizer.extract_entities("UNLEASH THE AUTOMATONS")
+        try:
+            OCPFeaturizer.init_keyword_matcher()
+            if self.entity_csvs:
+                OCPFeaturizer.load_csv(self.entity_csvs)
+                OCPFeaturizer.extract_entities("UNLEASH THE AUTOMATONS")
+        except ImportError:  # ovos-classifiers is optional
+            pass
 
-        if self.config.get("experimental_binary_classifier", True):  # ocp_medium
+        if self.config.get("experimental_binary_classifier", False):  # ocp_medium
+            from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
             LOG.info("Using experimental OCP binary classifier")
             # TODO - train a single multilingual model instead of this
             b = f"{dirname(__file__)}/models"
@@ -160,7 +163,8 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             c = SklearnOVOSClassifier.from_file(f"{b}/binary_ocp_cv2_kw_medium.clf")
             self._binary_en_clf = (c, OCPFeaturizer("binary_ocp_cv2_small"))
 
-        if self.config.get("experimental_media_classifier", True):
+        if self.config.get("experimental_media_classifier", False):
+            from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
             LOG.info("Using experimental OCP media type classifier")
             # TODO - train a single multilingual model instead of this
             b = f"{dirname(__file__)}/models"
@@ -253,6 +257,8 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             except:
                 LOG.error(f"{skill_id} reported an invalid media_type: {m}")
 
+        if OCPFeaturizer.ocp_keywords is None:
+            return
         # TODO - review below and add missing
         # set bias in classifier
         # aliases -> {type}_streaming_service bias
@@ -281,6 +287,8 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
     def handle_skill_keyword_register(self, message: Message):
         """ register skill provided keywords """
+        if OCPFeaturizer.ocp_keywords is None:
+            return
         skill_id = message.data["skill_id"]
         kw_label = message.data["label"]
         media = message.data["media_type"]
@@ -405,7 +413,10 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         media_type, confidence = self.classify_media(utterance, lang)
 
         # extract entities
-        ents = OCPFeaturizer.extract_entities(utterance)
+        if OCPFeaturizer.ocp_keywords is None:
+            ents = {}
+        else:
+            ents = OCPFeaturizer.extract_entities(utterance)
 
         # extract the query string
         query = self.remove_voc(utterance, "Play", lang).strip()
@@ -424,7 +435,11 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         """ match an utterance via presence of known OCP keywords,
         recommended before fallback_low pipeline stage"""
         utterance = utterances[0].lower()
-        ents = OCPFeaturizer.extract_entities(utterance)
+        if OCPFeaturizer.ocp_keywords is None:
+            ents = {}
+        else:
+            ents = OCPFeaturizer.extract_entities(utterance)
+
         if not ents:
             return None
 
@@ -487,7 +502,10 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
         # extract the query string
         query = self.remove_voc(utterance, "Play", lang).strip()
 
-        ents = OCPFeaturizer.extract_entities(utterance)
+        if OCPFeaturizer.ocp_keywords is None:
+            ents = {}
+        else:
+            ents = OCPFeaturizer.extract_entities(utterance)
 
         return IntentMatch(intent_service="OCP_intents",
                            intent_type="ocp:play",
@@ -728,7 +746,8 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
     def classify_media(self, query: str, lang: str) -> Tuple[MediaType, float]:
         """ determine what media type is being requested """
         # using a trained classifier (Experimental)
-        if self.config.get("experimental_media_classifier", True):
+        if self.config.get("experimental_media_classifier", False):
+            from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
             try:
                 if lang.startswith("en"):
                     clf: SklearnOVOSClassifier = self._media_en_clf[0]
@@ -753,7 +772,8 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
 
     def is_ocp_query(self, query: str, lang: str) -> Tuple[bool, float]:
         """ determine if a playback question is being asked"""
-        if self.config.get("experimental_binary_classifier", True):
+        if self.config.get("experimental_binary_classifier", False):
+            from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
             try:
                 # TODO - train a single multilingual classifier
                 if lang.startswith("en"):
@@ -1214,8 +1234,7 @@ class LegacyCommonPlay:
 class OCPFeaturizer:
     """used by the experimental media type classifier,
     API should be considered unstable"""
-    # ignore_list accounts for "noise" keywords in the csv file
-    ocp_keywords = KeywordFeaturesVectorizer(ignore_list=["play", "stop"])
+    ocp_keywords = None
     # defined at training time
     _clf_labels = ['ad_keyword', 'album_name', 'anime_genre', 'anime_name', 'anime_streaming_service',
                    'artist_name', 'asmr_keyword', 'asmr_trigger', 'audio_genre', 'audiobook_narrator',
@@ -1246,6 +1265,9 @@ class OCPFeaturizer:
 
     def __init__(self, base_clf=None):
         self.clf_feats = None
+        from ovos_classifiers.skovos.classifier import SklearnOVOSClassifier
+        from ovos_classifiers.skovos.features import ClassifierProbaVectorizer
+        self.init_keyword_matcher()
         if base_clf:
             if isinstance(base_clf, str):
                 clf_path = f"{dirname(__file__)}/models/{base_clf}.clf"
@@ -1254,6 +1276,13 @@ class OCPFeaturizer:
             self.clf_feats = ClassifierProbaVectorizer(base_clf)
         for l in self._clf_labels:  # no samples, just to ensure featurizer has right number of feats
             self.ocp_keywords.register_entity(l, [])
+
+    @classmethod
+    def init_keyword_matcher(cls):
+        from ovos_classifiers.skovos.features import KeywordFeaturesVectorizer
+        if OCPFeaturizer.ocp_keywords is None:
+            # ignore_list accounts for "noise" keywords in the csv file
+            OCPFeaturizer.ocp_keywords = KeywordFeaturesVectorizer(ignore_list=["play", "stop"])
 
     @classmethod
     def load_csv(cls, entity_csvs: list):

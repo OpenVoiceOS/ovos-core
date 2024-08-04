@@ -18,7 +18,7 @@ class TestOCPFeaturizer(unittest.TestCase):
         self.featurizer = OCPFeaturizer()
 
     @patch('os.path.isfile', return_value=True)
-    @patch('ovos_core.intent_services.ocp_service.KeywordFeaturesVectorizer.load_entities')
+    @patch('ovos_classifiers.skovos.features.KeywordFeaturesVectorizer.load_entities')
     @patch.object(LOG, 'info')
     def test_load_csv_with_existing_file(self, mock_log_info, mock_load_entities, mock_isfile):
         csv_path = "existing_file.csv"
