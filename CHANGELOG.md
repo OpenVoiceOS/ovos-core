@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a126...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a127...HEAD)
+
+**Merged pull requests:**
+
+- Update requirements.txt [\#531](https://github.com/OpenVoiceOS/ovos-core/pull/531) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a127](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a127) (2024-08-05)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a126...V0.0.8a127)
 
 **Fixed bugs:**
 
@@ -465,10 +473,6 @@
 ## [V0.0.8a76](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a76) (2024-02-24)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a75...V0.0.8a76)
-
-**Fixed bugs:**
-
-- fix: adjust adapt confidence levels [\#418](https://github.com/OpenVoiceOS/ovos-core/pull/418) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a75](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a75) (2024-02-14)
 
