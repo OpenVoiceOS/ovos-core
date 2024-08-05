@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a127...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a128...HEAD)
+
+**Fixed bugs:**
+
+- fix/reranker\_config [\#532](https://github.com/OpenVoiceOS/ovos-core/pull/532) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a128](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a128) (2024-08-05)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a127...V0.0.8a128)
 
 **Merged pull requests:**
 
@@ -457,10 +465,6 @@
 ## [V0.0.8a78](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a78) (2024-02-25)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a77...V0.0.8a78)
-
-**Fixed bugs:**
-
-- unittests: update tests [\#421](https://github.com/OpenVoiceOS/ovos-core/pull/421) ([JarbasAl](https://github.com/JarbasAl))
 
 **Merged pull requests:**
 
