@@ -17,7 +17,6 @@ from ovos_utils.log import LOG
 from ovos_utils.messagebus import FakeBus
 from ovos_workshop.app import OVOSAbstractApplication
 from padacioso import IntentContainer
-from sklearn.pipeline import FeatureUnion
 
 from ovos_plugin_manager.ocp import available_extractors
 from ovos_plugin_manager.templates.pipeline import IntentMatch
@@ -1366,6 +1365,7 @@ class OCPFeaturizer:
 
     def transform(self, X):
         if self.clf_feats:
+            from sklearn.pipeline import FeatureUnion
             vec = FeatureUnion([
                 ("kw", self.ocp_keywords),
                 ("clf", self.clf_feats)
