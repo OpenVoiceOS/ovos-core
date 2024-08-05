@@ -49,7 +49,7 @@ class CommonQAService(OVOSAbstractApplication):
         try:
             for name, plug in find_multiple_choice_solver_plugins().items():
                 if name == reranker_module:
-                    self.reranker = plug()
+                    self.reranker = plug(config=config.get(name, {}))
                     LOG.info(f"CommonQuery ReRanker: {name}")
                     break
             else:
