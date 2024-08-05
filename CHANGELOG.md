@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a125...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a126...HEAD)
+
+**Fixed bugs:**
+
+- fix/sklearn\_import [\#530](https://github.com/OpenVoiceOS/ovos-core/pull/530) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a126](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a126) (2024-08-04)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a125...V0.0.8a126)
 
 **Implemented enhancements:**
 
@@ -460,7 +468,6 @@
 
 **Fixed bugs:**
 
-- Problems with adapt service [\#417](https://github.com/OpenVoiceOS/ovos-core/issues/417)
 - fix: adjust adapt confidence levels [\#418](https://github.com/OpenVoiceOS/ovos-core/pull/418) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a75](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a75) (2024-02-14)
