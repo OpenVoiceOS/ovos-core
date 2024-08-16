@@ -6,6 +6,11 @@
   "play.what.dialog": [
     "Was soll ich als nächstes spielen?"
   ],
+  "no.media.skills.dialog": [
+    "Es tut mir leid, ich habe keine Medien Skills installiert",
+    "Ich muss einige Medien Skills installieren, bevor ich Medien abspielen kann",
+    "Ich kann keine Medien abspielen, bis einige Medien Skills installiert sind"
+  ],
   "just.one.moment.dialog": [
     "Gib mir einen Moment",
     "Augenblick",
