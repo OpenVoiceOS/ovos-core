@@ -1,46 +1,46 @@
 {
   "play.intent": [
     "(spiele|starte) {query}",
-    "Suche (common play|ocp|ovos common play|O C P) nach {query}",
+    "Suche (common play|ocp|ovos common play|O C P) für {query}",
     "Suche in (ovos|open voice os) Medien nach {query}",
-    "Suche {query} (in) (common play|ocp|ovos common play|O C P))",
-    "Suche {query} (in) (ovos|open voice os) Medien"
+    "Suche {query} (in|auf) (common play|ocp|ovos common play|O C P))",
+    "Suche {query} (in|auf) (ovos|open voice os) Medien"
   ],
   "like_song.intent": [
     "ich mag (das|dieses|es)",
     "ich mag (das|dieses|diese|diesen)(Lied|Musik|Track|Jam|Sound)",
-    "(gut|nett|großartig|erstaunlich|fantastisch|cool) (Lied|Musik|Track|Jam|Sound)",
-    "(das|dies|es) ist ein (guter|schöner|großartiger|erstaunlicher|fantastischer|cooler) (Song|Musik|Track|Jam|Sound)"
+    "(guter|netter|schöner|großartiger|erstaunlicher|fantastischer|cooler|gutes|nettes|schönes|großartiges|erstaunliches|fantastisches|cooles|gute|nette|schöne|großartige|erstaunliche|fantastische|coole) (Lied|Musik|Track|Jam|Sound)",
+    "(das|dies|es) ist (ein|eine) (guter|netter|schöner|großartiger|erstaunlicher|fantastischer|cooler|gutes|nettes|schönes|großartiges|erstaunliches|fantastisches|cooles|gute|nette|schöne|großartige|erstaunliche|fantastische|coole) (Song|Musik|Track|Jam|Sound)"
   ],
   "stop.intent": [
     "stopp",
     "höre auf damit",
     "stoppe das",
     "Hör auf mit dem, was du tust",
-    "schluß",
+    "schluss",
     "Kannst du damit aufhören",
     "Beende diese Aufgabe",
     "Bitte halte die aktuelle Aufgabe an",
     "Stoppe den laufenden Prozess",
-    "Beenden Sie die aktuelle Aktivität",
+    "Beende die (aktuelle|derzeitige) Aktivität",
     "Mache bitte Schluss damit",
     "Hör auf, daran zu arbeiten",
-    "Beende die Ausführung des aktuellen Befehls",
+    "Beende die Ausführung des (aktuellen|derzeitigen) Befehls",
     "Bitte beende die aktuelle Aufgabe",
     "Stoppe den aktuellen Vorgang",
-    "Beenden Sie die aktuelle Aktion",
+    "Beende die aktuelle Aktion",
     "Bitte breche die aktuelle Aufgabe ab"
   ],
   "next.intent": [
     "(weiter|überspringen|skippe|überspringe)",
-    "(weiter|überspringen|skippe|überspringe) (Musik|Lied|Track|Video|Medien)",
-    "(spiele|gehen zum) nächsten (Musik|Lied|Titel|Video|Medium)",
+    "(weiter|skippe|überspringe) (Musik|Lied|Track|Video|Medien)",
+    "(spiele|gehe zum) (nächsten|nächstes) (Musik|Lied|Titel|Video|Medium)",
     "spiele das nächste",
     "das nächste",
-    "(nächstes|nächsten) (Lied|Titel|Musik|Film|Video|Melodie)"
+    "(nächstes|nächsten|nächster|nächste) (Lied|Titel|Musik|Film|Video|Melodie)"
   ],
   "resume.intent": [
-    "(Pause beenden| fortsetzen| weiter)",
+    "(Pause beenden|fortsetzen| weiter)",
     "(Musik|Lied|Titel|Video|Medien|Wiedergabe) (Pause beenden|fortsetzen|fortfahren|neu starten) ",
     "spiele"
   ],
