@@ -6,6 +6,7 @@ ovos-skill-naptime~=0.2.3
 ovos-skill-date-time~=0.2.3
 ovos-skill-hello-world~=0.0.4
 ovos-skill-parrot~=0.0.1
+ovos-skill-wordnet~=0.0.1
 ovos-skill-randomness~=0.0.1
 ovos-skill-spelling~=0.1.0
 # TODO - publish
