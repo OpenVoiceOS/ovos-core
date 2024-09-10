@@ -1,6 +1,6 @@
 ovos-skill-weather~=0.0.1
 ovos-skill-ddg~=0.0.2
-ovos-skill-wolfie
+skill-wolfie~=0.1.0
 ovos-skill-wikipedia
 skill-ovos-fallback-chatgpt~=0.0.2
 ovos-skill-wikihow~=0.1.0
