@@ -1,5 +1,5 @@
 ovos-skill-somafm~=0.0.2
-ovos-skill-news~=0.0.4
+skill-news~=0.0.4
 ovos-skill-pyradios~=0.1.0
 ovos-skill-local-media~=0.2.0
 ovos-skill-youtube-music~=0.1.1
