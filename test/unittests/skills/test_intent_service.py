@@ -337,11 +337,8 @@ class TestIntentServiceApi(TestCase):
                           'register_intent',
                           'register_vocab',
                           'remove_context',
-                          'skill.converse.get_response',
                           'skill.converse.get_response.disable',
-                          'skill.converse.get_response.enable',
-                          'skill.converse.ping',
-                          'skill.converse.request'})
+                          'skill.converse.get_response.enable'})
 
 
 class TestAdaptIntent(TestCase):
