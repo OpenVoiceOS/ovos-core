@@ -5,3 +5,4 @@ ovos-skill-wikipedia
 skill-ovos-fallback-chatgpt~=0.0.2
 ovos-skill-wikihow~=0.1.0
 ovos-skill-speedtest~=0.1.0
+ovos-skill-ip~=0.1.0
