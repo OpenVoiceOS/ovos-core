@@ -1,3 +1,4 @@
+# skills for OCP, require audio playback plugins (usually mpv)
 ovos-skill-somafm~=0.0.2
 skill-news~=0.0.4
 ovos-skill-pyradios~=0.1.0
