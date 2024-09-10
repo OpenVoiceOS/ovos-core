@@ -1,0 +1,58 @@
+name: Stable Release
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  publish_stable:
+    uses: TigreGotico/gh-automations/.github/workflows/publish-stable.yml@master
+    secrets: inherit
+    with:
+      branch: 'master'
+      version_file: 'ovos_core/version.py'
+      setup_py: 'setup.py'
+      publish_release: true
+
+  publish_pypi:
+    needs: publish_stable
+    if: success()  # Ensure this job only runs if the previous job succeeds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: dev
+          fetch-depth: 0 # otherwise, there would be errors pushing refs to the destination repository.
+      - name: Setup Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+      - name: Install Build Tools
+        run: |
+          python -m pip install build wheel
+      - name: version
+        run: echo "::set-output name=version::$(python setup.py --version)"
+        id: version
+      - name: Build Distribution Packages
+        run: |
+          python setup.py sdist bdist_wheel
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          password: ${{secrets.PYPI_TOKEN}}
+
+
+  sync_dev:
+    needs: publish_stable
+    if: success()  # Ensure this job only runs if the previous job succeeds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0 # otherwise, there would be errors pushing refs to the destination repository.
+          ref: master
+      - name: Push master -> dev
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: dev
