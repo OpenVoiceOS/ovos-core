@@ -3,7 +3,5 @@ ovos-skill-ddg~=0.0.2
 ovos-skill-wolfie
 ovos-skill-wikipedia
 skill-ovos-fallback-chatgpt~=0.0.2
-# TODO - publish
-# https://github.com/OpenVoiceOS/ovos-skill-wikihow
-# https://github.com/OpenVoiceOS/ovos-skill-speedtest
-# https://github.com/OpenVoiceOS/ovos-skill-icanhazdadjokes
+ovos-skill-wikihow~=0.1.0
+ovos-skill-speedtest~=0.1.0
