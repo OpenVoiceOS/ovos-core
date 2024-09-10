@@ -1,22 +1,22 @@
 # ovos modules for compat with mycroft namespace
-ovos_PHAL~=0.0.5
-ovos-audio~=0.0.2
-ovos-listener~=0.0.3
-ovos-gui~=0.1.0
-ovos-messagebus~=0.0
+ovos_PHAL>=0.0.5,<1.0.0
+ovos-audio>=0.0.2,<1.0.0
+ovos-listener>=0.0.3,<1.0.0
+ovos-gui>=0.1.0,<1.0.0
+ovos-messagebus>=0.0.1,<1.0.0
 
 # default plugins
-ovos-stt-plugin-server>=0.0.3, <0.1.0
-ovos-tts-plugin-mimic>=0.2.8, <0.3.0
-ovos-tts-plugin-server>=0.0.2a6
+ovos-stt-plugin-server>=0.0.3, <1.0.0
+ovos-tts-plugin-mimic>=0.2.8, <1.0.0
+ovos-tts-plugin-server>=0.0.2a6, <1.0.0
 
-ovos-ww-plugin-pocketsphinx~=0.1
-ovos-ww-plugin-precise~=0.1
-ovos-vad-plugin-webrtcvad>=0.0.1, <0.1.0
+ovos-ww-plugin-pocketsphinx>=0.1, <1.0.0
+ovos-ww-plugin-precise>=0.1, <1.0.0
+ovos-vad-plugin-webrtcvad>=0.0.1, <1.0.0
 
-ovos_plugin_common_play~=0.0.7
+ovos_plugin_common_play>=0.0.7, <1.0.0
 # ovos-ocp-youtube-plugin~=0.0, >=0.0.1
-ovos-ocp-m3u-plugin>=0.0.1,<0.1.0
-ovos-ocp-rss-plugin>=0.0.2,<0.1.0
+ovos-ocp-m3u-plugin>=0.0.1,<1.0.0
+ovos-ocp-rss-plugin>=0.0.2,<1.0.0
 ovos-ocp-files-plugin~=0.13
-ovos-ocp-news-plugin>=0.0.3,<0.1.0
+ovos-ocp-news-plugin>=0.0.3,<1.0.0
