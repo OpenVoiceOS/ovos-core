@@ -1,3 +1,4 @@
+# skills that require internet connectivity, should not be installed in offline devices
 ovos-skill-weather~=0.0.1
 skill-ddg~=0.0.2
 skill-wolfie~=0.2.0
