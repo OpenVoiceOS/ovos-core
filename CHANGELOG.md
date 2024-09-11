@@ -1,11 +1,16 @@
 # Changelog
 
-## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
+## [0.0.8a132](https://github.com/OpenVoiceOS/ovos-core/tree/0.0.8a132) (2024-09-11)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a131...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a131...0.0.8a132)
+
+**Fixed bugs:**
+
+- fix:version\_handling [\#542](https://github.com/OpenVoiceOS/ovos-core/pull/542) ([JarbasAl](https://github.com/JarbasAl))
 
 **Merged pull requests:**
 
+- chore:delete\_unused\_file [\#543](https://github.com/OpenVoiceOS/ovos-core/pull/543) ([JarbasAl](https://github.com/JarbasAl))
 - chore:semver\_automations [\#540](https://github.com/OpenVoiceOS/ovos-core/pull/540) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a131](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a131) (2024-09-11)
@@ -455,17 +460,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a81...V0.0.8a82)
 
-**Merged pull requests:**
-
-- more tests for skills manager [\#428](https://github.com/OpenVoiceOS/ovos-core/pull/428) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a81](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a81) (2024-03-02)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a80...V0.0.8a81)
-
-**Merged pull requests:**
-
-- refactor/reduce code complexity [\#427](https://github.com/OpenVoiceOS/ovos-core/pull/427) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a80](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a80) (2024-03-02)
 
