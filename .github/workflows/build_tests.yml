@@ -39,4 +39,4 @@ jobs:
           python setup.py bdist_wheel
       - name: Install package
         run: |
-          pip install .[mycroft,lgpl,deprecated,skills-essential]
+          pip install .[mycroft,lgpl,plugins,skills-essential,skills-audio,skills-gui,skills-internet,skills-media,skills-desktop]
