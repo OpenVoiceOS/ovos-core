@@ -1,11 +1,9 @@
-ovos-skill-volume~=0.0, >=0.0.2a3
-ovos-skill-fallback-unknown~=0.0, >=0.0.4a1
-ovos-skill-alerts>=0.0.1a6
-ovos-skill-personal~=0.0, >=0.0.4a1
-ovos-skill-naptime~=0.2, >=0.2.2
-ovos-skill-date-time>=0.2.3a4
-ovos-skill-hello-world~=0.0, >=0.0.4a2
-ovos-skill-parrot
-# TODO - publish
-# https://github.com/OpenVoiceOS/skill-ovos-boot-finished
-# https://github.com/OpenVoiceOS/skill-ovos-audio-recording
+# skills providing core functionality (offline)
+ovos-skill-fallback-unknown>=0.0.4,<1.0.0
+ovos-skill-alerts>=0.0.1,<1.0.0
+ovos-skill-personal>=0.0.4,<1.0.0
+ovos-skill-date-time>=0.2.3,<1.0.0
+ovos-skill-hello-world>=0.0.4,<1.0.0
+skill-wordnet>=0.0.1,<1.0.0
+#skill-randomness>=0.0.1,<1.0.0
+ovos-skill-spelling>=0.1.0,<1.0.0

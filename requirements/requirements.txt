@@ -3,18 +3,18 @@ python-dateutil>=2.6, <3.0
 watchdog>=2.1, <3.0
 combo-lock>=0.2.2, <0.3
 
-padacioso~=0.2, >=0.2.1
+padacioso>=0.1.0,<1.0.0
 adapt-parser>=1.0.0, <2.0.0
 
-ovos-utils>=0.0.38
-ovos_bus_client<0.1.0, >=0.0.9a28
-ovos-plugin-manager<0.1.0, >=0.0.26a33
-ovos-config~=0.0,>=0.0.13a8
-ovos-lingua-franca>=0.4.7
-ovos-backend-client~=0.1.0
-ovos-workshop>=0.0.16a45
+ovos-utils>=0.0.38,<1.0.0
+ovos_bus_client>=0.0.9,<1.0.0
+ovos-plugin-manager>=0.0.26,<1.0.0
+ovos-config>=0.0.13,<1.0.0
+ovos-lingua-franca>=0.4.7,<1.0.0
+ovos-backend-client>=0.1.0,<1.0.0
+ovos-workshop>=0.0.16,<1.0.0
 
-ovos-utterance-normalizer>=0.0.0a5
+ovos-utterance-normalizer>=0.1.0,<1.0.0
 
 # ensure default plugin available for any solver plugins
 ovos-translate-server-plugin

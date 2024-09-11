@@ -61,9 +61,15 @@ class PadaciosoService:
         self.conf_low = self.padacioso_config.get("conf_low") or 0.5
         self.workers = self.padacioso_config.get("workers") or 4
 
-        self.containers = {lang: FallbackIntentContainer(
-            self.padacioso_config.get("fuzz"), n_workers=self.workers)
-            for lang in langs}
+        try:
+            self.containers = {
+                lang: FallbackIntentContainer(self.padacioso_config.get("fuzz"),
+                                              n_workers=self.workers)
+                for lang in langs}
+        except TypeError: # old padacioso version without n_workers kwarg
+            self.containers = {
+                lang: FallbackIntentContainer(self.padacioso_config.get("fuzz"))
+                for lang in langs}
 
         self.bus.on('padatious:register_intent', self.register_intent)
         self.bus.on('padatious:register_entity', self.register_entity)
