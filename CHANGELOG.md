@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a129...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a130...HEAD)
+
+**Merged pull requests:**
+
+- plugin extras [\#541](https://github.com/OpenVoiceOS/ovos-core/pull/541) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a130](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a130) (2024-09-11)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a129...V0.0.8a130)
 
 **Closed issues:**
 
@@ -438,10 +446,6 @@
 ## [V0.0.8a82](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a82) (2024-03-04)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a81...V0.0.8a82)
-
-**Closed issues:**
-
-- tests for blacklisted skills [\#425](https://github.com/OpenVoiceOS/ovos-core/issues/425)
 
 **Merged pull requests:**
 
