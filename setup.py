@@ -22,16 +22,16 @@ def get_version():
     """ Find the version of ovos-core"""
     version = None
     version_file = os.path.join(BASEDIR, 'ovos_core', 'version.py')
-    major, minor, build, alpha = (None, None, None, None)
+    major, minor, build, alpha = (0, 0, 0, 0)
     with open(version_file) as f:
         for line in f:
-            if 'OVOS_VERSION_MAJOR' in line:
+            if 'VERSION_MAJOR' in line:
                 major = line.split('=')[1].strip()
-            elif 'OVOS_VERSION_MINOR' in line:
+            elif 'VERSION_MINOR' in line:
                 minor = line.split('=')[1].strip()
-            elif 'OVOS_VERSION_BUILD' in line:
+            elif 'VERSION_BUILD' in line:
                 build = line.split('=')[1].strip()
-            elif 'OVOS_VERSION_ALPHA' in line:
+            elif 'VERSION_ALPHA' in line:
                 alpha = line.split('=')[1].strip()
 
             if ((major and minor and build and alpha) or
