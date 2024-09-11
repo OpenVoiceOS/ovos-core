@@ -2,7 +2,20 @@
 
 ## [Unreleased](https://github.com/OpenVoiceOS/ovos-core/tree/HEAD)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a128...HEAD)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a129...HEAD)
+
+**Closed issues:**
+
+- The link you requested. [\#536](https://github.com/OpenVoiceOS/ovos-core/issues/536)
+- Stable Dependencies for 0.0.8 Release [\#488](https://github.com/OpenVoiceOS/ovos-core/issues/488)
+
+**Merged pull requests:**
+
+- trust semantic versioning [\#538](https://github.com/OpenVoiceOS/ovos-core/pull/538) ([JarbasAl](https://github.com/JarbasAl))
+
+## [V0.0.8a129](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a129) (2024-08-05)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a128...V0.0.8a129)
 
 **Fixed bugs:**
 
@@ -454,21 +467,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a78...V0.0.8a79)
 
-**Fixed bugs:**
-
-- fix: blacklisted skills [\#424](https://github.com/OpenVoiceOS/ovos-core/pull/424) ([JarbasAl](https://github.com/JarbasAl))
-
-**Merged pull requests:**
-
-- test: fix codecov OCP tests [\#423](https://github.com/OpenVoiceOS/ovos-core/pull/423) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [V0.0.8a78](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a78) (2024-02-25)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/V0.0.8a77...V0.0.8a78)
-
-**Merged pull requests:**
-
-- unittests: OCP pipeline [\#422](https://github.com/OpenVoiceOS/ovos-core/pull/422) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [V0.0.8a77](https://github.com/OpenVoiceOS/ovos-core/tree/V0.0.8a77) (2024-02-24)
 
