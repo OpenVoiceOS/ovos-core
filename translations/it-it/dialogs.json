@@ -1,14 +1,19 @@
 {
   "cant.play.dialog": [
     "Non so come riprodurre {phrase}",
-    "Scusa, non posso aprire {phrase}"
+    "Scusa, non so come riprodurre {phrase}"
   ],
   "play.what.dialog": [
     "Cosa vuoi ascoltare dopo?"
   ],
+  "no.media.skills.dialog": [
+    "Scusa, non ho alcuna competenza legata ai media installata",
+    "Ho bisogno di installare alcune competenze legata ai media prima di poterli riprodurre",
+    "Non posso riprodurre media fino a quando una competenza legata ai media non verrà installata"
+  ],
   "just.one.moment.dialog": [
     "Aspetta",
-    "Un momentino",
+    "Un momento",
     "Un attimo, sto cercando"
   ]
 }
