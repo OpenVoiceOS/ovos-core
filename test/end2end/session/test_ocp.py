@@ -288,6 +288,7 @@ class TestOCPPipeline(TestCase):
             "ovos.common_play.reset",
             "add_context",  # NowPlaying context
             "ovos.common_play.play",  # OCP api,
+            "ovos.common_play.search.populate",
             "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
@@ -429,6 +430,7 @@ class TestOCPPipeline(TestCase):
             "ovos.common_play.reset",
             "add_context",  # NowPlaying context
             "ovos.common_play.play",  # OCP api
+            "ovos.common_play.search.populate",
             "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
@@ -504,6 +506,7 @@ class TestOCPPipeline(TestCase):
             "ovos.common_play.reset",
             "add_context",  # NowPlaying context
             'mycroft.audio.service.play',  # LEGACY api
+            "ovos.common_play.search.populate",
             "ovos.utterance.handled",  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
