@@ -15,9 +15,9 @@
 import re
 from enum import Enum, IntEnum
 from abc import ABC, abstractmethod
-from mycroft.messagebus.message import Message
-from mycroft.skills.mycroft_skill import MycroftSkill
-from mycroft.skills.audioservice import AudioService
+from ovos_bus_client.message import Message
+from ovos_workshop.skills import OVOSSkill
+from ovos_bus_client.apis.ocp import ClassicAudioServiceInterface as AudioService
 
 
 class CPSMatchLevel(Enum):
@@ -45,7 +45,7 @@ class CPSTrackStatus(IntEnum):
     END_OF_MEDIA = 90  # playback finished, is the default state when CPS loads
 
 
-class CommonPlaySkill(MycroftSkill, ABC):
+class CommonPlaySkill(OVOSSkill, ABC):
     """ To integrate with the common play infrastructure of Mycroft
     skills should use this base class and override the two methods
     `CPS_match_query_phrase` (for checking if the skill can play the
@@ -56,13 +56,13 @@ class CommonPlaySkill(MycroftSkill, ABC):
     is needed.
     """
 
-    def __init__(self, name=None, bus=None):
-        super().__init__(name, bus)
+    def __init__(self, *args, **kwargs):
         self.audioservice = None
+        super().__init__(*args, **kwargs)
         self.play_service_string = None
 
         # "MusicServiceSkill" -> "Music Service"
-        spoken = name or self.__class__.__name__
+        spoken = self.name or self.__class__.__name__
         self.spoken_name = re.sub(r"([a-z])([A-Z])", r"\g<1> \g<2>",
                                   spoken.replace("Skill", ""))
         # NOTE: Derived skills will likely want to override self.spoken_name
@@ -158,7 +158,7 @@ class CommonPlaySkill(MycroftSkill, ABC):
         data = message.data.get("callback_data")
 
         # Stop any currently playing audio
-        if self.audioservice.is_playing:
+        if self.audioservice and self.audioservice.is_playing:
             self.audioservice.stop()
         message.context["skill_id"] = self.skill_id
         self.bus.emit(message.forward("mycroft.stop"))
@@ -167,7 +167,7 @@ class CommonPlaySkill(MycroftSkill, ABC):
         # "... on the chromecast"
         self.play_service_string = phrase
 
-        self.make_active()
+        self.activate()
 
         # Invoke derived class to provide playback data
         self.CPS_start(phrase, data)
@@ -193,7 +193,7 @@ class CommonPlaySkill(MycroftSkill, ABC):
 
     def stop(self):
         """Stop anything playing on the audioservice."""
-        if self.audioservice.is_playing:
+        if self.audioservice and self.audioservice.is_playing:
             self.audioservice.stop()
             return True
         else:

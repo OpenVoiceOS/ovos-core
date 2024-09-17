@@ -1,0 +1,116 @@
+{
+  "play.intent": [
+    "(graj|start|zacznij) {query}",
+    "szukaj z (common play|ocp|ovos common play|O C P) {query}",
+    "szukaj z (ovos|open voice os) media {query}",
+    "szukaj {query} (w|za pomocą) (common play|ocp|ovos common play|O C P)",
+    "szukaj {query} (w|za pomocą) (ovos|open voice os) media"
+  ],
+  "like_song.intent": [
+    "lubię to",
+    "lubię (to|ten) (utwór|piosenkę|track|numer)",
+    "(dobry|fajny|świetny|super|cool) (utwór|piosenka|track|numer)",
+    "(to|ten|to jest) (dobry|fajny|świetny|super|cool) (utwór|piosenka|track|numer)"
+  ],
+  "stop.intent": [
+    "stop",
+    "przestań",
+    "zatrzymaj to",
+    "Przestań to robić",
+    "Proszę przestań",
+    "czy możesz teraz przestać",
+    "Przestań wykonywać to zadanie",
+    "Zatrzymaj bieżące działanie",
+    "Zatrzymaj bieżący proces",
+    "Zakończ bieżące działanie",
+    "Zakończ to",
+    "Nie kontynuuj",
+    "Przestań wykonywać bieżące zadanie",
+    "Zakończ bieżące zadanie",
+    "Zatrzymaj bieżące działanie",
+    "Zakończ bieżące działanie",
+    "Anuluj bieżące zadanie"
+  ],
+  "next.intent": [
+    "(następny|pomiń|pomiń|skip)",
+    "(następny|skip) (utwór|track|numer|wideo|media)",
+    "(odtwórz|przejdź do) następny (muzyka|piosenka|track|wideo|media)",
+    "odtwórz następny",
+    "następny",
+    "następny (numer|track|utwór|film|wideo)"
+  ],
+  "resume.intent": [
+    "(kontynuuj|wznów)",
+    "(wznów|kontynuuj) (numer|utwór|track|wideo|media)",
+    "odtwórz"
+  ],
+  "read.intent": [
+    "czytaj (książka|audiobook) {query}",
+    "czytaj {query}",
+    "czytaj {query} (książka|audiobook)"
+  ],
+  "prev.intent": [
+    "(odtwórz poprzedni|poprzedni) (utwór|piosenka|track|wideo|media)",
+    "(odtwórz poprzedni|poprzedni) (utwór|piosenka|track|wideo|media)",
+    "(odtwórz poprzedni|poprzedni|cofnij)",
+    "poprzedni",
+    "(poprzedni|poprzedni) (numer|track|utwór|film|wideo)"
+  ],
+  "global_stop.intent": [
+    "zatrzymaj wszystko",
+    "zakończ wszystko",
+    "wszystko zakończ",
+    "anuluj wszystko",
+    "zatrzymaj wszystko",
+    "zatrzymaj wszystko",
+    "wszystko zatrzymaj",
+    "wszystko zatrzymaj",
+    "przestań ze wszystkim",
+    "zakończ wszystko",
+    "wszystko zakończ",
+    "anuluj wszystko",
+    "wszystko zatrzymaj",
+    "wszystko zakończ",
+    "wszystko zatrzymaj",
+    "wszystko zatrzymaj",
+    "Zatrzymaj teraz wszystko",
+    "Zakończ wszystkie procesy",
+    "Zakończ wszystkie działania",
+    "Anuluj wszystkie zadania",
+    "Zakończ wszystkie działania",
+    "Zatrzymaj natychmiast wszystkie działania",
+    "Zatrzymaj wszystkie bieżące procesy",
+    "Przestań ze wszystkimi działaniami",
+    "Zatrzymaj wszystkie bieżące zadania",
+    "Zakończ wszystkie bieżące działania",
+    "Anuluj wszystkie bieżące działania",
+    "Zakończ wszystkie otwarte zadania",
+    "Zatrzymaj wszystkie bieżące procesy",
+    "Zatrzymaj wszystkie bieżące działania",
+    "Zatrzymaj wszystkie działania"
+  ],
+  "pause.intent": [
+    "(pauza|zatrzymaj)",
+    "zatrzymaj (utwór|numer|track|wideo|media)"
+  ],
+  "open.intent": [
+    "otwórz (OCP|O C P|common|ovos|open voice os) (odtwarzacz|media player)",
+    "otwórz (OCP|O C P|ovos common play|common play|ovos media player|open voice os player) (ekran główny|strona startowa|strona główna|menu)",
+    "otwórz (OCP|O C P|ovos common play|open voice os common play|common play)",
+    "otwórz (media|muzyka|gui|wideo) (odtwarzacz|katalog|umiejętności|menu)"
+  ],
+  "featured.intent": [
+    "(otwórz|pokaż) (wyróżnione) {media} (katalog|kolekcja|playlist|playlista)",
+    "(otwórz|pokaż) wyróżnione {media}"
+  ],
+  "play_favorites.intent": [
+    "(odtwórz|start) moje (ulubione) (utwory|numery|piosenki|muzykę)",
+    "(odtwórz|start) (ulubione|polubione|ulubione) (utwory|numery|piosenki|muzyka)"
+  ],
+  "media_stop.intent": [
+    "zatrzymaj",
+    "zatrzymaj (odtwarzanie|media|muzyka|film|filmy)",
+    "zatrzymaj wszystko"
+  ]
+}
+

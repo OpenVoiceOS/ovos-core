@@ -1,0 +1,5 @@
+(play|start) {query}
+search (common play|ocp|ovos common play|O C P) for {query}
+search (ovos|open voice os) media for {query}
+search {query} (in|on) (common play|ocp|ovos common play|O C P)
+search {query} (in|on) (ovos|open voice os) media

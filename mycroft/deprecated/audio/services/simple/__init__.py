@@ -16,10 +16,10 @@ import signal
 from threading import Lock
 from time import sleep
 
-from mycroft.audio.services import AudioBackend
-from mycroft.messagebus.message import Message
+from ovos_plugin_manager.templates.audio import AudioBackend
+from ovos_bus_client.message import Message
 from ovos_utils.log import LOG
-from mycroft.util import play_mp3, play_ogg, play_wav
+from ovos_utils.sound import play_audio
 import mimetypes
 import re
 from requests import Session
@@ -117,15 +117,7 @@ class SimpleAudioService(AudioBackend):
         # Replace file:// uri's with normal paths
         track = track.replace('file://', '')
         try:
-            if 'mpeg' in mime[1]:
-                self.process = play_mp3(track)
-            elif 'ogg' in mime[1]:
-                self.process = play_ogg(track)
-            elif 'wav' in mime[1]:
-                self.process = play_wav(track)
-            else:
-                # If no mime info could be determined guess mp3
-                self.process = play_mp3(track)
+            self.process = play_audio(track)
         except FileNotFoundError as e:
             LOG.error('Couldn\'t play audio, {}'.format(repr(e)))
             self.process = None
@@ -237,6 +229,16 @@ class SimpleAudioService(AudioBackend):
                 LOG.debug("Killing currently playing audio...")
                 self.process.kill()
         self.process = None
+
+    # mandatory abstract methods
+    def get_track_length(self) -> int:
+        return 0
+
+    def get_track_position(self) -> int:
+        return 0
+
+    def set_track_position(self, milliseconds):
+        pass
 
 
 def load_service(base_config, bus):

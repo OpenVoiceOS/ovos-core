@@ -1,0 +1,6 @@
+(next|skip)
+(next|skip) (music|song|track|video|media)
+(play|go to) next (music|song|track|video|media)
+next
+next (song|track|music|movie|video|tune)
+play next

@@ -1,0 +1,5 @@
+(graj|start|zacznij) {query}
+szukaj z (common play|ocp|ovos common play|O C P) {query}
+szukaj z (ovos|open voice os) media {query}
+szukaj {query} (w|za pomocą) (common play|ocp|ovos common play|O C P)
+szukaj {query} (w|za pomocą) (ovos|open voice os) media

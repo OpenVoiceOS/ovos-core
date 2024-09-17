@@ -13,55 +13,5 @@
 # limitations under the License.
 #
 """Intent service for Mycroft's fallback system."""
-from collections import namedtuple
-from mycroft.skills.intent_services.base import IntentMatch
+from ovos_core.intent_services.fallback_service import FallbackRange, FallbackService
 
-FallbackRange = namedtuple('FallbackRange', ['start', 'stop'])
-
-
-class FallbackService:
-    """Intent Service handling fallback skills."""
-
-    def __init__(self, bus):
-        self.bus = bus
-
-    def _fallback_range(self, utterances, lang, message, fb_range):
-        """Send fallback request for a specified priority range.
-
-        Args:
-            utterances (list): List of tuples,
-                               utterances and normalized version
-            lang (str): Langauge code
-            message: Message for session context
-            fb_range (FallbackRange): fallback order start and stop.
-
-        Returns:
-            IntentMatch or None
-        """
-        msg = message.reply(
-            'mycroft.skills.fallback',
-            data={'utterance': utterances[0][0],
-                  'lang': lang,
-                  'fallback_range': (fb_range.start, fb_range.stop)}
-        )
-        response = self.bus.wait_for_response(msg, timeout=10)
-        if response and response.data['handled']:
-            ret = IntentMatch('Fallback', None, {}, None)
-        else:
-            ret = None
-        return ret
-
-    def high_prio(self, utterances, lang, message):
-        """Pre-padatious fallbacks."""
-        return self._fallback_range(utterances, lang, message,
-                                    FallbackRange(0, 5))
-
-    def medium_prio(self, utterances, lang, message):
-        """General fallbacks."""
-        return self._fallback_range(utterances, lang, message,
-                                    FallbackRange(5, 90))
-
-    def low_prio(self, utterances, lang, message):
-        """Low prio fallbacks with general matching such as chat-bot."""
-        return self._fallback_range(utterances, lang, message,
-                                    FallbackRange(90, 101))

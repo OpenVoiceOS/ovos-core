@@ -1,0 +1,115 @@
+{
+  "play.intent": [
+    "(joue | démarre) {query}",
+    "cherche (common play|ocp|ovos common play|O C P) {query}",
+    "cherche le média (ovos | open voice os) pour {query}",
+    "cherche {query} (dans|sur) (common play|ocp|ovos common play|O C P)",
+    "cherche {query} (dans|sur) (ovos|open voice os)"
+  ],
+  "like_song.intent": [
+    "j'aime (ça)",
+    "j'aime (ça|ce|cette) (chanson|musique|piste|son)",
+    "(bon | bonne | superbe) (chanson | musique | piste | son)",
+    "(c'est) (un|une) (bon|bonne|super|superbe) (chanson|musique|piste|son)"
+  ],
+  "stop.intent": [
+    "arrête",
+    "arrête de faire ça",
+    "arrête ça",
+    "Arrêt ce que tu fais",
+    "tais toi",
+    "arrête maintenant",
+    "Arrête d'effectuer cette tâche",
+    "Arrête l'action en cours",
+    "Arrête le processus en cours",
+    "Cesse l'activité en cours",
+    "S'il te plaît, mets-y un terme",
+    "Arrête de travailler là-dessus",
+    "Arrête d'exécuter la commande en cours",
+    "Termine la tâche en cours",
+    "Arrête l'opération en cours",
+    "Arrête l'action en cours",
+    "annule la tâche en cours"
+  ],
+  "next.intent": [
+    "(suivant | passe)",
+    "(suivant | passe) (musique | chanson | piste | vidéo | média)",
+    "(lis | va à) (le|la) (musique | chanson | piste | vidéo | média) (suivant|suivante)",
+    "joue la suite",
+    "suivant",
+    "(chanson | piste | musique | film | vidéo | mélodie) (suivant|suivante)"
+  ],
+  "resume.intent": [
+    "reprend",
+    "(reprend | continue) (le|la) (musique | chanson | piste | vidéo | média | lecture)",
+    "joue"
+  ],
+  "read.intent": [
+    "lis (le|) (livre|livre audio|) {query}",
+    "lis {query}",
+    "lis {query} (le|) (livre|livre audio)"
+  ],
+  "prev.intent": [
+    "(musique | chanson | piste | vidéo | média) (précédente|précédent)",
+    "lis (le|la) (musique|chanson|piste|vidéo|média) (précédent|précédente) ",
+    "(reviens en arrière|lis le précédent|lis la précédente)",
+    "précédent",
+    "précédent (song|track|music|movie|video|tune)"
+  ],
+  "global_stop.intent": [
+    "arrête tout",
+    "met fin à tout",
+    "met fin à tout",
+    "annule tout",
+    "fini tout",
+    "arrête tout",
+    "abandonne tout",
+    "cesse tout",
+    "arrête tout",
+    "met fin à tout",
+    "arrête tout",
+    "annule tout",
+    "termine tout",
+    "arrête tout",
+    "abandonne tout",
+    "cesse tout",
+    "Arrête tout maintenant",
+    "Met fin à tous les processus",
+    "Arrête toutes les opérations",
+    "Annule toutes les tâches",
+    "Attête toutes les activités",
+    "Arrête immédiatement toutes les activités",
+    "Abandonne tous les processus en cours",
+    "Cesse toutes les actions",
+    "Arrête toutes les tâches en cours",
+    "Arrête à toutes les activités en cours",
+    "Annule toutes les opérations en attente",
+    "Termine toutes les tâches ouvertes",
+    "Arrête tous les processus en cours",
+    "Abandonne toutes les actions en cours",
+    "Cesse toutes les activités en cours"
+  ],
+  "pause.intent": [
+    "pause",
+    "pause (le|la) (musique | chanson | piste | vidéo | média | lecture)"
+  ],
+  "open.intent": [
+    "ouvre le (lecteur|lecteur multimédia) (OCP|O C P|common|ovos|open voice os)",
+    "(ouvre|affiche) (le|la||l') (OCP | O C P | ovos common play | common play | ovos media player | open voice os player) (écran d'accueil | page d'accueil | menu)",
+    "ouvre (OCP|O C P|ovos common play|open voice os common play|common play)",
+    "ouvre (le|la|l') (lecteur|catalogue|compétences|menu)(média|musique|interface|vidéo) "
+  ],
+  "featured.intent": [
+    "(ouvre|affiche|montre) (le|la) (catalogue|collection|playlist)  {media}  (en vedette)",
+    "(ouvre|affiche|affiche) (le|la) {media} en (vedette|tête d'affiche)"
+  ],
+  "play_favorites.intent": [
+    "(joue|démarre) (mon|ma|mes)  (piste|pistes|chanson|chansons|musique|musiques||son|sons) (favori|favoris|préféré|préféreś)",
+    "(joue|démarre) (mon|ma|mes)  (piste|pistes|chanson|chansons|musique|musiques||son|sons) (favori|favoris|préféré|préféreś)"
+  ],
+  "media_stop.intent": [
+    "arrête",
+    "arrête (playback|media|media playback|music|movie|movies|noise)",
+    "arrête tout"
+  ]
+}

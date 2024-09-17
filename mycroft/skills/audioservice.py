@@ -1,2 +1,2 @@
 # this was moved in order to allow importing it without dragging skills service dependencies
-from mycroft.audio.interface import AudioService
+from ovos_bus_client.apis.ocp import ClassicAudioServiceInterface as AudioService

@@ -1,0 +1,19 @@
+{
+  "cant.play.dialog": [
+    "Ik kan {phrase} niet afspelen",
+    "Sorry, ik weet niet hoe ik {phrase} moet afspelen"
+  ],
+  "play.what.dialog": [
+    "Wat zal ik hierna spelen?"
+  ],
+  "no.media.skills.dialog": [
+    "Het spijt me, er zijn geen media skills geïnstalleerd",
+    "Zonder media skills kan ik helaas niets afspelen",
+    "Ik kan helaas geen media afspelen, omdat er eerst media skills moeten worden geïnstalleerd"
+  ],
+  "just.one.moment.dialog": [
+    "Eén moment",
+    "Moment geduld",
+    "Eén momentje, ik ga op zoek voor je"
+  ]
+}

@@ -1,0 +1,2 @@
+# skills that require a linux desktop environment
+ovos-skill-application-launcher>=0.1.0,<1.0.0

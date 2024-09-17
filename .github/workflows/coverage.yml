@@ -1,0 +1,65 @@
+name: Run CodeCov
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      PYTHON: '3.9'
+    steps:
+    - uses: actions/checkout@master
+    - name: Setup Python
+      uses: actions/setup-python@master
+      with:
+        python-version: 3.9
+    - name: Install System Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt install python3-dev libssl-dev libfann-dev portaudio19-dev libpulse-dev
+        python -m pip install build wheel
+    - name: Install test dependencies
+      run: |
+          pip install -r requirements/tests.txt
+          pip install ./test/unittests/common_query/ovos_tskill_fakewiki
+          pip install ./test/end2end/skill-ovos-hello-world
+          pip install ./test/end2end/skill-ovos-fallback-unknown
+          pip install ./test/end2end/skill-ovos-slow-fallback
+          pip install ./test/end2end/skill-converse_test
+          pip install ./test/end2end/skill-ovos-schedule
+          pip install ./test/end2end/skill-new-stop
+          pip install ./test/end2end/skill-old-stop
+          pip install ./test/end2end/skill-fake-fm
+          pip install ./test/end2end/skill-fake-fm-legacy
+          pip install ./test/end2end/skill-ovos-fakewiki
+          pip install ./test/end2end/metadata-test-plugin
+    - name: Install core repo
+      run: |
+        pip install -e .[mycroft,deprecated]
+    - name: Generate coverage report
+      run: |
+        pytest --cov=ovos_core --cov-report xml test/unittests
+        pytest --cov-append --cov=ovos_core --cov-report xml test/end2end
+        pytest --cov-append --cov=ovos_core --cov-report xml test/integrationtests
+    - name: Generate coverage report with padatious
+      run: |
+        sudo apt install libfann-dev
+        pip install .[lgpl]
+        pytest --cov-append --cov=ovos_core --cov-report xml test/unittests/skills
+    - name: Generate coverage report with utils 0.0.38
+      run: |
+        pip install ovos-utils==0.0.38
+        pytest --cov-append --cov=ovos_core --cov-report xml test/end2end
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        directory: ./coverage/reports/
+        fail_ci_if_error: true
+        files: ./coverage.xml,!./cache
+        flags: unittests
+        name: codecov-umbrella
+        verbose: true

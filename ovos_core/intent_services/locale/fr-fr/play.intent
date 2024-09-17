@@ -1,0 +1,5 @@
+(joue | démarre) {query}
+cherche (common play|ocp|ovos common play|O C P) {query}
+cherche le média (ovos | open voice os) pour {query}
+cherche {query} (dans|sur) (common play|ocp|ovos common play|O C P)
+cherche {query} (dans|sur) (ovos|open voice os)

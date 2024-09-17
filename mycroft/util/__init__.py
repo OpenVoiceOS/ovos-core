@@ -18,9 +18,9 @@ A collections of utils and tools for making skill development easier.
 """
 from __future__ import absolute_import
 
-from mycroft.util.string_utils import camel_case_split
-from mycroft.util.audio_utils import (play_audio_file, play_wav, play_ogg,
-                                      play_mp3, record, find_input_device)
+from ovos_utils import camel_case_split
+from ovos_utils.sound import play_audio as play_ogg, play_audio as play_mp3, play_audio as play_wav
+from mycroft.util.audio_utils import (play_audio_file, find_input_device)
 from mycroft.util.file_utils import (
     read_stripped_lines,
     read_dict,
@@ -40,3 +40,8 @@ from ovos_utils.signal import check_for_signal, create_signal, \
     get_ipc_directory
 from mycroft.util.platform import get_arch
 from ovos_utils.log import init_service_logger, LOG
+
+
+def record(*args, **kwargs):
+    from mycroft.util.audio_test import record
+    record(*args, **kwargs)

@@ -16,7 +16,7 @@ jobs:
     strategy:
       max-parallel: 2
       matrix:
-        python-version: [ 3.7, 3.8, 3.9, "3.10" ]
+        python-version: [ 3.7, 3.8, 3.9, "3.10", "3.11" ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -39,11 +39,4 @@ jobs:
           python setup.py bdist_wheel
       - name: Install package
         run: |
-          pip install .[all,skills-essential]
-      - uses: pypa/gh-action-pip-audit@v1.0.0
-        with:
-          # Ignore setuptools vulnerability we can't do much about
-          # Ignore numpy vulnerability affecting latest version for Py3.7
-          ignore-vulns: |
-            GHSA-r9hx-vwmv-q579
-            GHSA-fpfv-jqm9-f5jm
+          pip install .[mycroft,lgpl,plugins,skills-essential,skills-audio,skills-gui,skills-internet,skills-media,skills-desktop]

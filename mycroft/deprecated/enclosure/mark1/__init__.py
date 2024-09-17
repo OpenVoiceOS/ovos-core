@@ -33,13 +33,13 @@ from ovos_config.locations import get_xdg_config_save_path
 import mycroft.dialog
 from mycroft.deprecated.enclosure.base import Enclosure
 from ovos_backend_client.pairing import has_been_paired
-from mycroft.audio import wait_while_speaking
+from ovos_audio.utils import wait_while_speaking
 from mycroft.deprecated.enclosure.mark1.arduino import EnclosureArduino
 from mycroft.deprecated.enclosure.mark1.eyes import EnclosureEyes
 from mycroft.deprecated.enclosure.mark1.mouth import EnclosureMouth
 from ovos_config.config import LocalConf
 from ovos_config.locations import USER_CONFIG
-from mycroft.messagebus.message import Message
+from ovos_bus_client.message import Message
 from mycroft.util import play_wav, connected
 from ovos_utils.signal import check_for_signal, create_signal
 from mycroft.util.audio_test import record

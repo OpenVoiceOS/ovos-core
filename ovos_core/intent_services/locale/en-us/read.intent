@@ -1,0 +1,3 @@
+read (book|audiobook|audio book) {query}
+read {query}
+read {query} (book|audiobook|audio book)

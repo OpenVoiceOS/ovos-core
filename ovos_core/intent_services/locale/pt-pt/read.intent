@@ -1,0 +1,3 @@
+(lê|lê-me) (um|uma|o|a) (livro|audiobook|história) {query}
+(lê|lê-me) {query}
+(lê|lê-me) {query} (livro|audiobook|história)

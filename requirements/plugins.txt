@@ -1,0 +1,8 @@
+ovos-utterance-corrections-plugin>=0.0.0, <1.0.0
+ovos-utterance-plugin-cancel>=0.0.1, <1.0.0
+ovos-bidirectional-translation-plugin>=0.0.1, <1.0.0
+ovos-translate-server-plugin>=0.0.1, <1.0.0
+ovos-utterance-normalizer>=0.1.0, <1.0.0
+
+# still in alpha
+ovos-classifiers

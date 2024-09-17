@@ -16,7 +16,7 @@ import yaml
 
 from ovos_backend_client.pairing import is_paired
 from ovos_backend_client.api import DeviceApi
-from mycroft.messagebus.message import Message
+from ovos_bus_client.message import Message
 from mycroft.util.file_utils import ensure_directory_exists
 from ovos_utils.log import LOG
 from ovos_config.config import Configuration

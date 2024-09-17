@@ -1,0 +1,5 @@
+(spiele|starte) {query}
+Suche (common play|ocp|ovos common play|O C P) nach {query}
+Suche in (ovos|open voice os) Medien nach {query}
+Suche {query} (in) (common play|ocp|ovos common play|O C P))
+Suche {query} (in) (ovos|open voice os) Medien

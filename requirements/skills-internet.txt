@@ -1,0 +1,9 @@
+# skills that require internet connectivity, should not be installed in offline devices
+ovos-skill-weather>=0.0.1,<1.0.0
+skill-ddg>=0.0.2,<1.0.0
+skill-wolfie>=0.2.0,<1.0.0
+ovos-skill-wikipedia>=0.5.0,<1.0.0
+skill-ovos-fallback-chatgpt>=0.0.2,<1.0.0
+ovos-skill-wikihow>=0.2.0,<1.0.0
+ovos-skill-speedtest>=0.1.0,<1.0.0
+ovos-skill-ip>=0.1.0,<1.0.0

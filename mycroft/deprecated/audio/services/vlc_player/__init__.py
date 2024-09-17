@@ -14,7 +14,7 @@
 #
 import vlc
 
-from mycroft.audio.services import AudioBackend
+from ovos_plugin_manager.templates.audio import AudioBackend
 from ovos_utils.log import LOG
 
 

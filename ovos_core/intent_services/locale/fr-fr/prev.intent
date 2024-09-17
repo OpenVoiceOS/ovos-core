@@ -1,0 +1,5 @@
+(musique | chanson | piste | vidéo | média) (précédente|précédent)
+(reviens en arrière|lis le précédent|lis la précédente)
+lis (le|la) (musique|chanson|piste|vidéo|média) (précédent|précédente) 
+précédent
+précédent (song|track|music|movie|video|tune)

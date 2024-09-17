@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from mycroft.deprecated.audio.speech import *
+from mycroft.deprecated.audio.speech import handle_stop, handle_speak, shutdown,\
+    mute_and_speak, mimic_fallback_obj, mimic_fallback_tts, tts_hash, init, bus, config, tts, lock
 from ovos_utils.log import LOG
 
 LOG.warning("This module is deprecated")

@@ -5,4 +5,4 @@ Bug fixes will be made to maintain compatibility but are very low priority!
 
 use ovos simple audio plugin instead
 """
-from mycroft.deprecated.audio.services.simple import *
+from mycroft.deprecated.audio.services.simple import SimpleAudioService

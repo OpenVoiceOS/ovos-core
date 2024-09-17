@@ -65,8 +65,8 @@ class TestSkill(unittest.TestCase):
             self.assertTrue(event in registered_events)
 
         # base skill class events exclusive to ovos-core
-        default_ovos = ["skill.converse.ping",
-                        "skill.converse.request",
+        default_ovos = [f"{self.skill.skill_id}.converse.ping",
+                        f"{self.skill.skill_id}.converse.request",
                         f"{self.skill.skill_id}.activate",
                         f"{self.skill.skill_id}.deactivate"]
         for event in default_ovos:

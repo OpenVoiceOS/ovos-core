@@ -47,7 +47,7 @@ class TestDeviceApi(unittest.TestCase):
         mock_identity_get.return_value = create_identity('1234')
 
         device = ovos_backend_client.api.DeviceApi(url="https://api-test.mycroft.ai",
-                                                   backend_type=BackendType.SELENE)
+                                                   backend_type=BackendType.PERSONAL)
         self.assertEqual(device.identity.uuid, '1234')
         self.assertTrue(device.url.endswith("/device"))
 
@@ -58,7 +58,7 @@ class TestDeviceApi(unittest.TestCase):
         mock_identity_get.return_value = create_identity('1234')
         # Test activate
         device = ovos_backend_client.api.DeviceApi(url="https://api-test.mycroft.ai",
-                                                   backend_type=BackendType.SELENE)
+                                                   backend_type=BackendType.PERSONAL)
         device.activate('state', 'token')
         json = mock_request.call_args[1]['json']
         self.assertEqual(json['state'], 'state')
@@ -71,7 +71,7 @@ class TestDeviceApi(unittest.TestCase):
         mock_identity_get.return_value = create_identity('1234')
         # Test get
         device = ovos_backend_client.api.DeviceApi(url="https://api-test.mycroft.ai",
-                                                   backend_type=BackendType.SELENE)
+                                                   backend_type=BackendType.PERSONAL)
         device.get()
         url = mock_request.call_args[0][0]
         self.assertEqual(url, 'https://api-test.mycroft.ai/v1/device/1234')
@@ -84,7 +84,7 @@ class TestDeviceApi(unittest.TestCase):
         mock_request.return_value = create_response(200, '123ABC')
         mock_identity_get.return_value = create_identity('1234')
         device = ovos_backend_client.api.DeviceApi(url="https://api-test.mycroft.ai",
-                                                   backend_type=BackendType.SELENE)
+                                                   backend_type=BackendType.PERSONAL)
         ret = device.get_code('state')
         self.assertEqual(ret, '123ABC')
         url = mock_request.call_args[0][0]
@@ -98,7 +98,7 @@ class TestDeviceApi(unittest.TestCase):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
         device = ovos_backend_client.api.DeviceApi(url="https://api-test.mycroft.ai",
-                                                   backend_type=BackendType.SELENE)
+                                                   backend_type=BackendType.PERSONAL)
         device.get_settings()
         url = mock_request.call_args[0][0]
         self.assertEqual(
@@ -110,7 +110,7 @@ class TestDeviceApi(unittest.TestCase):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
         device = ovos_backend_client.api.DeviceApi(url="https://api-test.mycroft.ai",
-                                                   backend_type=BackendType.SELENE)
+                                                   backend_type=BackendType.PERSONAL)
         device.report_metric('mymetric', {'data': 'mydata'})
         url = mock_request.call_args[0][0]
         params = mock_request.call_args[1]
@@ -128,7 +128,7 @@ class TestDeviceApi(unittest.TestCase):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
         device = ovos_backend_client.api.DeviceApi(url="https://api-test.mycroft.ai",
-                                                   backend_type=BackendType.SELENE)
+                                                   backend_type=BackendType.PERSONAL)
         device.send_email('title', 'body', 'sender')
         url = mock_request.call_args[0][0]
         params = mock_request.call_args[1]
@@ -146,7 +146,7 @@ class TestDeviceApi(unittest.TestCase):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
         device = ovos_backend_client.api.DeviceApi(url="https://api-test.mycroft.ai",
-                                                   backend_type=BackendType.SELENE)
+                                                   backend_type=BackendType.PERSONAL)
         device.get_oauth_token(1)
         url = mock_request.call_args[0][0]
 
@@ -159,7 +159,7 @@ class TestDeviceApi(unittest.TestCase):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
         device = ovos_backend_client.api.DeviceApi(url="https://api-test.mycroft.ai",
-                                                   backend_type=BackendType.SELENE)
+                                                   backend_type=BackendType.PERSONAL)
         device.get_location()
         url = mock_request.call_args[0][0]
         self.assertEqual(
@@ -171,7 +171,7 @@ class TestDeviceApi(unittest.TestCase):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
         device = ovos_backend_client.api.DeviceApi(url="https://api-test.mycroft.ai",
-                                                   backend_type=BackendType.SELENE)
+                                                   backend_type=BackendType.PERSONAL)
         device.get_subscription()
         url = mock_request.call_args[0][0]
         self.assertEqual(
@@ -192,7 +192,7 @@ class TestDeviceApi(unittest.TestCase):
         mock_request.return_value = create_response(200)
         mock_identity_get.return_value = create_identity('1234')
         device = ovos_backend_client.api.DeviceApi(url="https://api-test.mycroft.ai",
-                                                   backend_type=BackendType.SELENE)
+                                                   backend_type=BackendType.PERSONAL)
         device.upload_skills_data({})
         url = mock_request.call_args[0][0]
         data = mock_request.call_args[1]['json']
@@ -213,7 +213,7 @@ class TestDeviceApi(unittest.TestCase):
     def test_stt(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
-        stt = ovos_backend_client.api.STTApi('stt', backend_type=BackendType.SELENE)
+        stt = ovos_backend_client.api.STTApi('stt', backend_type=BackendType.PERSONAL)
         self.assertTrue(stt.url.endswith('stt'))
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
@@ -221,7 +221,7 @@ class TestDeviceApi(unittest.TestCase):
     def test_stt_stt(self, mock_request, mock_identity_get):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
-        stt = ovos_backend_client.api.STTApi('https://api-test.mycroft.ai', backend_type=BackendType.SELENE)
+        stt = ovos_backend_client.api.STTApi('https://api-test.mycroft.ai', backend_type=BackendType.PERSONAL)
         stt.stt('La la la', 'en-US', 1)
         url = mock_request.call_args[0][0]
         self.assertEqual(url, 'https://api-test.mycroft.ai/v1/stt')
@@ -254,7 +254,7 @@ class TestSettingsMeta(unittest.TestCase):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
         device = ovos_backend_client.api.DeviceApi(url="https://api-test.mycroft.ai",
-                                                   backend_type=BackendType.SELENE)
+                                                   backend_type=BackendType.PERSONAL)
 
         settings_meta = {
             'name': 'TestMeta',
@@ -290,7 +290,7 @@ class TestSettingsMeta(unittest.TestCase):
         mock_request.return_value = create_response(200, {})
         mock_identity_get.return_value = create_identity('1234')
         device = ovos_backend_client.api.DeviceApi(url="https://api-test.mycroft.ai",
-                                                   backend_type=BackendType.SELENE)
+                                                   backend_type=BackendType.PERSONAL)
         device.get_skill_settings()
         url = mock_request.call_args[0][0]
         params = mock_request.call_args[1]
@@ -319,7 +319,7 @@ class TestIsPaired(unittest.TestCase):
         self.assertFalse(ovos_backend_client.pairing.is_paired(backend_type=BackendType.OFFLINE))
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
-    @patch('ovos_backend_client.backends.selene.SeleneBackend.device_get')
+    @patch('ovos_backend_client.backends.personal.PersonalBackend.device_get')
     @patch('ovos_backend_client.pairing.is_backend_disabled')
     def test_is_paired_selene_true(self, mock_backend_status, mock_request, mock_identity_get):
         mock_backend_status.return_value = False
@@ -329,7 +329,7 @@ class TestIsPaired(unittest.TestCase):
         mock_identity.uuid = '1234'
         mock_identity_get.return_value = mock_identity
         num_calls = mock_identity_get.num_calls
-        self.assertTrue(ovos_backend_client.pairing.is_paired(backend_type=BackendType.SELENE))
+        self.assertTrue(ovos_backend_client.pairing.is_paired(backend_type=BackendType.PERSONAL))
         self.assertEqual(num_calls, mock_identity_get.num_calls)
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
@@ -342,9 +342,9 @@ class TestIsPaired(unittest.TestCase):
         mock_identity.is_expired.return_value = False
         mock_identity.uuid = ''
         mock_identity_get.return_value = mock_identity
-        self.assertFalse(ovos_backend_client.pairing.is_paired(backend_type=BackendType.SELENE))
+        self.assertFalse(ovos_backend_client.pairing.is_paired(backend_type=BackendType.PERSONAL))
         mock_identity.uuid = None
-        self.assertFalse(ovos_backend_client.pairing.is_paired(backend_type=BackendType.SELENE))
+        self.assertFalse(ovos_backend_client.pairing.is_paired(backend_type=BackendType.PERSONAL))
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
     @patch('ovos_backend_client.backends.base.requests.get')
@@ -356,7 +356,7 @@ class TestIsPaired(unittest.TestCase):
         mock_identity.is_expired.return_value = False
         mock_identity.uuid = '1234'
         mock_identity_get.return_value = mock_identity
-        self.assertFalse(ovos_backend_client.pairing.is_paired(backend_type=BackendType.SELENE))
+        self.assertFalse(ovos_backend_client.pairing.is_paired(backend_type=BackendType.PERSONAL))
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
     @patch('ovos_backend_client.backends.base.requests.get')
@@ -368,7 +368,7 @@ class TestIsPaired(unittest.TestCase):
         mock_identity.is_expired.return_value = False
         mock_identity.uuid = '1234'
         mock_identity_get.return_value = mock_identity
-        self.assertFalse(ovos_backend_client.pairing.is_paired(backend_type=BackendType.SELENE))
+        self.assertFalse(ovos_backend_client.pairing.is_paired(backend_type=BackendType.PERSONAL))
 
     @patch('ovos_backend_client.identity.IdentityManager.get')
     @patch('ovos_backend_client.backends.base.requests.get')
@@ -380,4 +380,4 @@ class TestIsPaired(unittest.TestCase):
         mock_identity.is_expired.return_value = False
         mock_identity.uuid = '1234'
         mock_identity_get.return_value = mock_identity
-        self.assertTrue(ovos_backend_client.pairing.is_paired(backend_type=BackendType.SELENE))
+        self.assertTrue(ovos_backend_client.pairing.is_paired(backend_type=BackendType.PERSONAL))

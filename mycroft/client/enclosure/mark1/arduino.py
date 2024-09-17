@@ -8,4 +8,4 @@ This is only meant for 3rd party code expecting ovos-core
 to be a drop in replacement for mycroft-core
 """
 
-from mycroft.deprecated.enclosure.mark1.arduino import *
+from mycroft.deprecated.enclosure.mark1.arduino import EnclosureArduino

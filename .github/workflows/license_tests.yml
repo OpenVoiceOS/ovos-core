@@ -26,7 +26,7 @@ jobs:
           sudo apt install python3-dev swig libssl-dev libfann-dev portaudio19-dev libpulse-dev
       - name: Install core repo
         run: |
-          pip install .[audio-backend,mark1,stt,tts,skills,gui,bus,PHAL,all]
+          pip install .[mycroft,lgpl,skills-essential]
       - name: Get explicit and transitive dependencies
         run: |
           pip freeze > requirements-all.txt
@@ -37,7 +37,7 @@ jobs:
           requirements: 'requirements-all.txt'
           fail: 'Copyleft,Other,Error'
           fails-only: true
-          exclude: '^(precise-runner|fann2|tqdm|bs4|mutagen|ovos-stt-plugin).*'
+          exclude: '^(precise-runner|fann2|tqdm|bs4|sonopy|caldav|recurring-ical-events|x-wr-timezone).*'
           exclude-license: '^(Mozilla).*$'
       - name: Print report
         if: ${{ always() }}

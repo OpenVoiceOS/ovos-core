@@ -4,7 +4,7 @@ on:
     branches:
       - dev
     paths-ignore:
-      - 'mycroft/version.py'
+      - 'ovos_core/version.py'
       - 'examples/**'
       - '.github/**'
       - '.gitignore'
@@ -17,7 +17,7 @@ on:
     branches:
       - master
     paths-ignore:
-      - 'mycroft/version.py'
+      - 'ovos_core/version.py'
       - 'requirements/**'
       - 'examples/**'
       - '.github/**'
@@ -32,11 +32,11 @@ on:
 jobs:
   unit_tests:
     strategy:
-      max-parallel: 2
+      max-parallel: 3
       matrix:
-        python-version: [ 3.7, 3.8, 3.9]
+        python-version: [3.9]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v2
       - name: Set up python ${{ matrix.python-version }}
@@ -46,28 +46,59 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt install python3-dev swig libssl-dev libfann-dev portaudio19-dev libpulse-dev
+          sudo apt install python3-dev swig libssl-dev portaudio19-dev libpulse-dev
           python -m pip install build wheel
-      - name: Install core repo
-        run: |
-          pip install .[audio,mark1,stt,tts,skills,gui,bus,PHAL,all,deprecated]
       - name: Install test dependencies
         run: |
           pip install -r requirements/tests.txt
           pip install ./test/unittests/common_query/ovos_tskill_fakewiki
+          pip install ./test/end2end/skill-ovos-hello-world
+          pip install ./test/end2end/skill-ovos-fallback-unknown
+          pip install ./test/end2end/skill-ovos-slow-fallback
+          pip install ./test/end2end/skill-converse_test
+          pip install ./test/end2end/skill-ovos-schedule
+          pip install ./test/end2end/skill-new-stop
+          pip install ./test/end2end/skill-old-stop
+          pip install ./test/end2end/skill-fake-fm
+          pip install ./test/end2end/skill-fake-fm-legacy
+          pip install ./test/end2end/skill-ovos-fakewiki
+          pip install ./test/end2end/metadata-test-plugin
+      - name: Install core repo
+        run: |
+          pip install -e .[mycroft,deprecated]
       - name: Run unittests
         run: |
-          pytest --cov=mycroft --cov-report xml test/unittests
+          pytest --cov=ovos_core --cov-report xml test/unittests
           # NOTE: additional pytest invocations should also add the --cov-append flag
           #       or they will overwrite previous invocations' coverage reports
           #       (for an example, see OVOS Skill Manager's workflow)
+      - name: Run full core unittests
+        run: |
+          pytest --cov-append --cov=ovos_core --cov-report xml test/end2end
       - name: Run integration tests
         run: |
-          pytest --cov-append --cov=mycroft --cov-report xml test/integrationtests
-          # NOTE: additional pytest invocations should also add the --cov-append flag
-          #       or they will overwrite previous invocations' coverage reports
-          #       (for an example, see OVOS Skill Manager's workflow)
+          pytest --cov-append --cov=ovos_core --cov-report xml test/integrationtests
+      - name: Install padatious
+        run: |
+          sudo apt install libfann-dev
+          pip install .[lgpl]
+      - name: Run unittests with padatious
+        run: |
+          pytest --cov-append --cov=ovos_core --cov-report xml test/unittests/skills
+      - name: Run unittests with utils 0.0.38
+        run: |
+          pip install ovos-utils==0.0.38
+          pytest --cov-append --cov=ovos_core --cov-report xml test/end2end
       - name: Upload coverage
+        if: "${{ matrix.python-version == '3.9' }}"
         env:
           CODECOV_TOKEN: ${{secrets.CODECOV_TOKEN}}
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: ./coverage/reports/
+          fail_ci_if_error: true
+          files: ./coverage.xml,!./cache
+          flags: unittests
+          name: codecov-umbrella
+          verbose: true

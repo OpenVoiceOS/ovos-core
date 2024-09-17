@@ -1,0 +1,136 @@
+{
+  "video_only.voc": [
+    "niet naar audio casten",
+    "niet naar audio casten",
+    "geen audiospeler",
+    "alleen video",
+    "alleen video"
+  ],
+  "AudioKeyword.voc": [
+    "audio",
+    "Geluid"
+  ],
+  "HentaiKeyword.voc": [
+    "hentai"
+  ],
+  "PodcastKeyword.voc": [
+    "podcast",
+    "podcasts"
+  ],
+  "Play.voc": [
+    "zoek",
+    "lees",
+    "(speel | play)",
+    "start"
+  ],
+  "audio_only.voc": [
+    "alleen audio",
+    "geen video",
+    "alleen audio",
+    "alleen audio",
+    "alleen audio"
+  ],
+  "NewsKeyword.voc": [
+    "nieuws"
+  ],
+  "GameKeyword.voc": [
+    "Spelletje"
+  ],
+  "ADKeyword.voc": [
+    "audio descriptie",
+    "film beschrijving"
+  ],
+  "TrailerKeyword.voc": [
+    "Trailer"
+  ],
+  "MovieKeyword.voc": [
+    "film",
+    "film"
+  ],
+  "CartoonKeyword.voc": [
+    "tekenfilm",
+    "cartoons"
+  ],
+  "VideoKeyword.voc": [
+    "video"
+  ],
+  "ASMRKeyword.voc": [
+    "ASMR",
+    "autonomous sensory meridian response"
+  ],
+  "DocumentaryKeyword.voc": [
+    "documentaire",
+    "documentaires"
+  ],
+  "SeriesKeyword.voc": [
+    "series",
+    "tv show",
+    "aflevering",
+    "afleveringen"
+  ],
+  "BWKeyword.voc": [
+    "zwart wit",
+    "monochroom"
+  ],
+  "AdultKeyword.voc": [
+    "porno",
+    "18 plus",
+    "pornografie"
+  ],
+  "RadioKeyword.voc": [
+    "radio",
+    "internetradio"
+  ],
+  "AudioDramaKeyword.voc": [
+    "Toneel",
+    "theater"
+  ],
+  "Resume.voc": [
+    "ga verder",
+    "hervat"
+  ],
+  "ComicBookKeyword.voc": [
+    "Animatie",
+    "Strip",
+    "plaatjes verhaal"
+  ],
+  "TVKeyword.voc": [
+    "TV",
+    "televisie",
+    "kanaal"
+  ],
+  "AnimeKeyword.voc": [
+    "anime"
+  ],
+  "MusicKeyword.voc": [
+    "muziek",
+    "liedje",
+    "soundtrack",
+    "soundtrack"
+  ],
+  "QuestionWord.voc": [
+    "wie",
+    "wat",
+    "hoe",
+    "waarom",
+    "wanneer",
+    "vraag",
+    "vertel me over",
+    "welke",
+    "Wiens"
+  ],
+  "AudioBookKeyword.voc": [
+    "boek",
+    "boeken",
+    "Lees",
+    "audioboek",
+    "audioboeken",
+    "Lees"
+  ],
+  "SilentKeyword.voc": [
+    "stom"
+  ],
+  "ShortKeyword.voc": [
+    "kort"
+  ]
+}

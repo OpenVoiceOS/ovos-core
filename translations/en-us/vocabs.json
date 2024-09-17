@@ -1,0 +1,136 @@
+{
+    "video_only.voc": [
+        "do not cast to audio",
+        "don't cast to audio",
+        "no audio player",
+        "only video",
+        "video only"
+    ],
+    "AudioKeyword.voc": [
+        "audio",
+        "sound"
+    ],
+    "HentaiKeyword.voc": [
+        "hentai"
+    ],
+    "PodcastKeyword.voc": [
+        "podcast",
+        "podcasts"
+    ],
+    "Play.voc": [
+        "search",
+        "read",
+        "play",
+        "start"
+    ],
+    "audio_only.voc": [
+        "audio only",
+        "no video",
+        "only audio",
+        "only sound",
+        "sound only"
+    ],
+    "NewsKeyword.voc": [
+        "news"
+    ],
+    "GameKeyword.voc": [
+        "game"
+    ],
+    "ADKeyword.voc": [
+        "audio description",
+        "movie description"
+    ],
+    "TrailerKeyword.voc": [
+        "trailer"
+    ],
+    "MovieKeyword.voc": [
+        "movie",
+        "film"
+    ],
+    "CartoonKeyword.voc": [
+        "cartoon",
+        "cartoons"
+    ],
+    "VideoKeyword.voc": [
+        "video"
+    ],
+    "ASMRKeyword.voc": [
+        "ASMR",
+        "autonomous sensory meridian response"
+    ],
+    "DocumentaryKeyword.voc": [
+        "documentary",
+        "documentaries"
+    ],
+    "SeriesKeyword.voc": [
+        "series",
+        "tv show",
+        "episode",
+        "episodes"
+    ],
+    "BWKeyword.voc": [
+        "black and white",
+        "monochrome"
+    ],
+    "AdultKeyword.voc": [
+        "porn",
+        "18 plus",
+        "pornography"
+    ],
+    "RadioKeyword.voc": [
+        "radio",
+        "internet radio"
+    ],
+    "AudioDramaKeyword.voc": [
+        "drama",
+        "theatre"
+    ],
+    "Resume.voc": [
+        "resume",
+        "unpause"
+    ],
+    "ComicBookKeyword.voc": [
+        "animated comic",
+        "comic",
+        "visual story"
+    ],
+    "TVKeyword.voc": [
+        "TV",
+        "television",
+        "channel"
+    ],
+    "AnimeKeyword.voc": [
+        "anime"
+    ],
+    "MusicKeyword.voc": [
+        "music",
+        "song",
+        "soundtrack",
+        "sound track"
+    ],
+    "QuestionWord.voc": [
+        "who",
+        "what",
+        "how",
+        "why",
+        "when",
+        "question",
+        "tell me about",
+        "which",
+        "whose"
+    ],
+    "AudioBookKeyword.voc": [
+        "book",
+        "books",
+        "read",
+        "audiobook",
+        "audiobooks",
+        "narrate"
+    ],
+    "SilentKeyword.voc": [
+        "silent"
+    ],
+    "ShortKeyword.voc": [
+        "short"
+    ]
+}

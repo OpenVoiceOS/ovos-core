@@ -16,18 +16,23 @@ class TestConfiguration(TestCase):
         self.assertEqual(d['b']['d'], d2['b']['d'])
         self.assertEqual(d['b']['c'], d1['b']['c'])
 
-    @patch('mycroft.api.DeviceApi')
-    @skip("requires backend to be enabled, TODO refactor test!")
-    def test_remote(self, mock_api):
-        remote_conf = {'TestConfig': True, 'uuid': 1234}
-        remote_location = {'city': {'name': 'Stockholm'}}
-        dev_api = MagicMock()
-        dev_api.get_settings.return_value = remote_conf
-        dev_api.get_location.return_value = remote_location
-        mock_api.return_value = dev_api
+    @patch('ovos_backend_client.config.RemoteConfigManager')
+    @patch('ovos_backend_client.pairing.is_paired')
+    def test_remote(self, is_paired, config_manager):
+        remote_conf = {'TestConfig': True, 'uuid': 1234,
+                       'location': {'city': {'name': 'Stockholm'}}}
+        is_paired.return_value = True
+
+        mock_api = MagicMock()
+        mock_api.config = remote_conf
+        config_manager.return_value = mock_api
 
         rc = mycroft.configuration.RemoteConf()
-        self.assertTrue(rc['test_config'])
+        rc.reload()
+        mock_api.download.assert_called_once()
+        is_paired.assert_called_once()
+
+        self.assertTrue(rc['TestConfig'])
         self.assertEqual(rc['location']['city']['name'], 'Stockholm')
 
     @patch('json.dump')

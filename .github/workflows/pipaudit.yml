@@ -1,0 +1,38 @@
+name: Run PipAudit
+on:
+  push:
+    branches:
+      - master
+      - dev
+  workflow_dispatch:
+
+jobs:
+  build_tests:
+    strategy:
+      max-parallel: 2
+      matrix:
+        python-version: [ 3.7, 3.8, 3.9, "3.10", "3.11" ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Build Tools
+        run: |
+          python -m pip install build wheel
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt install python3-dev swig libssl-dev
+      - name: Install package
+        run: |
+          pip install .[skills-essential]
+      - uses: pypa/gh-action-pip-audit@v1.0.0
+        with:
+          # Ignore setuptools vulnerability we can't do much about
+          # Ignore numpy vulnerability affecting latest version for Py3.7
+          ignore-vulns: |
+            GHSA-r9hx-vwmv-q579
+            GHSA-fpfv-jqm9-f5jm

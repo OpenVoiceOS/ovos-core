@@ -1,0 +1,115 @@
+{
+  "play.intent": [
+    "(riproduci|metti|racconta)(mi|) {query}",
+    "fammi (vedere|sentire|ascoltare) {query}",
+    "cerca media {query}",
+    "cerca {query} in ovos",
+    "[UNUSED]"
+  ],
+  "like_song.intent": [
+    "mi piace",
+    "mi piace (questa|questo)(canzone|musica|suono|concerto)",
+    "bella (canzone|musica)",
+    "[UNUSED]"
+  ],
+  "stop.intent": [
+    "basta",
+    "smettila",
+    "fermati",
+    "stop",
+    "piantala",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]"
+  ],
+  "next.intent": [
+    "salta",
+    "(salta|vai|) (alla prossima|al prossimo|) (canzone|video)",
+    "passa",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]"
+  ],
+  "resume.intent": [
+    "riprendi",
+    "[UNUSED]",
+    "suona"
+  ],
+  "read.intent": [
+    "leggi(mi|) (il libro|l'audiolibro|la storia) (di|su|) {query}",
+    "(leggi|racconta)(mi|) {query}",
+    "[UNUSED]"
+  ],
+  "prev.intent": [
+    "metti quella prima",
+    "quella prima",
+    "torna indietro",
+    "[UNUSED]",
+    "[UNUSED]"
+  ],
+  "global_stop.intent": [
+    "ferma tutto",
+    "smetti tutto",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]",
+    "[UNUSED]"
+  ],
+  "pause.intent": [
+    "pausa",
+    "metti in pausa"
+  ],
+  "open.intent": [
+    "apri il lettore",
+    "lancia il lettore",
+    "[UNUSED]",
+    "[UNUSED]"
+  ],
+  "featured.intent": [
+    "apri i favoriti",
+    "[UNUSED]"
+  ],
+  "play_favorites.intent": [
+    "lancia i favoriti",
+    "metti i (miei) favoriti"
+  ],
+  "media_stop.intent": [
+    "(stop|basta|ferma)",
+    "(ferma|spegni|chiudi) (la musica|il film|il libro|la storia)",
+    "(ferma|spegni|chiudi) tutto"
+  ]
+}

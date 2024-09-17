@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from mycroft.listener.service import SpeechService, on_error, on_stopping, on_ready
+from ovos_listener.service import SpeechService, on_error, on_stopping, on_ready
 from ovos_config.locale import setup_locale
 from ovos_utils.log import init_service_logger
 from ovos_utils.process_utils import reset_sigint_handler, PIDLock

@@ -1,6 +1,6 @@
 from unittest import TestCase, mock
 
-from mycroft.messagebus import Message
+from ovos_bus_client.message import Message
 from mycroft.skills.audioservice import AudioService
 
 

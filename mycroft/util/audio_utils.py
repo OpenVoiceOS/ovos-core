@@ -17,9 +17,7 @@ of audio, recording and listing devices.
 """
 import re
 from ovos_utils.log import LOG
-from ovos_utils.sound import play_acknowledge_sound, play_listening_sound, \
-    play_end_listening_sound, play_error_sound, record, play_audio, \
-    play_ogg as _po, play_wav as _pw, play_mp3 as _pm
+from ovos_utils.sound import play_audio
 try:
     import pyaudio
 except ImportError:
@@ -56,7 +54,7 @@ def play_wav(uri, environment=None):
 
     Returns: subprocess.Popen object or None if operation failed
     """
-    return _pw(uri, environment=environment)
+    return play_audio(uri, environment=environment)
 
 
 def play_mp3(uri, environment=None):
@@ -72,7 +70,7 @@ def play_mp3(uri, environment=None):
 
     Returns: subprocess.Popen object or None if operation failed
     """
-    return _pm(uri, environment=environment)
+    return play_audio(uri, environment=environment)
 
 
 def play_ogg(uri, environment=None):
@@ -88,7 +86,7 @@ def play_ogg(uri, environment=None):
 
     Returns: subprocess.Popen object, or None if operation failed
     """
-    return _po(uri, environment=environment)
+    return play_audio(uri, environment=environment)
 
 
 def find_input_device(device_name):

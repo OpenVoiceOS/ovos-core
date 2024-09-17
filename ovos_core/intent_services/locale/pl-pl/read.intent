@@ -1,0 +1,3 @@
+czytaj (książka|audiobook) {query}
+czytaj {query}
+czytaj {query} (książka|audiobook)

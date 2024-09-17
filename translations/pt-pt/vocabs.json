@@ -1,0 +1,136 @@
+{
+  "video_only.voc": [
+    "(sem|não) forçar áudio",
+    "não (transmitir|transmitas) apenas áudio",
+    "sem (o|) reprodutor de áudio",
+    "apenas video",
+    "só video"
+  ],
+  "AudioKeyword.voc": [
+    "audio",
+    "som"
+  ],
+  "HentaiKeyword.voc": [
+    "hentai"
+  ],
+  "PodcastKeyword.voc": [
+    "podcast",
+    "podcasts"
+  ],
+  "Play.voc": [
+    "(procura|procurar)",
+    "(lê|ler)",
+    "(toca|tocar)",
+    "(reproduz|reproduzir)"
+  ],
+  "audio_only.voc": [
+    "apenas audio",
+    "sem video",
+    "só audio",
+    "som apenas",
+    "(apenas|só) som"
+  ],
+  "NewsKeyword.voc": [
+    "noticias"
+  ],
+  "GameKeyword.voc": [
+    "jogo"
+  ],
+  "ADKeyword.voc": [
+    "audio descrição",
+    "descrição do filme"
+  ],
+  "TrailerKeyword.voc": [
+    "trailer"
+  ],
+  "MovieKeyword.voc": [
+    "[UNUSED]",
+    "filme"
+  ],
+  "CartoonKeyword.voc": [
+    "desenhos animados",
+    "(bonecos|bonecada|macacada)"
+  ],
+  "VideoKeyword.voc": [
+    "video"
+  ],
+  "ASMRKeyword.voc": [
+    "ASMR",
+    "resposta meridiana sensorial autónoma"
+  ],
+  "DocumentaryKeyword.voc": [
+    "documentário",
+    "documentários"
+  ],
+  "SeriesKeyword.voc": [
+    "serie",
+    "programa (televisivo|de televisão)",
+    "episódio",
+    "episódios"
+  ],
+  "BWKeyword.voc": [
+    "preto e branco",
+    "monocromáticos"
+  ],
+  "AdultKeyword.voc": [
+    "porno",
+    "maiores de 18",
+    "pornografia"
+  ],
+  "RadioKeyword.voc": [
+    "radio",
+    "radio da internet"
+  ],
+  "AudioDramaKeyword.voc": [
+    "drama",
+    "teatro"
+  ],
+  "Resume.voc": [
+    "(retoma|retomar)",
+    "(continua|continuar)"
+  ],
+  "ComicBookKeyword.voc": [
+    "animação",
+    "banda desenhada",
+    "história visual"
+  ],
+  "TVKeyword.voc": [
+    "TV",
+    "televisão",
+    "canal"
+  ],
+  "AnimeKeyword.voc": [
+    "anime"
+  ],
+  "MusicKeyword.voc": [
+    "musica",
+    "canção",
+    "banda sonora",
+    "[UNUSED]"
+  ],
+  "QuestionWord.voc": [
+    "quem",
+    "(quê|o que|que é)",
+    "como",
+    "(porque|porquê)",
+    "quando",
+    "pergunta",
+    "(diz-me|fala-me) sobre",
+    "qual",
+    "de quem"
+  ],
+  "AudioBookKeyword.voc": [
+    "livro",
+    "livros",
+    "(lê|ler)",
+    "(audiolivro|audio livro)",
+    "(audiolivros|audio livros)",
+    "(narrar|narração)"
+  ],
+  "SilentKeyword.voc": [
+    "mudo"
+  ],
+  "ShortKeyword.voc": [
+    "(curta|curto)"
+  ]
+}

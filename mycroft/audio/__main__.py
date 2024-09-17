@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from mycroft.audio.service import PlaybackService, on_ready, on_error, on_stopping
+# backwards compat imports
+from ovos_audio.service import PlaybackService, on_ready, on_error, on_stopping
 from ovos_config.locale import setup_locale
 from ovos_utils import wait_for_exit_signal
 from ovos_utils.process_utils import reset_sigint_handler, PIDLock

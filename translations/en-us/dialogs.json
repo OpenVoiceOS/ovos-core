@@ -1,0 +1,19 @@
+{
+    "cant.play.dialog": [
+        "I'm not sure how to play {phrase}",
+        "Sorry, I don't know how to play {phrase}"
+    ],
+    "play.what.dialog": [
+        "What should i play next?"
+    ],
+    "no.media.skills.dialog": [
+        "I'm sorry, I don't have any media skills installed",
+        "I need to install some media skills before I can play media",
+        "I can't play media until some media skills are installed"
+    ],
+    "just.one.moment.dialog": [
+        "Give me a moment",
+        "Just a second",
+        "Just one moment while I look for that"
+    ]
+}
