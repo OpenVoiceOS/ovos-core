@@ -298,7 +298,7 @@ class TestOCPPipeline(TestCase):
         for idx, m in enumerate(messages):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
-        play = messages[-2]
+        play = messages[-3]
         self.assertEqual(play.data["media"]["uri"], "https://fake_4.mp3")
 
     def test_unk_media_match(self):
