@@ -288,6 +288,7 @@ class TestOCPPipeline(TestCase):
             "ovos.common_play.reset",
             "add_context",  # NowPlaying context
             "ovos.common_play.play",  # OCP api,
+            "ovos.common_play.search.populate",
             "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
@@ -297,7 +298,7 @@ class TestOCPPipeline(TestCase):
         for idx, m in enumerate(messages):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
-        play = messages[-2]
+        play = messages[-3]
         self.assertEqual(play.data["media"]["uri"], "https://fake_4.mp3")
 
     def test_unk_media_match(self):
@@ -429,6 +430,7 @@ class TestOCPPipeline(TestCase):
             "ovos.common_play.reset",
             "add_context",  # NowPlaying context
             "ovos.common_play.play",  # OCP api
+            "ovos.common_play.search.populate",
             "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
@@ -504,6 +506,7 @@ class TestOCPPipeline(TestCase):
             "ovos.common_play.reset",
             "add_context",  # NowPlaying context
             'mycroft.audio.service.play',  # LEGACY api
+            "ovos.common_play.search.populate",
             "ovos.utterance.handled",  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
