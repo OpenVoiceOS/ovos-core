@@ -3,7 +3,7 @@ import unittest
 
 from ovos_utils.messagebus import FakeBus
 from ovos_tskill_fakewiki import FakeWikiSkill
-from mycroft.skills import CommonQuerySkill
+from ovos_workshop.skills.common_query_skill import CommonQuerySkill
 
 
 class TestSkill(unittest.TestCase):
