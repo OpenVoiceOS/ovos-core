@@ -604,7 +604,11 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             if not player.ocp_available:
                 self.legacy_play(results, query, message=message)
             else:
-                self.ocp_api.play(results, query, source_message=message)
+                self.ocp_api.play(tracks=[best], utterance=query, source_message=message)
+            self.ocp_api.populate_search_results(tracks=results,
+                                                 replace=True,
+                                                 sort_by_conf=False,  # already sorted
+                                                 source_message=message)
 
     def handle_open_intent(self, message: Message):
         LOG.info("Requesting OCP homescreen")
