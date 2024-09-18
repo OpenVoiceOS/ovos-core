@@ -68,5 +68,5 @@ manpower resources available to us:
 * [ovos-technical-manual](https://openvoiceos.github.io/ovos-technical-manual)
 * [Release Notes](https://github.com/OpenVoiceOS/ovos-core/releases)
 * [OpenVoiceOS Chat](https://matrix.to/#/!XFpdtmgyCoPDxOMPpH:matrix.org?via=matrix.org)
-* [OpenVoiceOS Website](https://openvoiceos.com/)
+* [OpenVoiceOS Website](https://openvoiceos.org)
 * [Open Conversational AI Forums](https://community.openconversational.ai/)  (previously mycroft forums)
