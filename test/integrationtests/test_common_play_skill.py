@@ -1,8 +1,10 @@
 from unittest import TestCase, mock
 
 from ovos_bus_client.message import Message
-from mycroft.skills.common_play_skill import CommonPlaySkill, CPSMatchLevel
 from ovos_bus_client.apis.ocp import ClassicAudioServiceInterface as AudioService
+
+# TODO - mycroft_legacy
+from mycroft.skills.common_play_skill import CommonPlaySkill, CPSMatchLevel
 
 
 class AnyCallable:

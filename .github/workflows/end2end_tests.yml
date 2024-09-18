@@ -60,7 +60,6 @@ jobs:
           pip install ./test/end2end/skill-new-stop
           pip install ./test/end2end/skill-old-stop
           pip install ./test/end2end/skill-fake-fm
-          pip install ./test/end2end/skill-fake-fm-legacy
           pip install ./test/end2end/skill-ovos-fakewiki
           pip install ./test/end2end/metadata-test-plugin
       - name: Install core repo
