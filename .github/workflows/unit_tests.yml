@@ -60,7 +60,6 @@ jobs:
           pip install ./test/end2end/skill-new-stop
           pip install ./test/end2end/skill-old-stop
           pip install ./test/end2end/skill-fake-fm
-          pip install ./test/end2end/skill-fake-fm-legacy
           pip install ./test/end2end/skill-ovos-fakewiki
           pip install ./test/end2end/metadata-test-plugin
       - name: Install core repo
@@ -72,7 +71,7 @@ jobs:
           # NOTE: additional pytest invocations should also add the --cov-append flag
           #       or they will overwrite previous invocations' coverage reports
           #       (for an example, see OVOS Skill Manager's workflow)
-      - name: Run full core unittests
+      - name: Run end2end tests
         run: |
           pytest --cov-append --cov=ovos_core --cov-report xml test/end2end
       - name: Run integration tests
