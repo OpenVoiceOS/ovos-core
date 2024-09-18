@@ -1,12 +1,12 @@
 # Changelog
 
-## [0.0.9a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.0.9a1) (2024-09-18)
+## [0.1.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.1.0a1) (2024-09-18)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.0.8...0.0.9a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.0.9...0.1.0a1)
 
 **Merged pull requests:**
 
-- ovos.common\_play.search.populate event [\#545](https://github.com/OpenVoiceOS/ovos-core/pull/545) ([JarbasAl](https://github.com/JarbasAl))
+- feat:fix website url [\#548](https://github.com/OpenVoiceOS/ovos-core/pull/548) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
