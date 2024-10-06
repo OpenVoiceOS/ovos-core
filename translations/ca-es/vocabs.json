@@ -7,15 +7,15 @@
     "només vídeo"
   ],
   "AudioKeyword.voc": [
-    null,
-    null
+    "àudio",
+    "so"
   ],
   "HentaiKeyword.voc": [
     "hentai"
   ],
   "PodcastKeyword.voc": [
-    null,
-    null
+    "pòdcast",
+    "pòdcasts"
   ],
   "Play.voc": [
     "cerca\nbusca",
@@ -31,7 +31,7 @@
     "només so"
   ],
   "NewsKeyword.voc": [
-    null
+    "notícies"
   ],
   "GameKeyword.voc": [
     "jocs"
