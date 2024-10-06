@@ -1,12 +1,13 @@
 # Changelog
 
-## [0.1.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.1.0a1) (2024-09-18)
+## [0.1.1a2](https://github.com/OpenVoiceOS/ovos-core/tree/0.1.1a2) (2024-10-06)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.0.9...0.1.0a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.1.0...0.1.1a2)
 
 **Merged pull requests:**
 
-- feat:fix website url [\#548](https://github.com/OpenVoiceOS/ovos-core/pull/548) ([JarbasAl](https://github.com/JarbasAl))
+- Add Catalan translation [\#551](https://github.com/OpenVoiceOS/ovos-core/pull/551) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- Add Catalan translation [\#550](https://github.com/OpenVoiceOS/ovos-core/pull/550) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
 
 
 
