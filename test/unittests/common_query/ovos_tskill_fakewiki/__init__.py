@@ -1,7 +1,7 @@
 from adapt.intent import IntentBuilder
 
 from ovos_workshop.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel
-from mycroft.skills.core import intent_handler
+from ovos_workshop.decorators import intent_handler
 
 
 class FakeWikiSkill(CommonQuerySkill):

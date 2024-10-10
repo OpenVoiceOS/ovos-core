@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from mycroft.skills.intent_services.commonqa_service import CommonQAService
+from ovos_core.intent_services.commonqa_service import CommonQAService
 from ovos_tskill_fakewiki import FakeWikiSkill
 from ovos_utils.messagebus import FakeBus, Message
 
