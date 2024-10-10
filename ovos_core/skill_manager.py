@@ -116,13 +116,16 @@ class SkillManager(Thread):
         self._network_skill_timeout = 300
         self._allow_state_reloads = True
         self._logged_skill_warnings = list()
+        self._detected_installed_skills = bool(find_skill_plugins())
+        if not self._detected_installed_skills:
+            LOG.warning("No installed skills detected! if you are running skills in standalone mode ignore this warning,"
+                        " otherwise you probably want to install skills first!")
 
         self.config = Configuration()
 
         self.skill_loaders = {}
         self.plugin_skills = {}
         self.enclosure = EnclosureAPI(bus)
-        self.initial_load_complete = False
         self.num_install_retries = 0
         self.empty_skill_dirs = set()  # Save a record of empty skill dirs.
 
@@ -194,9 +197,7 @@ class SkillManager(Thread):
         self.bus.on('skillmanager.deactivate', self.deactivate_skill)
         self.bus.on('skillmanager.keep', self.deactivate_except)
         self.bus.on('skillmanager.activate', self.activate_skill)
-        self.bus.once('mycroft.skills.initialized',
-                      self.handle_check_device_readiness)
-        self.bus.once('mycroft.skills.trained', self.handle_initial_training)
+        self.bus.once('mycroft.skills.initialized', self.handle_check_device_readiness)
 
         # Load skills waiting for connectivity
         self.bus.on("mycroft.network.connected", self.handle_network_connected)
@@ -497,16 +498,6 @@ class SkillManager(Thread):
             else:
                 LOG.error(f'Priority skill {skill_id} can\'t be found')
 
-    def handle_initial_training(self, message):
-        """Handle the initial intent training completion event.
-
-        This usually only includes offline skills
-
-        Args:
-            message: Message containing information about the initial training completion.
-        """
-        self.initial_load_complete = True
-
     def run(self):
         """Run the skill manager thread."""
         self.load_priority()
@@ -550,10 +541,6 @@ class SkillManager(Thread):
                  'network_loaded': self._network_loaded.is_set()}))
         self.bus.emit(Message('mycroft.skills.initialized'))
 
-        # wait for initial intents training
-        LOG.debug("Waiting for initial training")
-        while not self.initial_load_complete:
-            sleep(0.5)
         self.status.set_ready()
 
         if self._gui_event.is_set() and self._connected_event.is_set():
@@ -577,14 +564,16 @@ class SkillManager(Thread):
 
     def _load_on_network(self):
         """Load skills that require a network connection."""
-        LOG.info('Loading skills that require network...')
-        self._load_new_skills(network=True, internet=False)
+        if self._detected_installed_skills: # ensure we have skills is installed
+            LOG.info('Loading skills that require network...')
+            self._load_new_skills(network=True, internet=False)
         self._network_loaded.set()
 
     def _load_on_internet(self):
         """Load skills that require both internet and network connections."""
-        LOG.info('Loading skills that require internet (and network)...')
-        self._load_new_skills(network=True, internet=True)
+        if self._detected_installed_skills:  # ensure we have skills is installed
+            LOG.info('Loading skills that require internet (and network)...')
+            self._load_new_skills(network=True, internet=True)
         self._internet_loaded.set()
         self._network_loaded.set()
 
@@ -626,8 +615,9 @@ class SkillManager(Thread):
 
     def _load_on_startup(self):
         """Handle offline skills load on startup."""
-        LOG.info('Loading offline skills...')
-        self._load_new_skills(network=False, internet=False)
+        if self._detected_installed_skills:  # ensure we have skills is installed
+            LOG.info('Loading offline skills...')
+            self._load_new_skills(network=False, internet=False)
 
     def _load_new_skills(self, network=None, internet=None, gui=None):
         """Handle loading of skills installed since startup.
