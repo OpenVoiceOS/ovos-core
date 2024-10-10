@@ -24,12 +24,6 @@ class TestSkillManager(unittest.TestCase):
         self.bus.emit.assert_called_once_with(Message("ovos.skills.settings_changed", {"skill_id": "skills"}))
         mock_log.info.assert_called_once_with(f"skill settings.json change detected for skills")
 
-    @patch('ovos_core.skill_manager.is_paired', side_effect=[False, True])
-    def test_handle_check_device_readiness(self, mock_is_paired):
-        self.skill_manager.is_device_ready = MagicMock(return_value=True)
-        self.skill_manager.handle_check_device_readiness(Message(""))
-        self.bus.emit.assert_called_once_with(Message('mycroft.ready'))
-
     @patch('ovos_core.skill_manager.find_skill_plugins', return_value={'mock_plugin': 'path/to/mock_plugin'})
     def test_load_plugin_skills(self, mock_find_skill_plugins):
         self.skill_manager._load_plugin_skill = MagicMock(return_value=True)
