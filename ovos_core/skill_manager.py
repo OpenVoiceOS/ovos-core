@@ -378,6 +378,8 @@ class SkillManager(Thread):
 
         self.bus.emit(Message('mycroft.ready'))
 
+        LOG.info("ovos-core is ready! additional skills can now be loaded")
+
         # Scan the file folder that contains Skills.  If a Skill is updated,
         # unload the existing version from memory and reload from the disk.
         while not self._stop_event.wait(30):
