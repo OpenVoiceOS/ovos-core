@@ -30,7 +30,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  unit_tests:
+  end2end_tests:
     strategy:
       max-parallel: 3
       matrix:
