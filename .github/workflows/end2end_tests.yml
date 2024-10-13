@@ -46,7 +46,7 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt install python3-dev swig libssl-dev portaudio19-dev libpulse-dev
+          sudo apt install python3-dev swig libssl-dev
           python -m pip install build wheel
       - name: Install test dependencies
         run: |
@@ -65,12 +65,11 @@ jobs:
           pip install ./test/end2end/metadata-test-plugin
       - name: Install core repo
         run: |
-          pip install -e .[mycroft,deprecated]
+          pip install -e .[plugins]
       - name: Run end2end tests
         run: |
-          pytest --cov-append --cov=ovos_core --cov-report xml  --cov-flag=end2end test/end2end
+          pytest --cov-append --cov=ovos_core --cov-report xml test/end2end
       - name: Upload coverage
-        if: "${{ matrix.python-version == '3.9' }}"
         env:
           CODECOV_TOKEN: ${{secrets.CODECOV_TOKEN}}
         uses: codecov/codecov-action@v3
