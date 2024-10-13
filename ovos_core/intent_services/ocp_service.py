@@ -3,99 +3,25 @@ import random
 import threading
 from dataclasses import dataclass
 from os.path import join, dirname
-from threading import Lock, RLock
+from threading import RLock
 from typing import List, Tuple, Optional, Union
 
 import time
+from padacioso import IntentContainer
+
 from ovos_bus_client.apis.ocp import ClassicAudioServiceInterface
+from ovos_bus_client.apis.ocp import OCPInterface, OCPQuery
 from ovos_bus_client.message import Message, dig_for_message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import wait_for_reply
-from ovos_utils import classproperty
-from ovos_utils.gui import is_gui_connected, is_gui_running
-from ovos_utils.log import LOG
-from ovos_utils.messagebus import FakeBus
-from ovos_workshop.app import OVOSAbstractApplication
-from padacioso import IntentContainer
-
 from ovos_plugin_manager.ocp import available_extractors
 from ovos_plugin_manager.templates.pipeline import IntentMatch
-
-try:
-    from ovos_utils.ocp import MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID, \
-        MediaEntry, Playlist, MediaState, TrackState, dict2entry, PluginStream
-    from ovos_bus_client.apis.ocp import OCPInterface, OCPQuery
-except ImportError:
-    from ovos_workshop.backwards_compat import MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID, \
-        MediaEntry, Playlist, MediaState, TrackState, dict2entry, PluginStream
-    from ovos_bus_client.apis.ocp import OCPInterface as _OIF, OCPQuery as _OQ
-
-
-    class OCPInterface(_OIF):
-
-        # needs utils 0.1.0 in ovos-bus-client
-        @classmethod
-        def norm_tracks(cls, tracks: list):
-            """ensures a list of tracks contains only MediaEntry or Playlist items"""
-            assert isinstance(tracks, list)
-            # support Playlist and MediaEntry objects in tracks
-            for idx, track in enumerate(tracks):
-                if isinstance(track, dict):
-                    tracks[idx] = MediaEntry.from_dict(track)
-                if isinstance(track, list) and not isinstance(track, Playlist):
-                    tracks[idx] = cls.norm_tracks(track)
-                elif not isinstance(track, MediaEntry):
-                    # TODO - support string uris
-                    # let it fail in next assert
-                    # log all bad entries before failing
-                    LOG.error(f"Bad track, invalid type: {track}")
-            assert all(isinstance(t, (MediaEntry, Playlist)) for t in tracks)
-            return tracks
-
-
-    class OCPQuery(_OQ):
-        cast2audio = [
-            MediaType.MUSIC,
-            MediaType.PODCAST,
-            MediaType.AUDIOBOOK,
-            MediaType.RADIO,
-            MediaType.RADIO_THEATRE,
-            MediaType.VISUAL_STORY,
-            MediaType.NEWS
-        ]
-
-        # needs utils 0.1.0 in ovos-bus-client
-        def __init__(self, query, bus, media_type=MediaType.GENERIC, config=None):
-            LOG.debug(f"Created {media_type.name} query: {query}")
-            self.query = query
-            self.media_type = media_type
-            self.bus = bus
-            self.config = config or {}
-            self.reset()
-
-        def wait(self):
-            # if there is no match type defined, lets increase timeout a bit
-            # since all skills need to search
-            if self.media_type == MediaType.GENERIC:
-                timeout = self.config.get("max_timeout", 15) + 3  # timeout bonus
-            else:
-                timeout = self.config.get("max_timeout", 15)
-            while self.searching and time.time() - self.search_start <= timeout:
-                time.sleep(0.1)
-            self.searching = False
-            self.remove_events()
-
-        def reset(self):
-            self.active_skills = {}
-            self.active_skills_lock = Lock()
-            self.query_replies = []
-            self.searching = False
-            self.search_start = 0
-            self.query_timeouts = self.config.get("min_timeout", 5)
-            if self.config.get("playback_mode") in [PlaybackMode.AUDIO_ONLY]:
-                self.has_gui = False
-            else:
-                self.has_gui = is_gui_running() or is_gui_connected(self.bus)
+from ovos_utils import classproperty
+from ovos_utils.log import LOG
+from ovos_utils.messagebus import FakeBus
+from ovos_utils.ocp import MediaType, PlaybackType, PlaybackMode, PlayerState, OCP_ID, \
+    MediaEntry, Playlist, MediaState, TrackState, dict2entry, PluginStream
+from ovos_workshop.app import OVOSAbstractApplication
 
 
 @dataclass
@@ -480,10 +406,10 @@ class OCPPipelineMatcher(OVOSAbstractApplication):
             if not phrase:
                 # let the error intent handler take action
                 return IntentMatch(intent_service="OCP_intents",
-                                  intent_type="ocp:search_error",
-                                  intent_data=match,
-                                  skill_id=OCP_ID,
-                                  utterance=utterance)
+                                   intent_type="ocp:search_error",
+                                   intent_data=match,
+                                   skill_id=OCP_ID,
+                                   utterance=utterance)
 
         sess = SessionManager.get(message)
         # if a skill was explicitly requested, search it first
