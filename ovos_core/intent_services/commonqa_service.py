@@ -38,7 +38,7 @@ class CommonQAService(OVOSAbstractApplication):
                          resources_dir=f"{dirname(__file__)}")
         self.active_queries: Dict[str, Query] = dict()
 
-        self.common_query_skills = None
+        self.common_query_skills = []
         config = config or Configuration().get('intents', {}).get("common_query") or dict()
         self._extension_time = config.get('extension_time') or 3
         CommonQAService._EXTENSION_TIME = self._extension_time
@@ -64,8 +64,6 @@ class CommonQAService(OVOSAbstractApplication):
 
     def handle_skill_pong(self, message: Message):
         """ track running common query skills """
-        if self.common_query_skills is None:
-            self.common_query_skills = []
         if message.data["skill_id"] not in self.common_query_skills:
             self.common_query_skills.append(message.data["skill_id"])
             LOG.debug("Detected CommonQuery skill: " + message.data["skill_id"])
@@ -106,17 +104,8 @@ class CommonQAService(OVOSAbstractApplication):
 
         # exit early if no common query skills are installed
         if not self.common_query_skills:
-            from ovos_workshop.version import VERSION_BUILD, VERSION_ALPHA
-            # TODO - standalone skills can be any version >=0.0.12a16
-            # common query skills should ensure ovos-workshop >= 0.0.16a7 in requirements.txt
-            # ovos-core currently only requires ovos-workshop 0.0.15
-            if VERSION_BUILD < 16 or (VERSION_BUILD == 16 and 0 < VERSION_ALPHA < 7):
-                LOG.warning("you seem to be running ovos-workshop < 0.0.16a7 , "
-                            f"CommonQuery will wait minimum {self._min_wait} seconds for skills."
-                            f" upgrade ovos-workshop for an extra speedup")
-            else:
-                LOG.info("No CommonQuery skills to search")
-                return None
+            LOG.info("No CommonQuery skills to search")
+            return None
         else:
             LOG.info(f"Gathering answers from skills: {self.common_query_skills}")
 
@@ -217,7 +206,7 @@ class CommonQAService(OVOSAbstractApplication):
                 query.extensions.remove(skill_id)
 
             # if all skills answered, stop searching
-            if self.common_query_skills is not None and set(query.queried_skills) == set(self.common_query_skills):
+            if self.common_query_skills and set(query.queried_skills) == set(self.common_query_skills):
                 LOG.debug("All skills answered")
                 query.responses_gathered.set()
             else:

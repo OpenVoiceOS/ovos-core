@@ -1,13 +1,20 @@
 # Changelog
 
-## [0.1.1a2](https://github.com/OpenVoiceOS/ovos-core/tree/0.1.1a2) (2024-10-06)
+## [0.1.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.1.3a1) (2024-10-13)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.1.0...0.1.1a2)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.1.2a1...0.1.3a1)
 
 **Merged pull requests:**
 
-- Add Catalan translation [\#551](https://github.com/OpenVoiceOS/ovos-core/pull/551) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
-- Add Catalan translation [\#550](https://github.com/OpenVoiceOS/ovos-core/pull/550) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- fix:version check [\#557](https://github.com/OpenVoiceOS/ovos-core/pull/557) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.1.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.1.2a1) (2024-10-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.1.1...0.1.2a1)
+
+**Merged pull requests:**
+
+- automations:split tests into 2 workflows [\#558](https://github.com/OpenVoiceOS/ovos-core/pull/558) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
