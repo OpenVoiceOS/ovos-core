@@ -4,8 +4,7 @@ from unittest.mock import patch, Mock
 
 from ovos_classifiers.skovos.features import ClassifierProbaVectorizer
 from sklearn.pipeline import FeatureUnion
-
-import ovos_core.intent_services.ocp_service
+import ocp_pipeline.opm
 from ovos_bus_client.message import Message
 from ovos_utils.ocp import MediaType
 from ovos_core.intent_services.ocp_service import OCPFeaturizer, OCPPipelineMatcher
@@ -48,7 +47,7 @@ class TestOCPPipelineNoClassifierMatcher(unittest.TestCase):
             "experimental_media_classifier": False,
             "experimental_binary_classifier": False,
             "entity_csvs": [
-                os.path.dirname(ovos_core.intent_services.ocp_service.__file__) + "/models/ocp_entities_v0.csv"
+                os.path.dirname(ocp_pipeline.opm.__file__) + "/models/ocp_entities_v0.csv"
             ]}
         self.ocp = OCPPipelineMatcher(config=config)
 
@@ -115,7 +114,7 @@ class TestOCPPipelineMatcher(unittest.TestCase):
             "experimental_media_classifier": True,
             "experimental_binary_classifier": True,
             "entity_csvs": [
-                os.path.dirname(ovos_core.intent_services.ocp_service.__file__) + "/models/ocp_entities_v0.csv"
+                os.path.dirname(ocp_pipeline.opm.__file__) + "/models/ocp_entities_v0.csv"
             ]}
         self.ocp = OCPPipelineMatcher(config=config)
 
@@ -141,6 +140,7 @@ class TestOCPPipelineMatcher(unittest.TestCase):
 
     def test_match_fallback(self):
         result = self.ocp.match_fallback(["i wanna hear metallica"], "en-us")
+        print(result)
         self.assertIsNotNone(result)
         self.assertEqual(result.intent_service, 'OCP_fallback')
         self.assertEqual(result.intent_type, 'ocp:play')
