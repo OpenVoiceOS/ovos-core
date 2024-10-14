@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.0a1) (2024-10-14)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.1.4a1...0.2.0a1)
+
+**Closed issues:**
+
+- Standalone skill not working anymore [\#556](https://github.com/OpenVoiceOS/ovos-core/issues/556)
+
+**Merged pull requests:**
+
+- feat/pipeline\_plugins\_opm [\#527](https://github.com/OpenVoiceOS/ovos-core/pull/527) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.1.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.1.4a1) (2024-10-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.1.3...0.1.4a1)
