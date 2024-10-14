@@ -1,4 +1,4 @@
-# Copyright 2020 Mycroft AI Inc.
+# Copyright 2017 Mycroft AI Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""An intent parsing service using the Adapt parser."""
-from ovos_adapt.context import ContextManagerFrame
-from ovos_adapt.engine import IntentDeterminationEngine
-from ovos_workshop.intents import IntentBuilder, Intent
-from ovos_adapt.opm import ContextManager, AdaptPipeline as AdaptService
+from ovos_workshop.skills.mycroft_skill import MycroftSkill
 
 
-class AdaptIntent(IntentBuilder):
-    def __init__(self, name=''):
-        super().__init__(name)
+class LoadTestSkill(MycroftSkill):
+    pass
+
+
+def create_skill():
+    return LoadTestSkill()
