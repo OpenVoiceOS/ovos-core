@@ -1,6 +1,6 @@
 from os.path import join, dirname
 
-from ovos_core.intent_services.ocp_service import MediaType, PlaybackType
+from ovos_utils.ocp import MediaType, PlaybackType
 from ovos_workshop.decorators.ocp import ocp_search
 from ovos_workshop.skills.common_play import OVOSCommonPlaybackSkill
 
