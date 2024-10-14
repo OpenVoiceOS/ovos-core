@@ -60,9 +60,7 @@ with open(os.path.join(BASEDIR, "README.md"), "r") as f:
 PLUGIN_ENTRY_POINT = [
     'ovos-converse-pipeline-plugin=ovos_core.intent_services.converse_service:ConverseService',
     'ovos-fallback-pipeline-plugin=ovos_core.intent_services.fallback_service:FallbackService',
-    'ovos-ocp-pipeline-plugin=ovos_core.intent_services.ocp_service:OCPPipelineMatcher',
-    'ovos-stop-pipeline-plugin=ovos_core.intent_services.stop_service:StopService',
-    'ovos-common-query-pipeline-plugin=ovos_core.intent_services.commonqa_service:CommonQAService'
+    'ovos-stop-pipeline-plugin=ovos_core.intent_services.stop_service:StopService'
 ]
 
 
@@ -98,7 +96,7 @@ setup(
         'opm.pipeline': PLUGIN_ENTRY_POINT,
         'console_scripts': [
             'ovos-core=ovos_core.__main__:main',
-            # TODO - remove below console_scripts in 0.1.0 (backwards compat)
+            # TODO - remove below console_scripts in 1.0.0 (backwards compat)
             'mycroft-speech-client=mycroft.listener.__main__:main',
             'mycroft-messagebus=mycroft.messagebus.service.__main__:main',
             'mycroft-skills=mycroft.skills.__main__:main',
