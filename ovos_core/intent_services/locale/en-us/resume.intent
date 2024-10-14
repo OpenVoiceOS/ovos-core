@@ -1,3 +1,0 @@
-(unpause|resume)
-(unpause|resume|continue|restart) (music|song|track|video|media|playback)
-play

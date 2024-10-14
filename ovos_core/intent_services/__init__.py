@@ -14,24 +14,23 @@
 #
 from typing import Tuple, Callable
 
+from ocp_pipeline.opm import OCPPipelineMatcher
 from ovos_adapt.opm import AdaptPipeline as AdaptService
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_config.locale import setup_locale, get_valid_languages, get_full_lang_code
-from padacioso.opm import PadaciosoPipeline as PadaciosoService
-
 from ovos_core.intent_services.commonqa_service import CommonQAService
 from ovos_core.intent_services.converse_service import ConverseService
 from ovos_core.intent_services.fallback_service import FallbackService
-from ovos_core.intent_services.ocp_service import OCPPipelineMatcher
 from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
+from ovos_plugin_manager.templates.pipeline import IntentMatch
 from ovos_utils.log import LOG, deprecated, log_deprecation
 from ovos_utils.metrics import Stopwatch
 from ovos_workshop.intents import open_intent_envelope
-from ovos_plugin_manager.templates.pipeline import IntentMatch
+from padacioso.opm import PadaciosoPipeline as PadaciosoService
 
 
 class IntentService:
@@ -44,30 +43,12 @@ class IntentService:
     def __init__(self, bus, config=None):
         self.bus = bus
         self.config = config or Configuration().get("intents", {})
-        if "padatious" not in self.config:
-            self.config["padatious"] = Configuration().get("padatious", {})
 
         # Dictionary for translating a skill id to a name
         self.skill_names = {}
 
-        # TODO - replace with plugins
-        self.adapt_service = AdaptService(config=self.config.get("adapt", {}))
-        self.padatious_service = None
-        try:
-            if self.config["padatious"].get("disabled"):
-                LOG.info("padatious forcefully disabled in config")
-            else:
-                from ovos_padatious.opm import PadatiousPipeline as PadatiousService
-                self.padatious_service = PadatiousService(bus, self.config["padatious"])
-        except ImportError:
-            LOG.error(f'Failed to create padatious intent handlers, padatious not installed')
+        self._load_pipeline_plugins()
 
-        self.padacioso_service = PadaciosoService(bus, self.config["padatious"])
-        self.fallback = FallbackService(bus)
-        self.converse = ConverseService(bus)
-        self.common_qa = CommonQAService(bus, self.config.get("common_query"))
-        self.stop = StopService(bus)
-        self.ocp = OCPPipelineMatcher(self.bus, config=self.config.get("OCP", {}))
         self.utterance_plugins = UtteranceTransformersService(bus)
         self.metadata_plugins = MetadataTransformersService(bus)
 
@@ -98,6 +79,28 @@ class IntentService:
         self.bus.on('intent.service.padatious.get', self.handle_get_padatious)
         self.bus.on('intent.service.padatious.manifest.get', self.handle_padatious_manifest)
         self.bus.on('intent.service.padatious.entities.manifest.get', self.handle_entity_manifest)
+
+    def _load_pipeline_plugins(self):
+        # TODO - replace with plugin loader from OPM
+        self.adapt_service = AdaptService(config=self.config.get("adapt", {}))
+        self.padatious_service = None
+        if "padatious" not in self.config:
+            self.config["padatious"] = Configuration().get("padatious", {})
+        try:
+            if self.config["padatious"].get("disabled"):
+                LOG.info("padatious forcefully disabled in config")
+            else:
+                from ovos_padatious.opm import PadatiousPipeline as PadatiousService
+                self.padatious_service = PadatiousService(self.bus, self.config["padatious"])
+        except ImportError:
+            LOG.error(f'Failed to create padatious intent handlers, padatious not installed')
+
+        self.padacioso_service = PadaciosoService(self.bus, self.config["padatious"])
+        self.fallback = FallbackService(self.bus)
+        self.converse = ConverseService(self.bus)
+        self.common_qa = CommonQAService(self.bus, self.config.get("common_query"))
+        self.stop = StopService(self.bus)
+        self.ocp = OCPPipelineMatcher(self.bus, config=self.config.get("OCP", {}))
 
     @property
     def registered_intents(self):
@@ -370,10 +373,12 @@ class IntentService:
                 if match:
                     LOG.info(f"{pipeline} match: {match}")
                     if match.skill_id and match.skill_id in sess.blacklisted_skills:
-                        LOG.debug(f"ignoring match, skill_id '{match.skill_id}' blacklisted by Session '{sess.session_id}'")
+                        LOG.debug(
+                            f"ignoring match, skill_id '{match.skill_id}' blacklisted by Session '{sess.session_id}'")
                         continue
                     if match.intent_type and match.intent_type in sess.blacklisted_intents:
-                        LOG.debug(f"ignoring match, intent '{match.intent_type}' blacklisted by Session '{sess.session_id}'")
+                        LOG.debug(
+                            f"ignoring match, intent '{match.intent_type}' blacklisted by Session '{sess.session_id}'")
                         continue
                     try:
                         self._emit_match_message(match, message)
@@ -411,12 +416,6 @@ class IntentService:
         Args:
             message (Message): message containing vocab info
         """
-        # TODO: 22.02 Remove backwards compatibility
-        if _is_old_style_keyword_message(message):
-            LOG.warning('Deprecated: Registering keywords with old message. '
-                        'This will be removed in v22.02.')
-            _update_keyword_message(message)
-
         entity_value = message.data.get('entity_value')
         entity_type = message.data.get('entity_type')
         regex_str = message.data.get('regex')
@@ -639,29 +638,3 @@ class IntentService:
         self.bus.remove('intent.service.padatious.get', self.handle_get_padatious)
         self.bus.remove('intent.service.padatious.manifest.get', self.handle_padatious_manifest)
         self.bus.remove('intent.service.padatious.entities.manifest.get', self.handle_entity_manifest)
-
-
-def _is_old_style_keyword_message(message):
-    """Simple check that the message is not using the updated format.
-
-    TODO: Remove in v22.02
-
-    Args:
-        message (Message): Message object to check
-
-    Returns:
-        (bool) True if this is an old messagem, else False
-    """
-    return ('entity_value' not in message.data and 'start' in message.data)
-
-
-def _update_keyword_message(message):
-    """Make old style keyword registration message compatible.
-
-    Copies old keys in message data to new names.
-
-    Args:
-        message (Message): Message to update
-    """
-    message.data['entity_value'] = message.data['start']
-    message.data['entity_type'] = message.data['end']
