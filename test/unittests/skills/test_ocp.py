@@ -7,7 +7,7 @@ from sklearn.pipeline import FeatureUnion
 
 import ovos_core.intent_services.ocp_service
 from ovos_bus_client.message import Message
-from ovos_core.intent_services.ocp_service import MediaType
+from ovos_utils.ocp import MediaType
 from ovos_core.intent_services.ocp_service import OCPFeaturizer, OCPPipelineMatcher
 from ovos_utils.log import LOG
 

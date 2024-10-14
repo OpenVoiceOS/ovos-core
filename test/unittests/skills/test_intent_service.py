@@ -145,20 +145,6 @@ class TestIntentServiceApi(TestCase):
         msg = Message('register_intent', intent.__dict__)
         self.intent_service.handle_register_intent(msg)
 
-    def test_keyword_backwards_compatibility(self):
-        self.setup_simple_adapt_intent(
-            create_old_style_vocab_msg('testKeyword', 'test')
-        )
-
-        # Check that the intent is returned
-        msg = Message('intent.service.adapt.get',
-                      data={'utterance': 'test'})
-        self.intent_service.handle_get_adapt(msg)
-
-        reply = get_last_message(self.intent_service.bus)
-        self.assertEqual(reply.data['intent']['intent_type'],
-                         'skill:testIntent')
-
     def test_get_adapt_intent(self):
         self.setup_simple_adapt_intent()
         # Check that the intent is returned

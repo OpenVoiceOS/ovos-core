@@ -4,7 +4,8 @@ from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
-from ovos_core.intent_services.ocp_service import PlayerState, MediaState, OCPPlayerProxy
+from ovos_utils.ocp import PlayerState, MediaState
+from ocp_pipeline.opm import OCPPlayerProxy
 from ovos_plugin_manager.ocp import available_extractors
 from ..minicroft import get_minicroft
 
