@@ -92,7 +92,6 @@ class KeywordIntentRegistrationTest(unittest.TestCase):
         """Verify that the registration messages matches the expected."""
         for msg_type in self.emitter.get_types():
             self.assertEqual(msg_type, 'register_intent')
-
         self.assertEqual(
             sorted(self.emitter.get_results(),
                    key=lambda d: sorted(d.items())),
@@ -112,6 +111,7 @@ class KeywordIntentRegistrationTest(unittest.TestCase):
         intent_service.register_adapt_intent("test", intent)
         expected_data = {'at_least_one': [],
                          'name': 'test',
+                         'excludes': [],
                          'optional': [('testB', 'testB')],
                          'requires': [('testA', 'testA')]}
         self.check_emitter([expected_data])

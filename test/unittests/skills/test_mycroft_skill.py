@@ -21,14 +21,12 @@ from datetime import datetime
 from os.path import join, dirname, abspath
 from unittest.mock import MagicMock, patch
 
-from ovos_adapt.intent import IntentBuilder
-from ovos_config import Configuration
-
 from mycroft.skills.skill_data import (load_regex_from_file, load_regex,
                                        load_vocabulary, read_vocab_file)
 from ovos_bus_client.message import Message
-from ovos_workshop.intents import open_intent_envelope
+from ovos_config import Configuration
 from ovos_workshop.decorators import resting_screen_handler, intent_handler
+from ovos_workshop.intents import IntentBuilder, open_intent_envelope
 from ovos_workshop.skills.mycroft_skill import MycroftSkill
 from ovos_workshop.skills.ovos import OVOSSkill
 from test.util import base_config
@@ -213,6 +211,7 @@ class TestOVOSSkill(unittest.TestCase):
         s = SimpleSkill1(bus=self.emitter, skill_id="A")
         expected = [{'at_least_one': [],
                      'name': 'A:a',
+                     'excludes': [],
                      'optional': [],
                      'requires': [('AKeyword', 'AKeyword')]}]
         msg_data = self.emitter.get_results()
@@ -223,6 +222,7 @@ class TestOVOSSkill(unittest.TestCase):
         s = SimpleSkill2(bus=self.emitter, skill_id="A")
         expected = [{'at_least_one': [],
                      'name': 'A:a',
+                     'excludes': [],
                      'optional': [],
                      'requires': [('AKeyword', 'AKeyword')]}]
 
@@ -242,6 +242,7 @@ class TestOVOSSkill(unittest.TestCase):
         # check that intent was registered
         expected = [{'at_least_one': [],
                      'name': 'A:a',
+                     'excludes': [],
                      'optional': [],
                      'requires': [('AKeyword', 'AKeyword')]}]
         msg_data = self.emitter.get_results()
@@ -260,6 +261,7 @@ class TestOVOSSkill(unittest.TestCase):
         s = SimpleSkill1(bus=self.emitter, skill_id="A")
         expected = [{'at_least_one': [],
                      'name': 'A:a',
+                     'excludes': [],
                      'optional': [],
                      'requires': [('AKeyword', 'AKeyword')]}]
         msg_data = self.emitter.get_results()
@@ -358,6 +360,7 @@ class TestOVOSSkill(unittest.TestCase):
         expected = [{'at_least_one': [],
                      'name': 'A:a',
                      'optional': [],
+                     'excludes': [],
                      'requires': [('AKeyword', 'AKeyword')]},
                     {
                         'file_name': join(dirname(__file__), 'intent_file',
@@ -604,7 +607,7 @@ class TestOVOSSkill(unittest.TestCase):
                                             'es', 'pt-PT']
         self.assertEqual(s.lang, 'en-us')
         self.assertEqual(s.secondary_langs, ['en', 'en-au', 'es',
-                                              'pt-pt'])
+                                             'pt-pt'])
         self.assertEqual(len(s.native_langs), len(set(s.native_langs)))
         self.assertEqual(set(s.native_langs), {'en-us', 'en-au', 'pt-pt'})
         s.config_core['lang'] = lang
