@@ -103,7 +103,6 @@ class TestSkillManager(MycroftUnitTestBase):
             'skillmanager.keep',
             'skillmanager.activate',
             'mycroft.skills.initialized',
-            'mycroft.skills.trained',
             'mycroft.network.connected',
             'mycroft.internet.connected',
             'mycroft.gui.available',
