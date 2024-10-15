@@ -7,15 +7,14 @@ from typing import Optional, List
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_config.config import Configuration
+from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
 from ovos_utils import flatten_list
 from ovos_utils.bracket_expansion import expand_options
 from ovos_utils.log import LOG
 from ovos_utils.parse import match_one
 
-from ovos_plugin_manager.templates.pipeline import IntentMatch
 
-
-class StopService:
+class StopService(PipelinePlugin):
     """Intent Service thats handles stopping skills."""
 
     def __init__(self, bus):
@@ -43,7 +42,7 @@ class StopService:
         """
         return Configuration().get("skills", {}).get("stop") or {}
 
-    def get_active_skills(self, message: Optional[Message]=None):
+    def get_active_skills(self, message: Optional[Message] = None):
         """Active skill ids ordered by converse priority
         this represents the order in which stop will be called
 
@@ -147,10 +146,10 @@ class StopService:
             # emit a global stop, full stop anything OVOS is doing
             self.bus.emit(message.reply("mycroft.stop", {}))
             return IntentMatch(intent_service='Stop',
-                                                         intent_type=True,
-                                                         intent_data={"conf": conf},
-                                                         skill_id=None,
-                                                         utterance=utterance)
+                               intent_type=True,
+                               intent_data={"conf": conf},
+                               skill_id=None,
+                               utterance=utterance)
 
         if is_stop:
             # check if any skill can stop
@@ -161,10 +160,10 @@ class StopService:
 
                 if self.stop_skill(skill_id, message):
                     return IntentMatch(intent_service='Stop',
-                                                                 intent_type=True,
-                                                                 intent_data={"conf": conf},
-                                                                 skill_id=skill_id,
-                                                                 utterance=utterance)
+                                       intent_type=True,
+                                       intent_data={"conf": conf},
+                                       skill_id=skill_id,
+                                       utterance=utterance)
         return None
 
     def match_stop_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
@@ -229,19 +228,19 @@ class StopService:
 
             if self.stop_skill(skill_id, message):
                 return IntentMatch(intent_service='Stop',
-                                                             intent_type=True,
-                                                             # emit instead of intent message
-                                                             intent_data={"conf": conf},
-                                                             skill_id=skill_id, utterance=utterance)
+                                   intent_type=True,
+                                   # emit instead of intent message
+                                   intent_data={"conf": conf},
+                                   skill_id=skill_id, utterance=utterance)
 
         # emit a global stop, full stop anything OVOS is doing
         self.bus.emit(message.reply("mycroft.stop", {}))
         return IntentMatch(intent_service='Stop',
-                                                     intent_type=True,
-                                                     # emit instead of intent message {"conf": conf},
-                                                     intent_data={},
-                                                     skill_id=None,
-                                                     utterance=utterance)
+                           intent_type=True,
+                           # emit instead of intent message {"conf": conf},
+                           intent_data={},
+                           skill_id=None,
+                           utterance=utterance)
 
     def voc_match(self, utt: str, voc_filename: str, lang: str,
                   exact: bool = False):

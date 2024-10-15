@@ -1,3 +1,0 @@
-leia o (livro|audiobook) {query}
-leia {query}
-leia {query} (livro|audiobook)

@@ -1,115 +1,54 @@
 {
-    "play.intent": [
-        "(play|start) {query}",
-        "search (common play|ocp|ovos common play|O C P) for {query}",
-        "search (ovos|open voice os) media for {query}",
-        "search {query} (in|on) (common play|ocp|ovos common play|O C P)",
-        "search {query} (in|on) (ovos|open voice os) media"
-    ],
-    "like_song.intent": [
-        "i like (that|this|it)",
-        "i like (that|this)(song|music|track|jam|sound)",
-        "(good|nice|great|amazing|awesome|cool) (song|music|track|jam|sound)",
-        "(that|this|it) is a (good|nice|great|amazing|awesome|cool) (song|music|track|jam|sound)"
-    ],
-    "stop.intent": [
-        "stop",
-        "stop doing that",
-        "stop that",
-        "Stop what you're doing",
-        "Please stop that",
-        "Can you stop now",
-        "Stop performing that task",
-        "Please halt the current action",
-        "Stop the ongoing process",
-        "Cease the current activity",
-        "Please put an end to it",
-        "Stop working on that",
-        "Stop executing the current command",
-        "Please terminate the current task",
-        "Stop the current operation",
-        "Cease the current action",
-        "Please cancel the current task"
-    ],
-    "next.intent": [
-        "(next|skip)",
-        "(next|skip) (music|song|track|video|media)",
-        "(play|go to) next (music|song|track|video|media)",
-        "play next",
-        "next",
-        "next (song|track|music|movie|video|tune)"
-    ],
-    "resume.intent": [
-        "(unpause|resume)",
-        "(unpause|resume|continue|restart) (music|song|track|video|media|playback)",
-        "play"
-    ],
-    "read.intent": [
-        "read (book|audiobook|audio book) {query}",
-        "read {query}",
-        "read {query} (book|audiobook|audio book)"
-    ],
-    "prev.intent": [
-        "(play previous|go back one) (music|song|track|video|media)",
-        "(play previous|previous) (music|song|track|video|media)",
-        "(play previous|previous|go back)",
-        "previous",
-        "previous (song|track|music|movie|video|tune)"
-    ],
-    "global_stop.intent": [
-        "stop all",
-        "end all",
-        "terminate all",
-        "cancel all",
-        "finish all",
-        "halt all",
-        "abort all",
-        "cease all",
-        "stop everything",
-        "end everything",
-        "terminate everything",
-        "cancel everything",
-        "finish everything",
-        "halt everything",
-        "abort everything",
-        "cease everything",
-        "Stop everything now",
-        "End all processes",
-        "Terminate all operations",
-        "Cancel all tasks",
-        "Finish all activities",
-        "Halt all activities immediately",
-        "Abort all ongoing processes",
-        "Cease all actions",
-        "Stop all current tasks",
-        "Terminate all running activities",
-        "Cancel all pending operations",
-        "Finish all open tasks",
-        "Halt all ongoing processes",
-        "Abort all running actions",
-        "Cease all active activities"
-    ],
-    "pause.intent": [
-        "pause",
-        "pause (music|song|track|video|media|playback)"
-    ],
-    "open.intent": [
-        "open (OCP|O C P|common|ovos|open voice os) (player|media player)",
-        "open (OCP|O C P|ovos common play|common play|ovos media player|open voice os player) (home screen|home page|homescreen|homepage|menu)",
-        "open (OCP|O C P|ovos common play|open voice os common play|common play)",
-        "open (media|music|gui|video) (player|catalog|skills|menu|playback)"
-    ],
-    "featured.intent": [
-        "(open|show|display) (featured|) {media} (catalog|collection|playlist)",
-        "(open|show|display) featured {media}"
-    ],
-    "play_favorites.intent": [
-        "(play|start) my (favorite|liked) (tracks|song|songs|music|jam|jams)",
-        "(play|start) (favorite|liked) (tracks|song|songs|music|jam|jams)"
-    ],
-    "media_stop.intent": [
-        "stop",
-        "stop (playback|media|media playback|music|movie|movies|noise)",
-        "stop everything"
-    ]
+  "stop.intent": [
+    "stop",
+    "stop doing that",
+    "stop that",
+    "Stop what you're doing",
+    "Please stop that",
+    "Can you stop now",
+    "Stop performing that task",
+    "Please halt the current action",
+    "Stop the ongoing process",
+    "Cease the current activity",
+    "Please put an end to it",
+    "Stop working on that",
+    "Stop executing the current command",
+    "Please terminate the current task",
+    "Stop the current operation",
+    "Cease the current action",
+    "Please cancel the current task"
+  ],
+  "global_stop.intent": [
+    "stop all",
+    "end all",
+    "terminate all",
+    "cancel all",
+    "finish all",
+    "halt all",
+    "abort all",
+    "cease all",
+    "stop everything",
+    "end everything",
+    "terminate everything",
+    "cancel everything",
+    "finish everything",
+    "halt everything",
+    "abort everything",
+    "cease everything",
+    "Stop everything now",
+    "End all processes",
+    "Terminate all operations",
+    "Cancel all tasks",
+    "Finish all activities",
+    "Halt all activities immediately",
+    "Abort all ongoing processes",
+    "Cease all actions",
+    "Stop all current tasks",
+    "Terminate all running activities",
+    "Cancel all pending operations",
+    "Finish all open tasks",
+    "Halt all ongoing processes",
+    "Abort all running actions",
+    "Cease all active activities"
+  ]
 }

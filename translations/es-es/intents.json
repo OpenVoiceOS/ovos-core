@@ -1,7 +1,7 @@
 {
-    "stop.intent": [
-        "Para",
-        "para de hacer eso",
-        "detener"
-    ]
+  "stop.intent": [
+    "Para",
+    "para de hacer eso",
+    "detener"
+  ]
 }

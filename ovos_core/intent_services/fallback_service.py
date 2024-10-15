@@ -14,22 +14,21 @@
 #
 """Intent service for Mycroft's fallback system."""
 import operator
+import time
 from collections import namedtuple
 from typing import Optional
 
-import time
 from ovos_bus_client.session import SessionManager
 from ovos_config import Configuration
+from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
 from ovos_workshop.skills.fallback import FallbackMode
 
-from ovos_plugin_manager.templates.pipeline import IntentMatch
-
 FallbackRange = namedtuple('FallbackRange', ['start', 'stop'])
 
 
-class FallbackService:
+class FallbackService(PipelinePlugin):
     """Intent Service handling fallback skills."""
 
     def __init__(self, bus):
@@ -38,6 +37,7 @@ class FallbackService:
         self.registered_fallbacks = {}  # skill_id: priority
         self.bus.on("ovos.skills.fallback.register", self.handle_register_fallback)
         self.bus.on("ovos.skills.fallback.deregister", self.handle_deregister_fallback)
+        super().__init__(self.fallback_config)
 
     def handle_register_fallback(self, message):
         skill_id = message.data.get("skill_id")

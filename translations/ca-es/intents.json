@@ -1,17 +1,4 @@
 {
-  "play.intent": [
-    "(reprodueix|inicia|comença) {query}",
-    "(cerca|busca) (una|la|) (reproducció habitual|reproducció comú|O C P|o ce pe) (ovos|) (per a|per) {query}",
-    "(cerca|busca) (un|el|es) (mèdia|multimèdia|mitjà) (ovos|open voice os) (per|per a) {query}",
-    "(cerca|busca) {query} (en|a|en la|a la) (reproducció habitual|reproducció comú|ocp|ovos|O C P)",
-    "(cerca|busca) {query} (en|a|en el| al) (mèdia|contingut multimèdia|multimèdia) (ovos|open voice os)"
-  ],
-  "like_song.intent": [
-    "m'agrada (això|açò|)",
-    "m'agrada (aquesta|esta|aquest|este)(cançó|música|pista|peça|so)",
-    "(bon|bona|gran|agradable|increïble|genial) (cançó|música|pista|peça|àudio|so)",
-    "(açò|això|aquest|aquesta|este|esta) (és|era|ha estat|ha sigut|ha set) (un|una) (bon|bona|gran|agradable|increïble|genial) (cançó|música|pista|peça|àudio|so)"
-  ],
   "stop.intent": [
     "(atura|para)('t|)",
     "(prou|para|estop|stop) (de fer això|)",
@@ -30,31 +17,6 @@
     "(Atura|Para) l'operació actual",
     "(Atura|Para) l'acció actual",
     "Cancel·la la tasca actual"
-  ],
-  "next.intent": [
-    "(següent|salta)",
-    "(següent|salta) (a|al|a la|a sa) (música|cançó|pista|peça|vídeo|mèdia|multimèdia|contingut) ",
-    "(reprodueix|reproduix|ves|vés) (a|al|a es|a la|a sa|) (següent|) (música|cançó|pista|peça|vídeo|mèdia|multimèdia|contingut) (següent|)",
-    "(reprodueix|reproduix|posa) (el|la|es|sa|) següent",
-    "següent",
-    "(cançó|pista|peça|música|film|pel·li|pel·lícula|vídeo|emissora) següent"
-  ],
-  "resume.intent": [
-    "(deixa de pausar|reprèn|reprén|despausa)",
-    "(deixa de pausar|reprèn|reprén|continua|despausa) (la|el|es|sa) (música|cançó|pista|peça|vídeo|mèdia|multimèdia|contingut|reproducció)",
-    "(reprodueix|reproduix)"
-  ],
-  "read.intent": [
-    "llegeix (llibre|audiollibre|àudio llibre|llibre d'àudio) {query}",
-    "llegeix {query}",
-    "llegeix (el |l'|)(llibre|audiollibre|àudio llibre) {query}"
-  ],
-  "prev.intent": [
-    "(reprodueix|posa) (la|el|es|sa) (música|peça|pista|vídeo|mèdia|contingut|multimèdia) (anterior|d'abans)",
-    "(reprodueix|inicia|comença) (el|la|es|sa) (música|cançó|peça|pista|vídeo|mèdia|multimèdia) (anterior|previ|prèvia|enrere)",
-    "(reprodueix|inicia|comença) (l'anterior|enrere|anterior)",
-    "(enrere|anterior|previ|prèvia)",
-    "(cançó|peça|pista|música|pel·lícula|film|vídeo|emissora) (anterior|prèvia|enrere)"
   ],
   "global_stop.intent": [
     "(atura|para)(|-ho) tot",
@@ -88,28 +50,5 @@
     "Atura tots els processos en curs",
     "Avorta totes les accions en execució",
     "Cessa totes les activitats actives"
-  ],
-  "pause.intent": [
-    "pausa",
-    "pausa (la|el|sa|es|)(música|cançó|peça|psita|vídeo|mèdia|multimèdia)"
-  ],
-  "open.intent": [
-    "obre (el|es) (reproductor|reproductor multimèdia) (OCP|O C P|common|ovos|open voice os) ",
-    "(obre|executa) (el|es|la|sa) (pantalla d'inici|pantalla|pantalla inicial|menú) (del|des|de) (OCP|O C P|ovos comon plei|comon plei|reproductor ovos multimèdia|reproductor open vois) ",
-    "(obre|executa) (el|es) (OCP|O C P|ovos common play|open voice os common play|reproductor multimèdia)",
-    "(obre|executa) (el|es|la|sa|les|ses) (reproductor|catàleg|habilitats|menú) (multimèdia|de música|música|gràfic|vídeo| de vídeo)"
-  ],
-  "featured.intent": [
-    "(obre|mostra|reprodueix|posa) (el|la|es|sa|) (catàleg|col·lecció|llista|llista de reproducció) (de|) {media} (destacat|destacada|destacats|destacades)",
-    "(obre|mostra|reprodueix|posa) (el|la|es|sa|){media} (destacat|destacada)"
-  ],
-  "play_favorites.intent": [
-    "(reprodeux|inicia|posa) (les meves|ses meves|els meus|els|ses)(peces|pistes|àudios|cançons|música) (favorita|favorites|preferides|preferida|que m'agrada|preferits|favorits)",
-    "(reprodueix|inicia|comença) (la|les|sa|ses) (cançons|cançó|cançons|música) (preferida|favorita|preferides|favorites)"
-  ],
-  "media_stop.intent": [
-    "(para|atura)('t|)",
-    "(atura|para) (la|el|sa|es|els|les|ses) (reproducció|reproduccions|multimèdia|mèdia|mèdies|reproducció multimèdia|reproduccións multimèdia|música|pel·lícula|pel·lícules|soroll|àudio|peça|pista)",
-    "(atura|para)(-ho) tot"
   ]
 }

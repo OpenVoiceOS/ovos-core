@@ -1,20 +1,24 @@
 # Changelog
 
-## [0.1.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.1.3a1) (2024-10-13)
+## [0.2.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.0a1) (2024-10-14)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.1.2a1...0.1.3a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.1.4a1...0.2.0a1)
 
-**Merged pull requests:**
+**Closed issues:**
 
-- fix:version check [\#557](https://github.com/OpenVoiceOS/ovos-core/pull/557) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.1.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.1.2a1) (2024-10-13)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.1.1...0.1.2a1)
+- Standalone skill not working anymore [\#556](https://github.com/OpenVoiceOS/ovos-core/issues/556)
 
 **Merged pull requests:**
 
-- automations:split tests into 2 workflows [\#558](https://github.com/OpenVoiceOS/ovos-core/pull/558) ([JarbasAl](https://github.com/JarbasAl))
+- feat/pipeline\_plugins\_opm [\#527](https://github.com/OpenVoiceOS/ovos-core/pull/527) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.1.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.1.4a1) (2024-10-14)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.1.3...0.1.4a1)
+
+**Merged pull requests:**
+
+- fix:usage without skills installed [\#555](https://github.com/OpenVoiceOS/ovos-core/pull/555) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
