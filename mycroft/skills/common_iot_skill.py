@@ -24,7 +24,7 @@ from enum import Enum, unique
 from functools import total_ordering, wraps
 from itertools import count
 
-from ovos_workshop.skills.mycroft_skill import MycroftSkill
+from ovos_workshop.skills.ovos import OVOSSkill as MycroftSkill
 from ovos_bus_client.message import Message, dig_for_message
 
 ENTITY = "ENTITY"
