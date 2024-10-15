@@ -7,3 +7,10 @@ pyalsaaudio>=0.8
 pyserial>=3.0
 pillow>=8.3
 pyaudio
+
+# mycroft-core imports / default plugins
+# for compat with mycroft namespace
+ovos-listener>=0.0.3,<1.0.0
+ovos-tts-plugin-mimic>=0.2.8, <1.0.0
+ovos-ww-plugin-precise>=0.1, <1.0.0
+ovos-ww-plugin-pocketsphinx>=0.1, <1.0.0
