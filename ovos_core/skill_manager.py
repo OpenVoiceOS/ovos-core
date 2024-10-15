@@ -16,9 +16,9 @@
 import os
 from os.path import basename
 from threading import Thread, Event, Lock
-from time import sleep, monotonic
 
-from ovos_backend_client.pairing import is_paired
+from time import monotonic
+
 from ovos_bus_client.apis.enclosure import EnclosureAPI
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
@@ -28,8 +28,8 @@ from ovos_plugin_manager.skills import find_skill_plugins
 from ovos_plugin_manager.skills import get_skill_directories
 from ovos_utils.file_utils import FileWatcher
 from ovos_utils.gui import is_gui_connected
-from ovos_utils.log import LOG
-from ovos_utils.network_utils import is_connected
+from ovos_utils.log import LOG, deprecated
+from ovos_utils.network_utils import is_connected_http
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap, ProcessState
 from ovos_workshop.skill_launcher import SKILL_MAIN_MODULE
 from ovos_workshop.skill_launcher import SkillLoader, PluginSkillLoader
@@ -181,7 +181,7 @@ class SkillManager(Thread):
                 network = True
         else:
             LOG.debug("ovos-phal-plugin-connectivity-events not detected, performing direct network checks")
-            network = internet = is_connected()
+            network = internet = is_connected_http()
 
         if internet and not self._connected_event.is_set():
             LOG.debug("Notify internet connected")
@@ -197,7 +197,6 @@ class SkillManager(Thread):
         self.bus.on('skillmanager.deactivate', self.deactivate_skill)
         self.bus.on('skillmanager.keep', self.deactivate_except)
         self.bus.on('skillmanager.activate', self.activate_skill)
-        self.bus.once('mycroft.skills.initialized', self.handle_check_device_readiness)
 
         # Load skills waiting for connectivity
         self.bus.on("mycroft.network.connected", self.handle_network_connected)
@@ -207,6 +206,7 @@ class SkillManager(Thread):
         self.bus.on("mycroft.internet.disconnected", self.handle_internet_disconnected)
         self.bus.on("mycroft.gui.unavailable", self.handle_gui_disconnected)
 
+    @deprecated("mycroft.ready event has moved to finished booting skill", "0.1.0")
     def is_device_ready(self):
         """Check if the device is ready by waiting for various services to start.
 
@@ -215,44 +215,13 @@ class SkillManager(Thread):
         Raises:
             TimeoutError: If the device is not ready within a specified timeout.
         """
-        is_ready = False
-        # Different setups will have different needs
-        # eg, a server does not care about audio
-        # pairing -> device is paired
-        # internet -> device is connected to the internet - NOT IMPLEMENTED
-        # skills -> skills reported ready
-        # speech -> stt reported ready
-        # audio -> audio playback reported ready
-        # gui -> gui websocket reported ready - NOT IMPLEMENTED
-        # enclosure -> enclosure/HAL reported ready - NOT IMPLEMENTED
-        services = {k: False for k in
-                    self.config.get("ready_settings", ["skills"])}
-        start = monotonic()
-        while not is_ready:
-            is_ready = self.check_services_ready(services)
-            if is_ready:
-                break
-            elif monotonic() - start >= 60:
-                raise TimeoutError(
-                    f'Timeout waiting for services start. services={services}')
-            else:
-                sleep(3)
-        return is_ready
+        return True
 
+    @deprecated("mycroft.ready event has moved to finished booting skill", "0.1.0")
     def handle_check_device_readiness(self, message):
-        """Handle the check device readiness event."""
-        ready = False
-        while not ready:
-            try:
-                ready = self.is_device_ready()
-            except TimeoutError:
-                if is_paired():
-                    LOG.warning("OVOS should already have reported ready!")
-                sleep(5)
+        pass
 
-        LOG.info("Mycroft is all loaded and ready to roll!")
-        self.bus.emit(message.reply('mycroft.ready'))
-
+    @deprecated("mycroft.ready event has moved to finished booting skill", "0.1.0")
     def check_services_ready(self, services):
         """Report if all specified services are ready.
 
@@ -261,56 +230,7 @@ class SkillManager(Thread):
         Returns:
             bool: True if all specified services are ready, False otherwise.
         """
-        backend_type = self.config.get("server", {}).get("backend_type", "offline")
-        for ser, rdy in services.items():
-            if rdy:
-                # already reported ready
-                continue
-            if ser in ["pairing", "setup"]:
-
-                def setup_finish_interrupt(message):
-                    nonlocal services
-                    services[ser] = True
-
-                # if setup finishes naturally be ready early
-                self.bus.once("ovos.setup.finished", setup_finish_interrupt)
-
-                # pairing service (setup skill) needs to be available
-                # in offline mode (default) is_paired always returns True
-                # but setup skill may enable backend
-                # wait for backend selection event
-                response = self.bus.wait_for_response(
-                    Message('ovos.setup.state.get',
-                            context={"source": "skills",
-                                     "destination": "ovos-setup"}),
-                    'ovos.setup.state')
-                if response:
-                    state = response.data['state']
-                    LOG.debug(f"Setup state: {state}")
-                    if state == "finished":
-                        services[ser] = True
-                elif not services[ser] and backend_type == "selene":
-                    # older verson / alternate setup skill installed
-                    services[ser] = is_paired(ignore_errors=True)
-            elif ser in ["gui", "enclosure"]:
-                # not implemented
-                services[ser] = True
-                continue
-            elif ser in ["skills"]:
-                services[ser] = self.status.check_ready()
-                continue
-            elif ser in ["network_skills"]:
-                services[ser] = self._network_loaded.is_set()
-                continue
-            elif ser in ["internet_skills"]:
-                services[ser] = self._internet_loaded.is_set()
-                continue
-            response = self.bus.wait_for_response(
-                Message(f'mycroft.{ser}.is_ready',
-                        context={"source": "skills", "destination": ser}))
-            if response and response.data['status']:
-                services[ser] = True
-        return all([services[ser] for ser in services])
+        return True
 
     @property
     def skills_config(self):
@@ -469,86 +389,31 @@ class SkillManager(Thread):
 
         return skill_loader if load_status else None
 
+    @deprecated("priority skills have been deprecated for a long time", "0.1.0")
     def load_priority(self):
-        """DEPRECATED: Load priority skills based on the specified order in the configuration."""
-        skill_ids = {os.path.basename(skill_path): skill_path
-                     for skill_path in self._get_skill_directories()}
-        priority_skills = self.skills_config.get("priority_skills") or []
-        if priority_skills:
-            update_code = """priority skills have been deprecated and support will be removed in a future release
-            Update skills with the following:
-            
-            from ovos_utils.process_utils import RuntimeRequirements
-            from ovos_utils import classproperty
-
-            class MyPrioritySkill(OVOSSkill):
-                @classproperty
-                def network_requirements(self):
-                    return RuntimeRequirements(internet_before_load=False,
-                                                 network_before_load=False,
-                                                 requires_internet=False,
-                                                 requires_network=False)
-            """
-            LOG.warning(update_code)
-        for skill_id in priority_skills:
-            LOG.info(f"Please refactor {skill_id} to specify offline network requirements")
-            skill_path = skill_ids.get(skill_id)
-            if skill_path is not None:
-                self._load_skill(skill_path)
-            else:
-                LOG.error(f'Priority skill {skill_id} can\'t be found')
+        pass
 
     def run(self):
         """Run the skill manager thread."""
-        self.load_priority()
-
         self.status.set_alive()
 
         self._load_on_startup()
 
-        if self.skills_config.get("wait_for_internet", False):
-            LOG.warning("`wait_for_internet` is a deprecated option, update to "
-                        "specify `network_skills` or `internet_skills` in "
-                        "`ready_settings`")
-            # NOTE - self._connected_event will never be set
-            # if PHAL plugin is not running to emit the connected events
-            while not self._connected_event.is_set():
-                # Ensure we don't block here forever if the plugin is not installed
-                self._sync_skill_loading_state()
-                sleep(1)
-            LOG.debug("Internet Connected")
-        else:
-            # trigger a sync so we dont need to wait for the plugin to volunteer info
-            self._sync_skill_loading_state()
+        # trigger a sync so we dont need to wait for the plugin to volunteer info
+        self._sync_skill_loading_state()
 
-        if "network_skills" in self.config.get("ready_settings"):
-            self._network_event.wait()  # Wait for user to connect to network
-            if self._network_loaded.wait(self._network_skill_timeout):
-                LOG.debug("Network skills loaded")
-            else:
-                LOG.error("Gave up waiting for network skills to load")
-        if "internet_skills" in self.config.get("ready_settings"):
-            self._connected_event.wait()  # Wait for user to connect to network
-            if self._internet_loaded.wait(self._network_skill_timeout):
-                LOG.debug("Internet skills loaded")
-            else:
-                LOG.error("Gave up waiting for internet skills to load")
         if not all((self._network_loaded.is_set(),
                     self._internet_loaded.is_set())):
             self.bus.emit(Message(
                 'mycroft.skills.error',
                 {'internet_loaded': self._internet_loaded.is_set(),
                  'network_loaded': self._network_loaded.is_set()}))
+
         self.bus.emit(Message('mycroft.skills.initialized'))
 
         self.status.set_ready()
 
-        if self._gui_event.is_set() and self._connected_event.is_set():
-            LOG.info("Skills all loaded!")
-        elif not self._connected_event.is_set():
-            LOG.info("Offline Skills loaded, waiting for Internet to load more!")
-        elif not self._gui_event.is_set():
-            LOG.info("Skills loaded, waiting for GUI to load more!")
+        LOG.info("ovos-core is ready! additional skills can now be loaded")
 
         # Scan the file folder that contains Skills.  If a Skill is updated,
         # unload the existing version from memory and reload from the disk.
@@ -564,14 +429,14 @@ class SkillManager(Thread):
 
     def _load_on_network(self):
         """Load skills that require a network connection."""
-        if self._detected_installed_skills: # ensure we have skills is installed
+        if self._detected_installed_skills:  # ensure we have skills installed
             LOG.info('Loading skills that require network...')
             self._load_new_skills(network=True, internet=False)
         self._network_loaded.set()
 
     def _load_on_internet(self):
         """Load skills that require both internet and network connections."""
-        if self._detected_installed_skills:  # ensure we have skills is installed
+        if self._detected_installed_skills:  # ensure we have skills installed
             LOG.info('Loading skills that require internet (and network)...')
             self._load_new_skills(network=True, internet=True)
         self._internet_loaded.set()
@@ -615,7 +480,7 @@ class SkillManager(Thread):
 
     def _load_on_startup(self):
         """Handle offline skills load on startup."""
-        if self._detected_installed_skills:  # ensure we have skills is installed
+        if self._detected_installed_skills:  # ensure we have skills installed
             LOG.info('Loading offline skills...')
             self._load_new_skills(network=False, internet=False)
 

@@ -1,6 +1,6 @@
 from ovos_workshop.decorators import killable_intent
 from ovos_workshop.skills.ovos import OVOSSkill
-from mycroft.skills import intent_file_handler
+from ovos_workshop.decorators import intent_file_handler
 from time import sleep
 
 

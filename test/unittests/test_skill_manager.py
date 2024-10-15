@@ -118,7 +118,7 @@ class TestSkillManager(TestCase):
             'skillmanager.deactivate',
             'skillmanager.keep',
             'skillmanager.activate',
-            'mycroft.skills.initialized',
+            #'mycroft.skills.initialized',
             'mycroft.network.connected',
             'mycroft.internet.connected',
             'mycroft.gui.available',

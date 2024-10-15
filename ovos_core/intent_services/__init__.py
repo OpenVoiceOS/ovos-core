@@ -14,11 +14,13 @@
 #
 from typing import Tuple, Callable
 
-from ocp_pipeline.opm import OCPPipelineMatcher
-from ovos_adapt.opm import AdaptPipeline as AdaptService
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
+from ovos_workshop.intents import open_intent_envelope
+
+from ocp_pipeline.opm import OCPPipelineMatcher
+from ovos_adapt.opm import AdaptPipeline as AdaptService
 from ovos_commonqa.opm import CommonQAService
 from ovos_config.config import Configuration
 from ovos_config.locale import setup_locale, get_valid_languages, get_full_lang_code
@@ -29,7 +31,6 @@ from ovos_core.transformers import MetadataTransformersService, UtteranceTransfo
 from ovos_plugin_manager.templates.pipeline import IntentMatch
 from ovos_utils.log import LOG, deprecated, log_deprecation
 from ovos_utils.metrics import Stopwatch
-from ovos_workshop.intents import open_intent_envelope
 from padacioso.opm import PadaciosoPipeline as PadaciosoService
 
 
@@ -89,99 +90,100 @@ class IntentService:
         self.bus.on('intent.service.padatious.entities.manifest.get', self.handle_entity_manifest)
 
     @property
-    @deprecated("direct access to self.adapt_service is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def adapt_service(self):
+        log_deprecation("direct access to self.adapt_service is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._adapt_service
 
     @property
-    @deprecated("direct access to self.padatious_service is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def padatious_service(self):
+        log_deprecation("direct access to self.padatious_service is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._padatious_service
 
     @property
-    @deprecated("direct access to self.padacioso_service is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def padacioso_service(self):
+        log_deprecation("direct access to self.padacioso_service is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._padacioso_service
 
     @property
-    @deprecated("direct access to self.fallback is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def fallback(self):
+
+        log_deprecation("direct access to self.fallback is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._fallback
 
     @property
-    @deprecated("direct access to self.converse is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def converse(self):
+        log_deprecation("direct access to self.converse is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._converse
 
     @property
-    @deprecated("direct access to self.common_qa is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def common_qa(self):
+        log_deprecation("direct access to self.common_qa is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._common_qa
 
     @property
-    @deprecated("direct access to self.stop is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def stop(self):
+        log_deprecation("direct access to self.stop is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._stop
 
     @property
-    @deprecated("direct access to self.ocp is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def ocp(self):
+        log_deprecation("direct access to self.ocp is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._ocp
 
     @adapt_service.setter
-    @deprecated("direct access to self.adapt_service is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def adapt_service(self, value):
+        log_deprecation("direct access to self.adapt_service is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._adapt_service = value
 
     @padatious_service.setter
-    @deprecated("direct access to self.padatious_service is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def padatious_service(self, value):
+        log_deprecation("direct access to self.padatious_service is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._padatious_service = value
 
     @padacioso_service.setter
-    @deprecated("direct access to self.padacioso_service is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def padacioso_service(self, value):
+        log_deprecation("direct access to self.padacioso_service is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._padacioso_service = value
 
     @fallback.setter
-    @deprecated("direct access to self.fallback is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def fallback(self, value):
+        log_deprecation("direct access to self.fallback is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._fallback = value
 
     @converse.setter
-    @deprecated("direct access to self.converse is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def converse(self, value):
+        log_deprecation("direct access to self.converse is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._converse = value
 
     @common_qa.setter
-    @deprecated("direct access to self.common_qa is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def common_qa(self, value):
+        log_deprecation("direct access to self.common_qa is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._common_qa = value
 
     @stop.setter
-    @deprecated("direct access to self.stop is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def stop(self, value):
+        log_deprecation("direct access to self.stop is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._stop = value
 
     @ocp.setter
-    @deprecated("direct access to self.ocp is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def ocp(self, value):
+        log_deprecation("direct access to self.ocp is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._ocp = value
 
     def _load_pipeline_plugins(self):
@@ -209,7 +211,7 @@ class IntentService:
     def registered_intents(self):
         lang = get_message_lang()
         return [parser.__dict__
-                for parser in self.adapt_service.engines[lang].intent_parsers]
+                for parser in self._adapt_service.engines[lang].intent_parsers]
 
     def update_skill_name_dict(self, message):
         """Messagebus handler, updates dict of id to skill name conversions."""
@@ -454,7 +456,7 @@ class IntentService:
         # tag language of this utterance
         lang = self.disambiguate_lang(message)
 
-        try:
+        try:  # TODO - uncouple lingua franca from core, up to skills to ensure locale is loaded if needed
             setup_locale(lang)
         except Exception as e:
             LOG.exception(f"Failed to set lingua_franca default lang to {lang}")
@@ -524,7 +526,7 @@ class IntentService:
         regex_str = message.data.get('regex')
         alias_of = message.data.get('alias_of')
         lang = get_message_lang(message)
-        self.adapt_service.register_vocabulary(entity_value, entity_type,
+        self._adapt_service.register_vocabulary(entity_value, entity_type,
                                                alias_of, regex_str, lang)
         self.registered_vocab.append(message.data)
 
@@ -535,7 +537,7 @@ class IntentService:
             message (Message): message containing intent info
         """
         intent = open_intent_envelope(message)
-        self.adapt_service.register_intent(intent)
+        self._adapt_service.register_intent(intent)
 
     def handle_detach_intent(self, message):
         """Remover adapt intent.
@@ -544,7 +546,7 @@ class IntentService:
             message (Message): message containing intent info
         """
         intent_name = message.data.get('intent_name')
-        self.adapt_service.detach_intent(intent_name)
+        self._adapt_service.detach_intent(intent_name)
 
     def handle_detach_skill(self, message):
         """Remove all intents registered for a specific skill.
@@ -553,7 +555,7 @@ class IntentService:
             message (Message): message containing intent info
         """
         skill_id = message.data.get('skill_id')
-        self.adapt_service.detach_skill(skill_id)
+        self._adapt_service.detach_skill(skill_id)
 
     def handle_add_context(self, message):
         """Add context
@@ -652,7 +654,7 @@ class IntentService:
         """
         utterance = message.data["utterance"]
         lang = get_message_lang(message)
-        intent = self.adapt_service.match_intent((utterance,), lang, message.serialize())
+        intent = self._adapt_service.match_intent((utterance,), lang, message.serialize())
         intent_data = intent.intent_data if intent else None
         self.bus.emit(message.reply("intent.service.adapt.reply",
                                     {"intent": intent_data}))
@@ -714,15 +716,15 @@ class IntentService:
     def shutdown(self):
         self.utterance_plugins.shutdown()
         self.metadata_plugins.shutdown()
-        self.adapt_service.shutdown()
-        self.padacioso_service.shutdown()
-        if self.padatious_service:
-            self.padatious_service.shutdown()
-        self.common_qa.shutdown()
-        self.converse.shutdown()
-        self.fallback.shutdown()
-        if self.ocp:
-            self.ocp.shutdown()
+        self._adapt_service.shutdown()
+        self._padacioso_service.shutdown()
+        if self._padatious_service:
+            self._padatious_service.shutdown()
+        self._common_qa.shutdown()
+        self._converse.shutdown()
+        self._fallback.shutdown()
+        if self._ocp:
+            self._ocp.shutdown()
 
         self.bus.remove('register_vocab', self.handle_register_vocab)
         self.bus.remove('register_intent', self.handle_register_intent)
