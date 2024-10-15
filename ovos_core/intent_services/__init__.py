@@ -14,11 +14,13 @@
 #
 from typing import Tuple, Callable
 
-from ocp_pipeline.opm import OCPPipelineMatcher
-from ovos_adapt.opm import AdaptPipeline as AdaptService
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
+from ovos_workshop.intents import open_intent_envelope
+
+from ocp_pipeline.opm import OCPPipelineMatcher
+from ovos_adapt.opm import AdaptPipeline as AdaptService
 from ovos_commonqa.opm import CommonQAService
 from ovos_config.config import Configuration
 from ovos_config.locale import setup_locale, get_valid_languages, get_full_lang_code
@@ -29,7 +31,6 @@ from ovos_core.transformers import MetadataTransformersService, UtteranceTransfo
 from ovos_plugin_manager.templates.pipeline import IntentMatch
 from ovos_utils.log import LOG, deprecated, log_deprecation
 from ovos_utils.metrics import Stopwatch
-from ovos_workshop.intents import open_intent_envelope
 from padacioso.opm import PadaciosoPipeline as PadaciosoService
 
 
@@ -89,99 +90,100 @@ class IntentService:
         self.bus.on('intent.service.padatious.entities.manifest.get', self.handle_entity_manifest)
 
     @property
-    @deprecated("direct access to self.adapt_service is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def adapt_service(self):
+        log_deprecation("direct access to self.adapt_service is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._adapt_service
 
     @property
-    @deprecated("direct access to self.padatious_service is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def padatious_service(self):
+        log_deprecation("direct access to self.padatious_service is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._padatious_service
 
     @property
-    @deprecated("direct access to self.padacioso_service is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def padacioso_service(self):
+        log_deprecation("direct access to self.padacioso_service is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._padacioso_service
 
     @property
-    @deprecated("direct access to self.fallback is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def fallback(self):
+
+        log_deprecation("direct access to self.fallback is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._fallback
 
     @property
-    @deprecated("direct access to self.converse is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def converse(self):
+        log_deprecation("direct access to self.converse is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._converse
 
     @property
-    @deprecated("direct access to self.common_qa is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def common_qa(self):
+        log_deprecation("direct access to self.common_qa is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._common_qa
 
     @property
-    @deprecated("direct access to self.stop is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def stop(self):
+        log_deprecation("direct access to self.stop is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._stop
 
     @property
-    @deprecated("direct access to self.ocp is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def ocp(self):
+        log_deprecation("direct access to self.ocp is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._ocp
 
     @adapt_service.setter
-    @deprecated("direct access to self.adapt_service is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def adapt_service(self, value):
+        log_deprecation("direct access to self.adapt_service is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._adapt_service = value
 
     @padatious_service.setter
-    @deprecated("direct access to self.padatious_service is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def padatious_service(self, value):
+        log_deprecation("direct access to self.padatious_service is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._padatious_service = value
 
     @padacioso_service.setter
-    @deprecated("direct access to self.padacioso_service is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def padacioso_service(self, value):
+        log_deprecation("direct access to self.padacioso_service is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._padacioso_service = value
 
     @fallback.setter
-    @deprecated("direct access to self.fallback is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def fallback(self, value):
+        log_deprecation("direct access to self.fallback is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._fallback = value
 
     @converse.setter
-    @deprecated("direct access to self.converse is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def converse(self, value):
+        log_deprecation("direct access to self.converse is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._converse = value
 
     @common_qa.setter
-    @deprecated("direct access to self.common_qa is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def common_qa(self, value):
+        log_deprecation("direct access to self.common_qa is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._common_qa = value
 
     @stop.setter
-    @deprecated("direct access to self.stop is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def stop(self, value):
+        log_deprecation("direct access to self.stop is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._stop = value
 
     @ocp.setter
-    @deprecated("direct access to self.ocp is deprecated, "
-                "pipelines are in the progress of being replaced with plugins", "1.0.0")
     def ocp(self, value):
+        log_deprecation("direct access to self.ocp is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._ocp = value
 
     def _load_pipeline_plugins(self):
@@ -454,7 +456,7 @@ class IntentService:
         # tag language of this utterance
         lang = self.disambiguate_lang(message)
 
-        try:
+        try:  # TODO - uncouple lingua franca from core, up to skills to ensure locale is loaded if needed
             setup_locale(lang)
         except Exception as e:
             LOG.exception(f"Failed to set lingua_franca default lang to {lang}")
