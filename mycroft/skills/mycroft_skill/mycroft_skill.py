@@ -29,4 +29,4 @@ from mycroft.deprecated.skills import (
     read_vocab_file, read_value_file, read_translated_file,
     load_vocabulary, load_regex)
 from mycroft.deprecated.skills.settings import SettingsMetaUploader
-from ovos_workshop.skills.mycroft_skill import MycroftSkill
+from ovos_workshop.skills.ovos import OVOSSkill as MycroftSkill
