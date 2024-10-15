@@ -2,8 +2,7 @@ import json
 import unittest
 from os.path import dirname
 from time import sleep
-from mycroft.skills.skill_loader import SkillLoader
-from mycroft.skills.mycroft_skill.mycroft_skill import MycroftSkill
+from ovos_workshop.skill_launcher import SkillLoader
 from ovos_workshop.skills.ovos import OVOSSkill
 from ovos_utils.messagebus import FakeBus, Message
 
@@ -29,7 +28,6 @@ class TestSkill(unittest.TestCase):
 
     def test_skill_id(self):
         self.assertTrue(isinstance(self.skill.instance, OVOSSkill))
-        self.assertTrue(isinstance(self.skill.instance, MycroftSkill))
 
         self.assertEqual(self.skill.skill_id, "abort.test")
         # if running in ovos-core every message will have the skill_id in context

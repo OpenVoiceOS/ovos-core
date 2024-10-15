@@ -1,5 +1,5 @@
 # skills that run in audio enabled devices (require mic/speaker)
-ovos-skill-boot-finished>=0.2.1,<1.0.0
+ovos-skill-boot-finished>=0.3.0,<1.0.0
 ovos-skill-audio-recording>=0.2.2,<1.0.0
 ovos-skill-dictation>=0.2.0,<1.0.0
 ovos-skill-parrot>=0.1.2,<1.0.0

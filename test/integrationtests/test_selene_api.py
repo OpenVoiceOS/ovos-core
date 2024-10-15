@@ -19,6 +19,8 @@ import ovos_backend_client.backends
 import ovos_backend_client.pairing
 from unittest.mock import MagicMock, patch
 
+# TODO - move test to ovos-backend.client
+
 ovos_backend_client.backends.base.requests.post = MagicMock()
 
 
