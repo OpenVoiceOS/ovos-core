@@ -29,7 +29,7 @@ from ovos_plugin_manager.skills import get_skill_directories
 from ovos_utils.file_utils import FileWatcher
 from ovos_utils.gui import is_gui_connected
 from ovos_utils.log import LOG, deprecated
-from ovos_utils.network_utils import is_connected
+from ovos_utils.network_utils import is_connected_http
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap, ProcessState
 from ovos_workshop.skill_launcher import SKILL_MAIN_MODULE
 from ovos_workshop.skill_launcher import SkillLoader, PluginSkillLoader
@@ -181,7 +181,7 @@ class SkillManager(Thread):
                 network = True
         else:
             LOG.debug("ovos-phal-plugin-connectivity-events not detected, performing direct network checks")
-            network = internet = is_connected()
+            network = internet = is_connected_http()
 
         if internet and not self._connected_event.is_set():
             LOG.debug("Notify internet connected")
