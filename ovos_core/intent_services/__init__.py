@@ -717,14 +717,14 @@ class IntentService:
         self.utterance_plugins.shutdown()
         self.metadata_plugins.shutdown()
         self._adapt_service.shutdown()
-        self.padacioso_service.shutdown()
-        if self.padatious_service:
-            self.padatious_service.shutdown()
-        self.common_qa.shutdown()
-        self.converse.shutdown()
-        self.fallback.shutdown()
-        if self.ocp:
-            self.ocp.shutdown()
+        self._padacioso_service.shutdown()
+        if self._padatious_service:
+            self._padatious_service.shutdown()
+        self._common_qa.shutdown()
+        self._converse.shutdown()
+        self._fallback.shutdown()
+        if self._ocp:
+            self._ocp.shutdown()
 
         self.bus.remove('register_vocab', self.handle_register_vocab)
         self.bus.remove('register_intent', self.handle_register_intent)
