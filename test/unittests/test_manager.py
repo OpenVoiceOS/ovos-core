@@ -49,7 +49,7 @@ class TestSkillManager(unittest.TestCase):
         self.assertFalse(self.skill_manager._gui_event.is_set())
         self.assertTrue(self.skill_manager._unload_on_gui_disconnect.called)
 
-    @patch('ovos_core.skill_manager.is_connected', return_value=True)
+    @patch('ovos_core.skill_manager.is_connected_http', return_value=True)
     def test_handle_internet_connected(self, mock_is_connected):
         self.skill_manager._connected_event.clear()
         self.skill_manager._network_event.clear()
@@ -60,7 +60,7 @@ class TestSkillManager(unittest.TestCase):
         self.assertTrue(self.skill_manager._network_loaded.is_set())
         self.assertTrue(self.skill_manager._load_on_internet.called)
 
-    @patch('ovos_core.skill_manager.is_connected', return_value=False)
+    @patch('ovos_core.skill_manager.is_connected_http', return_value=False)
     def test_handle_internet_disconnected(self, mock_is_connected):
         self.skill_manager._allow_state_reloads = True
         self.skill_manager._connected_event.set()
@@ -70,7 +70,7 @@ class TestSkillManager(unittest.TestCase):
         self.assertFalse(self.skill_manager._connected_event.is_set())
         self.assertTrue(self.skill_manager._unload_on_internet_disconnect.called)
 
-    @patch('ovos_core.skill_manager.is_connected', return_value=True)
+    @patch('ovos_core.skill_manager.is_connected_http', return_value=True)
     def test_handle_network_connected(self, mock_is_connected):
         self.skill_manager._network_event.clear()
         self.skill_manager._load_on_network = MagicMock()
@@ -78,7 +78,7 @@ class TestSkillManager(unittest.TestCase):
         self.assertTrue(self.skill_manager._network_event.is_set())
         self.assertTrue(self.skill_manager._load_on_network.called)
 
-    @patch('ovos_core.skill_manager.is_connected', return_value=False)
+    @patch('ovos_core.skill_manager.is_connected_http', return_value=False)
     def test_handle_network_disconnected(self, mock_is_connected):
         self.skill_manager._allow_state_reloads = True
         self.skill_manager._network_event.set()
@@ -88,7 +88,7 @@ class TestSkillManager(unittest.TestCase):
         self.assertTrue(self.skill_manager._unload_on_network_disconnect.called)
 
     @patch('ovos_core.skill_manager.is_gui_connected', return_value=True)
-    @patch('ovos_core.skill_manager.is_connected', return_value=True)
+    @patch('ovos_core.skill_manager.is_connected_http', return_value=True)
     def test_sync_skill_loading_state_no_phal_plugin(self, mock_is_connected, mock_is_gui_connected):
         self.bus.wait_for_response.return_value = None
 
