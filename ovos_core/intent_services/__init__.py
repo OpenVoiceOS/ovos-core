@@ -211,7 +211,7 @@ class IntentService:
     def registered_intents(self):
         lang = get_message_lang()
         return [parser.__dict__
-                for parser in self.adapt_service.engines[lang].intent_parsers]
+                for parser in self._adapt_service.engines[lang].intent_parsers]
 
     def update_skill_name_dict(self, message):
         """Messagebus handler, updates dict of id to skill name conversions."""
@@ -526,7 +526,7 @@ class IntentService:
         regex_str = message.data.get('regex')
         alias_of = message.data.get('alias_of')
         lang = get_message_lang(message)
-        self.adapt_service.register_vocabulary(entity_value, entity_type,
+        self._adapt_service.register_vocabulary(entity_value, entity_type,
                                                alias_of, regex_str, lang)
         self.registered_vocab.append(message.data)
 
@@ -537,7 +537,7 @@ class IntentService:
             message (Message): message containing intent info
         """
         intent = open_intent_envelope(message)
-        self.adapt_service.register_intent(intent)
+        self._adapt_service.register_intent(intent)
 
     def handle_detach_intent(self, message):
         """Remover adapt intent.
@@ -546,7 +546,7 @@ class IntentService:
             message (Message): message containing intent info
         """
         intent_name = message.data.get('intent_name')
-        self.adapt_service.detach_intent(intent_name)
+        self._adapt_service.detach_intent(intent_name)
 
     def handle_detach_skill(self, message):
         """Remove all intents registered for a specific skill.
@@ -555,7 +555,7 @@ class IntentService:
             message (Message): message containing intent info
         """
         skill_id = message.data.get('skill_id')
-        self.adapt_service.detach_skill(skill_id)
+        self._adapt_service.detach_skill(skill_id)
 
     def handle_add_context(self, message):
         """Add context
@@ -654,7 +654,7 @@ class IntentService:
         """
         utterance = message.data["utterance"]
         lang = get_message_lang(message)
-        intent = self.adapt_service.match_intent((utterance,), lang, message.serialize())
+        intent = self._adapt_service.match_intent((utterance,), lang, message.serialize())
         intent_data = intent.intent_data if intent else None
         self.bus.emit(message.reply("intent.service.adapt.reply",
                                     {"intent": intent_data}))
@@ -716,7 +716,7 @@ class IntentService:
     def shutdown(self):
         self.utterance_plugins.shutdown()
         self.metadata_plugins.shutdown()
-        self.adapt_service.shutdown()
+        self._adapt_service.shutdown()
         self.padacioso_service.shutdown()
         if self.padatious_service:
             self.padatious_service.shutdown()
