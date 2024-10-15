@@ -1,12 +1,12 @@
 # Changelog
 
-## [0.2.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.1a1) (2024-10-15)
+## [0.2.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.2a1) (2024-10-15)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.0...0.2.1a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.1...0.2.2a1)
 
 **Merged pull requests:**
 
-- requirements:latest stable packages [\#563](https://github.com/OpenVoiceOS/ovos-core/pull/563) ([JarbasAl](https://github.com/JarbasAl))
+- deprecate ready setting [\#554](https://github.com/OpenVoiceOS/ovos-core/pull/554) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
