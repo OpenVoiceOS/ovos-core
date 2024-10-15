@@ -38,7 +38,7 @@ jobs:
           pip install ./test/end2end/metadata-test-plugin
     - name: Install core repo
       run: |
-        pip install -e .[mycroft,deprecated]
+        pip install -e .[mycroft,deprecated,plugins]
     - name: Generate coverage report
       run: |
         pytest --cov=ovos_core --cov-report xml test/unittests
