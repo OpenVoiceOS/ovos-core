@@ -20,7 +20,7 @@ mycroft.skills.
 # Import moved methods for backwards compatibility
 # This will need to remain here for quite some time since removing it
 # would break most of the skills out there.
-from ovos_workshop.skills.mycroft_skill import MycroftSkill
+from ovos_workshop.skills.ovos import OVOSSkill as MycroftSkill
 from ovos_workshop.skills.fallback import FallbackSkill
 from mycroft.skills.mycroft_skill import resting_screen_handler, intent_handler, intent_file_handler, skill_api_method
 

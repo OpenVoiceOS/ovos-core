@@ -22,7 +22,7 @@ from mycroft.skills.mycroft_skill import (intent_handler,
                                           resting_screen_handler,
                                           skill_api_method)
 from ovos_workshop.skills.fallback import FallbackSkill
-from ovos_workshop.skills.mycroft_skill import MycroftSkill
+from ovos_workshop.skills.ovos import OVOSSkill as MycroftSkill
 from mycroft.skills.common_iot_skill import CommonIoTSkill
 from mycroft.skills.common_play_skill import CommonPlaySkill, CPSMatchLevel
 from mycroft.skills.common_query_skill import CommonQuerySkill, CQSMatchLevel
