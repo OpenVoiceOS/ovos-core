@@ -21,7 +21,7 @@ class TestRouting(TestCase):
     def test_no_session(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.pipeline = ["adapt_high"]
 
         messages = []

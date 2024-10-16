@@ -20,7 +20,7 @@ class TestSessions(TestCase):
     def test_no_response(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.pipeline = [
                            "converse",
                            "padatious_high",
@@ -100,7 +100,7 @@ class TestSessions(TestCase):
         # (missing in utterance message) and kept in all messages
         for m in messages[1:]:
             self.assertEqual(m.context["session"]["session_id"], "default")
-            self.assertEqual(m.context["lang"], "en-us")
+            self.assertEqual(m.context["lang"], "en-US")
 
         # verify intent triggers
         self.assertEqual(messages[3].msg_type, f"{self.skill_id}:test_get_response.intent")
@@ -125,7 +125,7 @@ class TestSessions(TestCase):
         self.assertEqual(messages[7].msg_type, "enclosure.active_skill")
         self.assertEqual(messages[7].data["skill_id"], self.skill_id)
         self.assertEqual(messages[8].msg_type, "speak")
-        self.assertEqual(messages[8].data["lang"], "en-us")
+        self.assertEqual(messages[8].data["lang"], "en-US")
         self.assertTrue(messages[8].data["expect_response"])  # listen after dialog
         self.assertEqual(messages[8].data["meta"]["skill"], self.skill_id)
         self.assertEqual(messages[9].msg_type, "recognizer_loop:audio_output_start")
@@ -142,7 +142,7 @@ class TestSessions(TestCase):
         self.assertEqual(messages[14].msg_type, "enclosure.active_skill")
         self.assertEqual(messages[14].data["skill_id"], self.skill_id)
         self.assertEqual(messages[15].msg_type, "speak")
-        self.assertEqual(messages[15].data["lang"], "en-us")
+        self.assertEqual(messages[15].data["lang"], "en-US")
         self.assertFalse(messages[15].data["expect_response"])
         self.assertEqual(messages[15].data["utterance"], "ERROR")
         self.assertEqual(messages[15].data["meta"]["skill"], self.skill_id)
@@ -163,7 +163,7 @@ class TestSessions(TestCase):
     def test_with_response(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.pipeline = [
                            "converse",
                            "padatious_high",
@@ -279,7 +279,7 @@ class TestSessions(TestCase):
         self.assertEqual(messages[7].data["skill_id"], self.skill_id)
         self.assertEqual(messages[8].msg_type, "speak")
         self.assertEqual(messages[8].data["utterance"], "give me an answer", )
-        self.assertEqual(messages[8].data["lang"], "en-us")
+        self.assertEqual(messages[8].data["lang"], "en-US")
         self.assertTrue(messages[8].data["expect_response"])  # listen after dialog
         self.assertEqual(messages[8].data["meta"]["skill"], self.skill_id)
         # ovos-audio speak execution (simulated)
@@ -308,7 +308,7 @@ class TestSessions(TestCase):
         self.assertEqual(messages[19].msg_type, "enclosure.active_skill")
         self.assertEqual(messages[19].data["skill_id"], self.skill_id)
         self.assertEqual(messages[20].msg_type, "speak")
-        self.assertEqual(messages[20].data["lang"], "en-us")
+        self.assertEqual(messages[20].data["lang"], "en-US")
         self.assertFalse(messages[20].data["expect_response"])
         self.assertEqual(messages[20].data["utterance"], "ok")
         self.assertEqual(messages[20].data["meta"]["skill"], self.skill_id)
@@ -329,7 +329,7 @@ class TestSessions(TestCase):
     def test_cancel_response(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.pipeline = [
                            "converse",
                            "padatious_high",
@@ -445,7 +445,7 @@ class TestSessions(TestCase):
         self.assertEqual(messages[7].data["skill_id"], self.skill_id)
         self.assertEqual(messages[8].msg_type, "speak")
         self.assertEqual(messages[8].data["utterance"], "give me an answer", )
-        self.assertEqual(messages[8].data["lang"], "en-us")
+        self.assertEqual(messages[8].data["lang"], "en-US")
         self.assertTrue(messages[8].data["expect_response"])  # listen after dialog
         self.assertEqual(messages[8].data["meta"]["skill"], self.skill_id)
         # ovos-audio speak execution (simulated)
@@ -473,7 +473,7 @@ class TestSessions(TestCase):
         self.assertEqual(messages[19].msg_type, "enclosure.active_skill")
         self.assertEqual(messages[19].data["skill_id"], self.skill_id)
         self.assertEqual(messages[20].msg_type, "speak")
-        self.assertEqual(messages[20].data["lang"], "en-us")
+        self.assertEqual(messages[20].data["lang"], "en-US")
         self.assertFalse(messages[20].data["expect_response"])
         self.assertEqual(messages[20].data["utterance"], "ERROR")
         self.assertEqual(messages[20].data["meta"]["skill"], self.skill_id)
@@ -494,7 +494,7 @@ class TestSessions(TestCase):
     def test_with_reprompt(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.pipeline = [
                            "converse",
                            "padatious_high",
@@ -629,7 +629,7 @@ class TestSessions(TestCase):
         self.assertEqual(messages[18].msg_type, "enclosure.active_skill")
         self.assertEqual(messages[18].data["skill_id"], self.skill_id)
         self.assertEqual(messages[19].msg_type, "speak")
-        self.assertEqual(messages[19].data["lang"], "en-us")
+        self.assertEqual(messages[19].data["lang"], "en-US")
         self.assertFalse(messages[19].data["expect_response"])
         self.assertEqual(messages[19].data["utterance"], "ok")
         self.assertEqual(messages[19].data["meta"]["skill"], self.skill_id)
@@ -647,7 +647,7 @@ class TestSessions(TestCase):
     def test_nested(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.pipeline = [
                            "converse",
                            "padatious_high",
@@ -801,7 +801,7 @@ class TestSessions(TestCase):
         self.assertEqual(messages[5].msg_type, "enclosure.active_skill")
         self.assertEqual(messages[5].data["skill_id"], self.skill_id)
         self.assertEqual(messages[6].msg_type, "speak")
-        self.assertEqual(messages[6].data["lang"], "en-us")
+        self.assertEqual(messages[6].data["lang"], "en-US")
         self.assertFalse(messages[6].data["expect_response"])
         self.assertEqual(messages[6].data["utterance"], "give me items")
         self.assertEqual(messages[6].data["meta"]["skill"], self.skill_id)
@@ -847,7 +847,7 @@ class TestSessions(TestCase):
     def test_kill_response(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.pipeline = [
             "converse",
             "padatious_high",

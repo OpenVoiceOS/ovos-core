@@ -1,2 +1,2 @@
-ovos_padatious>=0.1.2,<1.0.0
+ovos_padatious>=0.1.3,<1.0.0
 fann2>=1.0.7, < 1.1.0

@@ -20,7 +20,7 @@ class TestSessions(TestCase):
     def test_no_session(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.pipeline = [
             "adapt_high"
         ]
@@ -73,7 +73,7 @@ class TestSessions(TestCase):
         # (missing in utterance message) and kept in all messages
         for m in messages[1:]:
             self.assertEqual(m.context["session"]["session_id"], "default")
-            self.assertEqual(m.context["lang"], "en-us")
+            self.assertEqual(m.context["lang"], "en-US")
 
         # verify skill is activated
         self.assertEqual(messages[1].msg_type, "intent.service.skills.activated")
@@ -105,7 +105,7 @@ class TestSessions(TestCase):
     def test_explicit_default_session(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         now = time.time()
         SessionManager.default_session.active_skills = [(self.skill_id, now)]
         SessionManager.default_session.pipeline = [
@@ -206,7 +206,7 @@ class TestSessions(TestCase):
     def test_explicit_session(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.pipeline = [
             "converse",
             "adapt_high"
@@ -295,7 +295,7 @@ class TestSessions(TestCase):
         self.assertEqual(messages[7].msg_type, "enclosure.active_skill")
         self.assertEqual(messages[7].data["skill_id"], self.skill_id)
         self.assertEqual(messages[8].msg_type, "speak")
-        self.assertEqual(messages[8].data["lang"], "en-us")
+        self.assertEqual(messages[8].data["lang"], "en-US")
         self.assertFalse(messages[8].data["expect_response"])
         self.assertEqual(messages[8].data["meta"]["dialog"], "hello.world")
         self.assertEqual(messages[8].data["meta"]["skill"], self.skill_id)
