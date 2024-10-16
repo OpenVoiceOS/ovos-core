@@ -24,7 +24,7 @@ class StopService(PipelinePlugin):
         self.bus = bus
         self._voc_cache = {}
         self.load_resource_files()
-        super().__init__()
+        super().__init__(config=Configuration().get("skills", {}).get("stop") or {})
 
     def load_resource_files(self):
         base = f"{dirname(__file__)}/locale"
@@ -37,14 +37,6 @@ class StopService(PipelinePlugin):
                              if l.strip() and not l.startswith("#")]
                     n = f.split(".", 1)[0]
                     self._voc_cache[lang2][n] = flatten_list(lines)
-
-    @property
-    def config(self):
-        """
-        Returns:
-            stop_config (dict): config for stop handling options
-        """
-        return Configuration().get("skills", {}).get("stop") or {}
 
     def get_active_skills(self, message: Optional[Message] = None):
         """Active skill ids ordered by converse priority
@@ -182,8 +174,8 @@ class StopService(PipelinePlugin):
         Returns:
             IntentMatch if handled otherwise None.
         """
-        lang = standardize_lang_tag(lang)
-        if lang not in self._voc_cache:
+        lang = self._get_closest_lang(lang)
+        if lang is None:  # no vocs registered for this lang
             return None
 
         # we call flatten in case someone is sending the old style list of tuples
