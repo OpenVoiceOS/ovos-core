@@ -28,7 +28,7 @@ class TestTransformerPlugins(TestCase):
 
     def test_cancel(self):
 
-        self.assertIn('ovos-utterance-plugin-cancel', self.core.intent_service.utterance_plugins.loaded_plugins)
+        self.assertIn('ovos-utterance-plugin-cancel', self.core.adapt_pipeline.utterance_plugins.loaded_plugins)
 
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
@@ -97,11 +97,11 @@ class TestTransformerPlugins(TestCase):
 
     def test_meta(self):
         self.assertNotIn('ovos-metadata-test-plugin',
-                         self.core.intent_service.metadata_plugins.loaded_plugins)
+                         self.core.adapt_pipeline.metadata_plugins.loaded_plugins)
         self.core.load_metadata_transformers({"ovos-metadata-test-plugin": {}})
         self.assertIn('ovos-metadata-test-plugin',
-                      self.core.intent_service.metadata_plugins.loaded_plugins,
-                      self.core.intent_service.metadata_plugins.find_plugins())
+                      self.core.adapt_pipeline.metadata_plugins.loaded_plugins,
+                      self.core.adapt_pipeline.metadata_plugins.find_plugins())
 
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
