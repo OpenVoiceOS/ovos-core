@@ -206,7 +206,7 @@ class FallbackService(PipelineStageConfidenceMatcher):
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(0, 5))
 
-    def mstch_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
+    def match_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
         """General fallbacks."""
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(5, 90))
