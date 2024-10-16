@@ -12,27 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from typing import Tuple, Callable
+from typing import Tuple, Callable, List
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
-from ovos_workshop.intents import open_intent_envelope
 
-from ocp_pipeline.opm import OCPPipelineMatcher
-from ovos_adapt.opm import AdaptPipeline as AdaptService
-from ovos_commonqa.opm import CommonQAService
 from ovos_config.config import Configuration
 from ovos_config.locale import setup_locale, get_valid_languages, get_full_lang_code
 from ovos_core.intent_services.converse_service import ConverseService
 from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
-from ovos_plugin_manager.templates.pipeline import IntentMatch
+from ovos_plugin_manager.pipeline import OVOSPipelineFactory
+from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelineMatch
 from ovos_utils.lang import standardize_lang_tag
-from ovos_utils.log import LOG, deprecated, log_deprecation
+from ovos_utils.log import LOG
 from ovos_utils.metrics import Stopwatch
-from padacioso.opm import PadaciosoPipeline as PadaciosoService
 
 
 class IntentService:
@@ -49,15 +45,7 @@ class IntentService:
         # Dictionary for translating a skill id to a name
         self.skill_names = {}
 
-        self._adapt_service = None
-        self._padatious_service = None
-        self._padacioso_service = None
-        self._fallback = None
-        self._converse = None
-        self._common_qa = None
-        self._stop = None
-        self._ocp = None
-        self._load_pipeline_plugins()
+        OVOSPipelineFactory.create(use_cache=True, bus=self.bus)  # pre-loa
 
         self.utterance_plugins = UtteranceTransformersService(bus)
         self.metadata_plugins = MetadataTransformersService(bus)
@@ -66,11 +54,7 @@ class IntentService:
         # this will sync default session across all components
         SessionManager.connect_to_bus(self.bus)
 
-        self.bus.on('register_vocab', self.handle_register_vocab)
-        self.bus.on('register_intent', self.handle_register_intent)
         self.bus.on('recognizer_loop:utterance', self.handle_utterance)
-        self.bus.on('detach_intent', self.handle_detach_intent)
-        self.bus.on('detach_skill', self.handle_detach_skill)
         # Context related handlers
         self.bus.on('add_context', self.handle_add_context)
         self.bus.on('remove_context', self.handle_remove_context)
@@ -83,136 +67,6 @@ class IntentService:
         self.registered_vocab = []
         self.bus.on('intent.service.intent.get', self.handle_get_intent)
         self.bus.on('intent.service.skills.get', self.handle_get_skills)
-        self.bus.on('intent.service.adapt.get', self.handle_get_adapt)
-        self.bus.on('intent.service.adapt.manifest.get', self.handle_adapt_manifest)
-        self.bus.on('intent.service.adapt.vocab.manifest.get', self.handle_vocab_manifest)
-        self.bus.on('intent.service.padatious.get', self.handle_get_padatious)
-        self.bus.on('intent.service.padatious.manifest.get', self.handle_padatious_manifest)
-        self.bus.on('intent.service.padatious.entities.manifest.get', self.handle_entity_manifest)
-
-    @property
-    def adapt_service(self):
-        log_deprecation("direct access to self.adapt_service is deprecated, "
-                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        return self._adapt_service
-
-    @property
-    def padatious_service(self):
-        log_deprecation("direct access to self.padatious_service is deprecated, "
-                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        return self._padatious_service
-
-    @property
-    def padacioso_service(self):
-        log_deprecation("direct access to self.padacioso_service is deprecated, "
-                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        return self._padacioso_service
-
-    @property
-    def fallback(self):
-
-        log_deprecation("direct access to self.fallback is deprecated, "
-                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        return self._fallback
-
-    @property
-    def converse(self):
-        log_deprecation("direct access to self.converse is deprecated, "
-                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        return self._converse
-
-    @property
-    def common_qa(self):
-        log_deprecation("direct access to self.common_qa is deprecated, "
-                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        return self._common_qa
-
-    @property
-    def stop(self):
-        log_deprecation("direct access to self.stop is deprecated, "
-                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        return self._stop
-
-    @property
-    def ocp(self):
-        log_deprecation("direct access to self.ocp is deprecated, "
-                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        return self._ocp
-
-    @adapt_service.setter
-    def adapt_service(self, value):
-        log_deprecation("direct access to self.adapt_service is deprecated, "
-                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        self._adapt_service = value
-
-    @padatious_service.setter
-    def padatious_service(self, value):
-        log_deprecation("direct access to self.padatious_service is deprecated, "
-                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        self._padatious_service = value
-
-    @padacioso_service.setter
-    def padacioso_service(self, value):
-        log_deprecation("direct access to self.padacioso_service is deprecated, "
-                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        self._padacioso_service = value
-
-    @fallback.setter
-    def fallback(self, value):
-        log_deprecation("direct access to self.fallback is deprecated, "
-                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        self._fallback = value
-
-    @converse.setter
-    def converse(self, value):
-        log_deprecation("direct access to self.converse is deprecated, "
-                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        self._converse = value
-
-    @common_qa.setter
-    def common_qa(self, value):
-        log_deprecation("direct access to self.common_qa is deprecated, "
-                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        self._common_qa = value
-
-    @stop.setter
-    def stop(self, value):
-        log_deprecation("direct access to self.stop is deprecated, "
-                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        self._stop = value
-
-    @ocp.setter
-    def ocp(self, value):
-        log_deprecation("direct access to self.ocp is deprecated, "
-                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        self._ocp = value
-
-    def _load_pipeline_plugins(self):
-        # TODO - replace with plugin loader from OPM
-        self._adapt_service = AdaptService(config=self.config.get("adapt", {}))
-        if "padatious" not in self.config:
-            self.config["padatious"] = Configuration().get("padatious", {})
-        try:
-            if self.config["padatious"].get("disabled"):
-                LOG.info("padatious forcefully disabled in config")
-            else:
-                from ovos_padatious.opm import PadatiousPipeline as PadatiousService
-                self._padatious_service = PadatiousService(self.bus, self.config["padatious"])
-        except ImportError:
-            LOG.error(f'Failed to create padatious intent handlers, padatious not installed')
-
-        self._padacioso_service = PadaciosoService(self.bus, self.config["padatious"])
-        self._fallback = FallbackService(self.bus)
-        self._converse = ConverseService(self.bus)
-        self._common_qa = CommonQAService(self.bus, self.config.get("common_query"))
-        self._stop = StopService(self.bus)
-        self._ocp = OCPPipelineMatcher(self.bus, config=self.config.get("OCP", {}))
-
-    @property
-    def registered_intents(self):
-        lang = get_message_lang()
-        return [parser.__dict__
-                for parser in self._adapt_service.engines[lang].intent_parsers]
 
     def update_skill_name_dict(self, message):
         """Messagebus handler, updates dict of id to skill name conversions."""
@@ -228,36 +82,6 @@ class IntentService:
             (str) Skill name or the skill id if the skill wasn't found
         """
         return self.skill_names.get(skill_id, skill_id)
-
-    # converse handling
-    @property
-    def active_skills(self):
-        log_deprecation("self.active_skills is deprecated! use Session instead", "0.0.9")
-        session = SessionManager.get()
-        return session.active_skills
-
-    @active_skills.setter
-    def active_skills(self, val):
-        log_deprecation("self.active_skills is deprecated! use Session instead", "0.0.9")
-        session = SessionManager.get()
-        session.active_skills = []
-        for skill_id, ts in val:
-            session.activate_skill(skill_id)
-
-    @deprecated("handle_activate_skill_request moved to ConverseService, overriding this method has no effect, "
-                "it has been disconnected from the bus event", "0.0.8")
-    def handle_activate_skill_request(self, message):
-        self.converse.handle_activate_skill_request(message)
-
-    @deprecated("handle_deactivate_skill_request moved to ConverseService, overriding this method has no effect, "
-                "it has been disconnected from the bus event", "0.0.8")
-    def handle_deactivate_skill_request(self, message):
-        self.converse.handle_deactivate_skill_request(message)
-
-    @deprecated("reset_converse moved to ConverseService, overriding this method has no effect, "
-                "it has been disconnected from the bus event", "0.0.8")
-    def reset_converse(self, message):
-        self.converse.reset_converse(message)
 
     def _handle_transformers(self, message):
         """
@@ -299,57 +123,50 @@ class IntentService:
 
         return default_lang
 
-    def get_pipeline(self, skips=None, session=None) -> Tuple[str, Callable]:
+    def get_pipeline(self, skips=None, session=None) -> List[Tuple[str, Callable]]:
         """return a list of matcher functions ordered by priority
         utterances will be sent to each matcher in order until one can handle the utterance
         the list can be configured in mycroft.conf under intents.pipeline,
         in the future plugins will be supported for users to define their own pipeline"""
+
+        # TODO - deprecate around ovos-core 2.0.0
+        MAP = {
+            "converse": "ovos-converse-pipeline-plugin",
+            "common_qa": "ovos-common-query-pipeline-plugin",
+            "fallback_high": "ovos-fallback-pipeline-plugin-high",
+            "fallback_medium": "ovos-fallback-pipeline-plugin-medium",
+            "fallback_low": "ovos-fallback-pipeline-plugin-low",
+            "stop_high": "ovos-stop-pipeline-plugin-high",
+            "stop_medium": "ovos-stop-pipeline-plugin-medium",
+            "stop_low": "ovos-stop-pipeline-plugin-low",
+            "adapt_high": "ovos-adapt-pipeline-plugin-high",
+            "adapt_medium": "ovos-adapt-pipeline-plugin-medium",
+            "adapt_low": "ovos-adapt-pipeline-plugin-low",
+            "padacioso_high": "ovos-padacioso-pipeline-plugin-high",
+            "padacioso_medium": "ovos-padacioso-pipeline-plugin-medium",
+            "padacioso_low": "ovos-padacioso-pipeline-plugin-low",
+            "padatious_high": "ovos-padatious-pipeline-plugin-high",
+            "padatious_medium": "ovos-padatious-pipeline-plugin-medium",
+            "padatious_low": "ovos-padatious-pipeline-plugin-low",
+            "ocp_high": "ovos-ocp-pipeline-plugin-high",
+            "ocp_medium": "ovos-ocp-pipeline-plugin-medium",
+            "ocp_low": "ovos-ocp-pipeline-plugin-low"
+        }
+
         session = session or SessionManager.get()
 
-        # Create matchers
-        # TODO - from plugins
-        if self._padatious_service is None:
-            if any("padatious" in p for p in session.pipeline):
-                LOG.warning("padatious is not available! using padacioso in it's place, "
-                            "intent matching will be extremely slow in comparison")
-            padatious_matcher = self._padacioso_service
-        else:
-            from ovos_core.intent_services.padatious_service import PadatiousMatcher
-            padatious_matcher = PadatiousMatcher(self._padatious_service)
+        skips = [MAP.get(p, p) for p in skips or []]
+        pipeline = [MAP.get(p, p) for p in session.pipeline
+                    if p not in skips or []]
 
-        matchers = {
-            "converse": self._converse.converse_with_skills,
-            "stop_high": self._stop.match_stop_high,
-            "stop_medium": self._stop.match_stop_medium,
-            "stop_low": self._stop.match_stop_low,
-            "padatious_high": padatious_matcher.match_high,
-            "padacioso_high": self._padacioso_service.match_high,
-            "adapt_high": self._adapt_service.match_high,
-            "common_qa": self._common_qa.match,
-            "fallback_high": self._fallback.high_prio,
-            "padatious_medium": padatious_matcher.match_medium,
-            "padacioso_medium": self._padacioso_service.match_medium,
-            "adapt_medium": self._adapt_service.match_medium,
-            "fallback_medium": self._fallback.medium_prio,
-            "padatious_low": padatious_matcher.match_low,
-            "padacioso_low": self._padacioso_service.match_low,
-            "adapt_low": self._adapt_service.match_low,
-            "fallback_low": self._fallback.low_prio
-        }
-        if self._ocp is not None:
-            matchers.update({
-                "ocp_high": self._ocp.match_high,
-                "ocp_medium": self._ocp.match_medium,
-                "ocp_fallback": self._ocp.match_fallback,
-                "ocp_legacy": self._ocp.match_legacy})
-        skips = skips or []
-        pipeline = [k for k in session.pipeline if k not in skips]
-        if any(k not in matchers for k in pipeline):
+        matchers = OVOSPipelineFactory.create(pipeline, use_cache=True, bus=self.bus)
+
+        if any(k[0] not in pipeline for k in matchers):
             LOG.warning(f"Requested some invalid pipeline components! "
                         f"filtered {[k for k in pipeline if k not in matchers]}")
             pipeline = [k for k in pipeline if k in matchers]
         LOG.debug(f"Session pipeline: {pipeline}")
-        return [(k, matchers[k]) for k in pipeline]
+        return matchers
 
     def _validate_session(self, message, lang):
         # get session
@@ -387,19 +204,19 @@ class IntentService:
             # ensure skill_id is present in message.context
             message.context["skill_id"] = match.skill_id
 
-        if match.intent_type is True:
+        if isinstance(match, PipelineMatch) and match.handled:
             # utterance fully handled
             reply = message.reply("ovos.utterance.handled",
                                   {"skill_id": match.skill_id})
             self.bus.emit(reply)
         # Launch skill if not handled by the match function
-        elif match.intent_type:
+        elif isinstance(match, IntentMatch) and match.match_type:
             # keep all original message.data and update with intent match
             data = dict(message.data)
-            data.update(match.intent_data)
+            data.update(match.match_data)
 
             # NOTE: message.reply to ensure correct message destination
-            reply = message.reply(match.intent_type, data)
+            reply = message.reply(match.match_type, data)
 
             # let's activate the skill BEFORE the intent is triggered
             # to ensure an accurate Session
@@ -483,9 +300,9 @@ class IntentService:
                         LOG.debug(
                             f"ignoring match, skill_id '{match.skill_id}' blacklisted by Session '{sess.session_id}'")
                         continue
-                    if match.intent_type and match.intent_type in sess.blacklisted_intents:
+                    if match.match_type and match.match_type in sess.blacklisted_intents:
                         LOG.debug(
-                            f"ignoring match, intent '{match.intent_type}' blacklisted by Session '{sess.session_id}'")
+                            f"ignoring match, intent '{match.match_type}' blacklisted by Session '{sess.session_id}'")
                         continue
                     try:
                         self._emit_match_message(match, message)
@@ -517,49 +334,8 @@ class IntentService:
         self.bus.emit(message.reply('complete_intent_failure'))
         self.bus.emit(message.reply("ovos.utterance.handled"))
 
-    def handle_register_vocab(self, message):
-        """Register adapt vocabulary.
-
-        Args:
-            message (Message): message containing vocab info
-        """
-        entity_value = message.data.get('entity_value')
-        entity_type = message.data.get('entity_type')
-        regex_str = message.data.get('regex')
-        alias_of = message.data.get('alias_of')
-        lang = get_message_lang(message)
-        self._adapt_service.register_vocabulary(entity_value, entity_type,
-                                               alias_of, regex_str, lang)
-        self.registered_vocab.append(message.data)
-
-    def handle_register_intent(self, message):
-        """Register adapt intent.
-
-        Args:
-            message (Message): message containing intent info
-        """
-        intent = open_intent_envelope(message)
-        self._adapt_service.register_intent(intent)
-
-    def handle_detach_intent(self, message):
-        """Remover adapt intent.
-
-        Args:
-            message (Message): message containing intent info
-        """
-        intent_name = message.data.get('intent_name')
-        self._adapt_service.detach_intent(intent_name)
-
-    def handle_detach_skill(self, message):
-        """Remove all intents registered for a specific skill.
-
-        Args:
-            message (Message): message containing intent info
-        """
-        skill_id = message.data.get('skill_id')
-        self._adapt_service.detach_skill(skill_id)
-
-    def handle_add_context(self, message):
+    @staticmethod
+    def handle_add_context(message: Message):
         """Add context
 
         Args:
@@ -581,7 +357,8 @@ class IntentService:
         sess = SessionManager.get(message)
         sess.context.inject_context(entity)
 
-    def handle_remove_context(self, message):
+    @staticmethod
+    def handle_remove_context(message: Message):
         """Remove specific context
 
         Args:
@@ -592,7 +369,8 @@ class IntentService:
             sess = SessionManager.get(message)
             sess.context.remove_context(context)
 
-    def handle_clear_context(self, message):
+    @staticmethod
+    def handle_clear_context(message: Message):
         """Clears all keywords from context """
         sess = SessionManager.get(message)
         sess.context.clear_context()
@@ -608,17 +386,18 @@ class IntentService:
         sess = SessionManager.get(message)
 
         # Loop through the matching functions until a match is found.
-        for pipeline, match_func in self.get_pipeline(skips=["converse",
-                                                             "fallback_high",
-                                                             "fallback_medium",
-                                                             "fallback_low"],
+        # TODO - skip by type not hardcoded list
+        for pipeline, match_func in self.get_pipeline(skips=["ovos-converse-pipeline-plugin",
+                                                             "ovos-fallback-pipeline-plugin-high",
+                                                             "ovos-fallback-pipeline-plugin-medium",
+                                                             "ovos-fallback-pipeline-plugin-low"],
                                                       session=sess):
             match = match_func([utterance], lang, message)
             if match:
-                if match.intent_type:
-                    intent_data = match.intent_data
-                    intent_data["intent_name"] = match.intent_type
-                    intent_data["intent_service"] = match.intent_service
+                if match.match_type:
+                    intent_data = match.match_data
+                    intent_data["intent_name"] = match.match_type
+                    intent_data["intent_service"] = pipeline
                     intent_data["skill_id"] = match.skill_id
                     intent_data["handler"] = match_func.__name__
                     self.bus.emit(message.reply("intent.service.intent.reply",
@@ -638,110 +417,15 @@ class IntentService:
         self.bus.emit(message.reply("intent.service.skills.reply",
                                     {"skills": self.skill_names}))
 
-    @deprecated("handle_get_active_skills moved to ConverseService, overriding this method has no effect, "
-                "it has been disconnected from the bus event", "0.0.8")
-    def handle_get_active_skills(self, message):
-        """Send active skills to caller.
-
-        Argument:
-            message: query message to reply to.
-        """
-        self.converse.handle_get_active_skills(message)
-
-    def handle_get_adapt(self, message: Message):
-        """handler getting the adapt response for an utterance.
-
-        Args:
-            message (Message): message containing utterance
-        """
-        utterance = message.data["utterance"]
-        lang = get_message_lang(message)
-        intent = self._adapt_service.match_intent((utterance,), lang, message.serialize())
-        intent_data = intent.intent_data if intent else None
-        self.bus.emit(message.reply("intent.service.adapt.reply",
-                                    {"intent": intent_data}))
-
-    def handle_adapt_manifest(self, message):
-        """Send adapt intent manifest to caller.
-
-        Argument:
-            message: query message to reply to.
-        """
-        self.bus.emit(message.reply("intent.service.adapt.manifest",
-                                    {"intents": self.registered_intents}))
-
-    def handle_vocab_manifest(self, message):
-        """Send adapt vocabulary manifest to caller.
-
-        Argument:
-            message: query message to reply to.
-        """
-        self.bus.emit(message.reply("intent.service.adapt.vocab.manifest",
-                                    {"vocab": self.registered_vocab}))
-
-    def handle_get_padatious(self, message):
-        """messagebus handler for perfoming padatious parsing.
-
-        Args:
-            message (Message): message triggering the method
-        """
-        utterance = message.data["utterance"]
-        norm = message.data.get('norm_utt', utterance)
-        intent = self.padacioso_service.calc_intent(utterance)
-        if not intent and norm != utterance:
-            intent = self.padacioso_service.calc_intent(norm)
-        if intent:
-            intent = intent.__dict__
-        self.bus.emit(message.reply("intent.service.padatious.reply",
-                                    {"intent": intent}))
-
-    def handle_padatious_manifest(self, message):
-        """Messagebus handler returning the registered padatious intents.
-
-        Args:
-            message (Message): message triggering the method
-        """
-        self.bus.emit(message.reply(
-            "intent.service.padatious.manifest",
-            {"intents": self.padacioso_service.registered_intents}))
-
-    def handle_entity_manifest(self, message):
-        """Messagebus handler returning the registered padatious entities.
-
-        Args:
-            message (Message): message triggering the method
-        """
-        self.bus.emit(message.reply(
-            "intent.service.padatious.entities.manifest",
-            {"entities": self.padacioso_service.registered_entities}))
-
     def shutdown(self):
         self.utterance_plugins.shutdown()
         self.metadata_plugins.shutdown()
-        self._adapt_service.shutdown()
-        self._padacioso_service.shutdown()
-        if self._padatious_service:
-            self._padatious_service.shutdown()
-        self._common_qa.shutdown()
-        self._converse.shutdown()
-        self._fallback.shutdown()
-        if self._ocp:
-            self._ocp.shutdown()
+        OVOSPipelineFactory.shutdown()
 
-        self.bus.remove('register_vocab', self.handle_register_vocab)
-        self.bus.remove('register_intent', self.handle_register_intent)
         self.bus.remove('recognizer_loop:utterance', self.handle_utterance)
-        self.bus.remove('detach_intent', self.handle_detach_intent)
-        self.bus.remove('detach_skill', self.handle_detach_skill)
         self.bus.remove('add_context', self.handle_add_context)
         self.bus.remove('remove_context', self.handle_remove_context)
         self.bus.remove('clear_context', self.handle_clear_context)
         self.bus.remove('mycroft.skills.loaded', self.update_skill_name_dict)
         self.bus.remove('intent.service.intent.get', self.handle_get_intent)
         self.bus.remove('intent.service.skills.get', self.handle_get_skills)
-        self.bus.remove('intent.service.adapt.get', self.handle_get_adapt)
-        self.bus.remove('intent.service.adapt.manifest.get', self.handle_adapt_manifest)
-        self.bus.remove('intent.service.adapt.vocab.manifest.get', self.handle_vocab_manifest)
-        self.bus.remove('intent.service.padatious.get', self.handle_get_padatious)
-        self.bus.remove('intent.service.padatious.manifest.get', self.handle_padatious_manifest)
-        self.bus.remove('intent.service.padatious.entities.manifest.get', self.handle_entity_manifest)
