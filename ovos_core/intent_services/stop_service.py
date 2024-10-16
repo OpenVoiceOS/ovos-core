@@ -10,6 +10,7 @@ from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
 from ovos_utils import flatten_list
 from ovos_utils.bracket_expansion import expand_options
+from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
 from ovos_utils.parse import match_one
 
@@ -25,7 +26,7 @@ class StopService(PipelinePlugin):
     def load_resource_files(self):
         base = f"{dirname(__file__)}/locale"
         for lang in os.listdir(base):
-            lang2 = lang.split("-")[0].lower()
+            lang2 = standardize_lang_tag(lang)
             self._voc_cache[lang2] = {}
             for f in os.listdir(f"{base}/{lang}"):
                 with open(f"{base}/{lang}/{f}", encoding="utf-8") as fi:
@@ -127,7 +128,7 @@ class StopService(PipelinePlugin):
         Returns:
             IntentMatch if handled otherwise None.
         """
-        lang = lang.split("-")[0]
+        lang = standardize_lang_tag(lang)
         if lang not in self._voc_cache:
             return None
 
@@ -178,7 +179,7 @@ class StopService(PipelinePlugin):
         Returns:
             IntentMatch if handled otherwise None.
         """
-        lang = lang.split("-")[0]
+        lang = standardize_lang_tag(lang)
         if lang not in self._voc_cache:
             return None
 
@@ -205,7 +206,7 @@ class StopService(PipelinePlugin):
         Returns:
             IntentMatch if handled otherwise None.
         """
-        lang = lang.split("-")[0]
+        lang = standardize_lang_tag(lang)
         if lang not in self._voc_cache:
             return None
         sess = SessionManager.get(message)
@@ -266,7 +267,7 @@ class StopService(PipelinePlugin):
         Returns:
             bool: True if the utterance has the given vocabulary it
         """
-        lang = lang.split("-")[0].lower()
+        lang = standardize_lang_tag(lang)
         if lang not in self._voc_cache:
             return False
 

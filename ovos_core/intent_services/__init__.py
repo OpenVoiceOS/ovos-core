@@ -29,6 +29,7 @@ from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
 from ovos_plugin_manager.templates.pipeline import IntentMatch
+from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG, deprecated, log_deprecation
 from ovos_utils.metrics import Stopwatch
 from padacioso.opm import PadaciosoPipeline as PadaciosoService
@@ -209,7 +210,7 @@ class IntentService:
 
     @property
     def registered_intents(self):
-        lang = get_message_lang()
+        lang = standardize_lang_tag(get_message_lang())
         return [parser.__dict__
                 for parser in self._adapt_service.engines[lang].intent_parsers]
 
@@ -263,7 +264,7 @@ class IntentService:
         Pipe utterance through transformer plugins to get more metadata.
         Utterances may be modified by any parser and context overwritten
         """
-        lang = get_message_lang(message)  # per query lang or default Configuration lang
+        lang = standardize_lang_tag(get_message_lang())  # per query lang or default Configuration lang
         original = utterances = message.data.get('utterances', [])
         message.context["lang"] = lang
         utterances, message.context = self.utterance_plugins.transform(utterances, message.context)
@@ -281,7 +282,7 @@ class IntentService:
         3 - detected_lang -> tagged by transformers  (text classification, free form chat)
         4 - config lang (or from message.data)
         """
-        default_lang = get_message_lang(message)
+        default_lang = standardize_lang_tag(get_message_lang())
         valid_langs = get_valid_languages()
         lang_keys = ["stt_lang",
                      "request_lang",
@@ -352,6 +353,7 @@ class IntentService:
 
     def _validate_session(self, message, lang):
         # get session
+        lang = standardize_lang_tag(lang)
         sess = SessionManager.get(message)
         if sess.session_id == "default":
             updated = False
@@ -525,7 +527,7 @@ class IntentService:
         entity_type = message.data.get('entity_type')
         regex_str = message.data.get('regex')
         alias_of = message.data.get('alias_of')
-        lang = get_message_lang(message)
+        lang = standardize_lang_tag(get_message_lang())
         self._adapt_service.register_vocabulary(entity_value, entity_type,
                                                alias_of, regex_str, lang)
         self.registered_vocab.append(message.data)
@@ -602,7 +604,7 @@ class IntentService:
             message (Message): message containing utterance
         """
         utterance = message.data["utterance"]
-        lang = get_message_lang(message)
+        lang = standardize_lang_tag(get_message_lang())
         sess = SessionManager.get(message)
 
         # Loop through the matching functions until a match is found.
@@ -653,7 +655,7 @@ class IntentService:
             message (Message): message containing utterance
         """
         utterance = message.data["utterance"]
-        lang = get_message_lang(message)
+        lang = standardize_lang_tag(get_message_lang())
         intent = self._adapt_service.match_intent((utterance,), lang, message.serialize())
         intent_data = intent.intent_data if intent else None
         self.bus.emit(message.reply("intent.service.adapt.reply",

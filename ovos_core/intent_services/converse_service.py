@@ -9,6 +9,7 @@ from ovos_config.config import Configuration
 from ovos_config.locale import setup_locale
 from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
 from ovos_utils import flatten_list
+from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
 
@@ -279,7 +280,7 @@ class ConverseService(PipelinePlugin):
             handled (bool): True if handled otherwise False.
         """
         session = SessionManager.get(message)
-        session.lang = lang
+        session.lang = standardize_lang_tag(lang)
 
         state = session.utterance_states.get(skill_id, UtteranceState.INTENT)
         if state == UtteranceState.RESPONSE:
@@ -384,7 +385,7 @@ class ConverseService(PipelinePlugin):
 
     def reset_converse(self, message):
         """Let skills know there was a problem with speech recognition"""
-        lang = get_message_lang(message)
+        lang = standardize_lang_tag(get_message_lang())
         try:
             setup_locale(lang)  # restore default lang
         except Exception as e:
