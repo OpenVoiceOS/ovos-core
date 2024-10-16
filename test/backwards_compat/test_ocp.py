@@ -201,31 +201,31 @@ class TestCPS(unittest.TestCase):
             {'type': 'padatious:register_intent',
              'data': {
                  'file_name': f'{locale_folder}/play.intent',
-                 'name': 'ovos.common_play:play.intent', 'lang': 'en-us'}},
+                 'name': 'ovos.common_play:play.intent', 'lang': 'en-US'}},
             {'type': 'padatious:register_intent',
              'data': {
                  'file_name': f'{locale_folder}/read.intent',
-                 'name': 'ovos.common_play:read.intent', 'lang': 'en-us'}},
+                 'name': 'ovos.common_play:read.intent', 'lang': 'en-US'}},
             {'type': 'padatious:register_intent',
              'data': {
                  'file_name': f'{locale_folder}/open.intent',
-                 'name': 'ovos.common_play:open.intent', 'lang': 'en-us'}},
+                 'name': 'ovos.common_play:open.intent', 'lang': 'en-US'}},
             {'type': 'padatious:register_intent',
              'data': {
                  'file_name': f'{locale_folder}/next.intent',
-                 'name': 'ovos.common_play:next.intent', 'lang': 'en-us'}},
+                 'name': 'ovos.common_play:next.intent', 'lang': 'en-US'}},
             {'type': 'padatious:register_intent',
              'data': {
                  'file_name': f'{locale_folder}/prev.intent',
-                 'name': 'ovos.common_play:prev.intent', 'lang': 'en-us'}},
+                 'name': 'ovos.common_play:prev.intent', 'lang': 'en-US'}},
             {'type': 'padatious:register_intent',
              'data': {
                  'file_name': f'{locale_folder}/pause.intent',
-                 'name': 'ovos.common_play:pause.intent', 'lang': 'en-us'}},
+                 'name': 'ovos.common_play:pause.intent', 'lang': 'en-US'}},
             {'type': 'padatious:register_intent',
              'data': {
                  'file_name': f'{locale_folder}/resume.intent',
-                 'name': 'ovos.common_play:resume.intent', 'lang': 'en-us'}},
+                 'name': 'ovos.common_play:resume.intent', 'lang': 'en-US'}},
             {'type': 'ovos.common_play.skills.get',
              'data': {}}
         ]

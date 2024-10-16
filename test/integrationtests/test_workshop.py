@@ -106,7 +106,7 @@ class TestKillableIntents(unittest.TestCase):
         speak_msg = {'type': 'speak',
                      'data': {'utterance': 'still here', 'expect_response': False,
                               'meta': {'skill': 'abort.test'},
-                              'lang': 'en-us'}}
+                              'lang': 'en-US'}}
         self.assertIn(start_msg, self.bus.emitted_msgs)
         self.assertIn(speak_msg, self.bus.emitted_msgs)
         self.assertTrue(self.skill.instance.my_special_var == "changed")
@@ -129,7 +129,7 @@ class TestKillableIntents(unittest.TestCase):
         speak_msg = {'type': 'speak',
                      'data': {'utterance': 'I am dead', 'expect_response': False,
                               'meta': {'skill': 'abort.test'},
-                              'lang': 'en-us'}}
+                              'lang': 'en-US'}}
         self.assertIn(speak_msg, self.bus.emitted_msgs)
         self.assertTrue(self.skill.instance.my_special_var == "default")
 
@@ -149,7 +149,7 @@ class TestKillableIntents(unittest.TestCase):
                      'data': {'name': 'TestAbortSkill.handle_test_abort_intent'}}
         speak_msg = {'type': 'speak',
                      'data': {'utterance': 'still here', 'expect_response': False,
-                              'meta': {'skill': 'abort.test'}, 'lang': 'en-us'}}
+                              'meta': {'skill': 'abort.test'}, 'lang': 'en-US'}}
         self.assertIn(start_msg, self.bus.emitted_msgs)
         self.assertIn(speak_msg, self.bus.emitted_msgs)
         self.assertTrue(self.skill.instance.my_special_var == "changed")
@@ -171,7 +171,7 @@ class TestKillableIntents(unittest.TestCase):
         speak_msg = {'type': 'speak',
                      'data': {'utterance': 'I am dead', 'expect_response': False,
                               'meta': {'skill': 'abort.test'},
-                              'lang': 'en-us'}}
+                              'lang': 'en-US'}}
 
         self.assertIn(speak_msg, self.bus.emitted_msgs)
         self.assertTrue(self.skill.instance.my_special_var == "default")
@@ -198,7 +198,7 @@ class TestKillableIntents(unittest.TestCase):
                      'data': {'utterance': 'this is a question',
                               'expect_response': True,
                               'meta': {'dialog': 'question', 'data': {}, 'skill': 'abort.test'},
-                              'lang': 'en-us'}}
+                              'lang': 'en-US'}}
         activate_msg = {'type': 'intent.service.skills.activate', 'data': {'skill_id': 'abort.test'}}
 
         self.assertIn(start_msg, self.bus.emitted_msgs)
@@ -219,7 +219,7 @@ class TestKillableIntents(unittest.TestCase):
                      'data': {'utterance': 'question aborted',
                               'expect_response': False,
                               'meta': {'skill': 'abort.test'},
-                              'lang': 'en-us'}}
+                              'lang': 'en-US'}}
         self.assertIn(speak_msg, self.bus.emitted_msgs)
 
     def test_developer_stop_msg(self):
@@ -236,7 +236,7 @@ class TestKillableIntents(unittest.TestCase):
                      'data': {'utterance': "you can't abort me",
                               'expect_response': False,
                               'meta': {'skill': 'abort.test'},
-                              'lang': 'en-us'}}
+                              'lang': 'en-US'}}
         self.assertIn(start_msg, self.bus.emitted_msgs)
         self.assertIn(speak_msg, self.bus.emitted_msgs)
 
@@ -265,7 +265,7 @@ class TestKillableIntents(unittest.TestCase):
         speak_msg = {'type': 'speak',
                      'data': {'utterance': 'I am dead', 'expect_response': False,
                               'meta': {'skill': 'abort.test'},
-                              'lang': 'en-us'}}
+                              'lang': 'en-US'}}
         self.assertIn(speak_msg, self.bus.emitted_msgs)
         self.assertTrue(self.skill.instance.my_special_var == "default")
 

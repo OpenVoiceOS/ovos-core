@@ -29,6 +29,7 @@ from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
 from ovos_plugin_manager.templates.pipeline import IntentMatch
+from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG, deprecated, log_deprecation
 from ovos_utils.metrics import Stopwatch
 from padacioso.opm import PadaciosoPipeline as PadaciosoService
@@ -352,6 +353,7 @@ class IntentService:
 
     def _validate_session(self, message, lang):
         # get session
+        lang = standardize_lang_tag(lang)
         sess = SessionManager.get(message)
         if sess.session_id == "default":
             updated = False

@@ -19,7 +19,7 @@ class TestSessions(TestCase):
     def test_complete_failure(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.active_skills = [(self.skill_id, time.time())]
         SessionManager.default_session.pipeline = [
                            "stop_high",
@@ -105,7 +105,7 @@ class TestSessions(TestCase):
     def test_complete_failure_lang_detect(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.active_skills = [(self.skill_id, time.time())]
         SessionManager.default_session.pipeline = [
                            "stop_high",
@@ -144,7 +144,7 @@ class TestSessions(TestCase):
 
         self.core.bus.on("message", new_msg)
 
-        SessionManager.default_session.valid_languages = ["en-us", stt_lang_detect, "fr-fr"]
+        SessionManager.default_session.valid_languages = ["en-US", stt_lang_detect, "fr-fr"]
         utt = Message("recognizer_loop:utterance",
                       {"utterances": ["hello world"]},
                       {"session": SessionManager.default_session.serialize(),
@@ -247,4 +247,4 @@ class TestSessions(TestCase):
         self.assertEqual(messages[18].data["session_data"]["lang"], "pt-pt")
         self.assertEqual(SessionManager.default_session.lang, "pt-pt")
 
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"

@@ -4,12 +4,15 @@ from os.path import dirname
 from threading import Event
 from typing import Optional, List
 
+from langcodes import closest_match
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
+
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
 from ovos_utils import flatten_list
 from ovos_utils.bracket_expansion import expand_options
+from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
 from ovos_utils.parse import match_one
 
@@ -21,11 +24,12 @@ class StopService(PipelinePlugin):
         self.bus = bus
         self._voc_cache = {}
         self.load_resource_files()
+        super().__init__(config=Configuration().get("skills", {}).get("stop") or {})
 
     def load_resource_files(self):
         base = f"{dirname(__file__)}/locale"
         for lang in os.listdir(base):
-            lang2 = lang.split("-")[0].lower()
+            lang2 = standardize_lang_tag(lang)
             self._voc_cache[lang2] = {}
             for f in os.listdir(f"{base}/{lang}"):
                 with open(f"{base}/{lang}/{f}", encoding="utf-8") as fi:
@@ -34,15 +38,8 @@ class StopService(PipelinePlugin):
                     n = f.split(".", 1)[0]
                     self._voc_cache[lang2][n] = flatten_list(lines)
 
-    @property
-    def config(self):
-        """
-        Returns:
-            stop_config (dict): config for stop handling options
-        """
-        return Configuration().get("skills", {}).get("stop") or {}
-
-    def get_active_skills(self, message: Optional[Message] = None):
+    @staticmethod
+    def get_active_skills(message: Optional[Message] = None) -> List[str]:
         """Active skill ids ordered by converse priority
         this represents the order in which stop will be called
 
@@ -52,7 +49,7 @@ class StopService(PipelinePlugin):
         session = SessionManager.get(message)
         return [skill[0] for skill in session.active_skills]
 
-    def _collect_stop_skills(self, message: Message):
+    def _collect_stop_skills(self, message: Message) -> List[str]:
         """use the messagebus api to determine which skills can stop
         This includes all skills and external applications"""
 
@@ -96,7 +93,7 @@ class StopService(PipelinePlugin):
         self.bus.remove("skill.stop.pong", handle_ack)
         return want_stop or active_skills
 
-    def stop_skill(self, skill_id: str, message: Message):
+    def stop_skill(self, skill_id: str, message: Message) -> bool:
         """Tell a skill to stop anything it's doing,
         taking into account the message Session
 
@@ -127,8 +124,8 @@ class StopService(PipelinePlugin):
         Returns:
             IntentMatch if handled otherwise None.
         """
-        lang = lang.split("-")[0]
-        if lang not in self._voc_cache:
+        lang = self._get_closest_lang(lang)
+        if lang is None:  # no vocs registered for this lang
             return None
 
         sess = SessionManager.get(message)
@@ -178,8 +175,8 @@ class StopService(PipelinePlugin):
         Returns:
             IntentMatch if handled otherwise None.
         """
-        lang = lang.split("-")[0]
-        if lang not in self._voc_cache:
+        lang = self._get_closest_lang(lang)
+        if lang is None:  # no vocs registered for this lang
             return None
 
         # we call flatten in case someone is sending the old style list of tuples
@@ -194,6 +191,18 @@ class StopService(PipelinePlugin):
 
         return self.match_stop_low(utterances, lang, message)
 
+    def _get_closest_lang(self, lang: str) -> Optional[str]:
+        if self._voc_cache:
+            lang = standardize_lang_tag(lang)
+            closest, score = closest_match(lang, list(self._voc_cache.keys()))
+            # https://langcodes-hickford.readthedocs.io/en/sphinx/index.html#distance-values
+            # 0 -> These codes represent the same language, possibly after filling in values and normalizing.
+            # 1- 3 -> These codes indicate a minor regional difference.
+            # 4 - 10 -> These codes indicate a significant but unproblematic regional difference.
+            if score < 10:
+                return closest
+        return None
+
     def match_stop_low(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
         """ before fallback_low , fuzzy match stop intent
 
@@ -205,8 +214,8 @@ class StopService(PipelinePlugin):
         Returns:
             IntentMatch if handled otherwise None.
         """
-        lang = lang.split("-")[0]
-        if lang not in self._voc_cache:
+        lang = self._get_closest_lang(lang)
+        if lang is None:  # no vocs registered for this lang
             return None
         sess = SessionManager.get(message)
         # we call flatten in case someone is sending the old style list of tuples
@@ -266,8 +275,8 @@ class StopService(PipelinePlugin):
         Returns:
             bool: True if the utterance has the given vocabulary it
         """
-        lang = lang.split("-")[0].lower()
-        if lang not in self._voc_cache:
+        lang = self._get_closest_lang(lang)
+        if lang is None:  # no vocs registered for this lang
             return False
 
         _vocs = self._voc_cache[lang].get(voc_filename) or []
