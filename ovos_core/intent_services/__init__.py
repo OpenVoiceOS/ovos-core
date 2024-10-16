@@ -447,3 +447,124 @@ class IntentService:
         """
         self.bus.emit(message.reply("intent.service.skills.reply",
                                     {"skills": {}}))
+
+    @deprecated("moved to ovos-adapt-pipeline-plugin, overriding here has no effect", "1.0.0")
+    def handle_register_vocab(self, message):
+        """Register adapt vocabulary.
+
+        Args:
+            message (Message): message containing vocab info
+        """
+
+    @deprecated("moved to ovos-adapt-pipeline-plugin, overriding here has no effect", "1.0.0")
+    def handle_register_intent(self, message):
+        """Register adapt intent.
+
+        Args:
+            message (Message): message containing intent info
+        """
+
+    @deprecated("moved to ovos-adapt-pipeline-plugin, overriding here has no effect", "1.0.0")
+    def handle_detach_intent(self, message):
+        """Remover adapt intent.
+
+        Args:
+            message (Message): message containing intent info
+        """
+
+    @deprecated("moved to ovos-adapt-pipeline-plugin/ovos-padatious-pipeline-plugin, overriding here has no effect", "1.0.0")
+    def handle_detach_skill(self, message):
+        """Remove all intents registered for a specific skill.
+
+        Args:
+            message (Message): message containing intent info
+        """
+
+    @property
+    def adapt_service(self) -> None:
+        log_deprecation("direct access to self.adapt_service is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
+        return None
+
+    @property
+    def padatious_service(self) -> None:
+        log_deprecation("direct access to self.padatious_service is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
+        return None
+
+    @property
+    def padacioso_service(self)-> None:
+        log_deprecation("direct access to self.padacioso_service is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
+        return None
+
+    @property
+    def fallback(self) -> None:
+
+        log_deprecation("direct access to self.fallback is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
+        return None
+
+    @property
+    def converse(self) -> None:
+        log_deprecation("direct access to self.converse is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
+        return None
+
+    @property
+    def common_qa(self) -> None:
+        log_deprecation("direct access to self.common_qa is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
+        return None
+
+    @property
+    def stop(self) -> None:
+        log_deprecation("direct access to self.stop is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
+        return None
+
+    @property
+    def ocp(self) -> None:
+        log_deprecation("direct access to self.ocp is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
+        return None
+
+    @adapt_service.setter
+    def adapt_service(self, value):
+        log_deprecation("NOT SET! direct access to self.adapt_service is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
+
+    @padatious_service.setter
+    def padatious_service(self, value):
+        log_deprecation("NOT SET! direct access to self.padatious_service is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
+
+    @padacioso_service.setter
+    def padacioso_service(self, value):
+        log_deprecation("NOT SET! direct access to self.padacioso_service is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
+
+    @fallback.setter
+    def fallback(self, value):
+        log_deprecation("NOT SET! direct access to self.fallback is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
+
+    @converse.setter
+    def converse(self, value):
+        log_deprecation("NOT SET! direct access to self.converse is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
+
+    @common_qa.setter
+    def common_qa(self, value):
+        log_deprecation("NOT SET! direct access to self.common_qa is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
+
+    @stop.setter
+    def stop(self, value):
+        log_deprecation("NOT SET! direct access to self.stop is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
+
+    @ocp.setter
+    def ocp(self, value):
+        log_deprecation("NOT SET! direct access to self.ocp is deprecated, "
+                        "pipelines are in the progress of being replaced with plugins", "1.0.0")
