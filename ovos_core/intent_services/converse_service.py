@@ -14,7 +14,7 @@ from ovos_plugin_manager.templates.pipeline import PipelineMatch, PipelineStageM
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.lang import standardize_lang_tag
-from ovos_utils.log import LOG
+from ovos_utils.log import LOG, deprecated
 
 
 class ConverseService(PipelineStageMatcher):
@@ -22,7 +22,7 @@ class ConverseService(PipelineStageMatcher):
 
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
                  config: Optional[Dict] = None):
-        config = config or Configuration().get("skills", {}).get("converse")
+        config = config or Configuration().get("skills", {}).get("converse", {})
         super().__init__(bus, config)
         self._consecutive_activations = {}
         self.bus.on('mycroft.speech.recognition.unknown', self.reset_converse)
@@ -406,6 +406,10 @@ class ConverseService(PipelineStageMatcher):
         """
         self.bus.emit(message.reply("intent.service.active_skills.reply",
                                     {"skills": self.get_active_skills(message)}))
+
+    @deprecated("'converse_with_skills' has been renamed to 'match'", "2.0.0")
+    def converse_with_skills(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
+        return self.match(utterances, lang, message)
 
     def shutdown(self):
         self.bus.remove('mycroft.speech.recognition.unknown', self.reset_converse)

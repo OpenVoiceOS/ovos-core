@@ -28,7 +28,7 @@ from ovos_plugin_manager.templates.pipeline import PipelineMatch, PipelineStageC
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.lang import standardize_lang_tag
-from ovos_utils.log import LOG
+from ovos_utils.log import LOG, deprecated, log_deprecation
 
 FallbackRange = namedtuple('FallbackRange', ['start', 'stop'])
 
@@ -215,6 +215,28 @@ class FallbackService(PipelineStageConfidenceMatcher):
         """Low prio fallbacks with general matching such as chat-bot."""
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(90, 101))
+
+    @deprecated("'low_prio' has been renamed to 'match_low'", "2.0.0")
+    def low_prio(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
+        return self.match_low(utterances, lang, message)
+
+    @deprecated("'medium_prio' has been renamed to 'match_medium'", "2.0.0")
+    def medium_prio(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
+        return self.match_medium(utterances, lang, message)
+
+    @deprecated("'high_prio' has been renamed to 'high_low'", "2.0.0")
+    def high_prio(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
+        return self.match_high(utterances, lang, message)
+
+    @property
+    def fallback_config(self) -> Dict:
+        log_deprecation("'self.fallback_config' is deprecated, access 'self.config' directly instead", "1.0.0")
+        return self.config
+
+    @fallback_config.setter
+    def fallback_config(self, val):
+        log_deprecation("'self.fallback_config' is deprecated, access 'self.config' directly instead", "1.0.0")
+        self.config = val
 
     def shutdown(self):
         self.bus.remove("ovos.skills.fallback.register", self.handle_register_fallback)
