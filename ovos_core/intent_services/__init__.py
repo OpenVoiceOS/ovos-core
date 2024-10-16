@@ -412,8 +412,11 @@ class IntentService:
         self.bus.remove('intent.service.intent.get', self.handle_get_intent)
         self.bus.remove('intent.service.skills.get', self.handle_get_skills)
 
+    ##################
+    # deprecation zone - delete all below in release 1.0.0
     @property
     def skill_names(self) -> Dict:
+        """DEPRECATED"""
         log_deprecation("skill names have been replaced by skill_id", "1.0.0")
         return {}
 
@@ -423,108 +426,99 @@ class IntentService:
 
     @deprecated("skill names have been replaced by skill_id", "1.0.0")
     def update_skill_name_dict(self, message):
-        """Messagebus handler, updates dict of id to skill name conversions."""
-        pass
+        """DEPRECATED"""
 
     @deprecated("skill names have been replaced by skill_id", "1.0.0")
     def get_skill_name(self, skill_id):
-        """Get skill name from skill ID.
-
-        Args:
-            skill_id: a skill id as encoded in Intent handlers.
-
-        Returns:
-            (str) Skill name or the skill id if the skill wasn't found
-        """
+        """DEPRECATED"""
         return skill_id
 
     @deprecated("skill names have been replaced by skill_id", "1.0.0")
     def handle_get_skills(self, message):
-        """Send registered skills to caller.
-
-        Argument:
-            message: query message to reply to.
-        """
+        """DEPRECATED"""
         self.bus.emit(message.reply("intent.service.skills.reply",
                                     {"skills": {}}))
 
     @deprecated("moved to ovos-adapt-pipeline-plugin, overriding here has no effect", "1.0.0")
     def handle_register_vocab(self, message):
-        """Register adapt vocabulary.
-
-        Args:
-            message (Message): message containing vocab info
-        """
+        """DEPRECATED"""
 
     @deprecated("moved to ovos-adapt-pipeline-plugin, overriding here has no effect", "1.0.0")
     def handle_register_intent(self, message):
-        """Register adapt intent.
-
-        Args:
-            message (Message): message containing intent info
-        """
+        """DEPRECATED"""
 
     @deprecated("moved to ovos-adapt-pipeline-plugin, overriding here has no effect", "1.0.0")
     def handle_detach_intent(self, message):
-        """Remover adapt intent.
+        """DEPRECATED"""
 
-        Args:
-            message (Message): message containing intent info
-        """
+    @deprecated("moved to ovos-padatious-pipeline-plugin, overriding here has no effect", "1.0.0")
+    def handle_get_padatious(self, message):
+        """DEPRECATED"""
+
+    @deprecated("moved to ovos-padatious-pipeline-plugin, overriding here has no effect", "1.0.0")
+    def handle_padatious_manifest(self, message):
+        """DEPRECATED"""
+
+    @deprecated("moved to ovos-padatious-pipeline-plugin, overriding here has no effect", "1.0.0")
+    def handle_entity_manifest(self, message):
+        """DEPRECATED"""
 
     @deprecated("moved to ovos-adapt-pipeline-plugin/ovos-padatious-pipeline-plugin, overriding here has no effect", "1.0.0")
     def handle_detach_skill(self, message):
-        """Remove all intents registered for a specific skill.
-
-        Args:
-            message (Message): message containing intent info
-        """
+        """DEPRECATED"""
 
     @property
     def adapt_service(self) -> None:
+        """DEPRECATED"""
         log_deprecation("direct access to self.adapt_service is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return None
 
     @property
     def padatious_service(self) -> None:
+        """DEPRECATED"""
         log_deprecation("direct access to self.padatious_service is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return None
 
     @property
     def padacioso_service(self)-> None:
+        """DEPRECATED"""
         log_deprecation("direct access to self.padacioso_service is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return None
 
     @property
     def fallback(self) -> None:
-
+        """DEPRECATED"""
         log_deprecation("direct access to self.fallback is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return None
 
     @property
     def converse(self) -> None:
+        """DEPRECATED"""
         log_deprecation("direct access to self.converse is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return None
 
     @property
     def common_qa(self) -> None:
+        """DEPRECATED"""
         log_deprecation("direct access to self.common_qa is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return None
 
     @property
     def stop(self) -> None:
+        """DEPRECATED"""
         log_deprecation("direct access to self.stop is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return None
 
     @property
     def ocp(self) -> None:
+        """DEPRECATED"""
         log_deprecation("direct access to self.ocp is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return None
