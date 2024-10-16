@@ -196,7 +196,7 @@ class TestCPS(unittest.TestCase):
 
         # assert that OCP intents registered
         locale_folder = join(dirname(ovos_plugin_common_play.__file__),
-                             "ocp", "res", "locale", "en-US")
+                             "ocp", "res", "locale", "en-us")
         ocp_msgs = [
             {'type': 'padatious:register_intent',
              'data': {
