@@ -1,17 +1,18 @@
 import time
 from threading import Event
-from typing import Optional
+from typing import Optional, List
 
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import SessionManager, UtteranceState
+from ovos_bus_client.session import SessionManager, UtteranceState, Session
 from ovos_bus_client.util import get_message_lang
+from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
+
 from ovos_config.config import Configuration
 from ovos_config.locale import setup_locale
 from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
 from ovos_utils import flatten_list
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
-from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
 
 
 class ConverseService(PipelinePlugin):
@@ -23,18 +24,10 @@ class ConverseService(PipelinePlugin):
         self.bus.on('mycroft.speech.recognition.unknown', self.reset_converse)
         self.bus.on('intent.service.skills.deactivate', self.handle_deactivate_skill_request)
         self.bus.on('intent.service.skills.activate', self.handle_activate_skill_request)
-        self.bus.on('active_skill_request', self.handle_activate_skill_request)  # TODO backwards compat, deprecate
         self.bus.on('intent.service.active_skills.get', self.handle_get_active_skills)
         self.bus.on("skill.converse.get_response.enable", self.handle_get_response_enable)
         self.bus.on("skill.converse.get_response.disable", self.handle_get_response_disable)
-
-    @property
-    def config(self):
-        """
-        Returns:
-            converse_config (dict): config for converse handling options
-        """
-        return Configuration().get("skills", {}).get("converse") or {}
+        super().__init__(config=Configuration().get("skills", {}).get("converse") or {})
 
     @property
     def active_skills(self):
@@ -48,7 +41,8 @@ class ConverseService(PipelinePlugin):
         for skill_id, ts in val:
             session.activate_skill(skill_id)
 
-    def get_active_skills(self, message=None):
+    @staticmethod
+    def get_active_skills(message: Optional[Message] = None) -> List[str]:
         """Active skill ids ordered by converse priority
         this represents the order in which converse will be called
 
@@ -58,12 +52,14 @@ class ConverseService(PipelinePlugin):
         session = SessionManager.get(message)
         return [skill[0] for skill in session.active_skills]
 
-    def deactivate_skill(self, skill_id, source_skill=None, message=None):
+    def deactivate_skill(self, skill_id: str, source_skill: Optional[str] = None,
+                         message: Optional[Message] = None):
         """Remove a skill from being targetable by converse.
 
         Args:
             skill_id (str): skill to remove
             source_skill (str): skill requesting the removal
+            message (Message): the bus message that requested deactivation
         """
         source_skill = source_skill or skill_id
         if self._deactivate_allowed(skill_id, source_skill):
@@ -82,7 +78,8 @@ class ConverseService(PipelinePlugin):
                 if skill_id in self._consecutive_activations:
                     self._consecutive_activations[skill_id] = 0
 
-    def activate_skill(self, skill_id, source_skill=None, message=None):
+    def activate_skill(self, skill_id: str, source_skill: Optional[str] = None,
+                       message: Optional[Message] = None) -> Optional[Session]:
         """Add a skill or update the position of an active skill.
 
         The skill is added to the front of the list, if it's already in the
@@ -91,6 +88,7 @@ class ConverseService(PipelinePlugin):
         Args:
             skill_id (str): identifier of skill to be added.
             source_skill (str): skill requesting the removal
+            message (Message): the bus message that requested activation
         """
         source_skill = source_skill or skill_id
         if self._activate_allowed(skill_id, source_skill):
@@ -109,7 +107,7 @@ class ConverseService(PipelinePlugin):
             self._consecutive_activations[skill_id] += 1
             return session
 
-    def _activate_allowed(self, skill_id, source_skill=None):
+    def _activate_allowed(self, skill_id: str, source_skill: Optional[str] = None) -> bool:
         """Checks if a skill_id is allowed to jump to the front of active skills list
 
         - can a skill activate a different skill
@@ -167,7 +165,7 @@ class ConverseService(PipelinePlugin):
             return False  # skill exceeded authorized consecutive number of activations
         return True
 
-    def _deactivate_allowed(self, skill_id, source_skill=None):
+    def _deactivate_allowed(self, skill_id: str, source_skill: Optional[str] = None) -> bool:
         """Checks if a skill_id is allowed to be removed from active skills list
 
         - can a skill deactivate a different skill
@@ -187,7 +185,7 @@ class ConverseService(PipelinePlugin):
                 return False
         return True
 
-    def _converse_allowed(self, skill_id):
+    def _converse_allowed(self, skill_id: str) -> bool:
         """Checks if a skill_id is allowed to converse
 
         - is the skill blacklisted from conversing
@@ -209,7 +207,7 @@ class ConverseService(PipelinePlugin):
             return False
         return True
 
-    def _collect_converse_skills(self, message):
+    def _collect_converse_skills(self, message: Message) -> List[str]:
         """use the messagebus api to determine which skills want to converse
         This includes all skills and external applications"""
         session = SessionManager.get(message)
@@ -257,7 +255,7 @@ class ConverseService(PipelinePlugin):
         self.bus.remove("skill.converse.pong", handle_ack)
         return want_converse
 
-    def _check_converse_timeout(self, message):
+    def _check_converse_timeout(self, message: Message):
         """ filter active skill list based on timestamps """
         timeouts = self.config.get("skill_timeouts") or {}
         def_timeout = self.config.get("timeout", 300)
@@ -266,7 +264,7 @@ class ConverseService(PipelinePlugin):
             skill for skill in session.active_skills
             if time.time() - skill[1] <= timeouts.get(skill[0], def_timeout)]
 
-    def converse(self, utterances, skill_id, lang, message):
+    def converse(self, utterances: List[str], skill_id: str, lang: str, message: Message) -> bool:
         """Call skill and ask if they want to process the utterance.
 
         Args:
@@ -279,8 +277,9 @@ class ConverseService(PipelinePlugin):
         Returns:
             handled (bool): True if handled otherwise False.
         """
+        lang = standardize_lang_tag(lang)
         session = SessionManager.get(message)
-        session.lang = standardize_lang_tag(lang)
+        session.lang = lang
 
         state = session.utterance_states.get(skill_id, UtteranceState.INTENT)
         if state == UtteranceState.RESPONSE:
@@ -313,7 +312,7 @@ class ConverseService(PipelinePlugin):
                             f'increasing "max_skill_runtime" in mycroft.conf might help alleviate this issue')
         return False
 
-    def converse_with_skills(self, utterances, lang, message) -> Optional[IntentMatch]:
+    def converse_with_skills(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
         """Give active skills a chance at the utterance
 
         Args:
@@ -324,6 +323,7 @@ class ConverseService(PipelinePlugin):
         Returns:
             IntentMatch if handled otherwise None.
         """
+        lang = standardize_lang_tag(lang)
         session = SessionManager.get(message)
 
         # we call flatten in case someone is sending the old style list of tuples
@@ -345,21 +345,23 @@ class ConverseService(PipelinePlugin):
                                    utterance=utterances[0])
         return None
 
-    def handle_get_response_enable(self, message):
+    @staticmethod
+    def handle_get_response_enable(message: Message):
         skill_id = message.data["skill_id"]
         session = SessionManager.get(message)
         session.enable_response_mode(skill_id)
         if session.session_id == "default":
             SessionManager.sync(message)
 
-    def handle_get_response_disable(self, message):
+    @staticmethod
+    def handle_get_response_disable(message: Message):
         skill_id = message.data["skill_id"]
         session = SessionManager.get(message)
         session.disable_response_mode(skill_id)
         if session.session_id == "default":
             SessionManager.sync(message)
 
-    def handle_activate_skill_request(self, message):
+    def handle_activate_skill_request(self, message: Message):
         # TODO imperfect solution - only a skill can activate itself
         # someone can forge this message and emit it raw, but in OpenVoiceOS all
         # skill messages should have skill_id in context, so let's make sure
@@ -371,7 +373,7 @@ class ConverseService(PipelinePlugin):
         if sess.session_id == "default":
             SessionManager.sync(message)
 
-    def handle_deactivate_skill_request(self, message):
+    def handle_deactivate_skill_request(self, message: Message):
         # TODO imperfect solution - only a skill can deactivate itself
         # someone can forge this message and emit it raw, but in ovos-core all
         # skill message should have skill_id in context, so let's make sure
@@ -383,7 +385,7 @@ class ConverseService(PipelinePlugin):
         if sess.session_id == "default":
             SessionManager.sync(message)
 
-    def reset_converse(self, message):
+    def reset_converse(self, message: Message):
         """Let skills know there was a problem with speech recognition"""
         lang = standardize_lang_tag(get_message_lang())
         try:
@@ -393,7 +395,7 @@ class ConverseService(PipelinePlugin):
 
         self.converse_with_skills([], lang, message)
 
-    def handle_get_active_skills(self, message):
+    def handle_get_active_skills(self, message: Message):
         """Send active skills to caller.
 
         Argument:
@@ -406,7 +408,6 @@ class ConverseService(PipelinePlugin):
         self.bus.remove('mycroft.speech.recognition.unknown', self.reset_converse)
         self.bus.remove('intent.service.skills.deactivate', self.handle_deactivate_skill_request)
         self.bus.remove('intent.service.skills.activate', self.handle_activate_skill_request)
-        self.bus.remove('active_skill_request', self.handle_activate_skill_request)  # TODO backwards compat, deprecate
         self.bus.remove('intent.service.active_skills.get', self.handle_get_active_skills)
         self.bus.remove("skill.converse.get_response.enable", self.handle_get_response_enable)
         self.bus.remove("skill.converse.get_response.disable", self.handle_get_response_disable)
