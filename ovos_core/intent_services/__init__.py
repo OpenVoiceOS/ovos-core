@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from typing import Tuple, Callable, List, Union
+from typing import Tuple, Callable, List, Union, Dict
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
@@ -27,7 +27,7 @@ from ovos_core.transformers import MetadataTransformersService, UtteranceTransfo
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
 from ovos_plugin_manager.templates.pipeline import PipelineMatch, IntentHandlerMatch
 from ovos_utils.lang import standardize_lang_tag
-from ovos_utils.log import LOG
+from ovos_utils.log import LOG, log_deprecation, deprecated
 from ovos_utils.metrics import Stopwatch
 
 
@@ -44,6 +44,7 @@ class IntentService:
 
         # Dictionary for translating a skill id to a name
         self.skill_names = {}
+
         for p in OVOSPipelineFactory.get_installed_pipelines():
             LOG.debug(f"Found pipeline: {p}")
         OVOSPipelineFactory.create(use_cache=True, bus=self.bus)  # pre-loa
@@ -61,28 +62,10 @@ class IntentService:
         self.bus.on('remove_context', self.handle_remove_context)
         self.bus.on('clear_context', self.handle_clear_context)
 
-        # Converse method
-        self.bus.on('mycroft.skills.loaded', self.update_skill_name_dict)
-
         # Intents API
         self.registered_vocab = []
         self.bus.on('intent.service.intent.get', self.handle_get_intent)
         self.bus.on('intent.service.skills.get', self.handle_get_skills)
-
-    def update_skill_name_dict(self, message):
-        """Messagebus handler, updates dict of id to skill name conversions."""
-        self.skill_names[message.data['id']] = message.data['name']
-
-    def get_skill_name(self, skill_id):
-        """Get skill name from skill ID.
-
-        Args:
-            skill_id: a skill id as encoded in Intent handlers.
-
-        Returns:
-            (str) Skill name or the skill id if the skill wasn't found
-        """
-        return self.skill_names.get(skill_id, skill_id)
 
     def _handle_transformers(self, message):
         """
@@ -109,13 +92,15 @@ class IntentService:
         """
         default_lang = get_message_lang(message)
         valid_langs = get_valid_languages()
+        valid_langs = [standardize_lang_tag(l)
+                       for l in valid_langs]
         lang_keys = ["stt_lang",
                      "request_lang",
                      "detected_lang"]
         for k in lang_keys:
             if k in message.context:
-                v = get_full_lang_code(message.context[k])
-                if v in valid_langs:
+                v = standardize_lang_tag(message.context[k])
+                if v in valid_langs:  # TODO - use lang distance instead to choose best dialect
                     if v != default_lang:
                         LOG.info(f"replaced {default_lang} with {k}: {v}")
                     return v
@@ -124,11 +109,12 @@ class IntentService:
 
         return default_lang
 
-    def get_pipeline(self, skips=None, session=None) -> List[Tuple[str, Callable]]:
+    def get_pipeline(self, skips=None, session=None, skip_stage_matchers=False) -> List[Tuple[str, Callable]]:
         """return a list of matcher functions ordered by priority
         utterances will be sent to each matcher in order until one can handle the utterance
         the list can be configured in mycroft.conf under intents.pipeline,
         in the future plugins will be supported for users to define their own pipeline"""
+        skips = skips or []
 
         # TODO - deprecate around ovos-core 2.0.0
         MAP = {
@@ -151,16 +137,21 @@ class IntentService:
             "padatious_low": "ovos-padatious-pipeline-plugin-low",
             "ocp_high": "ovos-ocp-pipeline-plugin-high",
             "ocp_medium": "ovos-ocp-pipeline-plugin-medium",
-            "ocp_low": "ovos-ocp-pipeline-plugin-low"
+            "ocp_low": "ovos-ocp-pipeline-plugin-low",
+            "ocp_legacy": "ovos-ocp-pipeline-plugin-legacy"
         }
 
         session = session or SessionManager.get()
 
-        skips = [MAP.get(p, p) for p in skips or []]
-        pipeline = [MAP.get(p, p) for p in session.pipeline
-                    if p not in skips or []]
+        if skips:
+            log_deprecation("'skips' kwarg has been deprecated!", "1.0.0")
+            skips = [MAP.get(p, p) for p in skips]
 
-        matchers = OVOSPipelineFactory.create(pipeline, use_cache=True, bus=self.bus)
+        pipeline = [MAP.get(p, p) for p in session.pipeline
+                    if p not in skips]
+
+        matchers = OVOSPipelineFactory.create(pipeline, use_cache=True, bus=self.bus,
+                                              skip_stage_matchers=skip_stage_matchers)
 
         if any(k[0] not in pipeline for k in matchers):
             LOG.warning(f"Requested some invalid pipeline components! "
@@ -169,7 +160,8 @@ class IntentService:
         LOG.debug(f"Session pipeline: {pipeline}")
         return matchers
 
-    def _validate_session(self, message, lang):
+    @staticmethod
+    def _validate_session(message, lang):
         # get session
         lang = standardize_lang_tag(lang)
         sess = SessionManager.get(message)
@@ -391,12 +383,7 @@ class IntentService:
         sess = SessionManager.get(message)
 
         # Loop through the matching functions until a match is found.
-        # TODO - skip by type not hardcoded list
-        for pipeline, match_func in self.get_pipeline(skips=["ovos-converse-pipeline-plugin",
-                                                             "ovos-fallback-pipeline-plugin-high",
-                                                             "ovos-fallback-pipeline-plugin-medium",
-                                                             "ovos-fallback-pipeline-plugin-low"],
-                                                      session=sess):
+        for pipeline, match_func in self.get_pipeline(session=sess, skip_stage_matchers=True):
             match = match_func([utterance], lang, message)
             if match:
                 if match.match_type:
@@ -413,15 +400,6 @@ class IntentService:
         self.bus.emit(message.reply("intent.service.intent.reply",
                                     {"intent": None}))
 
-    def handle_get_skills(self, message):
-        """Send registered skills to caller.
-
-        Argument:
-            message: query message to reply to.
-        """
-        self.bus.emit(message.reply("intent.service.skills.reply",
-                                    {"skills": self.skill_names}))
-
     def shutdown(self):
         self.utterance_plugins.shutdown()
         self.metadata_plugins.shutdown()
@@ -431,6 +409,41 @@ class IntentService:
         self.bus.remove('add_context', self.handle_add_context)
         self.bus.remove('remove_context', self.handle_remove_context)
         self.bus.remove('clear_context', self.handle_clear_context)
-        self.bus.remove('mycroft.skills.loaded', self.update_skill_name_dict)
         self.bus.remove('intent.service.intent.get', self.handle_get_intent)
         self.bus.remove('intent.service.skills.get', self.handle_get_skills)
+
+    @property
+    def skill_names(self) -> Dict:
+        log_deprecation("skill names have been replaced by skill_id", "1.0.0")
+        return {}
+
+    @skill_names.setter
+    def skill_names(self, v):
+        log_deprecation("skill names have been replaced by skill_id", "1.0.0")
+
+    @deprecated("skill names have been replaced by skill_id", "1.0.0")
+    def update_skill_name_dict(self, message):
+        """Messagebus handler, updates dict of id to skill name conversions."""
+        pass
+
+    @deprecated("skill names have been replaced by skill_id", "1.0.0")
+    def get_skill_name(self, skill_id):
+        """Get skill name from skill ID.
+
+        Args:
+            skill_id: a skill id as encoded in Intent handlers.
+
+        Returns:
+            (str) Skill name or the skill id if the skill wasn't found
+        """
+        return skill_id
+
+    @deprecated("skill names have been replaced by skill_id", "1.0.0")
+    def handle_get_skills(self, message):
+        """Send registered skills to caller.
+
+        Argument:
+            message: query message to reply to.
+        """
+        self.bus.emit(message.reply("intent.service.skills.reply",
+                                    {"skills": {}}))
