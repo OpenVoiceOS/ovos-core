@@ -19,7 +19,7 @@ class TestFallback(TestCase):
     def test_fallback(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.pipeline = [
             "converse",
             "fallback_high",
@@ -142,7 +142,7 @@ class TestFallback(TestCase):
     def test_fallback_with_session(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.pipeline = [
             "fallback_high",
             "fallback_medium",
@@ -316,7 +316,7 @@ class TestFallbackTimeout(TestCase):
     def test_fallback(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.pipeline = [
             "fallback_medium",
             "fallback_low"

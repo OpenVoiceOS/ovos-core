@@ -49,7 +49,7 @@ class TestDialog(unittest.TestCase):
         self.assertEqual(self.bus.emitted_msgs[-1],
                          {'context': {'skill_id': 'wiki.test'},
                           'data': {'expect_response': False,
-                                   'lang': 'en-us',
+                                   'lang': 'en-US',
                                    'meta': {'skill': 'wiki.test'},
                                    'utterance': 'answer 1'},
                           'type': 'speak'})
@@ -61,7 +61,7 @@ class TestDialog(unittest.TestCase):
         self.assertEqual(self.bus.emitted_msgs[-1],
                          {'context': {'skill_id': 'wiki.test'},
                           'data': {'expect_response': False,
-                                   'lang': 'en-us',
+                                   'lang': 'en-US',
                                    'meta': {'skill': 'wiki.test'},
                                    'utterance': 'answer 2'},
                           'type': 'speak'})

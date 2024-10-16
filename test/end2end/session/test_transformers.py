@@ -32,7 +32,7 @@ class TestTransformerPlugins(TestCase):
 
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.active_skills = [(self.skill_id, time.time())]
         SessionManager.default_session.pipeline = [
             "stop_high",
@@ -105,7 +105,7 @@ class TestTransformerPlugins(TestCase):
 
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.active_skills = [(self.skill_id, time.time())]
         SessionManager.default_session.pipeline = [
             "stop_high",

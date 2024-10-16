@@ -1,20 +1,12 @@
 # Changelog
 
-## [0.2.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.3a1) (2024-10-15)
+## [0.2.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.4a1) (2024-10-16)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.2a1...0.2.3a1)
-
-**Merged pull requests:**
-
-- fix:log\_spam [\#566](https://github.com/OpenVoiceOS/ovos-core/pull/566) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.2.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.2a1) (2024-10-15)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.1...0.2.2a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.3...0.2.4a1)
 
 **Merged pull requests:**
 
-- deprecate ready setting [\#554](https://github.com/OpenVoiceOS/ovos-core/pull/554) ([JarbasAl](https://github.com/JarbasAl))
+- fix:standardize\_lang [\#568](https://github.com/OpenVoiceOS/ovos-core/pull/568) ([JarbasAl](https://github.com/JarbasAl))
 
 
 

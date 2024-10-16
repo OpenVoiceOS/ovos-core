@@ -21,7 +21,7 @@ class TestSessions(TestCase):
     def test_blacklist(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.pipeline = ["adapt_high"]
         SessionManager.default_session.blacklisted_skills = []
         SessionManager.default_session.blacklisted_intents = []
@@ -309,7 +309,7 @@ class TestFallback(TestCase):
     def test_fallback(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.pipeline = [
             "fallback_high"
         ]
@@ -400,7 +400,7 @@ class TestCommonQuery(TestCase):
     def test_common_qa(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.pipeline = ["common_qa"]
         messages = []
 

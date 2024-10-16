@@ -67,7 +67,7 @@ class TextTransformersTests(unittest.TestCase):
     def test_utterance_transformer_service_priority(self):
 
         utterances = ["test 1", "test one"]
-        lang = "en-us"
+        lang = "en-US"
 
         def mod_1_parse(utterances, lang):
             utterances.append("mod 1 parsed")

@@ -21,7 +21,7 @@ class TestSessions(TestCase):
     def test_no_session(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.pipeline = [
             "converse",
             "padatious_high",
@@ -85,7 +85,7 @@ class TestSessions(TestCase):
         # (missing in utterance message) and kept in all messages
         for m in messages[1:]:
             self.assertEqual(m.context["session"]["session_id"], "default")
-            self.assertEqual(m.context["lang"], "en-us")
+            self.assertEqual(m.context["lang"], "en-US")
 
         # verify skill is activated
         self.assertEqual(messages[1].msg_type, "intent.service.skills.activated")
@@ -157,7 +157,7 @@ class TestSessions(TestCase):
         # (missing in utterance message) and kept in all messages
         for m in messages[1:]:
             self.assertEqual(m.context["session"]["session_id"], "default")
-            self.assertEqual(m.context["lang"], "en-us")
+            self.assertEqual(m.context["lang"], "en-US")
 
         # verify that "lang" is injected by converse.ping
         # (missing in utterance message) and kept in all messages
@@ -250,7 +250,7 @@ class TestSessions(TestCase):
         # (missing in utterance message) and kept in all messages
         for m in messages[1:]:
             self.assertEqual(m.context["session"]["session_id"], "default")
-            self.assertEqual(m.context["lang"], "en-us")
+            self.assertEqual(m.context["lang"], "en-US")
 
         # converse
         self.assertEqual(messages[1].msg_type, f"{self.other_skill_id}.converse.ping")
@@ -339,7 +339,7 @@ class TestSessions(TestCase):
         # (missing in utterance message) and kept in all messages
         for m in messages[1:]:
             self.assertEqual(m.context["session"]["session_id"], "default")
-            self.assertEqual(m.context["lang"], "en-us")
+            self.assertEqual(m.context["lang"], "en-US")
 
         # converse
         self.assertEqual(messages[1].msg_type, f"{self.skill_id}.converse.ping")

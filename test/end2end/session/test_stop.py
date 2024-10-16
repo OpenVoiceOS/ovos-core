@@ -20,7 +20,7 @@ class TestSessions(TestCase):
     def test_old_stop(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.pipeline = [
             "stop_high",
             "adapt_high"
@@ -196,7 +196,7 @@ class TestSessions(TestCase):
     def test_new_stop(self):
         SessionManager.sessions = {}
         SessionManager.default_session = SessionManager.sessions["default"] = Session("default")
-        SessionManager.default_session.lang = "en-us"
+        SessionManager.default_session.lang = "en-US"
         SessionManager.default_session.pipeline = [
             "stop_high",
             "adapt_high",

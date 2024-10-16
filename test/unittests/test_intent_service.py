@@ -31,7 +31,7 @@ BASE_CONF['lang'] = 'it-it'
 NO_LANG_CONF = deepcopy(LocalConf(DEFAULT_CONFIG))
 NO_LANG_CONF.pop('lang')
 
-setup_locale("en-us")
+setup_locale("en-US")
 
 
 class MockEmitter(object):
@@ -103,17 +103,17 @@ class TestLanguageExtraction(TestCase):
         """No lang in message should result in lang from active locale."""
         setup_locale("it-it")
         msg = Message('test msg', data={})
-        self.assertEqual(get_message_lang(msg), 'it-it')
-        setup_locale("en-us")
-        self.assertEqual(get_message_lang(msg), 'en-us')
+        self.assertEqual(get_message_lang(msg), 'it-IT')
+        setup_locale("en-US")
+        self.assertEqual(get_message_lang(msg), 'en-US')
 
     @mock.patch.dict(Configuration._Configuration__patch, BASE_CONF)
     def test_lang_exists(self):
         """Message has a lang code in data, it should be used."""
         msg = Message('test msg', data={'lang': 'de-de'})
-        self.assertEqual(get_message_lang(msg), 'de-de')
+        self.assertEqual(get_message_lang(msg), 'de-DE')
         msg = Message('test msg', data={'lang': 'sv-se'})
-        self.assertEqual(get_message_lang(msg), 'sv-se')
+        self.assertEqual(get_message_lang(msg), 'sv-SE')
 
 
 def create_old_style_vocab_msg(keyword, value):
