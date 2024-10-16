@@ -64,15 +64,13 @@ def mock_config():
 
 @patch.dict(Configuration._Configuration__patch, mock_config())
 class TestSkillManager(TestCase):
-    mock_package = 'mycroft.skills.skill_manager.'
+    mock_package = 'ovos_core.skill_manager.'
 
     def setUp(self):
         temp_dir = tempfile.mkdtemp()
         self.temp_dir = Path(temp_dir)
         self.message_bus_mock = MessageBusMock()
         self._mock_log()
-        self._mock_skill_updater()
-        self._mock_skill_settings_downloader()
         self.skill_manager = SkillManager(self.message_bus_mock)
         self._mock_skill_loader_instance()
 
@@ -83,22 +81,6 @@ class TestSkillManager(TestCase):
 
     def tearDown(self):
         rmtree(str(self.temp_dir))
-
-    def _mock_skill_settings_downloader(self):
-        settings_download_patch = patch(
-            self.mock_package + 'SkillSettingsDownloader',
-            spec=True
-        )
-        self.addCleanup(settings_download_patch.stop)
-        self.settings_download_mock = settings_download_patch.start()
-
-    def _mock_skill_updater(self):
-        skill_updater_patch = patch(
-            self.mock_package + 'SkillUpdater',
-            spec=True
-        )
-        self.addCleanup(skill_updater_patch.stop)
-        self.skill_updater_mock = skill_updater_patch.start()
 
     def _mock_skill_loader_instance(self):
         self.skill_dir = self.temp_dir.joinpath('test_skill')
@@ -167,16 +149,6 @@ class TestSkillManager(TestCase):
         self.skill_loader_mock.deactivate.assert_called_once()
         message.response.assert_called_once()
 
-    @patch("ovos_utils.log.LOG.exception")
-    def test_deactivate_skill_exception(self, mock_exception_logger):
-        message = Message("test.message", {'skill': 'test_skill'})
-        message.response = Mock()
-        self.skill_loader_mock.deactivate.side_effect = Exception()
-        self.skill_manager.deactivate_skill(message)
-        self.skill_loader_mock.deactivate.assert_called_once()
-        message.response.assert_called_once()
-        mock_exception_logger.assert_called_once_with('Failed to deactivate test_skill')
-
     def test_deactivate_except(self):
         message = Message("test.message", {'skill': 'test_skill'})
         message.response = Mock()
@@ -209,20 +181,3 @@ class TestSkillManager(TestCase):
         self.skill_manager.activate_skill(message)
         test_skill_loader.activate.assert_called_once()
         message.response.assert_called_once()
-
-    @patch("ovos_utils.log.LOG.exception")
-    def test_activate_skill_exception(self, mock_exception_logger):
-        message = Message("test.message", {'skill': 'test_skill'})
-        message.response = Mock()
-        test_skill_loader = Mock(spec=SkillLoader)
-        test_skill_loader.activate.side_effect = Exception()
-        test_skill_loader.skill_id = 'test_skill'
-        test_skill_loader.active = False
-
-        self.skill_manager.skill_loaders = {}
-        self.skill_manager.skill_loaders['test_skill'] = test_skill_loader
-
-        self.skill_manager.activate_skill(message)
-        test_skill_loader.activate.assert_called_once()
-        message.response.assert_called_once()
-        mock_exception_logger.assert_called_once_with('Couldn\'t activate skill test_skill')

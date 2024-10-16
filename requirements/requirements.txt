@@ -15,3 +15,5 @@ ovos-config>=0.0.13,<1.0.0
 ovos-lingua-franca>=0.4.7,<1.0.0
 ovos-backend-client>=0.1.0,<2.0.0
 ovos-workshop>=1.0.1,<2.0.0
+
+mycroft-legacy>=0.1.1, <1.0.0
