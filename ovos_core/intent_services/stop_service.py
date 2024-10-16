@@ -38,7 +38,8 @@ class StopService(PipelinePlugin):
                     n = f.split(".", 1)[0]
                     self._voc_cache[lang2][n] = flatten_list(lines)
 
-    def get_active_skills(self, message: Optional[Message] = None):
+    @staticmethod
+    def get_active_skills(message: Optional[Message] = None) -> List[str]:
         """Active skill ids ordered by converse priority
         this represents the order in which stop will be called
 
@@ -48,7 +49,7 @@ class StopService(PipelinePlugin):
         session = SessionManager.get(message)
         return [skill[0] for skill in session.active_skills]
 
-    def _collect_stop_skills(self, message: Message):
+    def _collect_stop_skills(self, message: Message) -> List[str]:
         """use the messagebus api to determine which skills can stop
         This includes all skills and external applications"""
 
@@ -92,7 +93,7 @@ class StopService(PipelinePlugin):
         self.bus.remove("skill.stop.pong", handle_ack)
         return want_stop or active_skills
 
-    def stop_skill(self, skill_id: str, message: Message):
+    def stop_skill(self, skill_id: str, message: Message) -> bool:
         """Tell a skill to stop anything it's doing,
         taking into account the message Session
 

@@ -16,15 +16,17 @@
 import operator
 import time
 from collections import namedtuple
-from typing import Optional
+from typing import Optional, List
 
+from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
+from ovos_workshop.permissions import FallbackMode
+
 from ovos_config import Configuration
 from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
 from ovos_utils import flatten_list
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
-from ovos_workshop.permissions import FallbackMode
 
 FallbackRange = namedtuple('FallbackRange', ['start', 'stop'])
 
@@ -40,7 +42,7 @@ class FallbackService(PipelinePlugin):
         self.bus.on("ovos.skills.fallback.deregister", self.handle_deregister_fallback)
         super().__init__(self.fallback_config)
 
-    def handle_register_fallback(self, message):
+    def handle_register_fallback(self, message: Message):
         skill_id = message.data.get("skill_id")
         priority = message.data.get("priority") or 101
 
@@ -53,12 +55,12 @@ class FallbackService(PipelinePlugin):
         else:
             self.registered_fallbacks[skill_id] = priority
 
-    def handle_deregister_fallback(self, message):
+    def handle_deregister_fallback(self, message: Message):
         skill_id = message.data.get("skill_id")
         if skill_id in self.registered_fallbacks:
             self.registered_fallbacks.pop(skill_id)
 
-    def _fallback_allowed(self, skill_id):
+    def _fallback_allowed(self, skill_id: str) -> bool:
         """Checks if a skill_id is allowed to fallback
 
         - is the skill blacklisted from fallback
@@ -79,7 +81,8 @@ class FallbackService(PipelinePlugin):
             return False
         return True
 
-    def _collect_fallback_skills(self, message, fb_range=FallbackRange(0, 100)):
+    def _collect_fallback_skills(self, message: Message,
+                                 fb_range: FallbackRange = FallbackRange(0, 100)) -> List[str]:
         """use the messagebus api to determine which skills have registered fallback handlers
         This includes all skills and external applications"""
         skill_ids = []  # skill_ids that already answered to ping
@@ -117,7 +120,7 @@ class FallbackService(PipelinePlugin):
             self.bus.remove("ovos.skills.fallback.pong", handle_ack)
         return fallback_skills
 
-    def attempt_fallback(self, utterances, skill_id, lang, message):
+    def attempt_fallback(self, utterances: List[str], skill_id: str, lang: str, message: Message) -> bool:
         """Call skill and ask if they want to process the utterance.
 
         Args:
@@ -159,7 +162,8 @@ class FallbackService(PipelinePlugin):
                             f'increasing "max_skill_runtime" in mycroft.conf might help alleviate this issue')
         return False
 
-    def _fallback_range(self, utterances, lang, message, fb_range) -> Optional[IntentMatch]:
+    def _fallback_range(self, utterances: List[str], lang: str,
+                        message: Message, fb_range: FallbackRange) -> Optional[IntentMatch]:
         """Send fallback request for a specified priority range.
 
         Args:
@@ -197,17 +201,17 @@ class FallbackService(PipelinePlugin):
                                    utterance=utterances[0])
         return None
 
-    def high_prio(self, utterances, lang, message) -> Optional[IntentMatch]:
+    def high_prio(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
         """Pre-padatious fallbacks."""
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(0, 5))
 
-    def medium_prio(self, utterances, lang, message) -> Optional[IntentMatch]:
+    def medium_prio(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
         """General fallbacks."""
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(5, 90))
 
-    def low_prio(self, utterances, lang, message) -> Optional[IntentMatch]:
+    def low_prio(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
         """Low prio fallbacks with general matching such as chat-bot."""
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(90, 101))
