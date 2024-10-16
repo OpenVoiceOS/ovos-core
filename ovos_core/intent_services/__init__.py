@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from typing import Tuple, Callable, List
+from typing import Tuple, Callable, List, Union
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
@@ -25,7 +25,7 @@ from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
-from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelineMatch
+from ovos_plugin_manager.templates.pipeline import PipelineMatch, IntentHandlerMatch
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
 from ovos_utils.metrics import Stopwatch
@@ -191,12 +191,12 @@ class IntentService:
         sess.touch()
         return sess
 
-    def _emit_match_message(self, match: IntentMatch, message: Message):
+    def _emit_match_message(self, match: Union[IntentHandlerMatch, PipelineMatch], message: Message):
         """Update the message data with the matched utterance information and
         activate the corresponding skill if available.
 
         Args:
-            match (IntentMatch): The matched utterance object.
+            match (IntentHandlerMatch): The matched utterance object.
             message (Message): The messagebus data.
         """
         message.data["utterance"] = match.utterance
@@ -211,7 +211,7 @@ class IntentService:
                                   {"skill_id": match.skill_id})
             self.bus.emit(reply)
         # Launch skill if not handled by the match function
-        elif isinstance(match, IntentMatch) and match.match_type:
+        elif isinstance(match, IntentHandlerMatch) and match.match_type:
             # keep all original message.data and update with intent match
             data = dict(message.data)
             data.update(match.match_data)
@@ -223,11 +223,15 @@ class IntentService:
             # to ensure an accurate Session
             # NOTE: this was previously done async by the skill,
             #   but then the skill was missing from Session.active_skills
-            sess = self.converse.activate_skill(message=reply,
-                                                skill_id=match.skill_id)
+            sess = SessionManager.get(message)
+            sess.activate_skill(match.skill_id)
+            activate = message.reply('intent.service.skills.activate',
+                                        {"skill_id": match.skill_id})
             if sess:
                 reply.context["session"] = sess.serialize()
+                activate.context["session"] = sess.serialize()
 
+            self.bus.emit(activate)
             self.bus.emit(reply)
 
     def send_cancel_event(self, message):
