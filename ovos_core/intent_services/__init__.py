@@ -116,38 +116,13 @@ class IntentService:
         in the future plugins will be supported for users to define their own pipeline"""
         skips = skips or []
 
-        # TODO - deprecate around ovos-core 2.0.0
-        MAP = {
-            "converse": "ovos-converse-pipeline-plugin",
-            "common_qa": "ovos-common-query-pipeline-plugin",
-            "fallback_high": "ovos-fallback-pipeline-plugin-high",
-            "fallback_medium": "ovos-fallback-pipeline-plugin-medium",
-            "fallback_low": "ovos-fallback-pipeline-plugin-low",
-            "stop_high": "ovos-stop-pipeline-plugin-high",
-            "stop_medium": "ovos-stop-pipeline-plugin-medium",
-            "stop_low": "ovos-stop-pipeline-plugin-low",
-            "adapt_high": "ovos-adapt-pipeline-plugin-high",
-            "adapt_medium": "ovos-adapt-pipeline-plugin-medium",
-            "adapt_low": "ovos-adapt-pipeline-plugin-low",
-            "padacioso_high": "ovos-padacioso-pipeline-plugin-high",
-            "padacioso_medium": "ovos-padacioso-pipeline-plugin-medium",
-            "padacioso_low": "ovos-padacioso-pipeline-plugin-low",
-            "padatious_high": "ovos-padatious-pipeline-plugin-high",
-            "padatious_medium": "ovos-padatious-pipeline-plugin-medium",
-            "padatious_low": "ovos-padatious-pipeline-plugin-low",
-            "ocp_high": "ovos-ocp-pipeline-plugin-high",
-            "ocp_medium": "ovos-ocp-pipeline-plugin-medium",
-            "ocp_low": "ovos-ocp-pipeline-plugin-low",
-            "ocp_legacy": "ovos-ocp-pipeline-plugin-legacy"
-        }
-
         session = session or SessionManager.get()
 
         if skips:
             log_deprecation("'skips' kwarg has been deprecated!", "1.0.0")
-            skips = [MAP.get(p, p) for p in skips]
+            skips = [OVOSPipelineFactory._MAP.get(p, p) for p in skips]
 
-        pipeline = [MAP.get(p, p) for p in session.pipeline
+        pipeline = [OVOSPipelineFactory._MAP.get(p, p) for p in session.pipeline
                     if p not in skips]
 
         matchers = OVOSPipelineFactory.create(pipeline, use_cache=True, bus=self.bus,
@@ -414,6 +389,12 @@ class IntentService:
 
     ##################
     # deprecation zone - delete all below in release 1.0.0
+    @property
+    def registered_intents(self) -> List:
+        """DEPRECATED"""
+        log_deprecation("'registered_intents' moved to ovos-adapt-pipeline-plugin", "1.0.0")
+        return []
+
     @property
     def skill_names(self) -> Dict:
         """DEPRECATED"""
