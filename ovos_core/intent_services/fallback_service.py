@@ -22,6 +22,7 @@ from ovos_bus_client.session import SessionManager
 from ovos_config import Configuration
 from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
 from ovos_utils import flatten_list
+from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
 from ovos_workshop.permissions import FallbackMode
 
@@ -171,6 +172,7 @@ class FallbackService(PipelinePlugin):
         Returns:
             IntentMatch or None
         """
+        lang = standardize_lang_tag(lang)
         # we call flatten in case someone is sending the old style list of tuples
         utterances = flatten_list(utterances)
         message.data["utterances"] = utterances  # all transcripts

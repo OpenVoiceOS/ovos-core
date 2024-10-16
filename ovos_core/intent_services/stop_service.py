@@ -4,8 +4,10 @@ from os.path import dirname
 from threading import Event
 from typing import Optional, List
 
+from langcodes import closest_match
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
+
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
 from ovos_utils import flatten_list
@@ -22,6 +24,7 @@ class StopService(PipelinePlugin):
         self.bus = bus
         self._voc_cache = {}
         self.load_resource_files()
+        super().__init__()
 
     def load_resource_files(self):
         base = f"{dirname(__file__)}/locale"
@@ -128,8 +131,8 @@ class StopService(PipelinePlugin):
         Returns:
             IntentMatch if handled otherwise None.
         """
-        lang = standardize_lang_tag(lang)
-        if lang not in self._voc_cache:
+        lang = self._get_closest_lang(lang)
+        if lang is None:  # no vocs registered for this lang
             return None
 
         sess = SessionManager.get(message)
@@ -195,6 +198,18 @@ class StopService(PipelinePlugin):
 
         return self.match_stop_low(utterances, lang, message)
 
+    def _get_closest_lang(self, lang: str) -> Optional[str]:
+        if self._voc_cache:
+            lang = standardize_lang_tag(lang)
+            closest, score = closest_match(lang, list(self._voc_cache.keys()))
+            # https://langcodes-hickford.readthedocs.io/en/sphinx/index.html#distance-values
+            # 0 -> These codes represent the same language, possibly after filling in values and normalizing.
+            # 1- 3 -> These codes indicate a minor regional difference.
+            # 4 - 10 -> These codes indicate a significant but unproblematic regional difference.
+            if score < 10:
+                return closest
+        return None
+
     def match_stop_low(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
         """ before fallback_low , fuzzy match stop intent
 
@@ -206,8 +221,8 @@ class StopService(PipelinePlugin):
         Returns:
             IntentMatch if handled otherwise None.
         """
-        lang = standardize_lang_tag(lang)
-        if lang not in self._voc_cache:
+        lang = self._get_closest_lang(lang)
+        if lang is None:  # no vocs registered for this lang
             return None
         sess = SessionManager.get(message)
         # we call flatten in case someone is sending the old style list of tuples
@@ -267,8 +282,8 @@ class StopService(PipelinePlugin):
         Returns:
             bool: True if the utterance has the given vocabulary it
         """
-        lang = standardize_lang_tag(lang)
-        if lang not in self._voc_cache:
+        lang = self._get_closest_lang(lang)
+        if lang is None:  # no vocs registered for this lang
             return False
 
         _vocs = self._voc_cache[lang].get(voc_filename) or []
