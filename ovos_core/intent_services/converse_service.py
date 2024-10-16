@@ -24,6 +24,7 @@ class ConverseService(PipelinePlugin):
         self.bus.on('mycroft.speech.recognition.unknown', self.reset_converse)
         self.bus.on('intent.service.skills.deactivate', self.handle_deactivate_skill_request)
         self.bus.on('intent.service.skills.activate', self.handle_activate_skill_request)
+        self.bus.on('active_skill_request', self.handle_activate_skill_request)  # TODO backwards compat, deprecate
         self.bus.on('intent.service.active_skills.get', self.handle_get_active_skills)
         self.bus.on("skill.converse.get_response.enable", self.handle_get_response_enable)
         self.bus.on("skill.converse.get_response.disable", self.handle_get_response_disable)
@@ -408,6 +409,7 @@ class ConverseService(PipelinePlugin):
         self.bus.remove('mycroft.speech.recognition.unknown', self.reset_converse)
         self.bus.remove('intent.service.skills.deactivate', self.handle_deactivate_skill_request)
         self.bus.remove('intent.service.skills.activate', self.handle_activate_skill_request)
+        self.bus.remove('active_skill_request', self.handle_activate_skill_request)  # TODO backwards compat, deprecate
         self.bus.remove('intent.service.active_skills.get', self.handle_get_active_skills)
         self.bus.remove("skill.converse.get_response.enable", self.handle_get_response_enable)
         self.bus.remove("skill.converse.get_response.disable", self.handle_get_response_disable)
