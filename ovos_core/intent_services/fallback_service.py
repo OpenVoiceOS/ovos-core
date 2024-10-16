@@ -38,7 +38,7 @@ class FallbackService(PipelineStageConfidenceMatcher):
 
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
                  config: Optional[Dict] = None):
-        config = config or Configuration()["skills"].get("fallbacks", {})
+        config = config or Configuration().get("skills", {}).get("fallbacks", {})
         super().__init__(bus, config)
         self.registered_fallbacks = {}  # skill_id: priority
         self.bus.on("ovos.skills.fallback.register", self.handle_register_fallback)
