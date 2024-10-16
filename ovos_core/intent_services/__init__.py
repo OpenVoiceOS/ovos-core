@@ -264,7 +264,7 @@ class IntentService:
         Pipe utterance through transformer plugins to get more metadata.
         Utterances may be modified by any parser and context overwritten
         """
-        lang = get_message_lang()  # per query lang or default Configuration lang
+        lang = get_message_lang(message)  # per query lang or default Configuration lang
         original = utterances = message.data.get('utterances', [])
         message.context["lang"] = lang
         utterances, message.context = self.utterance_plugins.transform(utterances, message.context)
@@ -282,7 +282,7 @@ class IntentService:
         3 - detected_lang -> tagged by transformers  (text classification, free form chat)
         4 - config lang (or from message.data)
         """
-        default_lang = get_message_lang()
+        default_lang = get_message_lang(message)
         valid_langs = get_valid_languages()
         lang_keys = ["stt_lang",
                      "request_lang",
@@ -527,7 +527,7 @@ class IntentService:
         entity_type = message.data.get('entity_type')
         regex_str = message.data.get('regex')
         alias_of = message.data.get('alias_of')
-        lang = get_message_lang()
+        lang = get_message_lang(message)
         self._adapt_service.register_vocabulary(entity_value, entity_type,
                                                alias_of, regex_str, lang)
         self.registered_vocab.append(message.data)
@@ -604,7 +604,7 @@ class IntentService:
             message (Message): message containing utterance
         """
         utterance = message.data["utterance"]
-        lang = get_message_lang()
+        lang = get_message_lang(message)
         sess = SessionManager.get(message)
 
         # Loop through the matching functions until a match is found.
@@ -655,7 +655,7 @@ class IntentService:
             message (Message): message containing utterance
         """
         utterance = message.data["utterance"]
-        lang = get_message_lang()
+        lang = get_message_lang(message)
         intent = self._adapt_service.match_intent((utterance,), lang, message.serialize())
         intent_data = intent.intent_data if intent else None
         self.bus.emit(message.reply("intent.service.adapt.reply",
