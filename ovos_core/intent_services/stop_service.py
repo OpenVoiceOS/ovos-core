@@ -291,14 +291,14 @@ class StopService(PipelineStageConfidenceMatcher):
                             for i in _vocs])
         return False
 
-    @deprecated("match_stop_low has been renamed to match_low", "2.0.0")
+    @deprecated("'match_stop_low' has been renamed to 'match_low'", "2.0.0")
     def match_stop_low(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
         return self.match_low(utterances, lang, message)
 
-    @deprecated("match_stop_medium has been renamed to match_medium", "2.0.0")
+    @deprecated("'match_stop_medium' has been renamed to 'match_medium'", "2.0.0")
     def match_stop_medium(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
         return self.match_medium(utterances, lang, message)
 
-    @deprecated("match_stop_high has been renamed to match_high", "2.0.0")
+    @deprecated("'match_stop_high' has been renamed to 'match_high'", "2.0.0")
     def match_stop_high(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
         return self.match_high(utterances, lang, message)
