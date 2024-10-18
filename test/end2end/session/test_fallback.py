@@ -349,7 +349,7 @@ class TestFallbackTimeout(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",
-            # FallbackV2
+            # Fallback High
             "ovos.skills.fallback.ping",
             "ovos.skills.fallback.pong",
             "ovos.skills.fallback.pong",
@@ -360,6 +360,11 @@ class TestFallbackTimeout(TestCase):
             "ovos.skills.fallback.force_timeout",  # timeout from core
             f"ovos.skills.fallback.{self.skill_id2}.response",
             f"ovos.skills.fallback.{self.skill_id2}.killed",  # killable_event decorator response
+
+            # Fallback Medium
+            "ovos.skills.fallback.ping",
+            "ovos.skills.fallback.pong",
+            "ovos.skills.fallback.pong",
 
             # skill executing
             f"ovos.skills.fallback.{self.skill_id}.request",

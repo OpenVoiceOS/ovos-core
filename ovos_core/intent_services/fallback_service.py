@@ -111,6 +111,7 @@ class FallbackService(PipelinePlugin):
             self.bus.on("ovos.skills.fallback.pong", handle_ack)
 
             LOG.info("checking for FallbackSkillsV2 candidates")
+            message.data["range"] = (fb_range.start, fb_range.stop)
             # wait for all skills to acknowledge they want to answer fallback queries
             self.bus.emit(message.forward("ovos.skills.fallback.ping",
                                           message.data))
