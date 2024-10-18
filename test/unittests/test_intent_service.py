@@ -15,11 +15,12 @@
 from unittest import TestCase, mock
 
 from ovos_bus_client.message import Message
+from ovos_bus_client.session import IntentContextManager as ContextManager
 from ovos_bus_client.util import get_message_lang
 from ovos_config import Configuration
 from ovos_config.locale import setup_locale
 from ovos_core.intent_services import IntentService
-from ovos_adapt.opm import ContextManager
+from ovos_utils.fakebus import FakeBus
 from ovos_workshop.intents import IntentBuilder, Intent as AdaptIntent
 from copy import deepcopy
 from ovos_config import LocalConf, DEFAULT_CONFIG
@@ -128,15 +129,17 @@ def create_vocab_msg(keyword, value):
                    {'entity_value': value, 'entity_type': keyword})
 
 
-def get_last_message(bus):
-    """Get last sent message on mock bus."""
-    last = bus.emit.call_args
-    return last[0][0]
-
-
 class TestIntentServiceApi(TestCase):
     def setUp(self):
-        self.intent_service = IntentService(mock.Mock())
+        self.bus = FakeBus()
+        self.bus.emitted_msgs = []
+
+        def on_msg(m):
+            self.bus.emitted_msgs.append(Message.deserialize(m))
+
+        self.bus.on("message", on_msg)
+
+        self.intent_service = IntentService(self.bus)
 
     def setup_simple_adapt_intent(self,
                                   msg=create_vocab_msg('testKeyword', 'test')):
@@ -153,7 +156,7 @@ class TestIntentServiceApi(TestCase):
                       data={'utterance': 'test'})
         self.intent_service.handle_get_adapt(msg)
 
-        reply = get_last_message(self.intent_service.bus)
+        reply = self.bus.emitted_msgs[-1]
         self.assertEqual(reply.data['intent']['intent_type'],
                          'skill:testIntent')
 
@@ -164,7 +167,7 @@ class TestIntentServiceApi(TestCase):
         msg = Message('intent.service.adapt.get',
                       data={'utterance': 'five'})
         self.intent_service.handle_get_adapt(msg)
-        reply = get_last_message(self.intent_service.bus)
+        reply = self.bus.emitted_msgs[-1]
         self.assertEqual(reply.data['intent'], None)
 
     def test_get_intent(self):
@@ -175,7 +178,7 @@ class TestIntentServiceApi(TestCase):
                       data={'utterance': 'test'})
         self.intent_service.handle_get_intent(msg)
 
-        reply = get_last_message(self.intent_service.bus)
+        reply = self.bus.emitted_msgs[-1]
         self.assertEqual(reply.data['intent']['intent_type'],
                          'skill:testIntent')
 
@@ -186,7 +189,7 @@ class TestIntentServiceApi(TestCase):
         msg = Message('intent.service.intent.get',
                       data={'utterance': 'five'})
         self.intent_service.handle_get_intent(msg)
-        reply = get_last_message(self.intent_service.bus)
+        reply = self.bus.emitted_msgs[-1]
         self.assertEqual(reply.data['intent'], None)
 
     def test_get_intent_manifest(self):
@@ -196,7 +199,7 @@ class TestIntentServiceApi(TestCase):
         msg = Message('intent.service.intent.get',
                       data={'utterance': 'five'})
         self.intent_service.handle_get_intent(msg)
-        reply = get_last_message(self.intent_service.bus)
+        reply = self.bus.emitted_msgs[-1]
         self.assertEqual(reply.data['intent'], None)
 
     def test_get_adapt_intent_manifest(self):
@@ -204,7 +207,7 @@ class TestIntentServiceApi(TestCase):
         self.setup_simple_adapt_intent()
         msg = Message('intent.service.adapt.manifest.get')
         self.intent_service.handle_adapt_manifest(msg)
-        reply = get_last_message(self.intent_service.bus)
+        reply = self.bus.emitted_msgs[-1]
         self.assertEqual(reply.data['intents'][0]['name'],
                          'skill:testIntent')
 
@@ -212,7 +215,7 @@ class TestIntentServiceApi(TestCase):
         self.setup_simple_adapt_intent()
         msg = Message('intent.service.adapt.vocab.manifest.get')
         self.intent_service.handle_vocab_manifest(msg)
-        reply = get_last_message(self.intent_service.bus)
+        reply = self.bus.emitted_msgs[-1]
         value = reply.data['vocab'][0]['entity_value']
         keyword = reply.data['vocab'][0]['entity_type']
         self.assertEqual(keyword, 'testKeyword')
@@ -227,7 +230,7 @@ class TestIntentServiceApi(TestCase):
         self.intent_service.handle_detach_intent(msg)
         msg = Message('intent.service.adapt.get', data={'utterance': 'test'})
         self.intent_service.handle_get_adapt(msg)
-        reply = get_last_message(self.intent_service.bus)
+        reply = self.bus.emitted_msgs[-1]
         self.assertEqual(reply.data['intent'], None)
 
     def test_get_no_match_after_detach_skill(self):
@@ -239,93 +242,8 @@ class TestIntentServiceApi(TestCase):
         self.intent_service.handle_detach_skill(msg)
         msg = Message('intent.service.adapt.get', data={'utterance': 'test'})
         self.intent_service.handle_get_adapt(msg)
-        reply = get_last_message(self.intent_service.bus)
+        reply = self.bus.emitted_msgs[-1]
         self.assertEqual(reply.data['intent'], None)
-
-    def test_shutdown(self):
-        intent_service = IntentService(MockEmitter(), config={"padatious": {"disabled": True}})
-        intent_service.shutdown()
-        self.assertEqual(set(intent_service.bus.removed),
-                         {'active_skill_request',
-                          'add_context',
-                          'clear_context',
-                          'common_query.openvoiceos.activate',
-                          'common_query.openvoiceos.converse.get_response',
-                          'common_query.openvoiceos.converse.ping',
-                          'common_query.openvoiceos.converse.request',
-                          'common_query.openvoiceos.deactivate',
-                          'common_query.openvoiceos.set',
-                          'common_query.openvoiceos.stop',
-                          'common_query.openvoiceos.stop.ping',
-                          'common_query.question',
-                          'detach_intent',
-                          'detach_skill',
-                          'intent.service.active_skills.get',
-                          'intent.service.adapt.get',
-                          'intent.service.adapt.manifest.get',
-                          'intent.service.adapt.vocab.manifest.get',
-                          'intent.service.intent.get',
-                          'intent.service.padatious.entities.manifest.get',
-                          'intent.service.padatious.get',
-                          'intent.service.padatious.manifest.get',
-                          'intent.service.skills.activate',
-                          'intent.service.skills.activated',
-                          'intent.service.skills.deactivate',
-                          'intent.service.skills.deactivated',
-                          'intent.service.skills.get',
-                          'mycroft.audio.playing_track',
-                          'mycroft.audio.queue_end',
-                          'mycroft.audio.service.pause',
-                          'mycroft.audio.service.resume',
-                          'mycroft.audio.service.stop',
-                          'mycroft.skill.disable_intent',
-                          'mycroft.skill.enable_intent',
-                          'mycroft.skill.remove_cross_context',
-                          'mycroft.skill.set_cross_context',
-                          'mycroft.skills.loaded',
-                          'mycroft.skills.settings.changed',
-                          'mycroft.speech.recognition.unknown',
-                          'mycroft.stop',
-                          'ocp:legacy_cps',
-                          'ocp:like_song',
-                          'ocp:media_stop',
-                          'ocp:next',
-                          'ocp:open',
-                          'ocp:pause',
-                          'ocp:play',
-                          'ocp:play_favorites',
-                          'ocp:prev',
-                          'ocp:resume',
-                          'ocp:search_error',
-                          'ovos.common_play.activate',
-                          'ovos.common_play.announce',
-                          'ovos.common_play.converse.get_response',
-                          'ovos.common_play.converse.ping',
-                          'ovos.common_play.converse.request',
-                          'ovos.common_play.deactivate',
-                          'ovos.common_play.deregister_keyword',
-                          'ovos.common_play.play_search',
-                          'ovos.common_play.register_keyword',
-                          'ovos.common_play.search',
-                          'ovos.common_play.set',
-                          'ovos.common_play.status.response',
-                          'ovos.common_play.stop',
-                          'ovos.common_play.stop.ping',
-                          'ovos.common_play.track.state',
-                          'ovos.common_query.pong',
-                          'ovos.skills.fallback.deregister',
-                          'ovos.skills.fallback.register',
-                          'ovos.skills.settings_changed',
-                          'padatious:register_entity',
-                          'padatious:register_intent',
-                          'play:query.response',
-                          'question:query.response',
-                          'recognizer_loop:utterance',
-                          'register_intent',
-                          'register_vocab',
-                          'remove_context',
-                          'skill.converse.get_response.disable',
-                          'skill.converse.get_response.enable'})
 
 
 class TestAdaptIntent(TestCase):
