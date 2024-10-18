@@ -2,29 +2,32 @@ import os
 import re
 from os.path import dirname
 from threading import Event
-from typing import Optional, List
+from typing import Optional, Dict, List, Union
 
 from langcodes import closest_match
+from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 
 from ovos_config.config import Configuration
-from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
+from ovos_plugin_manager.templates.pipeline import PipelineMatch, PipelineStageConfidenceMatcher
 from ovos_utils import flatten_list
 from ovos_utils.bracket_expansion import expand_options
+from ovos_utils.fakebus import FakeBus
 from ovos_utils.lang import standardize_lang_tag
-from ovos_utils.log import LOG
+from ovos_utils.log import LOG, deprecated
 from ovos_utils.parse import match_one
 
 
-class StopService(PipelinePlugin):
+class StopService(PipelineStageConfidenceMatcher):
     """Intent Service thats handles stopping skills."""
 
-    def __init__(self, bus):
-        self.bus = bus
+    def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
+                 config: Optional[Dict] = None):
+        config = config or Configuration().get("skills", {}).get("stop") or {}
+        super().__init__(config=config, bus=bus)
         self._voc_cache = {}
         self.load_resource_files()
-        super().__init__(config=Configuration().get("skills", {}).get("stop") or {})
 
     def load_resource_files(self):
         base = f"{dirname(__file__)}/locale"
@@ -113,7 +116,7 @@ class StopService(PipelinePlugin):
         elif result is not None:
             return result.data.get('result', False)
 
-    def match_stop_high(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
+    def match_high(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
         """If utterance is an exact match for "stop" , run before intent stage
 
         Args:
@@ -142,11 +145,10 @@ class StopService(PipelinePlugin):
         if is_global_stop:
             # emit a global stop, full stop anything OVOS is doing
             self.bus.emit(message.reply("mycroft.stop", {}))
-            return IntentMatch(intent_service='Stop',
-                               intent_type=True,
-                               intent_data={"conf": conf},
-                               skill_id=None,
-                               utterance=utterance)
+            return PipelineMatch(handled=True,
+                                 match_data={"conf": conf},
+                                 skill_id=None,
+                                 utterance=utterance)
 
         if is_stop:
             # check if any skill can stop
@@ -156,14 +158,13 @@ class StopService(PipelinePlugin):
                     continue
 
                 if self.stop_skill(skill_id, message):
-                    return IntentMatch(intent_service='Stop',
-                                       intent_type=True,
-                                       intent_data={"conf": conf},
-                                       skill_id=skill_id,
-                                       utterance=utterance)
+                    return PipelineMatch(handled=True,
+                                         match_data={"conf": conf},
+                                         skill_id=skill_id,
+                                         utterance=utterance)
         return None
 
-    def match_stop_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
+    def match_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
         """ if "stop" intent is in the utterance,
         but it contains additional words not in .intent files
 
@@ -189,21 +190,9 @@ class StopService(PipelinePlugin):
             if not is_global_stop:
                 return None
 
-        return self.match_stop_low(utterances, lang, message)
+        return self.match_low(utterances, lang, message)
 
-    def _get_closest_lang(self, lang: str) -> Optional[str]:
-        if self._voc_cache:
-            lang = standardize_lang_tag(lang)
-            closest, score = closest_match(lang, list(self._voc_cache.keys()))
-            # https://langcodes-hickford.readthedocs.io/en/sphinx/index.html#distance-values
-            # 0 -> These codes represent the same language, possibly after filling in values and normalizing.
-            # 1- 3 -> These codes indicate a minor regional difference.
-            # 4 - 10 -> These codes indicate a significant but unproblematic regional difference.
-            if score < 10:
-                return closest
-        return None
-
-    def match_stop_low(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
+    def match_low(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
         """ before fallback_low , fuzzy match stop intent
 
         Args:
@@ -236,20 +225,30 @@ class StopService(PipelinePlugin):
                 continue
 
             if self.stop_skill(skill_id, message):
-                return IntentMatch(intent_service='Stop',
-                                   intent_type=True,
-                                   # emit instead of intent message
-                                   intent_data={"conf": conf},
-                                   skill_id=skill_id, utterance=utterance)
+                return PipelineMatch(handled=True,
+                                     # emit instead of intent message
+                                     match_data={"conf": conf},
+                                     skill_id=skill_id, utterance=utterance)
 
         # emit a global stop, full stop anything OVOS is doing
         self.bus.emit(message.reply("mycroft.stop", {}))
-        return IntentMatch(intent_service='Stop',
-                           intent_type=True,
-                           # emit instead of intent message {"conf": conf},
-                           intent_data={},
-                           skill_id=None,
-                           utterance=utterance)
+        return PipelineMatch(handled=True,
+                             # emit instead of intent message {"conf": conf},
+                             match_data={},
+                             skill_id=None,
+                             utterance=utterance)
+
+    def _get_closest_lang(self, lang: str) -> Optional[str]:
+        if self._voc_cache:
+            lang = standardize_lang_tag(lang)
+            closest, score = closest_match(lang, list(self._voc_cache.keys()))
+            # https://langcodes-hickford.readthedocs.io/en/sphinx/index.html#distance-values
+            # 0 -> These codes represent the same language, possibly after filling in values and normalizing.
+            # 1- 3 -> These codes indicate a minor regional difference.
+            # 4 - 10 -> These codes indicate a significant but unproblematic regional difference.
+            if score < 10:
+                return closest
+        return None
 
     def voc_match(self, utt: str, voc_filename: str, lang: str,
                   exact: bool = False):
@@ -291,3 +290,15 @@ class StopService(PipelinePlugin):
                 return any([re.match(r'.*\b' + i + r'\b.*', utt)
                             for i in _vocs])
         return False
+
+    @deprecated("'match_stop_low' has been renamed to 'match_low'", "2.0.0")
+    def match_stop_low(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
+        return self.match_low(utterances, lang, message)
+
+    @deprecated("'match_stop_medium' has been renamed to 'match_medium'", "2.0.0")
+    def match_stop_medium(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
+        return self.match_medium(utterances, lang, message)
+
+    @deprecated("'match_stop_high' has been renamed to 'match_high'", "2.0.0")
+    def match_stop_high(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
+        return self.match_high(utterances, lang, message)

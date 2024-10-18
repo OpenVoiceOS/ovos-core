@@ -1,7 +1,8 @@
 import time
 from threading import Event
-from typing import Optional, List
+from typing import Optional, Dict, List, Union
 
+from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, UtteranceState, Session
 from ovos_bus_client.util import get_message_lang
@@ -9,17 +10,20 @@ from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
 
 from ovos_config.config import Configuration
 from ovos_config.locale import setup_locale
-from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
+from ovos_plugin_manager.templates.pipeline import PipelineMatch, PipelineStageMatcher
 from ovos_utils import flatten_list
+from ovos_utils.fakebus import FakeBus
 from ovos_utils.lang import standardize_lang_tag
-from ovos_utils.log import LOG
+from ovos_utils.log import LOG, deprecated
 
 
-class ConverseService(PipelinePlugin):
+class ConverseService(PipelineStageMatcher):
     """Intent Service handling conversational skills."""
 
-    def __init__(self, bus):
-        self.bus = bus
+    def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
+                 config: Optional[Dict] = None):
+        config = config or Configuration().get("skills", {}).get("converse", {})
+        super().__init__(bus, config)
         self._consecutive_activations = {}
         self.bus.on('mycroft.speech.recognition.unknown', self.reset_converse)
         self.bus.on('intent.service.skills.deactivate', self.handle_deactivate_skill_request)
@@ -28,7 +32,6 @@ class ConverseService(PipelinePlugin):
         self.bus.on('intent.service.active_skills.get', self.handle_get_active_skills)
         self.bus.on("skill.converse.get_response.enable", self.handle_get_response_enable)
         self.bus.on("skill.converse.get_response.disable", self.handle_get_response_disable)
-        super().__init__(config=Configuration().get("skills", {}).get("converse") or {})
 
     @property
     def active_skills(self):
@@ -313,7 +316,7 @@ class ConverseService(PipelinePlugin):
                             f'increasing "max_skill_runtime" in mycroft.conf might help alleviate this issue')
         return False
 
-    def converse_with_skills(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
+    def match(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
         """Give active skills a chance at the utterance
 
         Args:
@@ -338,10 +341,9 @@ class ConverseService(PipelinePlugin):
                 continue
             if self.converse(utterances, skill_id, lang, message):
                 state = session.utterance_states.get(skill_id, UtteranceState.INTENT)
-                return IntentMatch(intent_service='Converse',
-                                   intent_type=state != UtteranceState.RESPONSE,
-                                   # intent_type == True -> emit "ovos.utterance.handled"
-                                   intent_data={},
+                return PipelineMatch(handled=state != UtteranceState.RESPONSE,
+                                   # handled == True -> emit "ovos.utterance.handled"
+                                   match_data={},
                                    skill_id=skill_id,
                                    utterance=utterances[0])
         return None
@@ -404,6 +406,10 @@ class ConverseService(PipelinePlugin):
         """
         self.bus.emit(message.reply("intent.service.active_skills.reply",
                                     {"skills": self.get_active_skills(message)}))
+
+    @deprecated("'converse_with_skills' has been renamed to 'match'", "2.0.0")
+    def converse_with_skills(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
+        return self.match(utterances, lang, message)
 
     def shutdown(self):
         self.bus.remove('mycroft.speech.recognition.unknown', self.reset_converse)
