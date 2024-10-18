@@ -1,12 +1,12 @@
 # Changelog
 
-## [0.2.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.4a1) (2024-10-16)
+## [0.2.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.5a1) (2024-10-18)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.3...0.2.4a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.4...0.2.5a1)
 
 **Merged pull requests:**
 
-- fix:standardize\_lang [\#568](https://github.com/OpenVoiceOS/ovos-core/pull/568) ([JarbasAl](https://github.com/JarbasAl))
+- fix:fallback match [\#572](https://github.com/OpenVoiceOS/ovos-core/pull/572) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
