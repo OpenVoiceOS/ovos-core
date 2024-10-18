@@ -12,26 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from typing import Tuple, Callable
-
-from ovos_bus_client.message import Message
-from ovos_bus_client.session import SessionManager
-from ovos_bus_client.util import get_message_lang
-from ovos_workshop.intents import open_intent_envelope
+from typing import Tuple, Callable, Union
 
 from ocp_pipeline.opm import OCPPipelineMatcher
 from ovos_adapt.opm import AdaptPipeline as AdaptService
+from ovos_bus_client.message import Message
+from ovos_bus_client.session import SessionManager
+from ovos_bus_client.util import get_message_lang
 from ovos_commonqa.opm import CommonQAService
 from ovos_config.config import Configuration
-from ovos_config.locale import setup_locale, get_valid_languages, get_full_lang_code
+from ovos_config.locale import setup_locale, get_valid_languages
 from ovos_core.intent_services.converse_service import ConverseService
 from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
-from ovos_plugin_manager.templates.pipeline import IntentMatch
+from ovos_plugin_manager.templates.pipeline import PipelineMatch, IntentHandlerMatch
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG, deprecated, log_deprecation
 from ovos_utils.metrics import Stopwatch
+from ovos_workshop.intents import open_intent_envelope
 from padacioso.opm import PadaciosoPipeline as PadaciosoService
 
 
@@ -284,13 +283,14 @@ class IntentService:
         """
         default_lang = get_message_lang(message)
         valid_langs = get_valid_languages()
+        valid_langs = [standardize_lang_tag(l) for l in valid_langs]
         lang_keys = ["stt_lang",
                      "request_lang",
                      "detected_lang"]
         for k in lang_keys:
             if k in message.context:
-                v = get_full_lang_code(message.context[k])
-                if v in valid_langs:
+                v = standardize_lang_tag(message.context[k])
+                if v in valid_langs:  # TODO - use lang distance instead to choose best dialect
                     if v != default_lang:
                         LOG.info(f"replaced {default_lang} with {k}: {v}")
                     return v
@@ -314,8 +314,7 @@ class IntentService:
                             "intent matching will be extremely slow in comparison")
             padatious_matcher = self._padacioso_service
         else:
-            from ovos_core.intent_services.padatious_service import PadatiousMatcher
-            padatious_matcher = PadatiousMatcher(self._padatious_service)
+            padatious_matcher = self._padatious_service
 
         matchers = {
             "converse": self._converse.converse_with_skills,
@@ -351,7 +350,8 @@ class IntentService:
         LOG.debug(f"Session pipeline: {pipeline}")
         return [(k, matchers[k]) for k in pipeline]
 
-    def _validate_session(self, message, lang):
+    @staticmethod
+    def _validate_session(message, lang):
         # get session
         lang = standardize_lang_tag(lang)
         sess = SessionManager.get(message)
@@ -373,12 +373,12 @@ class IntentService:
         sess.touch()
         return sess
 
-    def _emit_match_message(self, match: IntentMatch, message: Message):
+    def _emit_match_message(self, match: Union[IntentHandlerMatch, PipelineMatch], message: Message):
         """Update the message data with the matched utterance information and
         activate the corresponding skill if available.
 
         Args:
-            match (IntentMatch): The matched utterance object.
+            match (IntentHandlerMatch): The matched utterance object.
             message (Message): The messagebus data.
         """
         message.data["utterance"] = match.utterance
@@ -387,19 +387,19 @@ class IntentService:
             # ensure skill_id is present in message.context
             message.context["skill_id"] = match.skill_id
 
-        if match.intent_type is True:
+        if isinstance(match, PipelineMatch) and match.handled:
             # utterance fully handled
             reply = message.reply("ovos.utterance.handled",
                                   {"skill_id": match.skill_id})
             self.bus.emit(reply)
         # Launch skill if not handled by the match function
-        elif match.intent_type:
+        elif isinstance(match, IntentHandlerMatch) and match.match_type:
             # keep all original message.data and update with intent match
             data = dict(message.data)
-            data.update(match.intent_data)
+            data.update(match.match_data)
 
             # NOTE: message.reply to ensure correct message destination
-            reply = message.reply(match.intent_type, data)
+            reply = message.reply(match.match_type, data)
 
             # let's activate the skill BEFORE the intent is triggered
             # to ensure an accurate Session
@@ -483,9 +483,9 @@ class IntentService:
                         LOG.debug(
                             f"ignoring match, skill_id '{match.skill_id}' blacklisted by Session '{sess.session_id}'")
                         continue
-                    if match.intent_type and match.intent_type in sess.blacklisted_intents:
+                    if isinstance(match, IntentHandlerMatch) and match.match_type in sess.blacklisted_intents:
                         LOG.debug(
-                            f"ignoring match, intent '{match.intent_type}' blacklisted by Session '{sess.session_id}'")
+                            f"ignoring match, intent '{match.match_type}' blacklisted by Session '{sess.session_id}'")
                         continue
                     try:
                         self._emit_match_message(match, message)
@@ -529,7 +529,7 @@ class IntentService:
         alias_of = message.data.get('alias_of')
         lang = get_message_lang(message)
         self._adapt_service.register_vocabulary(entity_value, entity_type,
-                                               alias_of, regex_str, lang)
+                                                alias_of, regex_str, lang)
         self.registered_vocab.append(message.data)
 
     def handle_register_intent(self, message):
@@ -559,7 +559,8 @@ class IntentService:
         skill_id = message.data.get('skill_id')
         self._adapt_service.detach_skill(skill_id)
 
-    def handle_add_context(self, message):
+    @staticmethod
+    def handle_add_context(message: Message):
         """Add context
 
         Args:
@@ -581,7 +582,8 @@ class IntentService:
         sess = SessionManager.get(message)
         sess.context.inject_context(entity)
 
-    def handle_remove_context(self, message):
+    @staticmethod
+    def handle_remove_context(message: Message):
         """Remove specific context
 
         Args:
@@ -592,7 +594,8 @@ class IntentService:
             sess = SessionManager.get(message)
             sess.context.remove_context(context)
 
-    def handle_clear_context(self, message):
+    @staticmethod
+    def handle_clear_context(message: Message):
         """Clears all keywords from context """
         sess = SessionManager.get(message)
         sess.context.clear_context()
@@ -615,10 +618,10 @@ class IntentService:
                                                       session=sess):
             match = match_func([utterance], lang, message)
             if match:
-                if match.intent_type:
-                    intent_data = match.intent_data
-                    intent_data["intent_name"] = match.intent_type
-                    intent_data["intent_service"] = match.intent_service
+                if match.match_type:
+                    intent_data = match.match_data
+                    intent_data["intent_name"] = match.match_type
+                    intent_data["intent_service"] = pipeline
                     intent_data["skill_id"] = match.skill_id
                     intent_data["handler"] = match_func.__name__
                     self.bus.emit(message.reply("intent.service.intent.reply",
@@ -657,7 +660,7 @@ class IntentService:
         utterance = message.data["utterance"]
         lang = get_message_lang(message)
         intent = self._adapt_service.match_intent((utterance,), lang, message.serialize())
-        intent_data = intent.intent_data if intent else None
+        intent_data = intent.match_data if intent else None
         self.bus.emit(message.reply("intent.service.adapt.reply",
                                     {"intent": intent_data}))
 
