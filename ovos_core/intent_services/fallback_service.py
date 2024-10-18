@@ -98,11 +98,13 @@ class FallbackService(PipelinePlugin):
         def handle_ack(msg):
             skill_id = msg.data["skill_id"]
             if msg.data.get("can_handle", True):
-                if skill_id in self.registered_fallbacks:
+                if skill_id in in_range:
                     fallback_skills.append(skill_id)
-                LOG.info(f"{skill_id} will try to handle fallback")
+                    LOG.info(f"{skill_id} will try to handle fallback")
+                else:
+                    LOG.debug(f"{skill_id} is out of range, skipping")
             else:
-                LOG.info(f"{skill_id} will NOT try to handle fallback")
+                LOG.debug(f"{skill_id} does NOT WANT to try to handle fallback")
             skill_ids.append(skill_id)
 
         if in_range:  # no need to search if no skills available
