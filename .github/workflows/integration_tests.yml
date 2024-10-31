@@ -37,7 +37,6 @@ jobs:
           python -m pip install build wheel
       - name: Install test dependencies
         run: |
-          pip install git+https://github.com/OpenVoiceOS/OVOS-workshop@fix/duplicate_handled_message
           pip install -r requirements/tests.txt
           pip install ./test/integrationtests/common_query/ovos_tskill_fakewiki
       - name: Install core repo
