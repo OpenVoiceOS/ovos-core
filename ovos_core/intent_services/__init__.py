@@ -89,6 +89,10 @@ class IntentService:
         self.bus.on('intent.service.padatious.manifest.get', self.handle_padatious_manifest)
         self.bus.on('intent.service.padatious.entities.manifest.get', self.handle_entity_manifest)
 
+        self._deactivations = []  # internal, track skills that call self.deactivate to avoid reactivating them again
+
+        self.bus.on('intent.service.skills.deactivate', self._handle_deactivate)
+
     @property
     def adapt_service(self):
         log_deprecation("direct access to self.adapt_service is deprecated, "
@@ -343,6 +347,15 @@ class IntentService:
         sess.touch()
         return sess
 
+    def _handle_deactivate(self, message):
+        """internal helper, track if a skill asked to be removed from active list during intent match
+        in this case we want to avoid reactivating it again
+        This only matters in PipelineMatchers, such as fallback and converse
+        in those cases the activation is only done AFTER the match, not before unlike intents
+        """
+        skill_id = message.data.get("skill_id")
+        self._deactivations.append(skill_id)
+
     def _emit_match_message(self, match: Union[IntentHandlerMatch, PipelineMatch], message: Message):
         """Update the message data with the matched utterance information and
         activate the corresponding skill if available.
@@ -358,7 +371,8 @@ class IntentService:
         if match.skill_id:
             # ensure skill_id is present in message.context
             message.context["skill_id"] = match.skill_id
-            if not sess.is_active(match.skill_id):
+            # NOTE: do not re-activate if the skill called self.deactivate
+            if match.skill_id not in self._deactivations and not sess.is_active(match.skill_id):
                 # ensure skill_id is in active skills list
                 sess.activate_skill(match.skill_id)
                 # emit event for skills callback -> self.handle_activate
@@ -368,6 +382,7 @@ class IntentService:
             # utterance fully handled
             reply = message.reply("ovos.utterance.handled",
                                   {"skill_id": match.skill_id})
+
         # Launch skill if not handled by the match function
         elif isinstance(match, IntentHandlerMatch) and match.match_type:
             # keep all original message.data and update with intent match
@@ -376,7 +391,7 @@ class IntentService:
             reply = message.reply(match.match_type, data)
 
         if reply is not None:
-            reply.context["session"] = sess.serialize() # updated active skill list
+            reply.context["session"] = sess.serialize()  # updated active skill list
             self.bus.emit(reply)
 
     def send_cancel_event(self, message):
@@ -441,6 +456,8 @@ class IntentService:
         # match
         match = None
         with stopwatch:
+            self._deactivations = []
+
             # Loop through the matching functions until a match is found.
             for pipeline, match_func in self.get_pipeline(session=sess):
                 match = match_func(utterances, lang, message)
