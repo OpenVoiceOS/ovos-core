@@ -42,6 +42,7 @@ jobs:
       - name: Install core repo
         run: |
           pip install -e .[plugins]
+          pip install git+https://github.com/OpenVoiceOS/OVOS-workshop@fix/duplicate_handled_message
       - name: Run integration tests
         run: |
           pytest test/integrationtests
