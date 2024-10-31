@@ -73,7 +73,6 @@ class TestSessions(TestCase):
             f"{self.skill_id}.stop.response",  # skill reporting nothing to stop
 
             # sanity check in test skill that method was indeed called
-            "enclosure.active_skill",
             "speak",  # "utterance":"old stop called"
 
             # NOTE: messages below might show up before enclosure.active_skill
@@ -112,7 +111,6 @@ class TestSessions(TestCase):
             f"{self.skill_id}:OldWorldIntent",
             "mycroft.skill.handler.start",
             # skill code executing
-            "enclosure.active_skill",
             "speak",
             "mycroft.skill.handler.complete",
             "ovos.utterance.handled"  # handle_utterance returned (intent service)
@@ -162,7 +160,6 @@ class TestSessions(TestCase):
             f"{self.skill_id}.stop.response",  # apparently fails to stop  (old style)
 
             # test in skill that global stop was called
-            "enclosure.active_skill",
             "speak",  # "utterance":"stop"
 
             # report old-style stop handled event
@@ -171,7 +168,7 @@ class TestSessions(TestCase):
             # old style unwanted side effects (global stop is global)
             f"{self.new_skill_id}.stop",
             f"{self.new_skill_id}.stop.response",
-            "enclosure.active_skill",  # other test skill also speaks
+            # other test skill also speaks
             "speak"  # "utterance":"old stop called"
         ]
 
@@ -250,8 +247,9 @@ class TestSessions(TestCase):
             f"{self.new_skill_id}.stop.response",  # skill reporting nothing to stop
 
             # sanity check in test skill that method was indeed called
-            "enclosure.active_skill",
-            "speak"  # "utterance":"old stop called"
+            "speak",  # "utterance":"old stop called"
+
+            "ovos.utterance.handled",
 
         ]
 
@@ -280,12 +278,10 @@ class TestSessions(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             # skill selected
-            "intent.service.skills.activated",
             f"{self.new_skill_id}.activate",
             f"{self.new_skill_id}:NewWorldIntent",
             "mycroft.skill.handler.start",
             # skill code executing
-            "enclosure.active_skill",
             "speak",
             "mycroft.skill.handler.complete",
             "ovos.utterance.handled"  # handle_utterance returned (intent service)
@@ -329,7 +325,6 @@ class TestSessions(TestCase):
             f"{self.new_skill_id}.stop",  # skill specific stop trigger
 
             # test session specific stop was called
-            "enclosure.active_skill",
             "speak",  # "utterance":"stop 123"
 
             f"{self.new_skill_id}.stop.response",  # skill reports it stopped (new style),
@@ -389,7 +384,6 @@ class TestSessions(TestCase):
             f"{self.skill_id}.stop.response",  # dont want to stop (new style)
 
             # check the global stop handlers are called
-            "enclosure.active_skill",
             "speak",  # "utterance":"old stop called"
         ]
 

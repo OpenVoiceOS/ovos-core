@@ -58,13 +58,10 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",
-            # skill selected
-            "intent.service.skills.activated",
             f"{self.skill_id}.activate",
             f"{self.skill_id}:HelloWorldIntent",
             "mycroft.skill.handler.start",
             # skill code executing
-            "enclosure.active_skill",
             "speak",
             "mycroft.skill.handler.complete",
             "ovos.utterance.handled"  # handle_utterance returned (intent service)
@@ -176,10 +173,8 @@ class TestOCP(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:play",
-            "enclosure.active_skill",
             "speak",
             "ovos.common_play.search.start",
             "enclosure.mouth.think",
@@ -222,10 +217,8 @@ class TestOCP(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:play",
-            "enclosure.active_skill",
             "speak",
             "ovos.common_play.search.start",
             "enclosure.mouth.think",
@@ -242,7 +235,6 @@ class TestOCP(TestCase):
             "ovos.common_play.search.end",
             'ovos.common_play.reset',
             # playback failure - would play if not blacklisted
-            "enclosure.active_skill",
             "speak",  # "dialog":"cant.play"
             "ovos.utterance.handled"
         ]
@@ -266,10 +258,8 @@ class TestOCP(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             "ovos.common_play.status",
-            "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:play",
-            "enclosure.active_skill",
             "speak",
             "ovos.common_play.search.start",
             "enclosure.mouth.think",
@@ -286,7 +276,6 @@ class TestOCP(TestCase):
             "ovos.common_play.search.end",
             'ovos.common_play.reset',
             # playback failure
-            "enclosure.active_skill",
             "speak",  # "dialog":"cant.play"
             "ovos.utterance.handled"
         ]
@@ -349,13 +338,9 @@ class TestFallback(TestCase):
             # skill executing
             f"ovos.skills.fallback.{self.skill_id}.request",
             f"ovos.skills.fallback.{self.skill_id}.start",
-            "enclosure.active_skill",
             "speak",
-            # activated only after skill return True
-            "intent.service.skills.activate",
-            "intent.service.skills.activated",
-            f"{self.skill_id}.activate",
             f"ovos.skills.fallback.{self.skill_id}.response",
+            f"{self.skill_id}.activate",
             "ovos.utterance.handled"
         ]
         wait_for_n_messages(len(expected_messages))
@@ -439,13 +424,10 @@ class TestCommonQuery(TestCase):
             "question:query.response",  # searching
             "question:query.response",  # response
             "enclosure.mouth.reset",
-            "question:action",
-            "intent.service.skills.activate",
-            "intent.service.skills.activated",
             f"{self.skill_id}.activate",
-            "enclosure.active_skill",
+            "question:action",  # similar to an intent triggering
+            "mycroft.skill.handler.start",
             "speak",  # answer
-            "enclosure.active_skill",
             "speak",  # callback
             "mycroft.skill.handler.complete",
             "ovos.utterance.handled"

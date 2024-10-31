@@ -61,15 +61,13 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",  # trigger intent to start the test
-            # skill selected
-            "intent.service.skills.activated",
             f"{self.skill_id}.activate",
             f"{self.skill_id}:test_get_response.intent",
             "mycroft.skill.handler.start",
             # intent code
             "skill.converse.get_response.enable",  # start of get_response
             "ovos.session.update_default",  # sync get_response status
-            "enclosure.active_skill",
+
             "speak",  # 'mycroft.mic.listen' if no dialog passed to get_response
             "recognizer_loop:audio_output_start",
             "recognizer_loop:audio_output_end",
@@ -80,7 +78,7 @@ class TestSessions(TestCase):
             "skill.converse.get_response.disable",  # end of get_response
             "ovos.session.update_default",  # sync get_response status
             # intent code post self.get_response
-            "enclosure.active_skill",  # from speak inside intent
+              # from speak inside intent
             "speak",  # speak "ERROR" inside intent
             "recognizer_loop:audio_output_start",
             "recognizer_loop:audio_output_end",
@@ -211,15 +209,13 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",  # trigger intent to start the test
-            # skill selected
-            "intent.service.skills.activated",
             f"{self.skill_id}.activate",
             f"{self.skill_id}:test_get_response.intent",
             "mycroft.skill.handler.start",
             # intent code
             "skill.converse.get_response.enable",  # start of get_response
             "ovos.session.update_default",  # sync get_response status
-            "enclosure.active_skill",
+
             "speak",  # 'mycroft.mic.listen' if no dialog passed to get_response
             "recognizer_loop:audio_output_start",
             "recognizer_loop:audio_output_end",
@@ -235,7 +231,7 @@ class TestSessions(TestCase):
             "skill.converse.get_response.disable",  # end of get_response
             "ovos.session.update_default",  # sync get_response status
             # intent code post self.get_response
-            "enclosure.active_skill",  # from speak inside intent
+
             "speak",  # speak "ok" inside intent
             "recognizer_loop:audio_output_start",
             "recognizer_loop:audio_output_end",
@@ -376,15 +372,13 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",  # trigger intent to start the test
-            # skill selected
-            "intent.service.skills.activated",
             f"{self.skill_id}.activate",
             f"{self.skill_id}:test_get_response.intent",
             "mycroft.skill.handler.start",
             # intent code
             "skill.converse.get_response.enable",  # start of get_response
             "ovos.session.update_default",  # sync get_response status
-            "enclosure.active_skill",
+            
             "speak",  # 'mycroft.mic.listen' if no dialog passed to get_response
             "recognizer_loop:audio_output_start",
             "recognizer_loop:audio_output_end",
@@ -401,7 +395,7 @@ class TestSessions(TestCase):
             "skill.converse.get_response.disable",  # end of get_response
             "ovos.session.update_default",  # sync get_response status
             # intent code post self.get_response
-            "enclosure.active_skill",  # from speak inside intent
+
             "speak",  # speak "ERROR" inside intent
             "recognizer_loop:audio_output_start",
             "recognizer_loop:audio_output_end",
@@ -543,8 +537,6 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",  # trigger intent to start the test
-            # skill selected
-            "intent.service.skills.activated",
             f"{self.skill_id}.activate",
             f"{self.skill_id}:test_get_response3.intent",
             "mycroft.skill.handler.start",
@@ -568,7 +560,7 @@ class TestSessions(TestCase):
             "skill.converse.get_response.disable",  # end of get_response
             "ovos.session.update_default",  # sync get_response status
             # intent code post self.get_response
-            "enclosure.active_skill",  # from speak inside intent
+
             "speak",  # speak "ok" inside intent
             "mycroft.skill.handler.complete",  # original intent finished executing
 
@@ -701,15 +693,13 @@ class TestSessions(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",  # no session
 
-            # skill selected
-            "intent.service.skills.activated",
             f"{self.skill_id}.activate",
 
             f"{self.skill_id}:test_get_response_cascade.intent",
             "mycroft.skill.handler.start",
 
             # intent code before self.get_response
-            "enclosure.active_skill",
+            
             "speak",  # "give me items"
 
             # first get_response
@@ -893,15 +883,13 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",  # trigger intent to start the test
-            # skill selected
-            "intent.service.skills.activated",
             f"{self.skill_id}.activate",
             f"{self.skill_id}:test_get_response.intent",
             "mycroft.skill.handler.start",
             # intent code
             "skill.converse.get_response.enable",  # start of get_response
             "ovos.session.update_default",  # sync get_response status
-            "enclosure.active_skill",
+            
             "speak",  # 'mycroft.mic.listen' if no dialog passed to get_response
             "recognizer_loop:audio_output_start",
             "recognizer_loop:audio_output_end",
@@ -913,7 +901,7 @@ class TestSessions(TestCase):
             "skill.converse.get_response.disable",  # end of get_response
             "ovos.session.update_default",  # sync get_response status
             # intent code post self.get_response
-            "enclosure.active_skill",  # from speak inside intent
+
             "speak",  # speak "ERROR" inside intent
             "recognizer_loop:audio_output_start",
             "recognizer_loop:audio_output_end",
@@ -976,15 +964,13 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",  # trigger intent to start the test
-            # skill selected
-            "intent.service.skills.activated",
             f"{self.skill_id}.activate",
             f"{self.skill_id}:test_get_response.intent",
             "mycroft.skill.handler.start",
             # intent code
             "skill.converse.get_response.enable",  # start of get_response
 
-            "enclosure.active_skill",
+            
             "speak",  # 'mycroft.mic.listen' if no dialog passed to get_response
             "recognizer_loop:audio_output_start",
             "recognizer_loop:audio_output_end",
@@ -996,7 +982,7 @@ class TestSessions(TestCase):
             "skill.converse.get_response.disable",  # end of get_response
 
             # intent code post self.get_response
-            "enclosure.active_skill",  # from speak inside intent
+
             "speak",  # speak "ERROR" inside intent
             "recognizer_loop:audio_output_start",
             "recognizer_loop:audio_output_end",
@@ -1057,15 +1043,13 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",  # trigger intent to start the test
-            # skill selected
-            "intent.service.skills.activated",
             f"{self.skill_id}.activate",
             f"{self.skill_id}:test_get_response.intent",
             "mycroft.skill.handler.start",
             # intent code
             "skill.converse.get_response.enable",  # start of get_response
 
-            "enclosure.active_skill",
+            
             "speak",  # 'mycroft.mic.listen' if no dialog passed to get_response
             "recognizer_loop:audio_output_start",
             "recognizer_loop:audio_output_end",
@@ -1078,7 +1062,7 @@ class TestSessions(TestCase):
             "skill.converse.get_response.disable",  # end of get_response
 
             # intent code post self.get_response
-            "enclosure.active_skill",  # from speak inside intent
+
             "speak",  # speak "ERROR" inside intent
             "recognizer_loop:audio_output_start",
             "recognizer_loop:audio_output_end",
@@ -1140,15 +1124,13 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",  # trigger intent to start the test
-            # skill selected
-            "intent.service.skills.activated",
             f"{self.skill_id}.activate",
             f"{self.skill_id}:test_get_response.intent",
             "mycroft.skill.handler.start",
             # intent code
             "skill.converse.get_response.enable",  # start of get_response
 
-            "enclosure.active_skill",
+            
             "speak",  # 'mycroft.mic.listen' if no dialog passed to get_response
             "recognizer_loop:audio_output_start",
             "recognizer_loop:audio_output_end",
@@ -1161,7 +1143,7 @@ class TestSessions(TestCase):
             "skill.converse.get_response.disable",  # end of get_response
 
             # intent code post self.get_response
-            "enclosure.active_skill",  # from speak inside intent
+
             "speak",  # speak "ERROR" inside intent
             "recognizer_loop:audio_output_start",
             "recognizer_loop:audio_output_end",

@@ -61,16 +61,10 @@ class TestFallback(TestCase):
             # skill executing
             f"ovos.skills.fallback.{self.skill_id}.request",
             f"ovos.skills.fallback.{self.skill_id}.start",
-            "enclosure.active_skill",
             "speak",
-
-            # activated only after skill return True
-            "intent.service.skills.activate",
-            "intent.service.skills.activated",
-            f"{self.skill_id}.activate",
-            "ovos.session.update_default",
-            
             f"ovos.skills.fallback.{self.skill_id}.response",
+            # activated only after skill returns True
+            f"{self.skill_id}.activate",
             "ovos.utterance.handled",  # handle_utterance returned (intent service)
             "ovos.session.update_default"
         ]
@@ -101,24 +95,14 @@ class TestFallback(TestCase):
         self.assertEqual(messages[3].msg_type, f"ovos.skills.fallback.{self.skill_id}.request")
         self.assertEqual(messages[3].data["skill_id"], self.skill_id)
         self.assertEqual(messages[4].msg_type, f"ovos.skills.fallback.{self.skill_id}.start")
-        self.assertEqual(messages[5].msg_type, "enclosure.active_skill")
-        self.assertEqual(messages[5].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[6].msg_type, "speak")
-        self.assertEqual(messages[6].data["meta"]["dialog"], "unknown")
-        self.assertEqual(messages[6].data["meta"]["skill"], self.skill_id)
-
-        # verify skill is activated
-        self.assertEqual(messages[7].msg_type, "intent.service.skills.activate")
-        self.assertEqual(messages[7].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[8].msg_type, "intent.service.skills.activated")
-        self.assertEqual(messages[8].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[9].msg_type, f"{self.skill_id}.activate")
-        self.assertEqual(messages[10].msg_type, "ovos.session.update_default")
+        self.assertEqual(messages[5].msg_type, "speak")
+        self.assertEqual(messages[5].data["meta"]["dialog"], "unknown")
+        self.assertEqual(messages[5].data["meta"]["skill"], self.skill_id)
 
         # end of fallback
-        self.assertEqual(messages[11].msg_type, f"ovos.skills.fallback.{self.skill_id}.response")
-        self.assertTrue(messages[11].data["result"])
-        self.assertEqual(messages[11].data["fallback_handler"], "UnknownSkill.handle_fallback")
+        self.assertEqual(messages[6].msg_type, f"ovos.skills.fallback.{self.skill_id}.response")
+        self.assertTrue(messages[6].data["result"])
+        self.assertEqual(messages[6].data["fallback_handler"], "UnknownSkill.handle_fallback")
 
         # verify default session is now updated
         self.assertEqual(messages[-1].msg_type, "ovos.session.update_default")
@@ -131,6 +115,8 @@ class TestFallback(TestCase):
         self.core.bus.emit(utt)
         # converse ping/pong due being active
         expected_messages.extend([f"{self.skill_id}.converse.ping", "skill.converse.pong"])
+        # already active, so no activate message this time
+        expected_messages.remove(f"{self.skill_id}.activate")
         wait_for_n_messages(len(expected_messages))
         self.assertEqual(len(expected_messages), len(messages))
 
@@ -189,14 +175,10 @@ class TestFallback(TestCase):
             # skill executing - TODO "mycroft.skill.handler.start" +  "mycroft.skill.handler.complete" should be added
             f"ovos.skills.fallback.{self.skill_id}.request",
             f"ovos.skills.fallback.{self.skill_id}.start",
-            "enclosure.active_skill",
-            "speak",
-            # activate skill on return True
-            "intent.service.skills.activate",
-            "intent.service.skills.activated",
-            f"{self.skill_id}.activate",
 
+            "speak",
             f"ovos.skills.fallback.{self.skill_id}.response",
+            f"{self.skill_id}.activate",
             "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))
@@ -221,22 +203,12 @@ class TestFallback(TestCase):
         self.assertEqual(messages[3].msg_type, f"ovos.skills.fallback.{self.skill_id}.request")
         self.assertEqual(messages[3].data["skill_id"], self.skill_id)
         self.assertEqual(messages[4].msg_type, f"ovos.skills.fallback.{self.skill_id}.start")
-        self.assertEqual(messages[5].msg_type, "enclosure.active_skill")
-        self.assertEqual(messages[5].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[6].msg_type, "speak")
-        self.assertEqual(messages[6].data["meta"]["dialog"], "unknown")
-        self.assertEqual(messages[6].data["meta"]["skill"], self.skill_id)
-
-        # verify skill is activated
-        self.assertEqual(messages[7].msg_type, "intent.service.skills.activate")
-        self.assertEqual(messages[7].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[8].msg_type, "intent.service.skills.activated")
-        self.assertEqual(messages[8].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[9].msg_type, f"{self.skill_id}.activate")
-
-        self.assertEqual(messages[10].msg_type, f"ovos.skills.fallback.{self.skill_id}.response")
-        self.assertTrue(messages[10].data["result"])
-        self.assertEqual(messages[10].data["fallback_handler"], "UnknownSkill.handle_fallback")
+        self.assertEqual(messages[5].msg_type, "speak")
+        self.assertEqual(messages[5].data["meta"]["dialog"], "unknown")
+        self.assertEqual(messages[5].data["meta"]["skill"], self.skill_id)
+        self.assertEqual(messages[6].msg_type, f"ovos.skills.fallback.{self.skill_id}.response")
+        self.assertTrue(messages[6].data["result"])
+        self.assertEqual(messages[6].data["fallback_handler"], "UnknownSkill.handle_fallback")
 
         # test that active skills list has been updated
         for m in messages[10:]:
@@ -286,7 +258,7 @@ class TestFallback(TestCase):
             # skill executing
             f"ovos.skills.fallback.{self.skill_id}.request",
             f"ovos.skills.fallback.{self.skill_id}.start",
-            "enclosure.active_skill",
+
             "speak",
             # deactivate skill in fallback handler
             "intent.service.skills.deactivate",
@@ -369,16 +341,11 @@ class TestFallbackTimeout(TestCase):
             # skill executing
             f"ovos.skills.fallback.{self.skill_id}.request",
             f"ovos.skills.fallback.{self.skill_id}.start",
-            "enclosure.active_skill",
             "speak",
+            f"ovos.skills.fallback.{self.skill_id}.response",
 
             # activated only after skill return True
-            "intent.service.skills.activate",
-            "intent.service.skills.activated",
             f"{self.skill_id}.activate",
-            "ovos.session.update_default",
-
-            f"ovos.skills.fallback.{self.skill_id}.response",
             "ovos.utterance.handled",  # handle_utterance returned (intent service)
             "ovos.session.update_default"
         ]

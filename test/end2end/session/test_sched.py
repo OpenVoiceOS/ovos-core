@@ -48,11 +48,9 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",
-            "intent.service.skills.activated",
             f"{self.skill_id}.activate",
             f"{self.skill_id}:ScheduleIntent",
             "mycroft.skill.handler.start",
-            "enclosure.active_skill",
             "speak",
             "mycroft.scheduler.schedule_event",
             "mycroft.skill.handler.complete",
@@ -60,7 +58,6 @@ class TestSessions(TestCase):
             "ovos.session.update_default",
             # event triggering after 3 seconds
             "skill-ovos-schedule.openvoiceos:my_event",
-            "enclosure.active_skill",
             "speak"
         ]
         wait_for_n_messages(len(expected_messages))
@@ -167,18 +164,15 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",
-            "intent.service.skills.activated",
             f"{self.skill_id}.activate",
             f"{self.skill_id}:ScheduleIntent",
             "mycroft.skill.handler.start",
-            "enclosure.active_skill",
             "speak",
             "mycroft.scheduler.schedule_event",
             "mycroft.skill.handler.complete",
             "ovos.utterance.handled",  # handle_utterance returned (intent service)
             # event triggering after 3 seconds
             "skill-ovos-schedule.openvoiceos:my_event",
-            "enclosure.active_skill",
             "speak"
         ]
         wait_for_n_messages(len(expected_messages))

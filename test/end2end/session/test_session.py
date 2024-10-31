@@ -52,11 +52,9 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",  # no session
-            "intent.service.skills.activated",
             f"{self.skill_id}.activate",
             f"{self.skill_id}:HelloWorldIntent",
             "mycroft.skill.handler.start",
-            "enclosure.active_skill",
             "speak",
             "mycroft.skill.handler.complete",
             "ovos.utterance.handled",  # handle_utterance returned (intent service)
@@ -144,11 +142,8 @@ class TestSessions(TestCase):
             "recognizer_loop:utterance",
             f"{self.skill_id}.converse.ping",
             "skill.converse.pong",
-            "intent.service.skills.activated",
-            f"{self.skill_id}.activate",
             f"{self.skill_id}:HelloWorldIntent",
             "mycroft.skill.handler.start",
-            "enclosure.active_skill",
             "speak",
             "mycroft.skill.handler.complete",
             "ovos.utterance.handled",  # handle_utterance returned (intent service)
@@ -250,11 +245,8 @@ class TestSessions(TestCase):
             "recognizer_loop:utterance",
             f"{self.skill_id}.converse.ping",
             "skill.converse.pong",
-            "intent.service.skills.activated",
-            f"{self.skill_id}.activate",
             f"{self.skill_id}:HelloWorldIntent",
             "mycroft.skill.handler.start",
-            "enclosure.active_skill",
             "speak",
             "mycroft.skill.handler.complete",
             "ovos.utterance.handled",  # handle_utterance returned (intent service)
