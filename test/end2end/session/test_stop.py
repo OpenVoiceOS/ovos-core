@@ -67,6 +67,11 @@ class TestSessions(TestCase):
             "recognizer_loop:utterance",
             # global stop trigger
             "mycroft.stop",
+            # intent pipelines
+            "common_query.openvoiceos.stop",
+            "common_query.openvoiceos.stop.response",  # reporting nothing to stop
+            "ovos.common_play.stop",
+            "ovos.common_play.stop.response",  # reporting nothing to stop
 
             # skill reporting
             f"{self.skill_id}.stop",  # internal, @killable_events
@@ -79,6 +84,7 @@ class TestSessions(TestCase):
             f"{self.new_skill_id}.stop",  # internal, @killable_events
             f"{self.new_skill_id}.stop.response",  # skill reporting nothing to stop
 
+            "ovos.utterance.handled"
         ]
 
         wait_for_n_messages(len(expected_messages))
@@ -106,7 +112,6 @@ class TestSessions(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",
             # skill selected
-            "intent.service.skills.activated",
             f"{self.skill_id}.activate",
             f"{self.skill_id}:OldWorldIntent",
             "mycroft.skill.handler.start",

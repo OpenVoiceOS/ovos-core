@@ -377,7 +377,9 @@ class IntentService:
             message.context["skill_id"] = match.skill_id
             # NOTE: do not re-activate if the skill called self.deactivate
             was_deactivated = match.skill_id in self._deactivations.get(sess.session_id, [])
-            if not was_deactivated and not sess.is_active(match.skill_id):
+            active_skills = [s[0] for s in sess.active_skills]
+            needs_activation = match.skill_id != active_skills[0] if active_skills else True
+            if not was_deactivated and needs_activation:
                 # ensure skill_id is in active skills list
                 sess.activate_skill(match.skill_id)
                 # emit event for skills callback -> self.handle_activate

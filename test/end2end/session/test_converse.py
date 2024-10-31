@@ -217,6 +217,7 @@ class TestSessions(TestCase):
             "skill.converse.pong",
             f"{self.skill_id}.converse.request",
             "skill.converse.response",  # does not want to converse
+            f"{self.skill_id}.activate",
             f"{self.skill_id}:converse_on.intent",
             # skill executing
             "mycroft.skill.handler.start",
@@ -257,14 +258,14 @@ class TestSessions(TestCase):
         self.assertFalse(messages[6].data["result"])  # do not want to converse
 
         # verify intent triggers
-        self.assertEqual(messages[7].msg_type, f"{self.skill_id}:converse_on.intent")
+        self.assertEqual(messages[8].msg_type, f"{self.skill_id}:converse_on.intent")
         # verify skill_id is now present in every message.context
-        for m in messages[7:]:
+        for m in messages[8:]:
             self.assertEqual(m.context["skill_id"], self.skill_id)
 
         # verify intent execution
-        self.assertEqual(messages[8].msg_type, "mycroft.skill.handler.start")
-        self.assertEqual(messages[8].data["name"], "TestAbortSkill.handle_converse_on")
+        self.assertEqual(messages[9].msg_type, "mycroft.skill.handler.start")
+        self.assertEqual(messages[9].data["name"], "TestAbortSkill.handle_converse_on")
 
         self.assertEqual(messages[-3].msg_type, "mycroft.skill.handler.complete")
         self.assertEqual(messages[-3].data["name"], "TestAbortSkill.handle_converse_on")
@@ -296,15 +297,10 @@ class TestSessions(TestCase):
         expected_messages = [
             "recognizer_loop:utterance",  # no session
             f"{self.skill_id}.converse.ping",  # default session injected
+            "skill.converse.pong",
             f"{self.other_skill_id}.converse.ping",
             "skill.converse.pong",
-            "skill.converse.pong",
             f"{self.skill_id}.converse.request",
-            # skill selected
-            "intent.service.skills.activate",
-            "intent.service.skills.activated",
-            f"{self.skill_id}.activate",
-            "ovos.session.update_default",
             "skill.converse.response",  # CONVERSED
             "ovos.utterance.handled",  # handle_utterance returned (intent service)
             # session updated
@@ -337,21 +333,13 @@ class TestSessions(TestCase):
         # verify answer from skill that it does not want to converse
         self.assertEqual(messages[5].msg_type, f"{self.skill_id}.converse.request")
 
-        # verify skill is activated by intent service (intent pipeline matched)
-        self.assertEqual(messages[6].msg_type, "intent.service.skills.activate")
-        self.assertEqual(messages[6].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[7].msg_type, "intent.service.skills.activated")
-        self.assertEqual(messages[7].data["skill_id"], self.skill_id)
-        self.assertEqual(messages[8].msg_type, f"{self.skill_id}.activate")
-        self.assertEqual(messages[9].msg_type, "ovos.session.update_default")
-
         # verify skill conversed
-        self.assertEqual(messages[10].msg_type, "skill.converse.response")
-        self.assertEqual(messages[10].data["skill_id"], self.skill_id)
-        self.assertTrue(messages[10].data["result"])  # CONVERSED
+        self.assertEqual(messages[-3].msg_type, "skill.converse.response")
+        self.assertEqual(messages[-3].data["skill_id"], self.skill_id)
+        self.assertTrue(messages[-3].data["result"])  # CONVERSED
 
         # verify default session is now updated
-        self.assertEqual(messages[11].msg_type, "ovos.utterance.handled")
+        self.assertEqual(messages[-2].msg_type, "ovos.utterance.handled")
         self.assertEqual(messages[-1].msg_type, "ovos.session.update_default")
         self.assertEqual(messages[-1].data["session_data"]["session_id"], "default")
         # test deserialization of payload
@@ -455,7 +443,6 @@ class TestSessions(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",  # no session
-            "intent.service.skills.activated",
             f"{self.skill_id}.activate",
             "ovos-tskill-abort.openvoiceos:deactivate.intent",
             # skill selected
