@@ -302,6 +302,7 @@ class TestSessions(TestCase):
             "skill.converse.pong",
             f"{self.skill_id}.converse.request",
             "skill.converse.response",  # CONVERSED
+            f"{self.skill_id}.activate",
             "ovos.utterance.handled",  # handle_utterance returned (intent service)
             # session updated
             "ovos.session.update_default"
@@ -334,9 +335,9 @@ class TestSessions(TestCase):
         self.assertEqual(messages[5].msg_type, f"{self.skill_id}.converse.request")
 
         # verify skill conversed
-        self.assertEqual(messages[-3].msg_type, "skill.converse.response")
-        self.assertEqual(messages[-3].data["skill_id"], self.skill_id)
-        self.assertTrue(messages[-3].data["result"])  # CONVERSED
+        self.assertEqual(messages[-4].msg_type, "skill.converse.response")
+        self.assertEqual(messages[-4].data["skill_id"], self.skill_id)
+        self.assertTrue(messages[-4].data["result"])  # CONVERSED
 
         # verify default session is now updated
         self.assertEqual(messages[-2].msg_type, "ovos.utterance.handled")

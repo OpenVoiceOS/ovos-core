@@ -89,7 +89,7 @@ class TestOCPPipeline(TestCase):
         for idx, m in enumerate(messages):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
-    def est_player_info(self):
+    def test_player_info(self):
         self.assertIsNotNone(self.core.intent_service.ocp)
         messages = []
 
@@ -1123,7 +1123,7 @@ class TestOCPPipeline(TestCase):
         def new_msg(msg):
             nonlocal messages
             m = Message.deserialize(msg)
-            if m.msg_type in ["ovos.skills.settings_changed", "gui.status.request"]:
+            if m.msg_type in ["ovos.skills.settings_changed", "gui.status.request", "register_vocab",]:
                 return  # skip these, only happen in 1st run
             messages.append(m)
             print(len(messages), msg)
@@ -1151,11 +1151,11 @@ class TestOCPPipeline(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",
+            "ovos.common_play.activate",
             "ocp:legacy_cps",
             # legacy cps api
             "play:query",
             "mycroft.audio.play_sound",  # error -  no results
-            "ovos.common_play.activate",
             "ovos.utterance.handled",  # handle_utterance returned (intent service)
         ]
         wait_for_n_messages(len(expected_messages))

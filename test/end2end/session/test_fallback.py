@@ -80,7 +80,7 @@ class TestFallback(TestCase):
             self.assertEqual(m.context["session"]["session_id"], "default")
             self.assertEqual(m.context["x"], "xx")
         # verify active skills is empty until "intent.service.skills.activated"
-        for m in messages[:8]:
+        for m in messages[:7]:
             self.assertEqual(m.context["session"]["session_id"], "default")
             self.assertEqual(m.context["session"]["active_skills"], [])
 
@@ -115,8 +115,7 @@ class TestFallback(TestCase):
         self.core.bus.emit(utt)
         # converse ping/pong due being active
         expected_messages.extend([f"{self.skill_id}.converse.ping", "skill.converse.pong"])
-        # already active, so no activate message this time
-        expected_messages.remove(f"{self.skill_id}.activate")
+
         wait_for_n_messages(len(expected_messages))
         self.assertEqual(len(expected_messages), len(messages))
 

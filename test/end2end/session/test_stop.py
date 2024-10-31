@@ -333,6 +333,7 @@ class TestSessions(TestCase):
             "speak",  # "utterance":"stop 123"
 
             f"{self.new_skill_id}.stop.response",  # skill reports it stopped (new style),
+            f"{self.new_skill_id}.activate",  # update timestamp of last interaction with skill
             "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
 
@@ -349,7 +350,7 @@ class TestSessions(TestCase):
                 self.assertEqual(m.data["utterance"], "stop 123")
 
         # confirm "skill-new-stop" was the one that reported success
-        handler = messages[-2]
+        handler = messages[-3]
         self.assertEqual(handler.msg_type, f"{self.new_skill_id}.stop.response")
         self.assertEqual(handler.data["result"], True)
 
