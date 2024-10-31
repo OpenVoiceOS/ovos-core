@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from typing import Tuple, Callable, Union
+from typing import Tuple, Callable, Union, Dict, List
 
 from ocp_pipeline.opm import OCPPipelineMatcher
 from ovos_adapt.opm import AdaptPipeline as AdaptService
@@ -28,7 +28,7 @@ from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
 from ovos_plugin_manager.templates.pipeline import PipelineMatch, IntentHandlerMatch
 from ovos_utils.lang import standardize_lang_tag
-from ovos_utils.log import LOG, deprecated, log_deprecation
+from ovos_utils.log import LOG, log_deprecation
 from ovos_utils.metrics import Stopwatch
 from ovos_workshop.intents import open_intent_envelope
 from padacioso.opm import PadaciosoPipeline as PadaciosoService
@@ -89,8 +89,8 @@ class IntentService:
         self.bus.on('intent.service.padatious.manifest.get', self.handle_padatious_manifest)
         self.bus.on('intent.service.padatious.entities.manifest.get', self.handle_entity_manifest)
 
-        self._deactivations = []  # internal, track skills that call self.deactivate to avoid reactivating them again
-
+        # internal, track skills that call self.deactivate to avoid reactivating them again
+        self._deactivations: Dict[str, List[str]] = {}
         self.bus.on('intent.service.skills.deactivate', self._handle_deactivate)
 
     @property
@@ -353,8 +353,12 @@ class IntentService:
         This only matters in PipelineMatchers, such as fallback and converse
         in those cases the activation is only done AFTER the match, not before unlike intents
         """
+        sess = SessionManager.get(message)
         skill_id = message.data.get("skill_id")
-        self._deactivations.append(skill_id)
+        if sess.session_id not in self._deactivations:
+            self._deactivations[sess.session_id] = [skill_id]
+        else:
+            self._deactivations[sess.session_id].append(skill_id)
 
     def _emit_match_message(self, match: Union[IntentHandlerMatch, PipelineMatch], message: Message):
         """Update the message data with the matched utterance information and
@@ -372,7 +376,8 @@ class IntentService:
             # ensure skill_id is present in message.context
             message.context["skill_id"] = match.skill_id
             # NOTE: do not re-activate if the skill called self.deactivate
-            if match.skill_id not in self._deactivations and not sess.is_active(match.skill_id):
+            was_deactivated = match.skill_id in self._deactivations.get(sess.session_id, [])
+            if not was_deactivated and not sess.is_active(match.skill_id):
                 # ensure skill_id is in active skills list
                 sess.activate_skill(match.skill_id)
                 # emit event for skills callback -> self.handle_activate
@@ -456,7 +461,7 @@ class IntentService:
         # match
         match = None
         with stopwatch:
-            self._deactivations = []
+            self._deactivations[sess.session_id] = []
 
             # Loop through the matching functions until a match is found.
             for pipeline, match_func in self.get_pipeline(session=sess):
