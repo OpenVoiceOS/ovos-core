@@ -228,36 +228,6 @@ class IntentService:
         """
         return self.skill_names.get(skill_id, skill_id)
 
-    # converse handling
-    @property
-    def active_skills(self):
-        log_deprecation("self.active_skills is deprecated! use Session instead", "0.0.9")
-        session = SessionManager.get()
-        return session.active_skills
-
-    @active_skills.setter
-    def active_skills(self, val):
-        log_deprecation("self.active_skills is deprecated! use Session instead", "0.0.9")
-        session = SessionManager.get()
-        session.active_skills = []
-        for skill_id, ts in val:
-            session.activate_skill(skill_id)
-
-    @deprecated("handle_activate_skill_request moved to ConverseService, overriding this method has no effect, "
-                "it has been disconnected from the bus event", "0.0.8")
-    def handle_activate_skill_request(self, message):
-        self.converse.handle_activate_skill_request(message)
-
-    @deprecated("handle_deactivate_skill_request moved to ConverseService, overriding this method has no effect, "
-                "it has been disconnected from the bus event", "0.0.8")
-    def handle_deactivate_skill_request(self, message):
-        self.converse.handle_deactivate_skill_request(message)
-
-    @deprecated("reset_converse moved to ConverseService, overriding this method has no effect, "
-                "it has been disconnected from the bus event", "0.0.8")
-    def reset_converse(self, message):
-        self.converse.reset_converse(message)
-
     def _handle_transformers(self, message):
         """
         Pipe utterance through transformer plugins to get more metadata.
@@ -381,35 +351,32 @@ class IntentService:
             match (IntentHandlerMatch): The matched utterance object.
             message (Message): The messagebus data.
         """
+        reply = None
         message.data["utterance"] = match.utterance
 
+        sess = SessionManager.get(message)
         if match.skill_id:
             # ensure skill_id is present in message.context
             message.context["skill_id"] = match.skill_id
+            if not sess.is_active(match.skill_id):
+                # ensure skill_id is in active skills list
+                sess.activate_skill(match.skill_id)
+                # emit event for skills callback -> self.handle_activate
+                self.bus.emit(message.reply(f"{match.skill_id}.activate"))
 
         if isinstance(match, PipelineMatch) and match.handled:
             # utterance fully handled
             reply = message.reply("ovos.utterance.handled",
                                   {"skill_id": match.skill_id})
-            self.bus.emit(reply)
         # Launch skill if not handled by the match function
         elif isinstance(match, IntentHandlerMatch) and match.match_type:
             # keep all original message.data and update with intent match
             data = dict(message.data)
             data.update(match.match_data)
-
-            # NOTE: message.reply to ensure correct message destination
             reply = message.reply(match.match_type, data)
 
-            # let's activate the skill BEFORE the intent is triggered
-            # to ensure an accurate Session
-            # NOTE: this was previously done async by the skill,
-            #   but then the skill was missing from Session.active_skills
-            sess = self.converse.activate_skill(message=reply,
-                                                skill_id=match.skill_id)
-            if sess:
-                reply.context["session"] = sess.serialize()
-
+        if reply is not None:
+            reply.context["session"] = sess.serialize() # updated active skill list
             self.bus.emit(reply)
 
     def send_cancel_event(self, message):
@@ -640,16 +607,6 @@ class IntentService:
         """
         self.bus.emit(message.reply("intent.service.skills.reply",
                                     {"skills": self.skill_names}))
-
-    @deprecated("handle_get_active_skills moved to ConverseService, overriding this method has no effect, "
-                "it has been disconnected from the bus event", "0.0.8")
-    def handle_get_active_skills(self, message):
-        """Send active skills to caller.
-
-        Argument:
-            message: query message to reply to.
-        """
-        self.converse.handle_get_active_skills(message)
 
     def handle_get_adapt(self, message: Message):
         """handler getting the adapt response for an utterance.
