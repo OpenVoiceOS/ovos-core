@@ -47,11 +47,9 @@ class TestSched(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",  # no session
-            "intent.service.skills.activated",  # response (from core)
             f"{self.skill_id}.activate",  # skill callback
             f"{self.skill_id}:ScheduleIntent",  # intent trigger
             "mycroft.skill.handler.start",  # intent code start
-            "enclosure.active_skill",
             "speak",
             "mycroft.scheduler.schedule_event",
 
@@ -61,7 +59,6 @@ class TestSched(TestCase):
 
             # skill event triggering after 3 seconds
             "skill-ovos-schedule.openvoiceos:my_event",
-            "enclosure.active_skill",
             "speak"
         ]
         wait_for_n_messages(len(expected_messages))
@@ -72,7 +69,7 @@ class TestSched(TestCase):
             self.assertEqual(m.msg_type, expected_messages[idx])
 
         # verify that source and destination are swapped after intent trigger
-        self.assertEqual(messages[3].msg_type, f"{self.skill_id}:ScheduleIntent")
+        self.assertEqual(messages[2].msg_type, f"{self.skill_id}:ScheduleIntent")
         for m in messages:
             # messages FOR ovos-core
             if m.msg_type in ["recognizer_loop:utterance",

@@ -52,11 +52,9 @@ class TestRouting(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",  # no session
-            "intent.service.skills.activated",
             f"{self.skill_id}.activate",
             f"{self.skill_id}:HelloWorldIntent",
             "mycroft.skill.handler.start",
-            "enclosure.active_skill",
             "speak",
             "mycroft.skill.handler.complete",
             "ovos.utterance.handled",  # handle_utterance returned (intent service)
@@ -75,7 +73,7 @@ class TestRouting(TestCase):
             self.assertEqual(m.context["session"]["session_id"], "default")
 
         # verify that source and destination are swapped after intent trigger
-        self.assertEqual(messages[3].msg_type, f"{self.skill_id}:HelloWorldIntent")
+        self.assertEqual(messages[2].msg_type, f"{self.skill_id}:HelloWorldIntent")
         for m in messages:
             if m.msg_type in ["recognizer_loop:utterance", "ovos.session.update_default"]:
                 self.assertEqual(messages[0].context["source"], "A")
@@ -135,10 +133,8 @@ class TestOCPRouting(TestCase):
         # confirm all expected messages are sent
         expected_messages = [
             "recognizer_loop:utterance",
-            "intent.service.skills.activated",
             "ovos.common_play.activate",
             "ocp:play",
-            "enclosure.active_skill",
             "speak",
             "ovos.common_play.search.start",
             "enclosure.mouth.think",
