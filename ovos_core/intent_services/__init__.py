@@ -367,26 +367,12 @@ class IntentService:
             message (Message): The messagebus data.
         """
         reply = None
-        message.data["utterance"] = match.utterance
-
         sess = SessionManager.get(message)
-        if match.skill_id:
-            # ensure skill_id is present in message.context
-            message.context["skill_id"] = match.skill_id
-            # NOTE: do not re-activate if the skill called self.deactivate
-            was_deactivated = match.skill_id in self._deactivations[sess.session_id]
-            # we could skip activation if skill is already active, but we still want to update the timestamp
-            if not was_deactivated:
-                # ensure skill_id is in active skills list
-                sess.activate_skill(match.skill_id)
-                # emit event for skills callback -> self.handle_activate
-                self.bus.emit(message.reply(f"{match.skill_id}.activate"))
 
-        if isinstance(match, PipelineMatch) and match.handled:
-            # utterance fully handled
-            reply = message.reply("ovos.utterance.handled",
-                                  {"skill_id": match.skill_id})
-
+        # utterance fully handled by pipeline matcher
+        if isinstance(match, PipelineMatch):
+            if match.handled:
+                reply = message.reply("ovos.utterance.handled", {"skill_id": match.skill_id})
         # Launch skill if not handled by the match function
         elif isinstance(match, IntentHandlerMatch) and match.match_type:
             # keep all original message.data and update with intent match
@@ -395,7 +381,23 @@ class IntentService:
             reply = message.reply(match.match_type, data)
 
         if reply is not None:
-            reply.context["session"] = sess.serialize()  # updated active skill list
+            reply.data["utterance"] = match.utterance
+
+            # update active skill list
+            if match.skill_id:
+                # ensure skill_id is present in message.context
+                reply.context["skill_id"] = match.skill_id
+
+                # NOTE: do not re-activate if the skill called self.deactivate
+                # we could also skip activation if skill is already active,
+                # but we still want to update the timestamp
+                was_deactivated = match.skill_id in self._deactivations[sess.session_id]
+                if not was_deactivated:
+                    sess.activate_skill(match.skill_id)
+                    reply.context["session"] = sess.serialize()
+                    # emit event for skills callback -> self.handle_activate
+                    self.bus.emit(reply.forward(f"{match.skill_id}.activate"))
+
             self.bus.emit(reply)
 
     def send_cancel_event(self, message):
@@ -491,6 +493,8 @@ class IntentService:
         # sync any changes made to the default session, eg by ConverseService
         if sess.session_id == "default":
             SessionManager.sync(message)
+        elif sess.session_id in self._deactivations:
+            self._deactivations.pop(sess.session_id)
         return match, message.context, stopwatch
 
     def send_complete_intent_failure(self, message):

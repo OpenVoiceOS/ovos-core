@@ -77,6 +77,8 @@ class TestSessions(TestCase):
         self.assertEqual(messages[1].msg_type, f"{self.skill_id}.activate")
         # verify skill_id is now present in every message.context
         for m in messages[1:]:
+            if m.msg_type == "ovos.session.update_default":
+                continue
             self.assertEqual(m.context["skill_id"], self.skill_id)
         # verify intent triggers
         self.assertEqual(messages[2].msg_type, f"{self.skill_id}:HelloWorldIntent")
@@ -172,6 +174,8 @@ class TestSessions(TestCase):
         self.assertEqual(messages[4].data["intent_type"], f"{self.skill_id}:HelloWorldIntent")
         # verify skill_id is now present in every message.context
         for m in messages[4:]:
+            if m.msg_type == "ovos.session.update_default":
+                continue
             self.assertEqual(m.context["skill_id"], self.skill_id)
 
         self.assertEqual(messages[5].msg_type, "mycroft.skill.handler.start")

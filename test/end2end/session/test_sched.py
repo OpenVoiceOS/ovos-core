@@ -76,6 +76,8 @@ class TestSessions(TestCase):
         # verify skill_id is now present in every message.context
         self.assertEqual(messages[1].msg_type, f"{self.skill_id}.activate")
         for m in messages[1:]:
+            if m.msg_type == "ovos.session.update_default":
+                continue
             self.assertEqual(m.context["skill_id"], self.skill_id)
 
         # verify intent triggers

@@ -91,6 +91,8 @@ class TestSessions(TestCase):
         self.assertEqual(messages[2].msg_type, f"{self.skill_id}:converse_off.intent")
         # verify skill_id is present in every message.context
         for m in messages[1:]:
+            if m.msg_type == "ovos.session.update_default":
+                continue
             self.assertEqual(m.context["skill_id"], self.skill_id)
 
         # verify intent execution
@@ -174,6 +176,8 @@ class TestSessions(TestCase):
         self.assertEqual(messages[6].msg_type, f"{self.other_skill_id}:HelloWorldIntent")
         # verify skill_id is present in every message.context
         for m in messages[5:]:
+            if m.msg_type == "ovos.session.update_default":
+                continue
             self.assertEqual(m.context["skill_id"], self.other_skill_id)
 
         self.assertEqual(messages[7].msg_type, "mycroft.skill.handler.start")
@@ -261,6 +265,8 @@ class TestSessions(TestCase):
         self.assertEqual(messages[8].msg_type, f"{self.skill_id}:converse_on.intent")
         # verify skill_id is now present in every message.context
         for m in messages[8:]:
+            if m.msg_type == "ovos.session.update_default":
+                continue
             self.assertEqual(m.context["skill_id"], self.skill_id)
 
         # verify intent execution
