@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from typing import Tuple, Callable, Union, Dict, List
+from collections import defaultdict
+from typing import Tuple, Callable, Union
 
 from ocp_pipeline.opm import OCPPipelineMatcher
 from ovos_adapt.opm import AdaptPipeline as AdaptService
@@ -90,7 +91,7 @@ class IntentService:
         self.bus.on('intent.service.padatious.entities.manifest.get', self.handle_entity_manifest)
 
         # internal, track skills that call self.deactivate to avoid reactivating them again
-        self._deactivations: Dict[str, List[str]] = {}
+        self._deactivations = defaultdict(list)
         self.bus.on('intent.service.skills.deactivate', self._handle_deactivate)
 
     @property
@@ -355,10 +356,7 @@ class IntentService:
         """
         sess = SessionManager.get(message)
         skill_id = message.data.get("skill_id")
-        if sess.session_id not in self._deactivations:
-            self._deactivations[sess.session_id] = [skill_id]
-        else:
-            self._deactivations[sess.session_id].append(skill_id)
+        self._deactivations[sess.session_id].append(skill_id)
 
     def _emit_match_message(self, match: Union[IntentHandlerMatch, PipelineMatch], message: Message):
         """Update the message data with the matched utterance information and
