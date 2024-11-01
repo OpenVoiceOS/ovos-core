@@ -1,2 +1,2 @@
-from ovos_core.intent_services.commonqa_service import CommonQAService
+from ovos_commonqa.opm import CommonQAService
 EXTENSION_TIME = 10

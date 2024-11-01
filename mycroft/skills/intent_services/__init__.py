@@ -11,4 +11,4 @@ try:
 except ImportError:
     from ovos_utils.log import LOG
     LOG.warning("padatious not installed")
-    from ovos_core.intent_services.padacioso_service import PadaciosoService as PadatiousService
+    from padacioso.opm import PadaciosoPipeline as PadatiousService
