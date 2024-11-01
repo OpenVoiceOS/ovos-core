@@ -4,6 +4,6 @@ ovos-skill-alerts>=0.1.2,<1.0.0
 ovos-skill-personal>=0.1.5,<1.0.0
 ovos-skill-date-time>=0.3.4,<1.0.0
 ovos-skill-hello-world>=0.1.7,<1.0.0
-skill-wordnet>=0.0.4,<1.0.0
+#skill-wordnet>=0.0.4,<1.0.0
 #skill-randomness>=0.0.1,<1.0.0
 ovos-skill-spelling>=0.2.3,<1.0.0
