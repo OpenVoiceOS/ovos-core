@@ -1,12 +1,12 @@
 # Changelog
 
-## [0.2.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.6a1) (2024-11-02)
+## [0.2.7a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.7a1) (2024-11-02)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.5...0.2.6a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.6...0.2.7a1)
 
 **Merged pull requests:**
 
-- fix:move code to dependencies [\#571](https://github.com/OpenVoiceOS/ovos-core/pull/571) ([JarbasAl](https://github.com/JarbasAl))
+- da-dk/translate [\#583](https://github.com/OpenVoiceOS/ovos-core/pull/583) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
 
 
 
