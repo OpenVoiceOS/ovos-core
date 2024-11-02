@@ -14,36 +14,28 @@
 #
 
 import json
-import warnings
 from collections import defaultdict
-from typing import Tuple, Callable, Union, List
+from typing import Tuple, Callable, List, Union, Dict
 
 import requests
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
-from ovos_plugin_manager.templates.pipeline import PipelineMatch, IntentHandlerMatch
-from ovos_utils.lang import standardize_lang_tag
-from ovos_utils.log import LOG, log_deprecation, deprecated
-from ovos_utils.metrics import Stopwatch
-from ovos_utils.thread_utils import create_daemon
-from padacioso.opm import PadaciosoPipeline as PadaciosoService
 
-from ocp_pipeline.opm import OCPPipelineMatcher
-from ovos_adapt.opm import AdaptPipeline
-from ovos_commonqa.opm import CommonQAService
+from ovos_utils.thread_utils import create_daemon
 from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
 from ovos_core.intent_services.converse_service import ConverseService
 from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
-from ovos_persona import PersonaService
+from ovos_plugin_manager.pipeline import OVOSPipelineFactory
+from ovos_plugin_manager.templates.pipeline import PipelineMatch, IntentHandlerMatch
+from ovos_utils.lang import standardize_lang_tag
+from ovos_utils.log import LOG, log_deprecation, deprecated
+from ovos_utils.metrics import Stopwatch
 
-try:
-    from ovos_ollama_intent_pipeline import LLMIntentPipeline
-except ImportError:
-    LLMIntentPipeline = None
+import warnings
 
 
 class IntentService:
@@ -56,11 +48,11 @@ class IntentService:
     def __init__(self, bus, config=None):
         """
         Initializes the IntentService with intent parsing pipelines, transformer services, and messagebus event handlers.
-        
+
         Args:
             bus: The messagebus connection for event handling.
             config: Optional configuration dictionary for intent services.
-        
+
         Sets up skill name mapping, loads all supported intent matching pipelines, initializes utterance and metadata transformer services, connects the session manager, and registers all relevant messagebus event handlers for utterance processing, context management, intent queries, and skill tracking.
         """
         self.bus = bus
@@ -69,16 +61,9 @@ class IntentService:
         # Dictionary for translating a skill id to a name
         self.skill_names = {}
 
-        self._adapt_service = None
-        self._padatious_service = None
-        self._padacioso_service = None
-        self._fallback = None
-        self._converse = None
-        self._common_qa = None
-        self._stop = None
-        self._ocp = None
-        self._ollama = None
-        self._load_pipeline_plugins()
+        for p in OVOSPipelineFactory.get_installed_pipelines():
+            LOG.debug(f"Found pipeline: {p}")
+        OVOSPipelineFactory.create(use_cache=True, bus=self.bus)  # pre-loa
 
         self.utterance_plugins = UtteranceTransformersService(bus)
         self.metadata_plugins = MetadataTransformersService(bus)
@@ -97,70 +82,10 @@ class IntentService:
         # Intents API
         self.registered_vocab = []
         self.bus.on('intent.service.intent.get', self.handle_get_intent)
-        self.bus.on('intent.service.skills.get', self.handle_get_skills)
-        self.bus.on('mycroft.skills.loaded', self.update_skill_name_dict)
 
         # internal, track skills that call self.deactivate to avoid reactivating them again
         self._deactivations = defaultdict(list)
         self.bus.on('intent.service.skills.deactivate', self._handle_deactivate)
-
-    def _load_pipeline_plugins(self):
-        # TODO - replace with plugin loader from OPM
-        """
-        Initializes and configures all intent matching pipeline plugins used by the service.
-        
-        Loads and sets up the Adapt, Padatious, Padacioso, Fallback, Converse, CommonQA, Stop, OCP, Persona, and optionally LLM intent pipelines based on the current configuration. Handles conditional loading and disabling of Padatious and Padacioso pipelines, and logs relevant status or errors.
-        """
-        self._adapt_service = AdaptPipeline(bus=self.bus, config=self.config.get("adapt", {}))
-        if "padatious" not in self.config:
-            self.config["padatious"] = Configuration().get("padatious", {})
-        try:
-            if self.config["padatious"].get("disabled"):
-                LOG.info("padatious forcefully disabled in config")
-            else:
-                from ovos_padatious.opm import PadatiousPipeline
-                if "instant_train" not in self.config["padatious"]:
-                    self.config["padatious"]["instant_train"] = False
-                self._padatious_service = PadatiousPipeline(self.bus, self.config["padatious"])
-        except ImportError:
-            LOG.error(f'Failed to create padatious intent handlers, padatious not installed')
-
-        # by default only load padacioso is padatious is not available
-        # save memory if padacioso isnt needed
-        disable_padacioso = self.config.get("disable_padacioso", self._padatious_service is not None)
-        if not disable_padacioso:
-            self._padacioso_service = PadaciosoService(self.bus, self.config["padatious"])
-        elif "disable_padacioso" not in self.config:
-            LOG.debug("Padacioso pipeline is disabled, only padatious is loaded. "
-                      "set 'disable_padacioso': false in mycroft.conf if you want it to load alongside padatious")
-        self._fallback = FallbackService(self.bus)
-        self._converse = ConverseService(self.bus)
-        self._common_qa = CommonQAService(self.bus, self.config.get("common_query"))
-        self._stop = StopService(self.bus)
-        self._ocp = OCPPipelineMatcher(self.bus, config=self.config.get("OCP", {}))
-        self._persona = PersonaService(self.bus, config=self.config.get("persona", {}))
-        if LLMIntentPipeline is not None:
-            self._ollama = LLMIntentPipeline(self.bus, config=self.config.get("ovos-ollama-intent-pipeline", {}))
-
-    def update_skill_name_dict(self, message):
-        """
-        Updates the mapping of skill IDs to skill names based on a messagebus event.
-        
-        Args:
-            message: A message containing 'id' and 'name' fields for the skill.
-        """
-        self.skill_names[message.data['id']] = message.data['name']
-
-    def get_skill_name(self, skill_id):
-        """Get skill name from skill ID.
-
-        Args:
-            skill_id: a skill id as encoded in Intent handlers.
-
-        Returns:
-            (str) Skill name or the skill id if the skill wasn't found
-        """
-        return self.skill_names.get(skill_id, skill_id)
 
     def _handle_transformers(self, message):
         """
@@ -203,84 +128,31 @@ class IntentService:
 
         return default_lang
 
-    def get_pipeline(self, skips=None, session=None) -> Tuple[str, Callable]:
-        """
-        Returns an ordered list of intent matcher functions for the current session pipeline.
-        
-        The pipeline is determined by the session's configuration and may be filtered by
-        the optional `skips` list. Each matcher is paired with its pipeline key, and the
-        resulting list reflects the order in which utterances will be processed for intent
-        matching. If a requested pipeline component is unavailable, it is skipped with a warning.
-        
-        Args:
-            skips: Optional list of pipeline keys to exclude from the matcher sequence.
-            session: Optional session object; if not provided, the current session is used.
-        
-        Returns:
-            A list of (pipeline_key, matcher_function) tuples in the order they will be applied.
-        """
+    def get_pipeline(self, skips=None, session=None, skip_stage_matchers=False) -> List[Tuple[str, Callable]]:
+        """return a list of matcher functions ordered by priority
+        utterances will be sent to each matcher in order until one can handle the utterance
+        the list can be configured in mycroft.conf under intents.pipeline,
+        in the future plugins will be supported for users to define their own pipeline"""
+        skips = skips or []
+
         session = session or SessionManager.get()
 
-        # Create matchers
-        # TODO - from plugins
-        padatious_matcher = None
-        if self._padatious_service is None:
-            needs_pada = any("padatious" in p for p in session.pipeline)
-            if self._padacioso_service is not None:
-                if needs_pada:
-                    LOG.warning("padatious is not available! using padacioso in it's place, "
-                                "intent matching will be extremely slow in comparison")
-                padatious_matcher = self._padacioso_service
-            elif needs_pada:
-                LOG.warning("padatious is not available! only adapt (keyword based) intents will match!")
-        else:
-            padatious_matcher = self._padatious_service
+        if skips:
+            log_deprecation("'skips' kwarg has been deprecated!", "1.0.0")
+            skips = [OVOSPipelineFactory._MAP.get(p, p) for p in skips]
 
-        matchers = {
-            "converse": self._converse.converse_with_skills,
-            "stop_high": self._stop.match_stop_high,
-            "stop_medium": self._stop.match_stop_medium,
-            "stop_low": self._stop.match_stop_low,
-            "adapt_high": self._adapt_service.match_high,
-            "common_qa": self._common_qa.match,
-            "fallback_high": self._fallback.high_prio,
-            "adapt_medium": self._adapt_service.match_medium,
-            "fallback_medium": self._fallback.medium_prio,
-            "adapt_low": self._adapt_service.match_low,
-            "fallback_low": self._fallback.low_prio,
-            "ovos-persona-pipeline-plugin-high": self._persona.match_high,
-            "ovos-persona-pipeline-plugin-low": self._persona.match_low
-        }
-        if self._ollama is not None:
-            matchers["ovos-ollama-intent-pipeline"] = self._ollama.match_low
-        if self._padacioso_service is not None:
-            matchers.update({
-                "padacioso_high": self._padacioso_service.match_high,
-                "padacioso_medium": self._padacioso_service.match_medium,
-                "padacioso_low": self._padacioso_service.match_low,
+        pipeline = [OVOSPipelineFactory._MAP.get(p, p) for p in session.pipeline
+                    if p not in skips]
 
-            })
-        if padatious_matcher is not None:
-            matchers.update({
-                "padatious_high": padatious_matcher.match_high,
-                "padatious_medium": padatious_matcher.match_medium,
-                "padatious_low": padatious_matcher.match_low,
+        matchers = OVOSPipelineFactory.create(pipeline, use_cache=True, bus=self.bus,
+                                              skip_stage_matchers=skip_stage_matchers)
 
-            })
-        if self._ocp is not None:
-            matchers.update({
-                "ocp_high": self._ocp.match_high,
-                "ocp_medium": self._ocp.match_medium,
-                "ocp_fallback": self._ocp.match_fallback,
-                "ocp_legacy": self._ocp.match_legacy})
-        skips = skips or []
-        pipeline = [k for k in session.pipeline if k not in skips]
-        if any(k not in matchers for k in pipeline):
+        if any(k[0] not in pipeline for k in matchers):
             LOG.warning(f"Requested some invalid pipeline components! "
                         f"filtered {[k for k in pipeline if k not in matchers]}")
             pipeline = [k for k in pipeline if k in matchers]
         LOG.debug(f"Session pipeline: {pipeline}")
-        return [(k, matchers[k]) for k in pipeline]
+        return matchers
 
     @staticmethod
     def _validate_session(message, lang):
@@ -439,18 +311,18 @@ class IntentService:
     def send_cancel_event(self, message):
         """
         Emit events and play a sound when an utterance is canceled.
-        
+
         Logs the cancellation with the specific cancel word, plays a predefined cancel sound,
         and emits multiple events to signal the utterance cancellation.
-        
+
         Parameters:
             message (Message): The original message that triggered the cancellation.
-        
+
         Events Emitted:
             - 'mycroft.audio.play_sound': Plays a cancel sound from configuration
             - 'ovos.utterance.cancelled': Signals that the utterance was canceled
             - 'ovos.utterance.handled': Indicates the utterance processing is complete
-        
+
         Notes:
             - Uses the default cancel sound path 'snd/cancel.mp3' if not specified in configuration
             - Ensures events are sent as replies to the original message
@@ -618,12 +490,7 @@ class IntentService:
         sess = SessionManager.get(message)
 
         # Loop through the matching functions until a match is found.
-        for pipeline, match_func in self.get_pipeline(skips=["converse",
-                                                             "common_qa",
-                                                             "fallback_high",
-                                                             "fallback_medium",
-                                                             "fallback_low"],
-                                                      session=sess):
+        for pipeline, match_func in self.get_pipeline(session=sess, skip_stage_matchers=True):
             match = match_func([utterance], lang, message)
             if match:
                 if match.match_type:
@@ -640,36 +507,16 @@ class IntentService:
         self.bus.emit(message.reply("intent.service.intent.reply",
                                     {"intent": None}))
 
-    def handle_get_skills(self, message):
-        """Send registered skills to caller.
-
-        Argument:
-            message: query message to reply to.
-        """
-        self.bus.emit(message.reply("intent.service.skills.reply",
-                                    {"skills": self.skill_names}))
-
     def shutdown(self):
         self.utterance_plugins.shutdown()
         self.metadata_plugins.shutdown()
-        self._adapt_service.shutdown()
-        if self._padacioso_service:
-            self._padacioso_service.shutdown()
-        if self._padatious_service:
-            self._padatious_service.shutdown()
-        self._common_qa.shutdown()
-        self._converse.shutdown()
-        self._fallback.shutdown()
-        if self._ocp:
-            self._ocp.shutdown()
+        OVOSPipelineFactory.shutdown()
 
         self.bus.remove('recognizer_loop:utterance', self.handle_utterance)
         self.bus.remove('add_context', self.handle_add_context)
         self.bus.remove('remove_context', self.handle_remove_context)
         self.bus.remove('clear_context', self.handle_clear_context)
-        self.bus.remove('mycroft.skills.loaded', self.update_skill_name_dict)
         self.bus.remove('intent.service.intent.get', self.handle_get_intent)
-        self.bus.remove('intent.service.skills.get', self.handle_get_skills)
 
     ###########
     # DEPRECATED STUFF
@@ -682,9 +529,31 @@ class IntentService:
             DeprecationWarning,
             stacklevel=2,
         )
-        lang = get_message_lang()
-        return [parser.__dict__
-                for parser in self._adapt_service.engines[lang].intent_parsers]
+        return []
+
+    @property
+    def skill_names(self) -> Dict:
+        """DEPRECATED"""
+        log_deprecation("skill names have been replaced by skill_id", "1.0.0")
+        return {}
+
+    @skill_names.setter
+    def skill_names(self, v):
+        log_deprecation("skill names have been replaced by skill_id", "1.0.0")
+
+    @deprecated("skill names have been replaced by skill_id", "1.0.0")
+    def update_skill_name_dict(self, message):
+        """DEPRECATED"""
+
+    @deprecated("skill names have been replaced by skill_id", "1.0.0")
+    def get_skill_name(self, skill_id):
+        """DEPRECATED"""
+        return skill_id
+
+    @deprecated("skill names have been replaced by skill_id", "1.0.0")
+    def handle_get_skills(self, message):
+        """DEPRECATED"""
+        return []
 
     @property
     def adapt_service(self):
@@ -695,7 +564,7 @@ class IntentService:
         )
         log_deprecation("direct access to self.adapt_service is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        return self._adapt_service
+        return None
 
     @property
     def padatious_service(self):
@@ -706,7 +575,7 @@ class IntentService:
         )
         log_deprecation("direct access to self.padatious_service is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        return self._padatious_service
+        return None
 
     @property
     def padacioso_service(self):
@@ -717,7 +586,7 @@ class IntentService:
         )
         log_deprecation("direct access to self.padacioso_service is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        return self._padacioso_service
+        return None
 
     @property
     def fallback(self):
@@ -728,7 +597,7 @@ class IntentService:
         )
         log_deprecation("direct access to self.fallback is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        return self._fallback
+        return None
 
     @property
     def converse(self):
@@ -739,7 +608,7 @@ class IntentService:
         )
         log_deprecation("direct access to self.converse is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        return self._converse
+        return None
 
     @property
     def common_qa(self):
@@ -750,7 +619,7 @@ class IntentService:
         )
         log_deprecation("direct access to self.common_qa is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        return self._common_qa
+        return None
 
     @property
     def stop(self):
@@ -761,7 +630,7 @@ class IntentService:
         )
         log_deprecation("direct access to self.stop is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        return self._stop
+        return None
 
     @property
     def ocp(self):
@@ -772,7 +641,7 @@ class IntentService:
         )
         log_deprecation("direct access to self.ocp is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        return self._ocp
+        return None
 
     @adapt_service.setter
     def adapt_service(self, value):
@@ -783,7 +652,6 @@ class IntentService:
         )
         log_deprecation("direct access to self.adapt_service is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        self._adapt_service = value
 
     @padatious_service.setter
     def padatious_service(self, value):
@@ -794,7 +662,6 @@ class IntentService:
         )
         log_deprecation("direct access to self.padatious_service is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        self._padatious_service = value
 
     @padacioso_service.setter
     def padacioso_service(self, value):
@@ -805,7 +672,6 @@ class IntentService:
         )
         log_deprecation("direct access to self.padacioso_service is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        self._padacioso_service = value
 
     @fallback.setter
     def fallback(self, value):
@@ -816,7 +682,6 @@ class IntentService:
         )
         log_deprecation("direct access to self.fallback is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        self._fallback = value
 
     @converse.setter
     def converse(self, value):
@@ -827,7 +692,6 @@ class IntentService:
         )
         log_deprecation("direct access to self.converse is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        self._converse = value
 
     @common_qa.setter
     def common_qa(self, value):
@@ -838,7 +702,6 @@ class IntentService:
         )
         log_deprecation("direct access to self.common_qa is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        self._common_qa = value
 
     @stop.setter
     def stop(self, value):
@@ -849,7 +712,6 @@ class IntentService:
         )
         log_deprecation("direct access to self.stop is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        self._stop = value
 
     @ocp.setter
     def ocp(self, value):
@@ -860,7 +722,6 @@ class IntentService:
         )
         log_deprecation("direct access to self.ocp is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
-        self._ocp = value
 
     @deprecated("handle_get_adapt moved to adapt service, this method does nothing", "1.0.0")
     def handle_get_adapt(self, message: Message):
