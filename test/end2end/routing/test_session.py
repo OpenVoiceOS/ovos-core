@@ -93,7 +93,7 @@ class TestOCPRouting(TestCase):
         self.core.stop()
 
     def test_no_session(self):
-        self.assertIsNotNone(self.core.intent_service.ocp)
+        self.assertIsNotNone(self.core.intent_service._ocp)
         messages = []
 
         def new_msg(msg):
@@ -121,7 +121,7 @@ class TestOCPRouting(TestCase):
                            "converse",
                            "ocp_high"
                        ])
-        self.core.intent_service.ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
+        self.core.intent_service._ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
             session_id=sess.session_id, available_extractors=[], ocp_available=True,
             player_state=PlayerState.STOPPED, media_state=MediaState.NO_MEDIA)
         utt = Message("recognizer_loop:utterance",
