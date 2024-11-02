@@ -138,18 +138,19 @@ class IntentService:
             log_deprecation("'skips' kwarg has been deprecated!", "1.0.0")
             skips = [OVOSPipelineFactory._MAP.get(p, p) for p in skips]
 
-        pipeline = [OVOSPipelineFactory._MAP.get(p, p) for p in session.pipeline
-                    if p not in skips]
+        pipeline: List[str] = [OVOSPipelineFactory._MAP.get(p, p) for p in session.pipeline
+                               if p not in skips]
 
-        matchers = OVOSPipelineFactory.create(pipeline, use_cache=True, bus=self.bus,
-                                              skip_stage_matchers=skip_stage_matchers)
-
+        matchers: List[Tuple[str, Callable]] = OVOSPipelineFactory.create(pipeline, use_cache=True, bus=self.bus,
+                                                                          skip_stage_matchers=skip_stage_matchers)
+        # Sort matchers to ensure the same order as in `pipeline`
+        matcher_dict = dict(matchers)
+        matchers = [(p, matcher_dict[p]) for p in pipeline if p in matcher_dict]
         final_pipeline = [k[0] for k in matchers]
 
-        if any(k not in pipeline for k in final_pipeline):
+        if pipeline != final_pipeline:
             LOG.warning(f"Requested some invalid pipeline components! "
                         f"filtered: {[k for k in pipeline if k not in final_pipeline]}")
-
         LOG.debug(f"Session final pipeline: {final_pipeline}")
         return matchers
 
@@ -579,7 +580,7 @@ class IntentService:
     @property
     def padacioso_service(self):
         warnings.warn(
-            "direct access to self.padatious_service is deprecated",
+            "direct access to self.padacioso_service is deprecated",
             DeprecationWarning,
             stacklevel=2,
         )
