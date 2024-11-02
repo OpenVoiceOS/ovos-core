@@ -3,14 +3,8 @@ python-dateutil>=2.6, <3.0
 watchdog>=2.1, <3.0
 combo-lock>=0.2.2, <0.4
 
-padacioso>=1.0.0, <2.0.0
-ovos-adapt-parser>=1.0.5, <2.0.0
-ovos_ocp_pipeline_plugin>=1.0.10, <2.0.0
-ovos-common-query-pipeline-plugin>=1.0.5,<2.0.0
-ovos-persona>=0.4.4,<1.0.0
-
 ovos-utils[extras]>=0.6.0,<1.0.0
 ovos_bus_client>=0.1.4,<2.0.0
-ovos-plugin-manager>=0.9.0,<1.0.0
+ovos-plugin-manager>=1.0.1,<2.0.0
 ovos-config>=0.0.13,<2.0.0
-ovos-workshop>=3.3.4,<4.0.0
+ovos-workshop>=7.0.1,<8.0.0

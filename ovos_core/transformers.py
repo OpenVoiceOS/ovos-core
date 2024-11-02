@@ -1,10 +1,10 @@
-from typing import Optional, List, Union
+from typing import Optional, List
 from ovos_config import Configuration
 from ovos_plugin_manager.intent_transformers import find_intent_transformer_plugins
 from ovos_plugin_manager.metadata_transformers import find_metadata_transformer_plugins
 from ovos_plugin_manager.text_transformers import find_utterance_transformer_plugins
 
-from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, PipelineMatch
+from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch
 from ovos_utils.json_helper import merge_dict
 from ovos_utils.log import LOG
 
@@ -203,7 +203,7 @@ class IntentTransformersService:
             except:
                 pass
 
-    def transform(self, intent: Union[IntentHandlerMatch, PipelineMatch]) -> Union[IntentHandlerMatch, PipelineMatch]:
+    def transform(self, intent: IntentHandlerMatch) -> IntentHandlerMatch:
         """
         Sequentially applies all loaded intent transformer plugins to the given intent object.
 

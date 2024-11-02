@@ -29,10 +29,6 @@ on:
 
 jobs:
   unit_tests:
-    strategy:
-      max-parallel: 3
-      matrix:
-        python-version: ["3.11", "3.12"]
     runs-on: ubuntu-latest
     permissions:
       # Gives the action the necessary permissions for publishing new
@@ -45,10 +41,10 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
-      - name: Set up python ${{ matrix.python-version }}
+      - name: Set up python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.11"
       - name: Install System Dependencies
         run: |
           sudo apt-get update
