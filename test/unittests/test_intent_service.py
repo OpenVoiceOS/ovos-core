@@ -95,11 +95,11 @@ class TestIntentServiceApi(TestCase):
 
         msg = Message('register_vocab',
                       {'entity_value': 'test', 'entity_type': 'testKeyword'})
-        self.intent_service._adapt_service.handle_register_vocab(msg)
+        self.intent_service.bus.emit(msg)
 
         intent = IntentBuilder('skill:testIntent').require('testKeyword')
         msg = Message('register_intent', intent.__dict__)
-        self.intent_service._adapt_service.handle_register_intent(msg)
+        self.intent_service.bus.emit(msg)
 
     def test_get_intent_no_match(self):
         """Check that if the intent doesn't match at all None is returned."""
