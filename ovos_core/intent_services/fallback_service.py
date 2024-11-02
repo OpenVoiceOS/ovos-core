@@ -20,13 +20,12 @@ from typing import Optional, List
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
-from ovos_workshop.permissions import FallbackMode
-
 from ovos_config import Configuration
-from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
+from ovos_plugin_manager.templates.pipeline import PipelineMatch, PipelinePlugin
 from ovos_utils import flatten_list
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
+from ovos_workshop.permissions import FallbackMode
 
 FallbackRange = namedtuple('FallbackRange', ['start', 'stop'])
 
@@ -166,7 +165,7 @@ class FallbackService(PipelinePlugin):
         return False
 
     def _fallback_range(self, utterances: List[str], lang: str,
-                        message: Message, fb_range: FallbackRange) -> Optional[IntentMatch]:
+                        message: Message, fb_range: FallbackRange) -> Optional[PipelineMatch]:
         """Send fallback request for a specified priority range.
 
         Args:
@@ -177,7 +176,7 @@ class FallbackService(PipelinePlugin):
             fb_range (FallbackRange): fallback order start and stop.
 
         Returns:
-            IntentMatch or None
+            PipelineMatch or None
         """
         lang = standardize_lang_tag(lang)
         # we call flatten in case someone is sending the old style list of tuples
@@ -197,24 +196,23 @@ class FallbackService(PipelinePlugin):
                 continue
             result = self.attempt_fallback(utterances, skill_id, lang, message)
             if result:
-                return IntentMatch(intent_service='Fallback',
-                                   intent_type=None,
-                                   intent_data={},
-                                   skill_id=skill_id,
-                                   utterance=utterances[0])
+                return PipelineMatch(handled=True,
+                                     match_data={},
+                                     skill_id=skill_id,
+                                     utterance=utterances[0])
         return None
 
-    def high_prio(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
+    def high_prio(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
         """Pre-padatious fallbacks."""
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(0, 5))
 
-    def medium_prio(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
+    def medium_prio(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
         """General fallbacks."""
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(5, 90))
 
-    def low_prio(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
+    def low_prio(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
         """Low prio fallbacks with general matching such as chat-bot."""
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(90, 101))

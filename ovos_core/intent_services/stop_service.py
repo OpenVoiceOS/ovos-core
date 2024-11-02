@@ -5,11 +5,11 @@ from threading import Event
 from typing import Optional, List
 
 from langcodes import closest_match
+
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
-
 from ovos_config.config import Configuration
-from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
+from ovos_plugin_manager.templates.pipeline import PipelineMatch, PipelinePlugin
 from ovos_utils import flatten_list
 from ovos_utils.bracket_expansion import expand_options
 from ovos_utils.lang import standardize_lang_tag
@@ -113,7 +113,7 @@ class StopService(PipelinePlugin):
         elif result is not None:
             return result.data.get('result', False)
 
-    def match_stop_high(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
+    def match_stop_high(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
         """If utterance is an exact match for "stop" , run before intent stage
 
         Args:
@@ -122,7 +122,7 @@ class StopService(PipelinePlugin):
             message (Message):  message to use to generate reply
 
         Returns:
-            IntentMatch if handled otherwise None.
+            PipelineMatch if handled otherwise None.
         """
         lang = self._get_closest_lang(lang)
         if lang is None:  # no vocs registered for this lang
@@ -142,11 +142,10 @@ class StopService(PipelinePlugin):
         if is_global_stop:
             # emit a global stop, full stop anything OVOS is doing
             self.bus.emit(message.reply("mycroft.stop", {}))
-            return IntentMatch(intent_service='Stop',
-                               intent_type=True,
-                               intent_data={"conf": conf},
-                               skill_id=None,
-                               utterance=utterance)
+            return PipelineMatch(handled=True,
+                                 match_data={"conf": conf},
+                                 skill_id=None,
+                                 utterance=utterance)
 
         if is_stop:
             # check if any skill can stop
@@ -156,14 +155,13 @@ class StopService(PipelinePlugin):
                     continue
 
                 if self.stop_skill(skill_id, message):
-                    return IntentMatch(intent_service='Stop',
-                                       intent_type=True,
-                                       intent_data={"conf": conf},
-                                       skill_id=skill_id,
-                                       utterance=utterance)
+                    return PipelineMatch(handled=True,
+                                         match_data={"conf": conf},
+                                         skill_id=skill_id,
+                                         utterance=utterance)
         return None
 
-    def match_stop_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
+    def match_stop_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
         """ if "stop" intent is in the utterance,
         but it contains additional words not in .intent files
 
@@ -173,7 +171,7 @@ class StopService(PipelinePlugin):
             message (Message):  message to use to generate reply
 
         Returns:
-            IntentMatch if handled otherwise None.
+            PipelineMatch if handled otherwise None.
         """
         lang = self._get_closest_lang(lang)
         if lang is None:  # no vocs registered for this lang
@@ -203,7 +201,7 @@ class StopService(PipelinePlugin):
                 return closest
         return None
 
-    def match_stop_low(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
+    def match_stop_low(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
         """ before fallback_low , fuzzy match stop intent
 
         Args:
@@ -212,7 +210,7 @@ class StopService(PipelinePlugin):
             message (Message):  message to use to generate reply
 
         Returns:
-            IntentMatch if handled otherwise None.
+            PipelineMatch if handled otherwise None.
         """
         lang = self._get_closest_lang(lang)
         if lang is None:  # no vocs registered for this lang
@@ -236,20 +234,18 @@ class StopService(PipelinePlugin):
                 continue
 
             if self.stop_skill(skill_id, message):
-                return IntentMatch(intent_service='Stop',
-                                   intent_type=True,
-                                   # emit instead of intent message
-                                   intent_data={"conf": conf},
-                                   skill_id=skill_id, utterance=utterance)
+                return PipelineMatch(handled=True,
+                                     # emit instead of intent message
+                                     match_data={"conf": conf},
+                                     skill_id=skill_id, utterance=utterance)
 
         # emit a global stop, full stop anything OVOS is doing
         self.bus.emit(message.reply("mycroft.stop", {}))
-        return IntentMatch(intent_service='Stop',
-                           intent_type=True,
-                           # emit instead of intent message {"conf": conf},
-                           intent_data={},
-                           skill_id=None,
-                           utterance=utterance)
+        return PipelineMatch(handled=True,
+                             # emit instead of intent message {"conf": conf},
+                             match_data={"conf": conf},
+                             skill_id=None,
+                             utterance=utterance)
 
     def voc_match(self, utt: str, voc_filename: str, lang: str,
                   exact: bool = False):

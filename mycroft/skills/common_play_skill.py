@@ -158,16 +158,13 @@ class CommonPlaySkill(OVOSSkill, ABC):
         data = message.data.get("callback_data")
 
         # Stop any currently playing audio
-        if self.audioservice and self.audioservice.is_playing:
-            self.audioservice.stop()
+        self.stop()
+
         message.context["skill_id"] = self.skill_id
-        self.bus.emit(message.forward("mycroft.stop"))
 
         # Save for CPS_play() later, e.g. if phrase includes modifiers like
         # "... on the chromecast"
         self.play_service_string = phrase
-
-        self.activate()
 
         # Invoke derived class to provide playback data
         self.CPS_start(phrase, data)
