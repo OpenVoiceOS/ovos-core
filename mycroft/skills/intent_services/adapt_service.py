@@ -13,10 +13,11 @@
 # limitations under the License.
 #
 """An intent parsing service using the Adapt parser."""
-from ovos_adapt.context import ContextManagerFrame
 from ovos_adapt.engine import IntentDeterminationEngine
 from ovos_workshop.intents import IntentBuilder, Intent
-from ovos_adapt.opm import ContextManager, AdaptPipeline as AdaptService
+from ovos_adapt.opm import AdaptPipeline as AdaptService
+from ovos_bus_client.session import IntentContextManagerFrame as ContextManagerFrame, \
+    IntentContextManager as ContextManager
 
 
 class AdaptIntent(IntentBuilder):

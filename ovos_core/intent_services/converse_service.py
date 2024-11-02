@@ -5,14 +5,13 @@ from typing import Optional, List
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, UtteranceState, Session
 from ovos_bus_client.util import get_message_lang
-from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
-
 from ovos_config.config import Configuration
 from ovos_config.locale import setup_locale
-from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
+from ovos_plugin_manager.templates.pipeline import PipelineMatch, PipelinePlugin
 from ovos_utils import flatten_list
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
+from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
 
 
 class ConverseService(PipelinePlugin):
@@ -313,7 +312,7 @@ class ConverseService(PipelinePlugin):
                             f'increasing "max_skill_runtime" in mycroft.conf might help alleviate this issue')
         return False
 
-    def converse_with_skills(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
+    def converse_with_skills(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
         """Give active skills a chance at the utterance
 
         Args:
@@ -338,12 +337,11 @@ class ConverseService(PipelinePlugin):
                 continue
             if self.converse(utterances, skill_id, lang, message):
                 state = session.utterance_states.get(skill_id, UtteranceState.INTENT)
-                return IntentMatch(intent_service='Converse',
-                                   intent_type=state != UtteranceState.RESPONSE,
-                                   # intent_type == True -> emit "ovos.utterance.handled"
-                                   intent_data={},
-                                   skill_id=skill_id,
-                                   utterance=utterances[0])
+                return PipelineMatch(handled=state != UtteranceState.RESPONSE,
+                                     # handled == True -> emit "ovos.utterance.handled"
+                                     match_data={},
+                                     skill_id=skill_id,
+                                     utterance=utterances[0])
         return None
 
     @staticmethod

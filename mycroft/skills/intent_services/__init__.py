@@ -1,14 +1,14 @@
-from ovos_core.intent_services import AdaptService,\
-    ConverseService, \
-    CommonQAService, \
-    FallbackService, \
-    PadaciosoService
-from ovos_core.intent_services import IntentMatch
-from mycroft.skills.intent_services.adapt_service import AdaptIntent, IntentBuilder, Intent
+from ovos_core.intent_services.fallback_service import FallbackService
+from ovos_core.intent_services.converse_service import ConverseService
+from ovos_adapt.opm import AdaptPipeline as AdaptService
+from padacioso.opm import PadaciosoPipeline as PadaciosoService
+from ovos_commonqa.opm import CommonQAService
+from ovos_plugin_manager.templates.pipeline import IntentMatch
+from ovos_workshop.intents import Intent as AdaptIntent, IntentBuilder, Intent
 
 try:
-    from ovos_core.intent_services.padatious_service import PadatiousService, PadatiousMatcher
+    from ovos_padatious.opm import PadatiousPipeline as PadatiousService, PadatiousMatcher
 except ImportError:
     from ovos_utils.log import LOG
     LOG.warning("padatious not installed")
-    from ovos_core.intent_services.padacioso_service import PadaciosoService as PadatiousService
+    from padacioso.opm import PadaciosoPipeline as PadatiousService
