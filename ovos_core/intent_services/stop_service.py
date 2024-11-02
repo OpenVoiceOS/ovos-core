@@ -282,18 +282,6 @@ class StopService(PipelineStageConfidenceMatcher):
 
         return self.match_low(utterances, lang, message)
 
-    def _get_closest_lang(self, lang: str) -> Optional[str]:
-        if self._voc_cache:
-            lang = standardize_lang_tag(lang)
-            closest, score = closest_match(lang, list(self._voc_cache.keys()))
-            # https://langcodes-hickford.readthedocs.io/en/sphinx/index.html#distance-values
-            # 0 -> These codes represent the same language, possibly after filling in values and normalizing.
-            # 1- 3 -> These codes indicate a minor regional difference.
-            # 4 - 10 -> These codes indicate a significant but unproblematic regional difference.
-            if score < 10:
-                return closest
-        return None
-
     def match_low(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
         """
         Perform a low-confidence fuzzy match for stop intent before fallback processing.
@@ -348,6 +336,18 @@ class StopService(PipelineStageConfidenceMatcher):
                              match_data={"conf": conf},
                              skill_id=None,
                              utterance=utterance)
+
+    def _get_closest_lang(self, lang: str) -> Optional[str]:
+        if self._voc_cache:
+            lang = standardize_lang_tag(lang)
+            closest, score = closest_match(lang, list(self._voc_cache.keys()))
+            # https://langcodes-hickford.readthedocs.io/en/sphinx/index.html#distance-values
+            # 0 -> These codes represent the same language, possibly after filling in values and normalizing.
+            # 1- 3 -> These codes indicate a minor regional difference.
+            # 4 - 10 -> These codes indicate a significant but unproblematic regional difference.
+            if score < 10:
+                return closest
+        return None
 
     def voc_match(self, utt: str, voc_filename: str, lang: str,
                   exact: bool = False):

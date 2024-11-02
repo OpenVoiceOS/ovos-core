@@ -70,6 +70,7 @@ class IntentService:
         # internal, track skills that call self.deactivate to avoid reactivating them again
         self._deactivations = defaultdict(list)
         self.bus.on('intent.service.skills.deactivate', self._handle_deactivate)
+        self.get_pipeline()  # trigger initial load of pipeline plugins (more may be lazy loaded on demand)
 
     def _handle_transformers(self, message):
         """
@@ -125,9 +126,9 @@ class IntentService:
             log_deprecation("'skips' kwarg has been deprecated!", "1.0.0")
             skips = [OVOSPipelineFactory._MAP.get(p, p) for p in skips]
 
-        pipeline: List[str] = [OVOSPipelineFactory._MAP.get(p, p) for p in session.pipeline
+        pipeline: List[str] = [OVOSPipelineFactory._MAP.get(p, p)
+                               for p in session.pipeline
                                if p not in skips]
-
         matchers: List[Tuple[str, Callable]] = OVOSPipelineFactory.create(pipeline, use_cache=True, bus=self.bus,
                                                                           skip_stage_matchers=skip_stage_matchers)
         # Sort matchers to ensure the same order as in `pipeline`
