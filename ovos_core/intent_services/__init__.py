@@ -129,11 +129,13 @@ class IntentService:
         matchers = OVOSPipelineFactory.create(pipeline, use_cache=True, bus=self.bus,
                                               skip_stage_matchers=skip_stage_matchers)
 
-        if any(k[0] not in pipeline for k in matchers):
+        final_pipeline = [k[0] for k in matchers]
+
+        if any(k not in pipeline for k in final_pipeline):
             LOG.warning(f"Requested some invalid pipeline components! "
-                        f"filtered {[k for k in pipeline if k not in matchers]}")
-            pipeline = [k for k in pipeline if k in matchers]
-        LOG.debug(f"Session pipeline: {pipeline}")
+                        f"filtered: {[k for k in pipeline if k not in final_pipeline]}")
+
+        LOG.debug(f"Session final pipeline: {final_pipeline}")
         return matchers
 
     @staticmethod
