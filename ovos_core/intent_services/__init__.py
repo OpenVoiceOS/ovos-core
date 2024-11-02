@@ -18,7 +18,6 @@ from typing import Tuple, Callable, List, Union, Dict
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
-
 from ovos_config.config import Configuration
 from ovos_config.locale import setup_locale, get_valid_languages
 from ovos_core.intent_services.converse_service import ConverseService
@@ -123,18 +122,19 @@ class IntentService:
             log_deprecation("'skips' kwarg has been deprecated!", "1.0.0")
             skips = [OVOSPipelineFactory._MAP.get(p, p) for p in skips]
 
-        pipeline = [OVOSPipelineFactory._MAP.get(p, p) for p in session.pipeline
-                    if p not in skips]
+        pipeline: List[str] = [OVOSPipelineFactory._MAP.get(p, p) for p in session.pipeline
+                               if p not in skips]
 
-        matchers = OVOSPipelineFactory.create(pipeline, use_cache=True, bus=self.bus,
-                                              skip_stage_matchers=skip_stage_matchers)
-
+        matchers: List[Tuple[str, Callable]] = OVOSPipelineFactory.create(pipeline, use_cache=True, bus=self.bus,
+                                                                          skip_stage_matchers=skip_stage_matchers)
+        # Sort matchers to ensure the same order as in `pipeline`
+        matcher_dict = dict(matchers)
+        matchers = [(p, matcher_dict[p]) for p in pipeline if p in matcher_dict]
         final_pipeline = [k[0] for k in matchers]
 
-        if any(k not in pipeline for k in final_pipeline):
+        if pipeline != final_pipeline:
             LOG.warning(f"Requested some invalid pipeline components! "
                         f"filtered: {[k for k in pipeline if k not in final_pipeline]}")
-
         LOG.debug(f"Session final pipeline: {final_pipeline}")
         return matchers
 
@@ -443,7 +443,7 @@ class IntentService:
         return None
 
     @property
-    def padacioso_service(self)-> None:
+    def padacioso_service(self) -> None:
         """DEPRECATED"""
         log_deprecation("direct access to self.padacioso_service is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
