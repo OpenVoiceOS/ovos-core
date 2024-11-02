@@ -227,7 +227,7 @@ class FallbackService(PipelineStageConfidenceMatcher):
     def medium_prio(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
         return self.match_medium(utterances, lang, message)
 
-    @deprecated("'high_prio' has been renamed to 'high_low'", "2.0.0")
+    @deprecated("'high_prio' has been renamed to 'match_high'", "2.0.0")
     def high_prio(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
         return self.match_high(utterances, lang, message)
 
