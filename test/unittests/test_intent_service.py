@@ -21,6 +21,9 @@ from ovos_bus_client.util import get_message_lang
 from ovos_config import Configuration
 from ovos_config import LocalConf, DEFAULT_CONFIG
 from ovos_config.locale import setup_locale
+from ovos_core.intent_services import IntentService
+from ovos_utils.fakebus import FakeBus
+from ovos_workshop.intents import IntentBuilder
 
 # Setup configurations to use with default language tests
 BASE_CONF = deepcopy(LocalConf(DEFAULT_CONFIG))
@@ -75,3 +78,41 @@ class TestLanguageExtraction(TestCase):
         self.assertEqual(get_message_lang(msg), 'de-DE')
         msg = Message('test msg', data={'lang': 'sv-se'})
         self.assertEqual(get_message_lang(msg), 'sv-SE')
+
+
+class TestIntentServiceApi(TestCase):
+    def setUp(self):
+        self.bus = FakeBus()
+        self.emitted = []
+
+        def on_msg(m):
+            self.emitted.append(Message.deserialize(m))
+
+        self.bus.on("message", on_msg)
+
+        self.intent_service = IntentService(self.bus)
+
+        msg = Message('register_vocab',
+                      {'entity_value': 'test', 'entity_type': 'testKeyword'})
+        self.intent_service._adapt_service.handle_register_vocab(msg)
+
+        intent = IntentBuilder('skill:testIntent').require('testKeyword')
+        msg = Message('register_intent', intent.__dict__)
+        self.intent_service._adapt_service.handle_register_intent(msg)
+
+    def test_get_intent_no_match(self):
+        """Check that if the intent doesn't match at all None is returned."""
+        # Check that no intent is matched
+        msg = Message('intent.service.intent.get',
+                      data={'utterance': 'five'})
+        self.intent_service.handle_get_intent(msg)
+        reply = self.emitted[-1]
+        self.assertEqual(reply.data['intent'], None)
+
+    def test_get_intent_match(self):
+        # Check that intent is matched
+        msg = Message('intent.service.intent.get',
+                      data={'utterance': 'test'})
+        self.intent_service.handle_get_intent(msg)
+        reply = self.emitted[-1]
+        self.assertEqual(reply.data['intent']['intent_name'], 'skill:testIntent')
