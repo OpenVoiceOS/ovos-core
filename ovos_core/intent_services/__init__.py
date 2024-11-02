@@ -16,7 +16,7 @@ from collections import defaultdict
 from typing import Tuple, Callable, Union
 
 from ocp_pipeline.opm import OCPPipelineMatcher
-from ovos_adapt.opm import AdaptPipeline as AdaptService
+from ovos_adapt.opm import AdaptPipeline
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
@@ -84,15 +84,15 @@ class IntentService:
 
     def _load_pipeline_plugins(self):
         # TODO - replace with plugin loader from OPM
-        self._adapt_service = AdaptService(config=self.config.get("adapt", {}))
+        self._adapt_service = AdaptPipeline(bus=self.bus, config=self.config.get("adapt", {}))
         if "padatious" not in self.config:
             self.config["padatious"] = Configuration().get("padatious", {})
         try:
             if self.config["padatious"].get("disabled"):
                 LOG.info("padatious forcefully disabled in config")
             else:
-                from ovos_padatious.opm import PadatiousPipeline as PadatiousService
-                self._padatious_service = PadatiousService(self.bus, self.config["padatious"])
+                from ovos_padatious.opm import PadatiousPipeline
+                self._padatious_service = PadatiousPipeline(self.bus, self.config["padatious"])
         except ImportError:
             LOG.error(f'Failed to create padatious intent handlers, padatious not installed')
 
