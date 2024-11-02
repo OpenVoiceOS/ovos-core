@@ -58,11 +58,8 @@ class IntentService:
         self.bus = bus
         self.config = config or Configuration().get("intents", {})
 
-        # Dictionary for translating a skill id to a name
-        self.skill_names = {}
-
         for p in OVOSPipelineFactory.get_installed_pipelines():
-            LOG.debug(f"Found pipeline: {p}")
+            LOG.info(f"Found pipeline: {p}")
         OVOSPipelineFactory.create(use_cache=True, bus=self.bus)  # pre-loa
 
         self.utterance_plugins = UtteranceTransformersService(bus)
