@@ -26,40 +26,8 @@ from ovos_config.locale import setup_locale
 BASE_CONF = deepcopy(LocalConf(DEFAULT_CONFIG))
 BASE_CONF['lang'] = 'it-it'
 
-NO_LANG_CONF = deepcopy(LocalConf(DEFAULT_CONFIG))
-NO_LANG_CONF.pop('lang')
-
-setup_locale("en-US")
-
-
-class MockEmitter(object):
-    def __init__(self):
-        self.reset()
-
-    def emit(self, message):
-        self.types.append(message.msg_type)
-        self.results.append(message.data)
-
-    def get_types(self):
-        return self.types
-
-    def get_results(self):
-        return self.results
-
-    def remove(self, msg_type, handler):
-        self.removed.append(msg_type)
-
-    def on(self, msg_type, handler):
-        pass
-
-    def reset(self):
-        self.removed = []
-        self.types = []
-        self.results = []
-
 
 class ContextManagerTest(TestCase):
-    emitter = MockEmitter()
 
     def setUp(self):
         self.context_manager = ContextManager(3)

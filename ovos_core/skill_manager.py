@@ -206,32 +206,6 @@ class SkillManager(Thread):
         self.bus.on("mycroft.internet.disconnected", self.handle_internet_disconnected)
         self.bus.on("mycroft.gui.unavailable", self.handle_gui_disconnected)
 
-    @deprecated("mycroft.ready event has moved to finished booting skill", "0.1.0")
-    def is_device_ready(self):
-        """Check if the device is ready by waiting for various services to start.
-
-        Returns:
-            bool: True if the device is ready, False otherwise.
-        Raises:
-            TimeoutError: If the device is not ready within a specified timeout.
-        """
-        return True
-
-    @deprecated("mycroft.ready event has moved to finished booting skill", "0.1.0")
-    def handle_check_device_readiness(self, message):
-        pass
-
-    @deprecated("mycroft.ready event has moved to finished booting skill", "0.1.0")
-    def check_services_ready(self, services):
-        """Report if all specified services are ready.
-
-        Args:
-            services (iterable): Service names to check.
-        Returns:
-            bool: True if all specified services are ready, False otherwise.
-        """
-        return True
-
     @property
     def skills_config(self):
         """Get the skills service configuration.
@@ -388,10 +362,6 @@ class SkillManager(Thread):
             self.plugin_skills[skill_id] = skill_loader
 
         return skill_loader if load_status else None
-
-    @deprecated("priority skills have been deprecated for a long time", "0.1.0")
-    def load_priority(self):
-        pass
 
     def run(self):
         """Run the skill manager thread."""
@@ -742,3 +712,35 @@ class SkillManager(Thread):
 
         if self._settings_watchdog:
             self._settings_watchdog.shutdown()
+
+    ############
+    # Deprecated stuff
+    @deprecated("priority skills have been deprecated for a long time", "1.0.0")
+    def load_priority(self):
+        pass
+
+    @deprecated("mycroft.ready event has moved to finished booting skill", "1.0.0")
+    def is_device_ready(self):
+        """Check if the device is ready by waiting for various services to start.
+
+        Returns:
+            bool: True if the device is ready, False otherwise.
+        Raises:
+            TimeoutError: If the device is not ready within a specified timeout.
+        """
+        return True
+
+    @deprecated("mycroft.ready event has moved to finished booting skill", "1.0.0")
+    def handle_check_device_readiness(self, message):
+        pass
+
+    @deprecated("mycroft.ready event has moved to finished booting skill", "1.0.0")
+    def check_services_ready(self, services):
+        """Report if all specified services are ready.
+
+        Args:
+            services (iterable): Service names to check.
+        Returns:
+            bool: True if all specified services are ready, False otherwise.
+        """
+        return True
