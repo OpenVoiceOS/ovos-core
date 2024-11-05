@@ -1,6 +1,6 @@
 # all ovos core modules, a full install like mycroft-core used to do
 ovos_PHAL[extras]>=0.2.5,<1.0.0
 ovos-audio[extras]>=0.2.4,<1.0.0
-ovos-gui[extras]>=0.2.2,<1.0.0
+ovos-gui[extras]>=1.0.0,<2.0.0
 ovos-messagebus>=0.0.6,<1.0.0
 ovos-dinkum-listener[extras]>=0.2.1,<1.0.0
