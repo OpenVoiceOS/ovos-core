@@ -65,7 +65,7 @@ jobs:
           pip install ./test/end2end/metadata-test-plugin
       - name: Install core repo
         run: |
-          pip install -e .[plugins]
+          pip install -e .[plugins] ovos-bus-client==1.0.0
       - name: Run end2end tests
         run: |
           pytest --cov-append --cov=ovos_core --cov-report xml test/end2end

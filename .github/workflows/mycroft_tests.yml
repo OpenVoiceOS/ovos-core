@@ -39,8 +39,7 @@ jobs:
           pip install -r requirements/tests.txt
       - name: Install core repo
         run: |
-          pip install -e .[deprecated]
-          pip install -e .[mycroft,plugins]
+          pip install -e .[mycroft,plugins,deprecated]
       - name: Run mycroft compat tests
         run: |
           pytest test/backwards_compat
