@@ -1,20 +1,12 @@
 # Changelog
 
-## [0.2.8a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.8a1) (2024-11-06)
+## [0.2.9a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.9a1) (2024-11-06)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.7a1...0.2.8a1)
-
-**Merged pull requests:**
-
-- fix: allow latest bus client version [\#588](https://github.com/OpenVoiceOS/ovos-core/pull/588) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.2.7a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.7a1) (2024-11-02)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.6...0.2.7a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.8...0.2.9a1)
 
 **Merged pull requests:**
 
-- da-dk/translate [\#583](https://github.com/OpenVoiceOS/ovos-core/pull/583) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- chore: release\_tests [\#590](https://github.com/OpenVoiceOS/ovos-core/pull/590) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
