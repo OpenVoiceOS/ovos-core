@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.8a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.8a1) (2024-11-06)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.7a1...0.2.8a1)
+
+**Merged pull requests:**
+
+- fix: allow latest bus client version [\#588](https://github.com/OpenVoiceOS/ovos-core/pull/588) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.2.7a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.7a1) (2024-11-02)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.6...0.2.7a1)
