@@ -4,4 +4,3 @@ ovos-audio[extras]>=0.3.1,<1.0.0
 ovos-gui[extras]>=1.0.0,<2.0.0
 ovos-messagebus>=0.0.7,<1.0.0
 ovos-dinkum-listener[extras]>=0.3.2,<1.0.0
-ovos-gui-plugin-shell-companion>=1.0.4
