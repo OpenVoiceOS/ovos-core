@@ -5,4 +5,4 @@ ovos-translate-server-plugin>=0.0.2, <1.0.0
 ovos-utterance-normalizer>=0.2.1, <1.0.0
 
 # still in alpha
-#ovos-classifiers
+ovos-classifiers
