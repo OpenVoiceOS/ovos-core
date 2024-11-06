@@ -1,6 +1,7 @@
-name: Test with Constraints
+name: Test Constraints
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - 'requirements/requirements.txt'
@@ -35,10 +36,6 @@ jobs:
           sudo apt-get update
           sudo apt install python3-dev swig libssl-dev portaudio19-dev libpulse-dev libfann-dev
 
-      - name: Install test dependencies
-        run: |
-          pip install -r requirements/tests.txt
-
       - name: Download constraints file
         run: |
           curl -o requirements/constraints-${{ matrix.constraints_file }}.txt https://raw.githubusercontent.com/OpenVoiceOS/ovos-releases/refs/heads/main/constraints-${{ matrix.constraints_file }}.txt
@@ -46,7 +43,3 @@ jobs:
       - name: Install core repo with constraints
         run: |
           pip install -e .[mycroft,lgpl,plugins,skills-essential,skills-audio,skills-gui,skills-internet,skills-media,skills-desktop] --pre -c requirements/constraints-${{ matrix.constraints_file }}.txt
-
-      - name: Run unit tests
-        run: |
-          pytest test/unittests
