@@ -13,6 +13,8 @@ on:
       - 'requirements/skills-gui.txt'
       - 'requirements/skills-internet.txt'
       - 'requirements/skills-media.txt'
+      - 'requirements/constraints-stable.txt'
+      - 'requirements/constraints-testing.txt'
 
 jobs:
   update-constraints:
