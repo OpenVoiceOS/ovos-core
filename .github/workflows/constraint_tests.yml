@@ -45,7 +45,7 @@ jobs:
 
       - name: Install core repo with constraints
         run: |
-          pip install -e .[mycroft,lgpl,plugins,skills-essential,skills-audio,skills-gui,skills-internet,skills-media,skills-desktop] -c requirements/constraints-${{ matrix.constraints_file }}.txt
+          pip install -e .[mycroft,lgpl,plugins,skills-essential,skills-audio,skills-gui,skills-internet,skills-media,skills-desktop] --pre -c requirements/constraints-${{ matrix.constraints_file }}.txt
 
       - name: Run unit tests
         run: |
