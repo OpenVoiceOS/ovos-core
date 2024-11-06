@@ -1,0 +1,87 @@
+name: Test with Constraints
+
+on:
+  pull_request:
+    paths:
+      - 'requirements/requirements.txt'
+      - 'requirements/lgpl.txt'
+      - 'requirements/mycroft.txt'
+      - 'requirements/plugins.txt'
+      - 'requirements/skills-audio.txt'
+      - 'requirements/skills-desktop.txt'
+      - 'requirements/skills-essential.txt'
+      - 'requirements/skills-gui.txt'
+      - 'requirements/skills-internet.txt'
+      - 'requirements/skills-media.txt'
+
+jobs:
+  update-constraints:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt install python3-dev swig libssl-dev portaudio19-dev libpulse-dev libfann-dev
+
+      - name: Install core repo dependencies
+        run: |
+          pip install -e .[mycroft,lgpl,plugins,skills-essential,skills-audio,skills-gui,skills-internet,skills-media,skills-desktop]
+
+      - name: Update constraints files
+        run: |
+          python scripts/release.py
+
+      - name: Upload constraints files
+        uses: actions/upload-artifact@v3
+        with:
+          name: constraints
+          path: |
+            requirements/constraints-stable.txt
+            requirements/constraints-testing.txt
+
+
+  test-stable-and-testing-constraints:
+    runs-on: ubuntu-latest
+    needs: update-constraints  # Depend on constraints update job
+    strategy:
+      matrix:
+        constraints_file: ['requirements/constraints-stable.txt', 'requirements/constraints-testing.txt']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download updated constraints
+        uses: actions/download-artifact@v3
+        with:
+          name: constraints
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt install python3-dev swig libssl-dev portaudio19-dev libpulse-dev libfann-dev
+
+      - name: Install test dependencies
+        run: |
+          pip install -r requirements/tests.txt
+
+      - name: Install core repo with constraints
+        run: |
+          pip install -e .[mycroft,lgpl,plugins,skills-essential,skills-audio,skills-gui,skills-internet,skills-media,skills-desktop] -c ${{ matrix.constraints_file }}
+
+      - name: Run unit tests
+        run: |
+          pytest test/unittests
