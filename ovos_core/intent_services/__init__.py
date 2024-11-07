@@ -331,11 +331,6 @@ class IntentService:
         # tag language of this utterance
         lang = self.disambiguate_lang(message)
 
-        try:  # TODO - uncouple lingua franca from core, up to skills to ensure locale is loaded if needed
-            setup_locale(lang)
-        except Exception as e:
-            LOG.exception(f"Failed to set lingua_franca default lang to {lang}")
-
         utterances = message.data.get('utterances', [])
 
         stopwatch = Stopwatch()
