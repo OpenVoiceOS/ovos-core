@@ -15,5 +15,3 @@ ovos-config>=0.0.13,<1.0.0
 ovos-backend-client>=0.1.0,<2.0.0
 ovos-workshop>=2.0.1,<3.0.0
 ovos-utterance-normalizer>=0.0.1,<1.0.0
-ovos-number-parser>=0.0.1,<1.0.0
-ovos-date-parser>=0.0.1,<1.0.0
