@@ -10,6 +10,7 @@ pyaudio
 
 # mycroft-core imports / default plugins
 # for compat with mycroft namespace
+ovos-lingua-franca>=0.4.7,<1.0.0
 # NOTE: ovos-listener is causing conflicts in dependency resolution, blocks ovos-bus-client 1.0.0
 ovos-listener>=0.0.3,<1.0.0
 ovos-tts-plugin-mimic>=0.2.8, <1.0.0

@@ -387,11 +387,6 @@ class ConverseService(PipelinePlugin):
     def reset_converse(self, message: Message):
         """Let skills know there was a problem with speech recognition"""
         lang = get_message_lang()
-        try:
-            setup_locale(lang)  # restore default lang
-        except Exception as e:
-            LOG.exception(f"Failed to set lingua_franca default lang to {lang}")
-
         self.converse_with_skills([], lang, message)
 
     def handle_get_active_skills(self, message: Message):
