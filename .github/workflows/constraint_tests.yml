@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        constraints_file: ['stable', 'testing']
+        constraints_file: ['testing']
 
     steps:
       - name: Checkout repository

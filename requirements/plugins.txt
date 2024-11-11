@@ -3,6 +3,7 @@ ovos-utterance-plugin-cancel>=0.2.2, <1.0.0
 ovos-bidirectional-translation-plugin>=0.1.0, <1.0.0
 ovos-translate-server-plugin>=0.0.2, <1.0.0
 ovos-utterance-normalizer>=0.2.1, <1.0.0
-
+ovos-number-parser>=0.0.1,<1.0.0
+ovos-date-parser>=0.0.3,<1.0.0
 # still in alpha
 ovos-classifiers
