@@ -14,4 +14,3 @@ ovos-plugin-manager>=0.5.6,<1.0.0
 ovos-config>=0.0.13,<1.0.0
 ovos-backend-client>=0.1.0,<2.0.0
 ovos-workshop>=2.2.2,<3.0.0
-ovos-utterance-normalizer>=0.0.1,<1.0.0
