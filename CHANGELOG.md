@@ -1,24 +1,12 @@
 # Changelog
 
-## [0.2.10a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.10a1) (2024-11-11)
+## [0.2.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.11a1) (2024-11-12)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.9a1...0.2.10a1)
-
-**Closed issues:**
-
-- deprecate lingua franca [\#592](https://github.com/OpenVoiceOS/ovos-core/issues/592)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.10...0.2.11a1)
 
 **Merged pull requests:**
 
-- fix: drop lingua\_franca [\#593](https://github.com/OpenVoiceOS/ovos-core/pull/593) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.2.9a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.9a1) (2024-11-06)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.8...0.2.9a1)
-
-**Merged pull requests:**
-
-- chore: release\_tests [\#590](https://github.com/OpenVoiceOS/ovos-core/pull/590) ([JarbasAl](https://github.com/JarbasAl))
+- Update combo-lock requirement from \<0.3,\>=0.2.2 to \>=0.2.2,\<0.4 in /requirements [\#585](https://github.com/OpenVoiceOS/ovos-core/pull/585) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 
 
