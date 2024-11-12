@@ -45,9 +45,7 @@ class IntentService:
         self.bus = bus
         self.config = config or Configuration().get("intents", {})
 
-        for p in OVOSPipelineFactory.get_installed_pipelines():
-            LOG.info(f"Found pipeline: {p}")
-        OVOSPipelineFactory.create(use_cache=True, bus=self.bus)  # pre-loa
+        self.get_pipeline()  # trigger initial load of pipeline plugins (more may be lazy loaded on demand)
 
         self.utterance_plugins = UtteranceTransformersService(bus)
         self.metadata_plugins = MetadataTransformersService(bus)
@@ -70,7 +68,6 @@ class IntentService:
         # internal, track skills that call self.deactivate to avoid reactivating them again
         self._deactivations = defaultdict(list)
         self.bus.on('intent.service.skills.deactivate', self._handle_deactivate)
-        self.get_pipeline()  # trigger initial load of pipeline plugins (more may be lazy loaded on demand)
 
     def _handle_transformers(self, message):
         """
@@ -125,6 +122,9 @@ class IntentService:
         if skips:
             log_deprecation("'skips' kwarg has been deprecated!", "1.0.0")
             skips = [OVOSPipelineFactory._MAP.get(p, p) for p in skips]
+
+        for p in OVOSPipelineFactory.get_installed_pipelines():
+            LOG.info(f"Found pipeline: {p}")
 
         pipeline: List[str] = [OVOSPipelineFactory._MAP.get(p, p)
                                for p in session.pipeline
