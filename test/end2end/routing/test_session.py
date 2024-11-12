@@ -3,7 +3,7 @@ from time import sleep
 from unittest import TestCase
 from ovos_utils.ocp import PlayerState, MediaState
 from ocp_pipeline.opm import OCPPlayerProxy
-
+from ovos_plugin_manager.pipeline import OVOSPipelineFactory
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, Session
 from ..minicroft import get_minicroft
@@ -93,7 +93,7 @@ class TestOCPRouting(TestCase):
         self.core.stop()
 
     def test_no_session(self):
-        self.assertIsNotNone(self.core.intent_service._ocp)
+        self.assertIsNotNone(OVOSPipelineFactory._CACHE.get("ovos-ocp-pipeline-plugin-high"))
         messages = []
 
         def new_msg(msg):
@@ -121,7 +121,8 @@ class TestOCPRouting(TestCase):
                            "converse",
                            "ocp_high"
                        ])
-        self.core.intent_service._ocp.ocp_sessions[sess.session_id] = OCPPlayerProxy(
+
+        OVOSPipelineFactory._CACHE["ovos-ocp-pipeline-plugin-high"].ocp_sessions[sess.session_id] = OCPPlayerProxy(
             session_id=sess.session_id, available_extractors=[], ocp_available=True,
             player_state=PlayerState.STOPPED, media_state=MediaState.NO_MEDIA)
         utt = Message("recognizer_loop:utterance",
