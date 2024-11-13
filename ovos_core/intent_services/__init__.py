@@ -43,6 +43,8 @@ class IntentService:
         self.config = config or Configuration().get("intents", {})
 
         self.get_pipeline()  # trigger initial load of pipeline plugins (more may be lazy loaded on demand)
+        for p, c in OVOSPipelineFactory._CACHE.items():
+            LOG.info(f"Loaded pipeline: {p} - {c.__class__.__name__}")
 
         self.utterance_plugins = UtteranceTransformersService(bus)
         self.metadata_plugins = MetadataTransformersService(bus)
@@ -119,9 +121,6 @@ class IntentService:
         if skips:
             log_deprecation("'skips' kwarg has been deprecated!", "1.0.0")
             skips = [OVOSPipelineFactory._MAP.get(p, p) for p in skips]
-
-        for p in OVOSPipelineFactory.get_installed_pipelines():
-            LOG.info(f"Found pipeline: {p}")
 
         pipeline: List[str] = [OVOSPipelineFactory._MAP.get(p, p)
                                for p in session.pipeline
