@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.11a2](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.11a2) (2024-11-15)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.11a1...0.2.11a2)
+
+**Merged pull requests:**
+
+- fix: Update skills-gui.txt [\#597](https://github.com/OpenVoiceOS/ovos-core/pull/597) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.2.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.11a1) (2024-11-12)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.10...0.2.11a1)
