@@ -2,3 +2,4 @@
 skill-wordnet>=0.0.6,<1.0.0
 ovos-skill-randomness>=0.1.0,<1.0.0
 ovos-skill-days-in-history>=0.1.0,<1.0.0
+ovos-skill-laugh>=0.1.1,<1.0.0
