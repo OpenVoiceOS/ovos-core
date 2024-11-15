@@ -79,6 +79,7 @@ setup(
         'deprecated': required('requirements/extra-deprecated.txt'),
         'plugins': required('requirements/plugins.txt'),
         'skills-essential': required('requirements/skills-essential.txt'),
+        'skills-extra': required('requirements/skills-extra.txt'),
         'skills-audio': required('requirements/skills-audio.txt'),
         'skills-desktop': required('requirements/skills-desktop.txt'),
         'skills-internet': required('requirements/skills-internet.txt'),
