@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.13a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.13a1) (2024-11-19)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.12a1...0.2.13a1)
+
+**Merged pull requests:**
+
+- deprecate!:backend client [\#604](https://github.com/OpenVoiceOS/ovos-core/pull/604) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.2.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.12a1) (2024-11-18)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.11...0.2.12a1)
