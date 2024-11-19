@@ -1,20 +1,20 @@
 # Changelog
 
-## [0.2.11a2](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.11a2) (2024-11-15)
+## [0.2.13a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.13a1) (2024-11-19)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.11a1...0.2.11a2)
-
-**Merged pull requests:**
-
-- fix: Update skills-gui.txt [\#597](https://github.com/OpenVoiceOS/ovos-core/pull/597) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.2.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.11a1) (2024-11-12)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.10...0.2.11a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.12a1...0.2.13a1)
 
 **Merged pull requests:**
 
-- Update combo-lock requirement from \<0.3,\>=0.2.2 to \>=0.2.2,\<0.4 in /requirements [\#585](https://github.com/OpenVoiceOS/ovos-core/pull/585) ([dependabot[bot]](https://github.com/apps/dependabot))
+- deprecate!:backend client [\#604](https://github.com/OpenVoiceOS/ovos-core/pull/604) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.2.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.12a1) (2024-11-18)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.11...0.2.12a1)
+
+**Merged pull requests:**
+
+- Update ovos-skill-homescreen requirement from \<3.0.0,\>=1.0.4 to \>=1.0.4,\<4.0.0 in /requirements [\#602](https://github.com/OpenVoiceOS/ovos-core/pull/602) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 
 
