@@ -1,5 +1,4 @@
 import time
-import unittest
 from time import sleep
 from unittest import TestCase
 
@@ -8,7 +7,6 @@ from ovos_bus_client.session import SessionManager, Session
 from ..minicroft import get_minicroft
 
 
-@unittest.skip("DEBUG - TODO restore me")
 class TestSessions(TestCase):
 
     def setUp(self):
