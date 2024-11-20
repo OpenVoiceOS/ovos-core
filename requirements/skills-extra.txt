@@ -6,3 +6,5 @@ ovos-skill-laugh>=0.1.1,<1.0.0
 ovos-skill-number-facts>=0.1.4,<1.0.0
 ovos-skill-iss-location>=0.2.2,<1.0.0
 ovos-skill-cmd>=0.2.5,<1.0.0
+ovos-skill-moviemaster>=0.0.7,<1.0.0
+ovos-skill-confucius-quotes>=0.1.7,<1.0.0
