@@ -17,7 +17,7 @@ from mycroft.audio.audioservice import AudioService
 # from mycroft.configuration import Configuration
 from mycroft.skills.intent_service import IntentService
 from mycroft.skills.skill_loader import SkillLoader
-from ovos_utils.messagebus import FakeBus
+from ovos_utils.fakebus import FakeBus
 
 # Patch Configuration in the audioservice module to ensure its patched
 from ovos_config.config import Configuration

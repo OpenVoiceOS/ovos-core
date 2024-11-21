@@ -57,7 +57,6 @@ def mock_config():
     config = deepcopy(LocalConf(DEFAULT_CONFIG))
     config['skills']['priority_skills'] = ['foobar']
     config['data_dir'] = str(tempfile.mkdtemp())
-    config['server']['metrics'] = False
     config['enclosure'] = {}
     return config
 
@@ -71,8 +70,6 @@ class TestSkillManager(TestCase):
         self.temp_dir = Path(temp_dir)
         self.message_bus_mock = MessageBusMock()
         self._mock_log()
-        self._mock_skill_updater()
-        self._mock_skill_settings_downloader()
         self.skill_manager = SkillManager(self.message_bus_mock)
         self._mock_skill_loader_instance()
 
@@ -83,22 +80,6 @@ class TestSkillManager(TestCase):
 
     def tearDown(self):
         rmtree(str(self.temp_dir))
-
-    def _mock_skill_settings_downloader(self):
-        settings_download_patch = patch(
-            self.mock_package + 'SkillSettingsDownloader',
-            spec=True
-        )
-        self.addCleanup(settings_download_patch.stop)
-        self.settings_download_mock = settings_download_patch.start()
-
-    def _mock_skill_updater(self):
-        skill_updater_patch = patch(
-            self.mock_package + 'SkillUpdater',
-            spec=True
-        )
-        self.addCleanup(skill_updater_patch.stop)
-        self.skill_updater_mock = skill_updater_patch.start()
 
     def _mock_skill_loader_instance(self):
         self.skill_dir = self.temp_dir.joinpath('test_skill')

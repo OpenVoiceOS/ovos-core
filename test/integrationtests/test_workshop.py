@@ -4,7 +4,7 @@ from os.path import dirname
 from time import sleep
 from ovos_workshop.skill_launcher import SkillLoader
 from ovos_workshop.skills.ovos import OVOSSkill
-from ovos_utils.messagebus import FakeBus, Message
+from ovos_utils.fakebus import FakeBus, FakeMessage as Message
 
 # tests taken from ovos_workshop
 
