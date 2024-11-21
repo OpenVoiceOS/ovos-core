@@ -5,7 +5,7 @@ from unittest.mock import Mock
 from ovos_core.transformers import UtteranceTransformersService
 from ovos_plugin_manager.templates.transformers import UtteranceTransformer
 
-from ovos_utils.messagebus import FakeBus
+from ovos_utils.fakebus import FakeBus
 
 
 class MockTransformer(UtteranceTransformer):

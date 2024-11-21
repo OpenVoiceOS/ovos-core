@@ -2,7 +2,7 @@ import json
 import unittest
 
 from ovos_tskill_fakewiki import FakeWikiSkill
-from ovos_utils.messagebus import FakeBus, Message
+from ovos_utils.fakebus import FakeBus, FakeMessage as Message
 
 
 class TestDialog(unittest.TestCase):

@@ -6,7 +6,7 @@ from ovos_core.intent_services import IntentService
 from ovos_core.skill_manager import SkillManager
 from ovos_plugin_manager.skills import find_skill_plugins
 from ovos_utils.log import LOG
-from ovos_utils.messagebus import FakeBus
+from ovos_utils.fakebus import FakeBus
 from ovos_utils.process_utils import ProcessState
 from ovos_workshop.skills.fallback import FallbackSkill
 
