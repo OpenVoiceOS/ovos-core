@@ -1,12 +1,12 @@
 # Changelog
 
-## [0.2.16a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.16a1) (2024-11-20)
+## [0.2.17a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.17a1) (2024-11-21)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.15...0.2.16a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.16...0.2.17a1)
 
 **Merged pull requests:**
 
-- Update skills-extra.txt [\#609](https://github.com/OpenVoiceOS/ovos-core/pull/609) ([JarbasAl](https://github.com/JarbasAl))
+- fix: update deprecated imports from ovos-utils [\#611](https://github.com/OpenVoiceOS/ovos-core/pull/611) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
