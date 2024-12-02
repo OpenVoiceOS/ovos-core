@@ -1,12 +1,20 @@
 # Changelog
 
-## [0.2.17a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.17a1) (2024-11-21)
+## [0.2.18a2](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.18a2) (2024-12-02)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.16...0.2.17a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.18a1...0.2.18a2)
 
 **Merged pull requests:**
 
-- fix: update deprecated imports from ovos-utils [\#611](https://github.com/OpenVoiceOS/ovos-core/pull/611) ([JarbasAl](https://github.com/JarbasAl))
+- import basque translations [\#615](https://github.com/OpenVoiceOS/ovos-core/pull/615) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.2.18a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.18a1) (2024-12-02)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.17...0.2.18a1)
+
+**Merged pull requests:**
+
+- import galician translations [\#613](https://github.com/OpenVoiceOS/ovos-core/pull/613) ([JarbasAl](https://github.com/JarbasAl))
 
 
 

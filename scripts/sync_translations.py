@@ -21,8 +21,11 @@ for lang in os.listdir(tx):
             data = json.load(f)
         for fid, samples in data.items():
             if samples:
-                samples = [s for s in samples if s]  # s may be None
-                with open(f"{locale}/{lang.lower()}/{fid}", "w") as f:
+                samples = [s.strip() for s in samples
+                           if s and s.strip() != "[UNUSED]"]  # s may be None
+                p = f"{locale}/{lang.lower()}/{fid.lstrip('/')}"
+                os.makedirs(dirname(p), exist_ok=True)
+                with open(p, "w") as f:
                     f.write("\n".join(sorted(samples)))
 
     if os.path.isfile(dialogs):
@@ -30,8 +33,11 @@ for lang in os.listdir(tx):
             data = json.load(f)
         for fid, samples in data.items():
             if samples:
-                samples = [s for s in samples if s]  # s may be None
-                with open(f"{locale}/{lang.lower()}/{fid}", "w") as f:
+                samples = [s.strip() for s in samples
+                           if s and s.strip() != "[UNUSED]"]  # s may be None
+                p = f"{locale}/{lang.lower()}/{fid.lstrip('/')}"
+                os.makedirs(dirname(p), exist_ok=True)
+                with open(p, "w") as f:
                     f.write("\n".join(sorted(samples)))
 
     if os.path.isfile(vocs):
@@ -39,8 +45,11 @@ for lang in os.listdir(tx):
             data = json.load(f)
         for fid, samples in data.items():
             if samples:
-                samples = [s for s in samples if s]  # s may be None
-                with open(f"{locale}/{lang.lower()}/{fid}", "w") as f:
+                samples = [s.strip() for s in samples
+                           if s and s.strip() != "[UNUSED]"]  # s may be None
+                p = f"{locale}/{lang.lower()}/{fid.lstrip('/')}"
+                os.makedirs(dirname(p), exist_ok=True)
+                with open(p, "w") as f:
                     f.write("\n".join(sorted(samples)))
 
     if os.path.isfile(regexes):
@@ -48,7 +57,10 @@ for lang in os.listdir(tx):
             data = json.load(f)
         for fid, samples in data.items():
             if samples:
-                samples = [s for s in samples if s]  # s may be None
-                with open(f"{locale}/{lang.lower()}/{fid}", "w") as f:
+                samples = [s.strip() for s in samples
+                           if s and s.strip() != "[UNUSED]"]  # s may be None
+                p = f"{locale}/{lang.lower()}/{fid.lstrip('/')}"
+                os.makedirs(dirname(p), exist_ok=True)
+                with open(p, "w") as f:
                     f.write("\n".join(sorted(samples)))
 
