@@ -22,7 +22,7 @@ class InstallError(str, enum.Enum):
 
 class SkillsStore:
     # default constraints to use if none are given
-    DEFAULT_CONSTRAINTS = '/etc/mycroft/constraints.txt'  # TODO XDG paths, keep backwards compat for now with msm/osm
+    DEFAULT_CONSTRAINTS = 'https://raw.githubusercontent.com/OpenVoiceOS/ovos-releases/refs/heads/main/constraints-stable.txt'
     PIP_LOCK = NamedLock("ovos_pip.lock")
 
     def __init__(self, bus, config=None):
@@ -56,8 +56,8 @@ class SkillsStore:
             LOG.error('Couldn\'t find the constraints file')
             self.play_error_sound()
             return False
-        elif exists(SkillsStore.DEFAULT_CONSTRAINTS):
-            constraints = SkillsStore.DEFAULT_CONSTRAINTS
+        else:
+            constraints = self.config.get("constraints", SkillsStore.DEFAULT_CONSTRAINTS)
 
         pip_args = [sys.executable, '-m', 'pip', 'install']
         if constraints:
