@@ -47,20 +47,20 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt install python3-dev swig libssl-dev portaudio19-dev libpulse-dev
-          python -m pip install build wheel
+          python -m pip install build wheel uv
       - name: Install test dependencies
         run: |
-          pip install -r requirements/tests.txt
+          uv pip install -r requirements/tests.txt
       - name: Install core repo
         run: |
-          pip install -e .[mycroft,plugins]
+          uv pip install -e .[mycroft,plugins]
       - name: Run unittests
         run: |
           pytest --cov=ovos_core --cov-report xml test/unittests
       - name: Install padatious
         run: |
           sudo apt install libfann-dev
-          pip install .[lgpl]
+          uv pip install .[lgpl]
       - name: Run unittests with padatious
         run: |
           pytest --cov-append --cov=ovos_core --cov-report xml test/unittests

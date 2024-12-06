@@ -26,12 +26,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install Build Tools
         run: |
-          python -m pip install build wheel
+          python -m pip install build wheel uv
       - name: Install System Dependencies
         run: |
           sudo apt-get update
           sudo apt install python3-dev swig libssl-dev libfann-dev portaudio19-dev libpulse-dev python3-fann2
-          python -m pip install build wheel
       - name: Build Source Packages
         run: |
           python setup.py sdist
@@ -40,4 +39,4 @@ jobs:
           python setup.py bdist_wheel
       - name: Install package
         run: |
-          pip install .[mycroft,lgpl,plugins,skills-essential,skills-extra,skills-audio,skills-gui,skills-internet,skills-media,skills-desktop]
+          uv pip install .[mycroft,lgpl,plugins,skills-essential,skills-extra,skills-audio,skills-gui,skills-internet,skills-media,skills-desktop]

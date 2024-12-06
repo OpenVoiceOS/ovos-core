@@ -19,17 +19,17 @@ jobs:
           python-version: 3.8
       - name: Install Build Tools
         run: |
-          python -m pip install build wheel
+          python -m pip install build wheel uv
       - name: Install System Dependencies
         run: |
           sudo apt-get update
           sudo apt install python3-dev swig libssl-dev libfann-dev portaudio19-dev libpulse-dev
       - name: Install core repo
         run: |
-          pip install .[mycroft,lgpl,skills-essential]
+          uv pip install .[mycroft,lgpl,skills-essential]
       - name: Get explicit and transitive dependencies
         run: |
-          pip freeze > requirements-all.txt
+          uv pip freeze > requirements-all.txt
       - name: Check python
         id: license_check_report
         uses: pilosus/action-pip-license-checker@v0.5.0
