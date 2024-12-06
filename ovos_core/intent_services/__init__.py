@@ -32,6 +32,7 @@ from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG, log_deprecation, deprecated
 from ovos_utils.metrics import Stopwatch
 from padacioso.opm import PadaciosoPipeline as PadaciosoService
+from linha_fina.opm import LinhaFinaPipeline
 
 
 class IntentService:
@@ -51,6 +52,7 @@ class IntentService:
         self._adapt_service = None
         self._padatious_service = None
         self._padacioso_service = None
+        self._lf = None
         self._fallback = None
         self._converse = None
         self._common_qa = None
@@ -88,7 +90,7 @@ class IntentService:
         if "padatious" not in self.config:
             self.config["padatious"] = Configuration().get("padatious", {})
         try:
-            if self.config["padatious"].get("disabled"):
+            if self.config["padatious"].get("disabled", True):
                 LOG.info("padatious forcefully disabled in config")
             else:
                 from ovos_padatious.opm import PadatiousPipeline
@@ -102,6 +104,7 @@ class IntentService:
         self._common_qa = CommonQAService(self.bus, self.config.get("common_query"))
         self._stop = StopService(self.bus)
         self._ocp = OCPPipelineMatcher(self.bus, config=self.config.get("OCP", {}))
+        self._lf = LinhaFinaPipeline(self.bus, config=self.config.get("linha_fina", {}))
 
     def update_skill_name_dict(self, message):
         """Messagebus handler, updates dict of id to skill name conversions."""
@@ -175,6 +178,9 @@ class IntentService:
             padatious_matcher = self._padacioso_service
         else:
             padatious_matcher = self._padatious_service
+
+        # TODO - just for testing viability of Linha Fina as Padatious replacement, remove me
+        padatious_matcher = self._lf
 
         matchers = {
             "converse": self._converse.converse_with_skills,
