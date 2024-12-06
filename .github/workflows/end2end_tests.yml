@@ -47,25 +47,25 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt install python3-dev swig libssl-dev
-          python -m pip install build wheel
+          python -m pip install build wheel uv
       - name: Install test dependencies
         run: |
-          pip install -r requirements/tests.txt
-          pip install ./test/integrationtests/common_query/ovos_tskill_fakewiki
-          pip install ./test/end2end/skill-ovos-hello-world
-          pip install ./test/end2end/skill-ovos-fallback-unknown
-          pip install ./test/end2end/skill-ovos-slow-fallback
-          pip install ./test/end2end/skill-converse_test
-          pip install ./test/end2end/skill-ovos-schedule
-          pip install ./test/end2end/skill-new-stop
-          pip install ./test/end2end/skill-old-stop
-          pip install ./test/end2end/skill-fake-fm
-          pip install ./test/end2end/skill-fake-fm-legacy
-          pip install ./test/end2end/skill-ovos-fakewiki
-          pip install ./test/end2end/metadata-test-plugin
+          uv pip install --system -r requirements/tests.txt
+          uv pip install --system ./test/integrationtests/common_query/ovos_tskill_fakewiki
+          uv pip install --system ./test/end2end/skill-ovos-hello-world
+          uv pip install --system ./test/end2end/skill-ovos-fallback-unknown
+          uv pip install --system ./test/end2end/skill-ovos-slow-fallback
+          uv pip install --system ./test/end2end/skill-converse_test
+          uv pip install --system ./test/end2end/skill-ovos-schedule
+          uv pip install --system ./test/end2end/skill-new-stop
+          uv pip install --system ./test/end2end/skill-old-stop
+          uv pip install --system ./test/end2end/skill-fake-fm
+          uv pip install --system ./test/end2end/skill-fake-fm-legacy
+          uv pip install --system ./test/end2end/skill-ovos-fakewiki
+          uv pip install --system ./test/end2end/metadata-test-plugin
       - name: Install core repo
         run: |
-          pip install -e .[plugins]
+          uv pip install --system -e .[plugins]
       - name: Run end2end tests
         run: |
           pytest --cov-append --cov=ovos_core --cov-report xml test/end2end

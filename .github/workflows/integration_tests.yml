@@ -34,14 +34,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt install python3-dev swig
-          python -m pip install build wheel
+          python -m pip install build wheel uv
       - name: Install test dependencies
         run: |
-          pip install -r requirements/tests.txt
-          pip install ./test/integrationtests/common_query/ovos_tskill_fakewiki
+          uv pip install --system -r requirements/tests.txt
+          uv pip install --system ./test/integrationtests/common_query/ovos_tskill_fakewiki
       - name: Install core repo
         run: |
-          pip install -e .[plugins]
+          uv pip install --system -e .[plugins]
       - name: Run integration tests
         run: |
           pytest test/integrationtests

@@ -33,13 +33,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt install python3-dev swig libssl-dev portaudio19-dev libpulse-dev
-          python -m pip install build wheel
+          python -m pip install build wheel uv
       - name: Install test dependencies
         run: |
-          pip install -r requirements/tests.txt
+          uv pip install --system -r requirements/tests.txt
       - name: Install core repo
         run: |
-          pip install -e .[mycroft,plugins,deprecated]
+          uv pip install --system -e .[mycroft,plugins,deprecated]
       - name: Run mycroft compat tests
         run: |
           pytest test/backwards_compat
