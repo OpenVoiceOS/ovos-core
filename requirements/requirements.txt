@@ -8,7 +8,7 @@ ovos-adapt-parser>=1.0.5, <2.0.0
 ovos_ocp_pipeline_plugin==1.0.7
 ovos-common-query-pipeline-plugin>=1.0.5, <2.0.0
 
-ovos-utils[extras]>=0.6.0a1,<1.0.0
+ovos-utils[extras]>=0.6.0,<1.0.0
 ovos_bus_client>=0.1.4,<2.0.0
 ovos-plugin-manager>=0.5.6,<1.0.0
 ovos-config>=0.0.13,<2.0.0
