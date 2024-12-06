@@ -126,6 +126,7 @@ class TestOCPPipeline(TestCase):
             "recognizer_loop:utterance",
             "ovos.common_play.status",
             "ovos.common_play.SEI.get",  # request player info
+            "ovos.common_play.SEI.get",  # (we didnt get player answer, so we try again)
             # no response
             "ovos.common_play.activate",
             "ocp:play",
@@ -142,6 +143,7 @@ class TestOCPPipeline(TestCase):
             "ovos.common_play.query.response",
             "ovos.common_play.query.response",
             "ovos.common_play.skill.search_end",
+            "ovos.common_play.SEI.get",  # request info again, cause player didnt answer before
             "ovos.common_play.search.end",
             "ovos.common_play.reset",
             
@@ -500,6 +502,10 @@ class TestOCPPipeline(TestCase):
             "ovos.common_play.reset",
             "add_context",  # NowPlaying context
             'mycroft.audio.service.play',  # LEGACY api
+            "mycroft.audio.service.queue",
+            "mycroft.audio.service.queue",
+            "mycroft.audio.service.queue",
+            "mycroft.audio.service.queue",
             "ovos.common_play.search.populate",
             "ovos.utterance.handled",  # handle_utterance returned (intent service)
         ]

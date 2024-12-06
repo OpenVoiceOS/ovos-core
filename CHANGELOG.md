@@ -1,32 +1,12 @@
 # Changelog
 
-## [0.2.21a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.21a1) (2024-12-06)
+## [0.3.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.1a1) (2024-12-06)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.20a1...0.2.21a1)
-
-**Closed issues:**
-
-- feat: constraints files [\#596](https://github.com/OpenVoiceOS/ovos-core/issues/596)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.0...0.3.1a1)
 
 **Merged pull requests:**
 
-- fix: constraints.txt from url [\#617](https://github.com/OpenVoiceOS/ovos-core/pull/617) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.2.20a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.20a1) (2024-12-06)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.19a1...0.2.20a1)
-
-**Merged pull requests:**
-
-- fix:bracket\_expansion [\#618](https://github.com/OpenVoiceOS/ovos-core/pull/618) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.2.19a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.19a1) (2024-12-06)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.18...0.2.19a1)
-
-**Merged pull requests:**
-
-- refactor:use uv to speedup workflows [\#619](https://github.com/OpenVoiceOS/ovos-core/pull/619) ([JarbasAl](https://github.com/JarbasAl))
+- fix:ocp-pipeline\>=1.0.8 [\#621](https://github.com/OpenVoiceOS/ovos-core/pull/621) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
