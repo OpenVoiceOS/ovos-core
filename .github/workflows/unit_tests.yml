@@ -50,17 +50,17 @@ jobs:
           python -m pip install build wheel uv
       - name: Install test dependencies
         run: |
-          uv pip install -r requirements/tests.txt
+          uv pip install --system -r requirements/tests.txt
       - name: Install core repo
         run: |
-          uv pip install -e .[mycroft,plugins]
+          uv pip install --system -e .[mycroft,plugins]
       - name: Run unittests
         run: |
           pytest --cov=ovos_core --cov-report xml test/unittests
       - name: Install padatious
         run: |
           sudo apt install libfann-dev
-          uv pip install .[lgpl]
+          uv pip install --system .[lgpl]
       - name: Run unittests with padatious
         run: |
           pytest --cov-append --cov=ovos_core --cov-report xml test/unittests

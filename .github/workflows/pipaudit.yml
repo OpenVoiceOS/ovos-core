@@ -28,7 +28,7 @@ jobs:
           sudo apt install python3-dev swig libssl-dev
       - name: Install package
         run: |
-          uv pip install .[skills-essential]
+          uv pip install --system .[skills-essential]
       - uses: pypa/gh-action-pip-audit@v1.0.0
         with:
           # Ignore setuptools vulnerability we can't do much about

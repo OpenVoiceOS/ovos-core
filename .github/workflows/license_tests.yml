@@ -26,7 +26,7 @@ jobs:
           sudo apt install python3-dev swig libssl-dev libfann-dev portaudio19-dev libpulse-dev
       - name: Install core repo
         run: |
-          uv pip install .[mycroft,lgpl,skills-essential]
+          uv pip install --system .[mycroft,lgpl,skills-essential]
       - name: Get explicit and transitive dependencies
         run: |
           uv pip freeze > requirements-all.txt

@@ -37,11 +37,11 @@ jobs:
           python -m pip install build wheel uv
       - name: Install test dependencies
         run: |
-          uv pip install -r requirements/tests.txt
-          uv pip install ./test/integrationtests/common_query/ovos_tskill_fakewiki
+          uv pip install --system -r requirements/tests.txt
+          uv pip install --system ./test/integrationtests/common_query/ovos_tskill_fakewiki
       - name: Install core repo
         run: |
-          uv pip install -e .[plugins]
+          uv pip install --system -e .[plugins]
       - name: Run integration tests
         run: |
           pytest test/integrationtests

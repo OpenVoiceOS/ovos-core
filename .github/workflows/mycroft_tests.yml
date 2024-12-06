@@ -36,10 +36,10 @@ jobs:
           python -m pip install build wheel uv
       - name: Install test dependencies
         run: |
-          uv pip install -r requirements/tests.txt
+          uv pip install --system -r requirements/tests.txt
       - name: Install core repo
         run: |
-          uv pip install -e .[mycroft,plugins,deprecated]
+          uv pip install --system -e .[mycroft,plugins,deprecated]
       - name: Run mycroft compat tests
         run: |
           pytest test/backwards_compat
