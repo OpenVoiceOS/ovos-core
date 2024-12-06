@@ -1,4 +1,5 @@
 import enum
+import shutil
 import sys
 from importlib import reload
 from os.path import exists
@@ -21,11 +22,11 @@ class InstallError(str, enum.Enum):
     NO_PKGS = "no packages to install"
 
 
-# TODO - use uv pip if available, speeds things up a lot and is the default in raspOVOS
 class SkillsStore:
     # default constraints to use if none are given
     DEFAULT_CONSTRAINTS = 'https://raw.githubusercontent.com/OpenVoiceOS/ovos-releases/refs/heads/main/constraints-stable.txt'
     PIP_LOCK = NamedLock("ovos_pip.lock")
+    UV = shutil.which("uv")  # use 'uv pip' if available, speeds things up a lot and is the default in raspOVOS
 
     def __init__(self, bus, config=None):
         self.config = config or Configuration().get("skills", {}).get("installer", {})
@@ -82,7 +83,10 @@ class SkillsStore:
             self.play_error_sound()
             return False
 
-        pip_args = [sys.executable, '-m', 'pip', 'install']
+        if self.UV is not None:
+            pip_args = [self.UV, 'pip', 'install']
+        else:
+            pip_args = [sys.executable, '-m', 'pip', 'install']
         if constraints:
             pip_args += ['-c', constraints]
         if self.config.get("break_system_packages", False):
@@ -151,7 +155,10 @@ class SkillsStore:
             self.play_error_sound()
             return False
 
-        pip_args = [sys.executable, '-m', 'pip', 'uninstall', '-y']
+        if self.UV is not None:
+            pip_args = [self.UV, 'pip', 'uninstall']
+        else:
+            pip_args = [sys.executable, '-m', 'pip', 'uninstall', '-y']
         if self.config.get("break_system_packages", False):
             pip_args += ["--break-system-packages"]
 
