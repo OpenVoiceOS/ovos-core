@@ -21,6 +21,7 @@ class InstallError(str, enum.Enum):
     NO_PKGS = "no packages to install"
 
 
+# TODO - use uv pip if available, speeds things up a lot and is the default in raspOVOS
 class SkillsStore:
     # default constraints to use if none are given
     DEFAULT_CONSTRAINTS = 'https://raw.githubusercontent.com/OpenVoiceOS/ovos-releases/refs/heads/main/constraints-stable.txt'
@@ -45,6 +46,27 @@ class SkillsStore:
         snd = self.config.get("sounds", {}).get("pip_success", "snd/acknowledge.mp3")
         self.bus.emit(Message("mycroft.audio.play_sound", {"uri": snd}))
 
+    @staticmethod
+    def validate_constrainsts(constraints: str):
+        if constraints.startswith('http'):
+            LOG.debug(f"Constraints url: {constraints}")
+            try:
+                response = requests.head(constraints)
+                if response.status_code != 200:
+                    LOG.error(f'Remote constraints file not accessible: {response.status_code}')
+                    return False
+                return True
+            except Exception as e:
+                LOG.error(f'Error accessing remote constraints: {str(e)}')
+                return False
+
+        # Use constraints to limit the installed versions
+        if not exists(constraints):
+            LOG.error('Couldn\'t find the constraints file')
+            return False
+
+        return True
+
     def pip_install(self, packages: list,
                     constraints: Optional[str] = None,
                     print_logs: bool = True):
@@ -53,27 +75,12 @@ class SkillsStore:
             self.play_error_sound()
             return False
 
-        # Use constraints to limit the installed versions
-        if constraints and not exists(constraints):
-            LOG.error('Couldn\'t find the constraints file')
+        # can be set in mycroft.conf to change to testing/alpha channels
+        constraints = constraints or self.config.get("constraints", SkillsStore.DEFAULT_CONSTRAINTS)
+
+        if not self.validate_constrainsts(constraints):
             self.play_error_sound()
             return False
-        else:
-            # can be set in mycroft.conf to change to testing/alpha channels
-            constraints = self.config.get("constraints", SkillsStore.DEFAULT_CONSTRAINTS)
-
-        if constraints.startswith('http'):
-            LOG.debug(f"Constraints url: {constraints}")
-            try:
-                response = requests.head(constraints)
-                if response.status_code != 200:
-                    LOG.error(f'Remote constraints file not accessible: {response.status_code}')
-                    self.play_error_sound()
-                    return False
-            except Exception as e:
-                LOG.error(f'Error accessing remote constraints: {str(e)}')
-                self.play_error_sound()
-                return False
 
         pip_args = [sys.executable, '-m', 'pip', 'install']
         if constraints:
@@ -117,25 +124,29 @@ class SkillsStore:
             self.play_error_sound()
             return False
 
-        # Use constraints to limit package removal
-        if constraints and not exists(constraints):
-            LOG.error('Couldn\'t find the constraints file')
+        # can be set in mycroft.conf to change to testing/alpha channels
+        constraints = constraints or self.config.get("constraints", SkillsStore.DEFAULT_CONSTRAINTS)
+
+        if not self.validate_constrainsts(constraints):
             self.play_error_sound()
             return False
-        elif exists(SkillsStore.DEFAULT_CONSTRAINTS):
-            constraints = SkillsStore.DEFAULT_CONSTRAINTS
 
-        if constraints:
+        # get protected packages that can't be uninstalled
+        # by default cant uninstall any official ovos package via this bus api
+        if constraints.startswith("http"):
+            cpkgs = requests.get(constraints).text.split("\n")
+        elif exists(constraints):
             with open(constraints) as f:
-                # remove version pinning and normalize _ to - (pip accepts both)
-                cpkgs = [p.split("~")[0].split("<")[0].split(">")[0].split("=")[0].replace("_", "-")
-                         for p in f.read().split("\n") if p.strip()]
+                cpkgs = f.read().split("\n")
         else:
             cpkgs = ["ovos-core", "ovos-utils", "ovos-plugin-manager",
                      "ovos-config", "ovos-bus-client", "ovos-workshop"]
 
-        # normalize _ to - (pip accepts both)
-        if any(p.replace("_", "-") in cpkgs for p in packages):
+        # remove version pinning and normalize _ to - (pip accepts both)
+        cpkgs = [p.split("~")[0].split("<")[0].split(">")[0].split("=")[0].replace("_", "-")
+                 for p in cpkgs]
+
+        if any(p in cpkgs for p in packages):
             LOG.error(f'tried to uninstall a protected package: {cpkgs}')
             self.play_error_sound()
             return False
@@ -168,7 +179,8 @@ class SkillsStore:
         self.play_success_sound()
         return True
 
-    def validate_skill(self, url):
+    @staticmethod
+    def validate_skill(url):
         if not url.startswith("https://github.com/"):
             return False
         # TODO - check if setup.py
