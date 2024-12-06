@@ -1,20 +1,32 @@
 # Changelog
 
-## [0.2.18a2](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.18a2) (2024-12-02)
+## [0.2.21a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.21a1) (2024-12-06)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.18a1...0.2.18a2)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.20a1...0.2.21a1)
 
-**Merged pull requests:**
+**Closed issues:**
 
-- import basque translations [\#615](https://github.com/OpenVoiceOS/ovos-core/pull/615) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.2.18a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.18a1) (2024-12-02)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.17...0.2.18a1)
+- feat: constraints files [\#596](https://github.com/OpenVoiceOS/ovos-core/issues/596)
 
 **Merged pull requests:**
 
-- import galician translations [\#613](https://github.com/OpenVoiceOS/ovos-core/pull/613) ([JarbasAl](https://github.com/JarbasAl))
+- fix: constraints.txt from url [\#617](https://github.com/OpenVoiceOS/ovos-core/pull/617) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.2.20a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.20a1) (2024-12-06)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.19a1...0.2.20a1)
+
+**Merged pull requests:**
+
+- fix:bracket\_expansion [\#618](https://github.com/OpenVoiceOS/ovos-core/pull/618) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.2.19a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.19a1) (2024-12-06)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.18...0.2.19a1)
+
+**Merged pull requests:**
+
+- refactor:use uv to speedup workflows [\#619](https://github.com/OpenVoiceOS/ovos-core/pull/619) ([JarbasAl](https://github.com/JarbasAl))
 
 
 

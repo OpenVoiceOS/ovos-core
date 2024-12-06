@@ -11,7 +11,7 @@ from ovos_bus_client.session import SessionManager
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import PipelineMatch, PipelinePlugin
 from ovos_utils import flatten_list
-from ovos_utils.bracket_expansion import expand_options
+from ovos_utils.bracket_expansion import expand_template
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
 from ovos_utils.parse import match_one
@@ -33,7 +33,7 @@ class StopService(PipelinePlugin):
             self._voc_cache[lang2] = {}
             for f in os.listdir(f"{base}/{lang}"):
                 with open(f"{base}/{lang}/{f}", encoding="utf-8") as fi:
-                    lines = [expand_options(l) for l in fi.read().split("\n")
+                    lines = [expand_template(l) for l in fi.read().split("\n")
                              if l.strip() and not l.startswith("#")]
                     n = f.split(".", 1)[0]
                     self._voc_cache[lang2][n] = flatten_list(lines)
