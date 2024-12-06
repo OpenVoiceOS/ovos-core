@@ -5,11 +5,12 @@ from os.path import exists
 from subprocess import Popen, PIPE
 from typing import Optional
 
+import requests
 from combo_lock import NamedLock
-from ovos_config.config import Configuration
 
 import ovos_plugin_manager
 from ovos_bus_client import Message
+from ovos_config.config import Configuration
 from ovos_utils.log import LOG
 
 
@@ -53,9 +54,22 @@ class SkillsStore:
             return False
         # Use constraints to limit the installed versions
         if constraints and not exists(constraints):
-            LOG.error('Couldn\'t find the constraints file')
-            self.play_error_sound()
-            return False
+            if constraints.startswith('http'):
+                LOG.debug(f"Constraints url: {constraints}")
+                try:
+                    response = requests.head(constraints)
+                    if response.status_code != 200:
+                        LOG.error(f'Remote constraints file not accessible: {response.status_code}')
+                        self.play_error_sound()
+                        return False
+                except Exception as e:
+                    LOG.error(f'Error accessing remote constraints: {str(e)}')
+                    self.play_error_sound()
+                    return False
+            else:
+                LOG.error('Couldn\'t find the constraints file')
+                self.play_error_sound()
+                return False
         else:
             constraints = self.config.get("constraints", SkillsStore.DEFAULT_CONSTRAINTS)
 
