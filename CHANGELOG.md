@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.21a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.21a1) (2024-12-06)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.20a1...0.2.21a1)
+
+**Closed issues:**
+
+- feat: constraints files [\#596](https://github.com/OpenVoiceOS/ovos-core/issues/596)
+
+**Merged pull requests:**
+
+- fix: constraints.txt from url [\#617](https://github.com/OpenVoiceOS/ovos-core/pull/617) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.2.20a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.20a1) (2024-12-06)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.19a1...0.2.20a1)
