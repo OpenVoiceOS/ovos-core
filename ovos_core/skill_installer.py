@@ -52,26 +52,28 @@ class SkillsStore:
             LOG.error("no package list provided to install")
             self.play_error_sound()
             return False
+
         # Use constraints to limit the installed versions
         if constraints and not exists(constraints):
-            if constraints.startswith('http'):
-                LOG.debug(f"Constraints url: {constraints}")
-                try:
-                    response = requests.head(constraints)
-                    if response.status_code != 200:
-                        LOG.error(f'Remote constraints file not accessible: {response.status_code}')
-                        self.play_error_sound()
-                        return False
-                except Exception as e:
-                    LOG.error(f'Error accessing remote constraints: {str(e)}')
+            LOG.error('Couldn\'t find the constraints file')
+            self.play_error_sound()
+            return False
+        else:
+            # can be set in mycroft.conf to change to testing/alpha channels
+            constraints = self.config.get("constraints", SkillsStore.DEFAULT_CONSTRAINTS)
+
+        if constraints.startswith('http'):
+            LOG.debug(f"Constraints url: {constraints}")
+            try:
+                response = requests.head(constraints)
+                if response.status_code != 200:
+                    LOG.error(f'Remote constraints file not accessible: {response.status_code}')
                     self.play_error_sound()
                     return False
-            else:
-                LOG.error('Couldn\'t find the constraints file')
+            except Exception as e:
+                LOG.error(f'Error accessing remote constraints: {str(e)}')
                 self.play_error_sound()
                 return False
-        else:
-            constraints = self.config.get("constraints", SkillsStore.DEFAULT_CONSTRAINTS)
 
         pip_args = [sys.executable, '-m', 'pip', 'install']
         if constraints:
