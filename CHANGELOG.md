@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.20a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.20a1) (2024-12-06)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.19a1...0.2.20a1)
+
+**Merged pull requests:**
+
+- fix:bracket\_expansion [\#618](https://github.com/OpenVoiceOS/ovos-core/pull/618) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.2.19a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.2.19a1) (2024-12-06)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.2.18...0.2.19a1)
