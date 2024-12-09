@@ -92,6 +92,8 @@ class IntentService:
                 LOG.info("padatious forcefully disabled in config")
             else:
                 from ovos_padatious.opm import PadatiousPipeline
+                # TODO - read from config once default value has been added to ovos-config
+                self.config["padatious"]["instant_train"] = False
                 self._padatious_service = PadatiousPipeline(self.bus, self.config["padatious"])
         except ImportError:
             LOG.error(f'Failed to create padatious intent handlers, padatious not installed')
