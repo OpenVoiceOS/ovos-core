@@ -16,7 +16,6 @@
 import os
 from os.path import basename
 from threading import Thread, Event, Lock
-
 from time import monotonic
 
 from ovos_bus_client.apis.enclosure import EnclosureAPI
@@ -118,8 +117,9 @@ class SkillManager(Thread):
         self._logged_skill_warnings = list()
         self._detected_installed_skills = bool(find_skill_plugins())
         if not self._detected_installed_skills:
-            LOG.warning("No installed skills detected! if you are running skills in standalone mode ignore this warning,"
-                        " otherwise you probably want to install skills first!")
+            LOG.warning(
+                "No installed skills detected! if you are running skills in standalone mode ignore this warning,"
+                " otherwise you probably want to install skills first!")
 
         self.config = Configuration()
 
@@ -517,17 +517,15 @@ class SkillManager(Thread):
         if loaded_new:
             LOG.info("Requesting padatious intent training")
             try:
-                response = self.bus.wait_for_response(Message("padatious:train"),
-                                                "mycroft.skills.trained",
-                                                timeout=60)  # 60 second timeout
+                response = self.bus.wait_for_response(Message("mycroft.skills.train"),
+                                                      "mycroft.skills.trained",
+                                                      timeout=60)  # 60 second timeout
                 if not response:
                     LOG.error("Padatious training timed out")
                 elif response.data.get('error'):
                     LOG.error(f"Padatious training failed: {response.data['error']}")
             except Exception as e:
                 LOG.exception(f"Error during padatious training: {e}")
-        else:
-            LOG.debug("Nothing new to train")
 
     def _get_skill_loader(self, skill_directory, init_bus=True):
         """Get a skill loader instance.
