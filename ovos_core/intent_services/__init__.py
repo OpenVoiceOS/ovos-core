@@ -15,14 +15,16 @@
 from collections import defaultdict
 from typing import Tuple, Callable, Union
 
-from ocp_pipeline.opm import OCPPipelineMatcher
 from ovos_adapt.opm import AdaptPipeline
+from ovos_commonqa.opm import CommonQAService
+from padacioso.opm import PadaciosoPipeline as PadaciosoService
+
+from ocp_pipeline.opm import OCPPipelineMatcher
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
-from ovos_commonqa.opm import CommonQAService
 from ovos_config.config import Configuration
-from ovos_config.locale import setup_locale, get_valid_languages
+from ovos_config.locale import get_valid_languages
 from ovos_core.intent_services.converse_service import ConverseService
 from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.stop_service import StopService
@@ -31,7 +33,6 @@ from ovos_plugin_manager.templates.pipeline import PipelineMatch, IntentHandlerM
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG, log_deprecation, deprecated
 from ovos_utils.metrics import Stopwatch
-from padacioso.opm import PadaciosoPipeline as PadaciosoService
 
 
 class IntentService:
@@ -92,8 +93,8 @@ class IntentService:
                 LOG.info("padatious forcefully disabled in config")
             else:
                 from ovos_padatious.opm import PadatiousPipeline
-                # TODO - read from config once default value has been added to ovos-config
-                self.config["padatious"]["instant_train"] = False
+                if "instant_train" not in self.config["padatious"]:
+                    self.config["padatious"]["instant_train"] = False
                 self._padatious_service = PadatiousPipeline(self.bus, self.config["padatious"])
         except ImportError:
             LOG.error(f'Failed to create padatious intent handlers, padatious not installed')
