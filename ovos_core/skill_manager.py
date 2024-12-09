@@ -16,7 +16,6 @@
 import os
 from os.path import basename
 from threading import Thread, Event, Lock
-
 from time import monotonic
 
 from ovos_bus_client.apis.enclosure import EnclosureAPI
@@ -118,8 +117,9 @@ class SkillManager(Thread):
         self._logged_skill_warnings = list()
         self._detected_installed_skills = bool(find_skill_plugins())
         if not self._detected_installed_skills:
-            LOG.warning("No installed skills detected! if you are running skills in standalone mode ignore this warning,"
-                        " otherwise you probably want to install skills first!")
+            LOG.warning(
+                "No installed skills detected! if you are running skills in standalone mode ignore this warning,"
+                " otherwise you probably want to install skills first!")
 
         self.config = Configuration()
 
@@ -288,6 +288,7 @@ class SkillManager(Thread):
             network (bool): Network connection status.
             internet (bool): Internet connection status.
         """
+        loaded_new = False
         if network is None:
             network = self._network_event.is_set()
         if internet is None:
@@ -310,6 +311,8 @@ class SkillManager(Thread):
                 if not internet and requirements.internet_before_load:
                     continue
                 self._load_plugin_skill(skill_id, plug)
+                loaded_new = True
+        return loaded_new
 
     def _get_internal_skill_bus(self):
         """Get a dedicated skill bus connection per skill.
@@ -477,7 +480,7 @@ class SkillManager(Thread):
         # There is a possible race condition where this handler would be executing several times otherwise.
         with self._lock:
 
-            self.load_plugin_skills(network=network, internet=internet)
+            loaded_new = self.load_plugin_skills(network=network, internet=internet)
 
             for skill_dir in self._get_skill_directories():
                 replaced_skills = []
@@ -509,6 +512,20 @@ class SkillManager(Thread):
 
                 if skill_dir not in self.skill_loaders:
                     self._load_skill(skill_dir)
+                    loaded_new = True
+
+        if loaded_new:
+            LOG.info("Requesting padatious intent training")
+            try:
+                response = self.bus.wait_for_response(Message("mycroft.skills.train"),
+                                                      "mycroft.skills.trained",
+                                                      timeout=60)  # 60 second timeout
+                if not response:
+                    LOG.error("Padatious training timed out")
+                elif response.data.get('error'):
+                    LOG.error(f"Padatious training failed: {response.data['error']}")
+            except Exception as e:
+                LOG.exception(f"Error during padatious training: {e}")
 
     def _get_skill_loader(self, skill_directory, init_bus=True):
         """Get a skill loader instance.
