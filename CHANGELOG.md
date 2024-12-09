@@ -1,12 +1,12 @@
 # Changelog
 
-## [0.3.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.2a1) (2024-12-06)
+## [0.3.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.3a1) (2024-12-09)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.1...0.3.2a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.2...0.3.3a1)
 
 **Merged pull requests:**
 
-- fix: pull padatious fixes from ovos-padatious-pipeline-plugin/pul/l26 [\#625](https://github.com/OpenVoiceOS/ovos-core/pull/625) ([JarbasAl](https://github.com/JarbasAl))
+- fix: runtime requirements [\#628](https://github.com/OpenVoiceOS/ovos-core/pull/628) ([JarbasAl](https://github.com/JarbasAl))
 
 
 

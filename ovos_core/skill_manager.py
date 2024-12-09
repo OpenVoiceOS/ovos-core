@@ -302,7 +302,8 @@ class SkillManager(Thread):
                     LOG.info(f"Consider uninstalling {skill_id} instead of blacklisting it")
                 continue
             if skill_id not in self.plugin_skills and skill_id not in loaded_skill_ids:
-                skill_loader = self._get_plugin_skill_loader(skill_id, init_bus=False)
+                skill_loader = self._get_plugin_skill_loader(skill_id, init_bus=False,
+                                                             skill_class=plug)
                 requirements = skill_loader.runtime_requirements
                 if not network and requirements.network_before_load:
                     continue
@@ -327,7 +328,7 @@ class SkillManager(Thread):
             bus = self.bus
         return bus
 
-    def _get_plugin_skill_loader(self, skill_id, init_bus=True):
+    def _get_plugin_skill_loader(self, skill_id, init_bus=True, skill_class=None):
         """Get a plugin skill loader.
 
         Args:
@@ -340,7 +341,10 @@ class SkillManager(Thread):
         bus = None
         if init_bus:
             bus = self._get_internal_skill_bus()
-        return PluginSkillLoader(bus, skill_id)
+        loader = PluginSkillLoader(bus, skill_id)
+        if skill_class:
+            loader.skill_class = skill_class
+        return loader
 
     def _load_plugin_skill(self, skill_id, skill_plugin):
         """Load a plugin skill.
@@ -352,7 +356,7 @@ class SkillManager(Thread):
         Returns:
             PluginSkillLoader: Loaded plugin skill loader instance if successful, None otherwise.
         """
-        skill_loader = self._get_plugin_skill_loader(skill_id)
+        skill_loader = self._get_plugin_skill_loader(skill_id, skill_class=skill_plugin)
         try:
             load_status = skill_loader.load(skill_plugin)
         except Exception:
