@@ -208,7 +208,7 @@ class IntentService:
                 "padacioso_low": self._padacioso_service.match_low,
 
             })
-        if self._padatious_service is not None:
+        if padatious_matcher is not None:
             matchers.update({
                 "padatious_high": padatious_matcher.match_high,
                 "padatious_medium": padatious_matcher.match_medium,
