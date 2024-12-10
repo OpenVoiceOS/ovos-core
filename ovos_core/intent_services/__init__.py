@@ -180,11 +180,14 @@ class IntentService:
         # TODO - from plugins
         padatious_matcher = None
         if self._padatious_service is None:
+            needs_pada = any("padatious" in p for p in session.pipeline)
             if self._padacioso_service is not None:
-                if any("padatious" in p for p in session.pipeline):
+                if needs_pada:
                     LOG.warning("padatious is not available! using padacioso in it's place, "
                                 "intent matching will be extremely slow in comparison")
                 padatious_matcher = self._padacioso_service
+            elif needs_pada:
+                LOG.warning("padatious is not available! only adapt (keyword based) intents will match!")
         else:
             padatious_matcher = self._padatious_service
 
