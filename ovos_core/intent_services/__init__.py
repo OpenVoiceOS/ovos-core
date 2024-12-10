@@ -99,7 +99,14 @@ class IntentService:
         except ImportError:
             LOG.error(f'Failed to create padatious intent handlers, padatious not installed')
 
-        self._padacioso_service = PadaciosoService(self.bus, self.config["padatious"])
+        # by default only load padacioso is padatious is not available
+        # save memory if padacioso isnt needed
+        disable_padacioso = self.config.get("disable_padacioso", self._padatious_service is not None)
+        if not disable_padacioso:
+            self._padacioso_service = PadaciosoService(self.bus, self.config["padatious"])
+        elif "disable_padacioso" not in self.config:
+            LOG.debug("Padacioso pipeline is disabled, only padatious is loaded. "
+                      "set 'disable_padacioso': false in mycroft.conf if you want it to load alongside padatious")
         self._fallback = FallbackService(self.bus)
         self._converse = ConverseService(self.bus)
         self._common_qa = CommonQAService(self.bus, self.config.get("common_query"))
@@ -171,11 +178,16 @@ class IntentService:
 
         # Create matchers
         # TODO - from plugins
+        padatious_matcher = None
         if self._padatious_service is None:
-            if any("padatious" in p for p in session.pipeline):
-                LOG.warning("padatious is not available! using padacioso in it's place, "
-                            "intent matching will be extremely slow in comparison")
-            padatious_matcher = self._padacioso_service
+            needs_pada = any("padatious" in p for p in session.pipeline)
+            if self._padacioso_service is not None:
+                if needs_pada:
+                    LOG.warning("padatious is not available! using padacioso in it's place, "
+                                "intent matching will be extremely slow in comparison")
+                padatious_matcher = self._padacioso_service
+            elif needs_pada:
+                LOG.warning("padatious is not available! only adapt (keyword based) intents will match!")
         else:
             padatious_matcher = self._padatious_service
 
@@ -184,20 +196,28 @@ class IntentService:
             "stop_high": self._stop.match_stop_high,
             "stop_medium": self._stop.match_stop_medium,
             "stop_low": self._stop.match_stop_low,
-            "padatious_high": padatious_matcher.match_high,
-            "padacioso_high": self._padacioso_service.match_high,
             "adapt_high": self._adapt_service.match_high,
             "common_qa": self._common_qa.match,
             "fallback_high": self._fallback.high_prio,
-            "padatious_medium": padatious_matcher.match_medium,
-            "padacioso_medium": self._padacioso_service.match_medium,
             "adapt_medium": self._adapt_service.match_medium,
             "fallback_medium": self._fallback.medium_prio,
-            "padatious_low": padatious_matcher.match_low,
-            "padacioso_low": self._padacioso_service.match_low,
             "adapt_low": self._adapt_service.match_low,
             "fallback_low": self._fallback.low_prio
         }
+        if self._padacioso_service is not None:
+            matchers.update({
+                "padacioso_high": self._padacioso_service.match_high,
+                "padacioso_medium": self._padacioso_service.match_medium,
+                "padacioso_low": self._padacioso_service.match_low,
+
+            })
+        if padatious_matcher is not None:
+            matchers.update({
+                "padatious_high": padatious_matcher.match_high,
+                "padatious_medium": padatious_matcher.match_medium,
+                "padatious_low": padatious_matcher.match_low,
+
+            })
         if self._ocp is not None:
             matchers.update({
                 "ocp_high": self._ocp.match_high,
@@ -478,7 +498,8 @@ class IntentService:
         self.utterance_plugins.shutdown()
         self.metadata_plugins.shutdown()
         self._adapt_service.shutdown()
-        self._padacioso_service.shutdown()
+        if self._padacioso_service:
+            self._padacioso_service.shutdown()
         if self._padatious_service:
             self._padatious_service.shutdown()
         self._common_qa.shutdown()
