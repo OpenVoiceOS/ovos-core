@@ -495,7 +495,8 @@ class IntentService:
         self.utterance_plugins.shutdown()
         self.metadata_plugins.shutdown()
         self._adapt_service.shutdown()
-        self._padacioso_service.shutdown()
+        if self._padacioso_service:
+            self._padacioso_service.shutdown()
         if self._padatious_service:
             self._padatious_service.shutdown()
         self._common_qa.shutdown()
