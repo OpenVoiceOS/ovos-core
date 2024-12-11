@@ -86,27 +86,8 @@ class IntentService:
     def _load_pipeline_plugins(self):
         # TODO - replace with plugin loader from OPM
         self._adapt_service = AdaptPipeline(bus=self.bus, config=self.config.get("adapt", {}))
-        if "padatious" not in self.config:
-            self.config["padatious"] = Configuration().get("padatious", {})
-        try:
-            if self.config["padatious"].get("disabled"):
-                LOG.info("padatious forcefully disabled in config")
-            else:
-                from ovos_padatious.opm import PadatiousPipeline
-                if "instant_train" not in self.config["padatious"]:
-                    self.config["padatious"]["instant_train"] = False
-                self._padatious_service = PadatiousPipeline(self.bus, self.config["padatious"])
-        except ImportError:
-            LOG.error(f'Failed to create padatious intent handlers, padatious not installed')
-
-        # by default only load padacioso is padatious is not available
-        # save memory if padacioso isnt needed
-        disable_padacioso = self.config.get("disable_padacioso", self._padatious_service is not None)
-        if not disable_padacioso:
-            self._padacioso_service = PadaciosoService(self.bus, self.config["padatious"])
-        elif "disable_padacioso" not in self.config:
-            LOG.debug("Padacioso pipeline is disabled, only padatious is loaded. "
-                      "set 'disable_padacioso': false in mycroft.conf if you want it to load alongside padatious")
+        from nebulento.opm import NebulentoPipeline
+        self._padatious_service = NebulentoPipeline(bus=self.bus)
         self._fallback = FallbackService(self.bus)
         self._converse = ConverseService(self.bus)
         self._common_qa = CommonQAService(self.bus, self.config.get("common_query"))
