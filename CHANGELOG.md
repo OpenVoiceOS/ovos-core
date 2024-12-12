@@ -1,12 +1,12 @@
 # Changelog
 
-## [0.3.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.4a1) (2024-12-09)
+## [0.3.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.5a1) (2024-12-10)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.3...0.3.4a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.4...0.3.5a1)
 
 **Merged pull requests:**
 
-- fix:delayed\_padatious\_training [\#627](https://github.com/OpenVoiceOS/ovos-core/pull/627) ([JarbasAl](https://github.com/JarbasAl))
+- optimize: dont load padacioso if not needed by default [\#629](https://github.com/OpenVoiceOS/ovos-core/pull/629) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
