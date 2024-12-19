@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.6a2](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.6a2) (2024-12-19)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.6a1...0.3.6a2)
+
+**Merged pull requests:**
+
+- Update README.md [\#637](https://github.com/OpenVoiceOS/ovos-core/pull/637) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.3.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.6a1) (2024-12-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.5...0.3.6a1)
