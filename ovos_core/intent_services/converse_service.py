@@ -335,6 +335,7 @@ class ConverseService(PipelinePlugin):
             if skill_id in session.blacklisted_skills:
                 LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{session.session_id}'")
                 continue
+            LOG.debug(f"Attempting to converse with skill: {skill_id}")
             if self.converse(utterances, skill_id, lang, message):
                 state = session.utterance_states.get(skill_id, UtteranceState.INTENT)
                 return PipelineMatch(handled=state != UtteranceState.RESPONSE,
