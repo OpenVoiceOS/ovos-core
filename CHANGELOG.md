@@ -1,12 +1,20 @@
 # Changelog
 
-## [0.3.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.5a1) (2024-12-10)
+## [0.3.6a2](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.6a2) (2024-12-19)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.4...0.3.5a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.6a1...0.3.6a2)
 
 **Merged pull requests:**
 
-- optimize: dont load padacioso if not needed by default [\#629](https://github.com/OpenVoiceOS/ovos-core/pull/629) ([JarbasAl](https://github.com/JarbasAl))
+- Update README.md [\#637](https://github.com/OpenVoiceOS/ovos-core/pull/637) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.3.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.6a1) (2024-12-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.5...0.3.6a1)
+
+**Merged pull requests:**
+
+- Update skills-extra.txt [\#634](https://github.com/OpenVoiceOS/ovos-core/pull/634) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
