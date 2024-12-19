@@ -47,8 +47,6 @@ While some skills come pre-installed, most need to be installed explicitly.
 
 🌍 OVOS is **open source** and thrives on community contributions. Whether you're a coder, designer, or translator, there's a way to contribute!  
 
-📜 Read our [Contributing Guide](.github/CONTRIBUTING.md) to get started.  
-
 🌐 **Translate!** Help improve OVOS in your language through our [Translation Portal](https://gitlocalize.com/users/OpenVoiceOS).  
 
 🙋‍♂️ Have questions or need guidance? Say hi in the [OpenVoiceOS Chat](https://matrix.to/#/!XFpdtmgyCoPDxOMPpH:matrix.org?via=matrix.org), and a team member will be happy to mentor you.  
@@ -68,9 +66,9 @@ The OpenVoiceOS team extends gratitude to the following organizations for their 
 
 ## 🔗 Links
 
+- 🛠️ [Release Notes](https://github.com/OpenVoiceOS/ovos-releases)
 - 📘 [Technical Manual](https://openvoiceos.github.io/ovos-technical-manual)  
 - 💬 [OpenVoiceOS Chat](https://matrix.to/#/!XFpdtmgyCoPDxOMPpH:matrix.org?via=matrix.org)  
 - 🌐 [Website](https://openvoiceos.org)  
-- 🛠️ [Release Notes](https://github.com/OpenVoiceOS/ovos-core/releases)  
 - 📣 [Open Conversational AI Forums](https://community.openconversational.ai/) (previously Mycroft forums)
 ```
