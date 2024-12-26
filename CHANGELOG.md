@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.7a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.7a1) (2024-12-26)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.6a2...0.3.7a1)
+
+**Merged pull requests:**
+
+- Update skills-extra.txt [\#639](https://github.com/OpenVoiceOS/ovos-core/pull/639) ([JarbasAl](https://github.com/JarbasAl))
+- fix: logs and pipeline query api [\#636](https://github.com/OpenVoiceOS/ovos-core/pull/636) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.3.6a2](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.6a2) (2024-12-19)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.6a1...0.3.6a2)
