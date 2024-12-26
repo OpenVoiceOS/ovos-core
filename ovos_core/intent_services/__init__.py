@@ -17,7 +17,6 @@ from typing import Tuple, Callable, Union
 
 from ovos_adapt.opm import AdaptPipeline
 from ovos_commonqa.opm import CommonQAService
-from padacioso.opm import PadaciosoPipeline as PadaciosoService
 
 from ocp_pipeline.opm import OCPPipelineMatcher
 from ovos_bus_client.message import Message
@@ -33,6 +32,7 @@ from ovos_plugin_manager.templates.pipeline import PipelineMatch, IntentHandlerM
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG, log_deprecation, deprecated
 from ovos_utils.metrics import Stopwatch
+from padacioso.opm import PadaciosoPipeline as PadaciosoService
 
 
 class IntentService:
@@ -355,6 +355,7 @@ class IntentService:
         lang = self.disambiguate_lang(message)
 
         utterances = message.data.get('utterances', [])
+        LOG.info(f"Parsing utterance: {utterances}")
 
         stopwatch = Stopwatch()
 
@@ -465,6 +466,7 @@ class IntentService:
 
         # Loop through the matching functions until a match is found.
         for pipeline, match_func in self.get_pipeline(skips=["converse",
+                                                             "common_qa",
                                                              "fallback_high",
                                                              "fallback_medium",
                                                              "fallback_low"],
