@@ -36,3 +36,11 @@ LOG.init(_logs_conf)  # read log level from config
 
 LOG.warning("mycroft has been deprecated! please start importing from ovos_core and companion packages\n"
             "mycroft module remains available for backwards compatibility and will be removed in version 0.2.0")
+
+import warnings
+
+warnings.warn(
+    "'mycroft' has been deprecated! please start importing from 'ovos_core' and companion packages",
+    DeprecationWarning,
+    stacklevel=2,
+)
