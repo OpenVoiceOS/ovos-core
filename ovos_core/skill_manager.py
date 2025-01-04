@@ -32,6 +32,7 @@ from ovos_utils.network_utils import is_connected_http
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap, ProcessState
 from ovos_workshop.skill_launcher import SKILL_MAIN_MODULE
 from ovos_workshop.skill_launcher import SkillLoader, PluginSkillLoader
+import warnings
 
 
 def _shutdown_skill(instance):
@@ -738,7 +739,11 @@ class SkillManager(Thread):
     # Deprecated stuff
     @deprecated("priority skills have been deprecated for a long time", "1.0.0")
     def load_priority(self):
-        pass
+        warnings.warn(
+            "priority skills have been deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     @deprecated("mycroft.ready event has moved to finished booting skill", "1.0.0")
     def is_device_ready(self):
@@ -749,11 +754,20 @@ class SkillManager(Thread):
         Raises:
             TimeoutError: If the device is not ready within a specified timeout.
         """
+        warnings.warn(
+            "mycroft.ready event has moved to finished booting skill",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return True
 
     @deprecated("mycroft.ready event has moved to finished booting skill", "1.0.0")
     def handle_check_device_readiness(self, message):
-        pass
+        warnings.warn(
+            "mycroft.ready event has moved to finished booting skill",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     @deprecated("mycroft.ready event has moved to finished booting skill", "1.0.0")
     def check_services_ready(self, services):
@@ -764,4 +778,9 @@ class SkillManager(Thread):
         Returns:
             bool: True if all specified services are ready, False otherwise.
         """
+        warnings.warn(
+            "mycroft.ready event has moved to finished booting skill",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return True
