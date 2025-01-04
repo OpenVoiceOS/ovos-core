@@ -1,8 +1,20 @@
 # Changelog
 
+## [0.3.7a2](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.7a2) (2025-01-04)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.7a1...0.3.7a2)
+
+**Merged pull requests:**
+
+- chore: add warnings [\#641](https://github.com/OpenVoiceOS/ovos-core/pull/641) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.3.7a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.7a1) (2024-12-26)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.6a2...0.3.7a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.6a3...0.3.7a1)
+
+## [0.3.6a3](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.6a3) (2024-12-26)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.6a2...0.3.6a3)
 
 **Merged pull requests:**
 
