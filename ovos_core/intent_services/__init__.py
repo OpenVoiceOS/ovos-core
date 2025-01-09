@@ -268,12 +268,31 @@ class IntentService:
         self._deactivations[sess.session_id].append(skill_id)
 
     def _emit_match_message(self, match: Union[IntentHandlerMatch, PipelineMatch], message: Message):
-        """Update the message data with the matched utterance information and
-        activate the corresponding skill if available.
-
+        """
+        Emit a reply message for a matched intent, updating session and skill activation.
+        
+        This method processes matched intents from either a pipeline matcher or an intent handler,
+        creating a reply message with matched intent details and managing skill activation.
+        
         Args:
-            match (IntentHandlerMatch): The matched utterance object.
-            message (Message): The messagebus data.
+            match (Union[IntentHandlerMatch, PipelineMatch]): The matched intent object containing
+                utterance and matching information.
+            message (Message): The original messagebus message that triggered the intent match.
+        
+        Details:
+            - Handles two types of matches: PipelineMatch and IntentHandlerMatch
+            - Creates a reply message with matched intent data
+            - Activates the corresponding skill if not previously deactivated
+            - Updates session information
+            - Emits the reply message on the messagebus
+        
+        Side Effects:
+            - Modifies session state
+            - Emits a messagebus event
+            - Can trigger skill activation events
+        
+        Returns:
+            None
         """
         reply = None
         sess = match.updated_session or SessionManager.get(message)
@@ -313,6 +332,24 @@ class IntentService:
             self.bus.emit(reply)
 
     def send_cancel_event(self, message):
+        """
+        Emit events and play a sound when an utterance is canceled.
+        
+        Logs the cancellation with the specific cancel word, plays a predefined cancel sound,
+        and emits multiple events to signal the utterance cancellation.
+        
+        Parameters:
+            message (Message): The original message that triggered the cancellation.
+        
+        Events Emitted:
+            - 'mycroft.audio.play_sound': Plays a cancel sound from configuration
+            - 'ovos.utterance.cancelled': Signals that the utterance was canceled
+            - 'ovos.utterance.handled': Indicates the utterance processing is complete
+        
+        Notes:
+            - Uses the default cancel sound path 'snd/cancel.mp3' if not specified in configuration
+            - Ensures events are sent as replies to the original message
+        """
         LOG.info("utterance canceled, cancel_word:" + message.context.get("cancel_word"))
         # play dedicated cancel sound
         sound = Configuration().get('sounds', {}).get('cancel', "snd/cancel.mp3")
