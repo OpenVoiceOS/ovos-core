@@ -313,15 +313,29 @@ class ConverseService(PipelinePlugin):
         return False
 
     def converse_with_skills(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
-        """Give active skills a chance at the utterance
-
+        """
+        Attempt to converse with active skills for a given set of utterances.
+        
+        Iterates through active skills to find one that can handle the utterance. Filters skills based on timeout and blacklist status.
+        
         Args:
-            utterances (list):  list of utterances
-            lang (string):      4 letter ISO language code
-            message (Message):  message to use to generate reply
-
+            utterances (List[str]): List of utterance strings to process
+            lang (str): 4-letter ISO language code for the utterances
+            message (Message): Message context for generating a reply
+        
         Returns:
-            IntentMatch if handled otherwise None.
+            PipelineMatch: Match details if a skill successfully handles the utterance, otherwise None
+            - handled (bool): Whether the utterance was fully handled
+            - match_data (dict): Additional match metadata
+            - skill_id (str): ID of the skill that handled the utterance
+            - updated_session (Session): Current session state after skill interaction
+            - utterance (str): The original utterance processed
+        
+        Notes:
+            - Standardizes language tag
+            - Filters out blacklisted skills
+            - Checks for skill conversation timeouts
+            - Attempts conversation with each eligible skill
         """
         lang = standardize_lang_tag(lang)
         session = SessionManager.get(message)
