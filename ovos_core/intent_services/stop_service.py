@@ -52,11 +52,13 @@ class StopService(PipelinePlugin):
     def _collect_stop_skills(self, message: Message) -> List[str]:
         """use the messagebus api to determine which skills can stop
         This includes all skills and external applications"""
+        sess = SessionManager.get(message)
 
         want_stop = []
         skill_ids = []
 
-        active_skills = self.get_active_skills(message)
+        active_skills = [s for s in self.get_active_skills(message)
+                         if s not in sess.blacklisted_skills]
 
         if not active_skills:
             return want_stop
@@ -64,7 +66,7 @@ class StopService(PipelinePlugin):
         event = Event()
 
         def handle_ack(msg):
-            nonlocal event
+            nonlocal event, skill_ids
             skill_id = msg.data["skill_id"]
 
             # validate the stop pong
@@ -111,7 +113,24 @@ class StopService(PipelinePlugin):
             LOG.error(f"{skill_id}: {error_msg}")
             return False
         elif result is not None:
-            return result.data.get('result', False)
+            stopped = result.data.get('result', False)
+        else:
+            stopped = False
+
+        if stopped:
+            sess = SessionManager.get(message)
+            state = sess.utterance_states.get(skill_id, "intent")
+            LOG.debug(f"skill response status: {state}")
+            if state == "response":  # TODO this is never happening and it should...
+                LOG.debug(f"stopping {skill_id} in middle of get_response!")
+
+            # force-kill any ongoing get_response/converse/TTS - see @killable_event decorator
+            self.bus.emit(message.forward("mycroft.skills.abort_question", {"skill_id": skill_id}))
+            self.bus.emit(message.forward("ovos.skills.converse.force_timeout", {"skill_id": skill_id}))
+            # TODO - track if speech is coming from this skill! not currently tracked
+            self.bus.emit(message.reply("mycroft.audio.speech.stop",{"skill_id": skill_id}))
+
+        return stopped
 
     def match_stop_high(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
         """If utterance is an exact match for "stop" , run before intent stage
@@ -140,6 +159,7 @@ class StopService(PipelinePlugin):
         conf = 1.0
 
         if is_global_stop:
+            LOG.info(f"Emitting global stop, {len(self.get_active_skills(message))} active skills")
             # emit a global stop, full stop anything OVOS is doing
             self.bus.emit(message.reply("mycroft.stop", {}))
             return PipelineMatch(handled=True,
@@ -150,15 +170,15 @@ class StopService(PipelinePlugin):
         if is_stop:
             # check if any skill can stop
             for skill_id in self._collect_stop_skills(message):
-                if skill_id in sess.blacklisted_skills:
-                    LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{sess.session_id}'")
-                    continue
-
+                LOG.debug(f"Checking if skill wants to stop: {skill_id}")
                 if self.stop_skill(skill_id, message):
+                    LOG.info(f"Skill stopped: {skill_id}")
+                    sess.disable_response_mode(skill_id)
                     return PipelineMatch(handled=True,
                                          match_data={"conf": conf},
                                          skill_id=skill_id,
-                                         utterance=utterance)
+                                         utterance=utterance,
+                                         updated_session=sess)
         return None
 
     def match_stop_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
@@ -229,17 +249,17 @@ class StopService(PipelinePlugin):
 
         # check if any skill can stop
         for skill_id in self._collect_stop_skills(message):
-            if skill_id in sess.blacklisted_skills:
-                LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{sess.session_id}'")
-                continue
-
+            LOG.debug(f"Checking if skill wants to stop: {skill_id}")
             if self.stop_skill(skill_id, message):
+                sess.disable_response_mode(skill_id)
                 return PipelineMatch(handled=True,
-                                     # emit instead of intent message
                                      match_data={"conf": conf},
-                                     skill_id=skill_id, utterance=utterance)
+                                     skill_id=skill_id,
+                                     utterance=utterance,
+                                     updated_session=sess)
 
         # emit a global stop, full stop anything OVOS is doing
+        LOG.debug(f"Emitting global stop signal, {len(self.get_active_skills(message))} active skills")
         self.bus.emit(message.reply("mycroft.stop", {}))
         return PipelineMatch(handled=True,
                              # emit instead of intent message {"conf": conf},

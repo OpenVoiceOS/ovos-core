@@ -342,6 +342,7 @@ class ConverseService(PipelinePlugin):
                                      # handled == True -> emit "ovos.utterance.handled"
                                      match_data={},
                                      skill_id=skill_id,
+                                     updated_session=session,
                                      utterance=utterances[0])
         return None
 

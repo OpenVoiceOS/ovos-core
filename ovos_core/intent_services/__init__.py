@@ -276,7 +276,7 @@ class IntentService:
             message (Message): The messagebus data.
         """
         reply = None
-        sess = SessionManager.get(message)
+        sess = match.updated_session or SessionManager.get(message)
 
         # utterance fully handled by pipeline matcher
         if isinstance(match, PipelineMatch):
@@ -303,10 +303,13 @@ class IntentService:
                 was_deactivated = match.skill_id in self._deactivations[sess.session_id]
                 if not was_deactivated:
                     sess.activate_skill(match.skill_id)
-                    reply.context["session"] = sess.serialize()
                     # emit event for skills callback -> self.handle_activate
                     self.bus.emit(reply.forward(f"{match.skill_id}.activate"))
 
+            # update Session if modified by pipeline
+            reply.context["session"] = sess.serialize()
+
+            # finally emit reply message
             self.bus.emit(reply)
 
     def send_cancel_event(self, message):
