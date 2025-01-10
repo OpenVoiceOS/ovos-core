@@ -110,7 +110,8 @@ class TestSessions(TestCase):
         self.assertEqual(messages[8].data["session_data"]["active_skills"][0][0], self.skill_id)
 
         # ensure context in triggered event is the same from message that triggered the intent
-        intent_context = messages[1].context  # when skill added to active list (last context change)
+        intent_context = messages[-3].context  # when skill added to active list (last context change)
+        intent_context["skill_id"] = 'skill-ovos-schedule.openvoiceos'  # for tests below, skill_id is injected
 
         self.assertEqual(messages[-2].msg_type, "skill-ovos-schedule.openvoiceos:my_event")
         self.assertEqual(messages[-2].context, intent_context)

@@ -17,7 +17,6 @@ from typing import Tuple, Callable, Union
 
 from ovos_adapt.opm import AdaptPipeline
 from ovos_commonqa.opm import CommonQAService
-from padacioso.opm import PadaciosoPipeline as PadaciosoService
 
 from ocp_pipeline.opm import OCPPipelineMatcher
 from ovos_bus_client.message import Message
@@ -33,6 +32,8 @@ from ovos_plugin_manager.templates.pipeline import PipelineMatch, IntentHandlerM
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG, log_deprecation, deprecated
 from ovos_utils.metrics import Stopwatch
+from padacioso.opm import PadaciosoPipeline as PadaciosoService
+import warnings
 
 
 class IntentService:
@@ -267,15 +268,34 @@ class IntentService:
         self._deactivations[sess.session_id].append(skill_id)
 
     def _emit_match_message(self, match: Union[IntentHandlerMatch, PipelineMatch], message: Message):
-        """Update the message data with the matched utterance information and
-        activate the corresponding skill if available.
-
+        """
+        Emit a reply message for a matched intent, updating session and skill activation.
+        
+        This method processes matched intents from either a pipeline matcher or an intent handler,
+        creating a reply message with matched intent details and managing skill activation.
+        
         Args:
-            match (IntentHandlerMatch): The matched utterance object.
-            message (Message): The messagebus data.
+            match (Union[IntentHandlerMatch, PipelineMatch]): The matched intent object containing
+                utterance and matching information.
+            message (Message): The original messagebus message that triggered the intent match.
+        
+        Details:
+            - Handles two types of matches: PipelineMatch and IntentHandlerMatch
+            - Creates a reply message with matched intent data
+            - Activates the corresponding skill if not previously deactivated
+            - Updates session information
+            - Emits the reply message on the messagebus
+        
+        Side Effects:
+            - Modifies session state
+            - Emits a messagebus event
+            - Can trigger skill activation events
+        
+        Returns:
+            None
         """
         reply = None
-        sess = SessionManager.get(message)
+        sess = match.updated_session or SessionManager.get(message)
 
         # utterance fully handled by pipeline matcher
         if isinstance(match, PipelineMatch):
@@ -302,13 +322,34 @@ class IntentService:
                 was_deactivated = match.skill_id in self._deactivations[sess.session_id]
                 if not was_deactivated:
                     sess.activate_skill(match.skill_id)
-                    reply.context["session"] = sess.serialize()
                     # emit event for skills callback -> self.handle_activate
                     self.bus.emit(reply.forward(f"{match.skill_id}.activate"))
 
+            # update Session if modified by pipeline
+            reply.context["session"] = sess.serialize()
+
+            # finally emit reply message
             self.bus.emit(reply)
 
     def send_cancel_event(self, message):
+        """
+        Emit events and play a sound when an utterance is canceled.
+        
+        Logs the cancellation with the specific cancel word, plays a predefined cancel sound,
+        and emits multiple events to signal the utterance cancellation.
+        
+        Parameters:
+            message (Message): The original message that triggered the cancellation.
+        
+        Events Emitted:
+            - 'mycroft.audio.play_sound': Plays a cancel sound from configuration
+            - 'ovos.utterance.cancelled': Signals that the utterance was canceled
+            - 'ovos.utterance.handled': Indicates the utterance processing is complete
+        
+        Notes:
+            - Uses the default cancel sound path 'snd/cancel.mp3' if not specified in configuration
+            - Ensures events are sent as replies to the original message
+        """
         LOG.info("utterance canceled, cancel_word:" + message.context.get("cancel_word"))
         # play dedicated cancel sound
         sound = Configuration().get('sounds', {}).get('cancel', "snd/cancel.mp3")
@@ -355,6 +396,7 @@ class IntentService:
         lang = self.disambiguate_lang(message)
 
         utterances = message.data.get('utterances', [])
+        LOG.info(f"Parsing utterance: {utterances}")
 
         stopwatch = Stopwatch()
 
@@ -465,6 +507,7 @@ class IntentService:
 
         # Loop through the matching functions until a match is found.
         for pipeline, match_func in self.get_pipeline(skips=["converse",
+                                                             "common_qa",
                                                              "fallback_high",
                                                              "fallback_medium",
                                                              "fallback_low"],
@@ -522,143 +565,267 @@ class IntentService:
     def registered_intents(self):
         log_deprecation("direct access to self.adapt_service is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
+        warnings.warn(
+            "direct access to self.adapt_service is deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         lang = get_message_lang()
         return [parser.__dict__
                 for parser in self._adapt_service.engines[lang].intent_parsers]
 
     @property
     def adapt_service(self):
+        warnings.warn(
+            "direct access to self.adapt_service is deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         log_deprecation("direct access to self.adapt_service is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._adapt_service
 
     @property
     def padatious_service(self):
+        warnings.warn(
+            "direct access to self.padatious_service is deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         log_deprecation("direct access to self.padatious_service is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._padatious_service
 
     @property
     def padacioso_service(self):
+        warnings.warn(
+            "direct access to self.padatious_service is deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         log_deprecation("direct access to self.padacioso_service is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._padacioso_service
 
     @property
     def fallback(self):
-
+        warnings.warn(
+            "direct access to self.fallback is deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         log_deprecation("direct access to self.fallback is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._fallback
 
     @property
     def converse(self):
+        warnings.warn(
+            "direct access to self.converse is deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         log_deprecation("direct access to self.converse is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._converse
 
     @property
     def common_qa(self):
+        warnings.warn(
+            "direct access to self.common_qa is deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         log_deprecation("direct access to self.common_qa is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._common_qa
 
     @property
     def stop(self):
+        warnings.warn(
+            "direct access to self.stop is deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         log_deprecation("direct access to self.stop is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._stop
 
     @property
     def ocp(self):
+        warnings.warn(
+            "direct access to self.ocp is deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         log_deprecation("direct access to self.ocp is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         return self._ocp
 
     @adapt_service.setter
     def adapt_service(self, value):
+        warnings.warn(
+            "direct access to self.adapt_service is deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         log_deprecation("direct access to self.adapt_service is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._adapt_service = value
 
     @padatious_service.setter
     def padatious_service(self, value):
+        warnings.warn(
+            "direct access to self.padatious_service is deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         log_deprecation("direct access to self.padatious_service is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._padatious_service = value
 
     @padacioso_service.setter
     def padacioso_service(self, value):
+        warnings.warn(
+            "direct access to self.padacioso_service is deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         log_deprecation("direct access to self.padacioso_service is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._padacioso_service = value
 
     @fallback.setter
     def fallback(self, value):
+        warnings.warn(
+            "direct access to self.fallback is deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         log_deprecation("direct access to self.fallback is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._fallback = value
 
     @converse.setter
     def converse(self, value):
+        warnings.warn(
+            "direct access to self.converse is deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         log_deprecation("direct access to self.converse is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._converse = value
 
     @common_qa.setter
     def common_qa(self, value):
+        warnings.warn(
+            "direct access to self.common_qa is deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         log_deprecation("direct access to self.common_qa is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._common_qa = value
 
     @stop.setter
     def stop(self, value):
+        warnings.warn(
+            "direct access to self.stop is deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         log_deprecation("direct access to self.stop is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._stop = value
 
     @ocp.setter
     def ocp(self, value):
+        warnings.warn(
+            "direct access to self.ocp is deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         log_deprecation("direct access to self.ocp is deprecated, "
                         "pipelines are in the progress of being replaced with plugins", "1.0.0")
         self._ocp = value
 
     @deprecated("handle_get_adapt moved to adapt service, this method does nothing", "1.0.0")
     def handle_get_adapt(self, message: Message):
-        """DEPRECATED"""
+        warnings.warn(
+            "moved to adapt service, this method does nothing",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     @deprecated("handle_adapt_manifest moved to adapt service, this method does nothing", "1.0.0")
     def handle_adapt_manifest(self, message):
-        """DEPRECATED"""
+        warnings.warn(
+            "moved to adapt service, this method does nothing",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     @deprecated("handle_vocab_manifest moved to adapt service, this method does nothing", "1.0.0")
     def handle_vocab_manifest(self, message):
-        """DEPRECATED"""
+        warnings.warn(
+            "moved to adapt service, this method does nothing",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     @deprecated("handle_get_padatious moved to padatious service, this method does nothing", "1.0.0")
     def handle_get_padatious(self, message):
-        """DEPRECATED"""
+        warnings.warn(
+            "moved to padatious service, this method does nothing",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     @deprecated("handle_padatious_manifest moved to padatious service, this method does nothing", "1.0.0")
     def handle_padatious_manifest(self, message):
-        """DEPRECATED"""
+        warnings.warn(
+            "moved to padatious service, this method does nothing",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     @deprecated("handle_entity_manifest moved to padatious service, this method does nothing", "1.0.0")
     def handle_entity_manifest(self, message):
-        """DEPRECATED"""
+        warnings.warn(
+            "moved to padatious service, this method does nothing",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     @deprecated("handle_register_vocab moved to individual pipeline services, this method does nothing", "1.0.0")
     def handle_register_vocab(self, message):
-        """DEPRECATED"""
+        warnings.warn(
+            "moved to pipeline plugins, this method does nothing",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     @deprecated("handle_register_intent moved to individual pipeline services, this method does nothing", "1.0.0")
     def handle_register_intent(self, message):
-        """DEPRECATED"""
+        warnings.warn(
+            "moved to pipeline plugins, this method does nothing",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     @deprecated("handle_detach_intent moved to individual pipeline services, this method does nothing", "1.0.0")
     def handle_detach_intent(self, message):
-        """DEPRECATED"""
+        warnings.warn(
+            "moved to pipeline plugins, this method does nothing",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     @deprecated("handle_detach_skill moved to individual pipeline services, this method does nothing", "1.0.0")
     def handle_detach_skill(self, message):
-        """DEPRECATED"""
+        warnings.warn(
+            "moved to pipeline plugins, this method does nothing",
+            DeprecationWarning,
+            stacklevel=2,
+        )

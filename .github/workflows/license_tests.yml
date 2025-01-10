@@ -16,7 +16,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v1
         with:
-          python-version: 3.8
+          python-version: '3.11'
       - name: Install Build Tools
         run: |
           python -m pip install build wheel uv
@@ -37,7 +37,7 @@ jobs:
           requirements: 'requirements-all.txt'
           fail: 'Copyleft,Other,Error'
           fails-only: true
-          exclude: '^(precise-runner|fann2|ovos-adapt-parser|ovos-padatious|tqdm|bs4|sonopy|caldav|recurring-ical-events|x-wr-timezone|zeroconf|mutagen).*'
+          exclude: '^(precise-runner|fann2|ovos-adapt-parser|ovos-padatious|tqdm|bs4|sonopy|caldav|recurring-ical-events|x-wr-timezone|zeroconf|mutagen|attrs).*'
           exclude-license: '^(Mozilla).*$'
       - name: Print report
         if: ${{ always() }}
