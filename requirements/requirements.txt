@@ -10,6 +10,6 @@ ovos-common-query-pipeline-plugin>=1.0.5, <2.0.0
 
 ovos-utils[extras]>=0.6.0,<1.0.0
 ovos_bus_client>=0.1.4,<2.0.0
-ovos-plugin-manager>=0.5.6,<1.0.0
+ovos-plugin-manager>=0.8.0,<1.0.0
 ovos-config>=0.0.13,<2.0.0
-ovos-workshop>=3.1.2,<4.0.0
+ovos-workshop>=3.3.4,<4.0.0

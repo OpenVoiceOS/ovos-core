@@ -78,7 +78,6 @@ class TestOCPPipeline(TestCase):
             "ovos.common_play.search.end",
             # no good results
             "ovos.common_play.reset",
-            
             "speak",  # error,
             "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
@@ -146,7 +145,7 @@ class TestOCPPipeline(TestCase):
             "ovos.common_play.SEI.get",  # request info again, cause player didnt answer before
             "ovos.common_play.search.end",
             "ovos.common_play.reset",
-            
+
             "speak",  # nothing to play
             "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
@@ -351,11 +350,15 @@ class TestOCPPipeline(TestCase):
             # skill searching (generic)
             "ovos.common_play.skill.search_start",
             "ovos.common_play.query.response",
+            "ovos.common_play.query.response",
+            "ovos.common_play.query.response",
+            "ovos.common_play.query.response",
+            "ovos.common_play.query.response",
             "ovos.common_play.skill.search_end",
             "ovos.common_play.search.end",
             # no good results
             "ovos.common_play.reset",
-            
+
             "speak",  # error
             "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]

@@ -15,7 +15,7 @@ class FakeFMSkill(OVOSCommonPlaybackSkill):
 
     @ocp_search()
     def search_fakefm(self, phrase, media_type):
-        score = 50
+        score = 30
         if "fake" in phrase:
             score += 35
         if media_type == MediaType.RADIO:

@@ -67,22 +67,12 @@ class TestSessions(TestCase):
             "recognizer_loop:utterance",
             # global stop trigger
             "mycroft.stop",
-            # intent pipelines
-            "common_query.openvoiceos.stop",
-            "common_query.openvoiceos.stop.response",  # reporting nothing to stop
-            "ovos.common_play.stop",
-            "ovos.common_play.stop.response",  # reporting nothing to stop
-
-            # skill reporting
-            f"{self.skill_id}.stop",  # internal, @killable_events
-            f"{self.skill_id}.stop.response",  # skill reporting nothing to stop
-
+            "common_query.openvoiceos.stop.response",
+            "ovos.common_play.stop.response",
+            f"{self.skill_id}.stop.response",
             # sanity check in test skill that method was indeed called
             "speak",  # "utterance":"old stop called"
-
-            # NOTE: messages below might show up before enclosure.active_skill
-            f"{self.new_skill_id}.stop",  # internal, @killable_events
-            f"{self.new_skill_id}.stop.response",  # skill reporting nothing to stop
+            f"{self.new_skill_id}.stop.response", # nothing to stop
 
             "ovos.utterance.handled"
         ]
@@ -151,30 +141,17 @@ class TestSessions(TestCase):
             f"{self.skill_id}.stop.ping",  # check if active skill wants to stop
             "skill.stop.pong",  # "can_handle":true
             f"{self.skill_id}.stop",  # skill specific stop trigger
-            f"{self.skill_id}.stop.response",  # skill fails to stop  (old style)
+            "speak",  # "old stop called" in the test skill stop method
+            f"{self.skill_id}.stop.response",  # skill stops and reports back
 
-            # stop medium
-            f"{self.skill_id}.stop.ping",
-            "skill.stop.pong",
-            f"{self.skill_id}.stop",  # skill specific stop trigger
-            f"{self.skill_id}.stop.response",  # skill fails to stop  (old style)
+            # skill reports it stopped, so core ensures any threaded activity is also killed
+            "mycroft.skills.abort_question",  # core kills any ongoing get_response
+            "ovos.skills.converse.force_timeout",  # core kills any ongoing converse
+            "mycroft.audio.speech.stop",  # core kills any ongoing TTS
 
-            # stop fallback
-            "mycroft.stop",  # global stop for backwards compat
-            f"{self.skill_id}.stop",
-            f"{self.skill_id}.stop.response",  # apparently fails to stop  (old style)
+            f"{self.skill_id}.activate", # update of skill last usage timestamp
+            "ovos.utterance.handled"
 
-            # test in skill that global stop was called
-            "speak",  # "utterance":"stop"
-
-            # report old-style stop handled event
-            "mycroft.stop.handled",  # {"by":"skill:skill-old-stop.openvoiceos"}
-
-            # old style unwanted side effects (global stop is global)
-            f"{self.new_skill_id}.stop",
-            f"{self.new_skill_id}.stop.response",
-            # other test skill also speaks
-            "speak"  # "utterance":"old stop called"
         ]
 
         wait_for_n_messages(len(expected_messages))
@@ -246,13 +223,14 @@ class TestSessions(TestCase):
             "recognizer_loop:utterance",
             # global stop trigger
             "mycroft.stop",
-            f"{self.skill_id}.stop",  # internal, @killable_events
+            "common_query.openvoiceos.stop.response", # common_query framework reporting nothing to stop
+            "ovos.common_play.stop.response",  # OCP framework reporting nothing to stop
             f"{self.skill_id}.stop.response",  # skill reporting nothing to stop
-            f"{self.new_skill_id}.stop",  # internal, @killable_events
-            f"{self.new_skill_id}.stop.response",  # skill reporting nothing to stop
 
             # sanity check in test skill that method was indeed called
             "speak",  # "utterance":"old stop called"
+
+            f"{self.new_skill_id}.stop.response",  # skill reporting it stopped
 
             "ovos.utterance.handled",
 
@@ -331,8 +309,11 @@ class TestSessions(TestCase):
 
             # test session specific stop was called
             "speak",  # "utterance":"stop 123"
-
             f"{self.new_skill_id}.stop.response",  # skill reports it stopped (new style),
+
+            "mycroft.skills.abort_question", # core kills any ongoing get_response
+            "ovos.skills.converse.force_timeout", # core kills any ongoing converse
+            "mycroft.audio.speech.stop", # core kills any ongoing TTS
             f"{self.new_skill_id}.activate",  # update timestamp of last interaction with skill
             "ovos.utterance.handled"  # handle_utterance returned (intent service)
         ]
@@ -350,7 +331,7 @@ class TestSessions(TestCase):
                 self.assertEqual(m.data["utterance"], "stop 123")
 
         # confirm "skill-new-stop" was the one that reported success
-        handler = messages[-3]
+        handler = messages[-6]
         self.assertEqual(handler.msg_type, f"{self.new_skill_id}.stop.response")
         self.assertEqual(handler.data["result"], True)
 
@@ -373,6 +354,7 @@ class TestSessions(TestCase):
             f"{self.new_skill_id}.stop.ping",  # check if active skill wants to stop
             "skill.stop.pong",  # "can_handle":true
             f"{self.new_skill_id}.stop",  # skill specific stop trigger
+            "speak", # it's in the stop method even if it returns False!
             f"{self.new_skill_id}.stop.response",  # dont want to stop (new style)
 
             # rest of pipeline
@@ -380,17 +362,19 @@ class TestSessions(TestCase):
             f"{self.new_skill_id}.stop.ping",
             "skill.stop.pong",
             f"{self.new_skill_id}.stop",  # skill specific stop trigger
+            "speak", # it's in the stop method even if it returns False!
             f"{self.new_skill_id}.stop.response",  # dont want to stop (new style)
 
             # global stop fallback
             "mycroft.stop",
-            f"{self.skill_id}.stop",  # skill specific stop trigger
-            f"{self.skill_id}.stop.response",  # old style, never stops
-            f"{self.new_skill_id}.stop",  # skill specific stop trigger
-            f"{self.skill_id}.stop.response",  # dont want to stop (new style)
+            "common_query.openvoiceos.stop.response", # dont want to stop
+            "ovos.common_play.stop.response", # dont want to stop
 
-            # check the global stop handlers are called
-            "speak",  # "utterance":"old stop called"
+            f"{self.skill_id}.stop.response",  # old style, never stops
+            "speak", # it's in the stop method even if it returns False!
+            f"{self.new_skill_id}.stop.response",  # dont want to stop (new style)
+
+            "ovos.utterance.handled"
         ]
 
         wait_for_n_messages(len(expected_messages))
