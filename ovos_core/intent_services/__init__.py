@@ -408,26 +408,33 @@ class IntentService:
         match = None
         with stopwatch:
             self._deactivations[sess.session_id] = []
-
             # Loop through the matching functions until a match is found.
             for pipeline, match_func in self.get_pipeline(session=sess):
-                match = match_func(utterances, lang, message)
-                if match:
-                    LOG.info(f"{pipeline} match: {match}")
-                    if match.skill_id and match.skill_id in sess.blacklisted_skills:
-                        LOG.debug(
-                            f"ignoring match, skill_id '{match.skill_id}' blacklisted by Session '{sess.session_id}'")
-                        continue
-                    if isinstance(match, IntentHandlerMatch) and match.match_type in sess.blacklisted_intents:
-                        LOG.debug(
-                            f"ignoring match, intent '{match.match_type}' blacklisted by Session '{sess.session_id}'")
-                        continue
-                    try:
-                        self._emit_match_message(match, message)
-                        break
-                    except:
-                        LOG.exception(f"{match_func} returned an invalid match")
-                LOG.debug(f"no match from {match_func}")
+                langs = [lang]
+                if self.config.get("multilingual_matching"):
+                    # if multilingual matching is enabled, attempt to match all user languages if main fails
+                    langs += [l for l in get_valid_languages() if l != lang]
+                for l in langs:
+                    match = match_func(utterances, l, message)
+                    if match:
+                        LOG.info(f"{pipeline} match ({l}): {match}")
+                        if match.skill_id and match.skill_id in sess.blacklisted_skills:
+                            LOG.debug(
+                                f"ignoring match, skill_id '{match.skill_id}' blacklisted by Session '{sess.session_id}'")
+                            continue
+                        if isinstance(match, IntentHandlerMatch) and match.match_type in sess.blacklisted_intents:
+                            LOG.debug(
+                                f"ignoring match, intent '{match.match_type}' blacklisted by Session '{sess.session_id}'")
+                            continue
+                        try:
+                            self._emit_match_message(match, message)
+                            break
+                        except:
+                            LOG.exception(f"{match_func} returned an invalid match")
+                else:
+                    LOG.debug(f"no match from {match_func}")
+                    continue
+                break
             else:
                 # Nothing was able to handle the intent
                 # Ask politely for forgiveness for failing in this vital task
