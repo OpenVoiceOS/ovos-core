@@ -1,49 +1,12 @@
 # Changelog
 
-## [0.3.8a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.8a1) (2025-01-10)
+## [0.4.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.4.0a1) (2025-01-29)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.7a2...0.3.8a1)
-
-**Merged pull requests:**
-
-- fix:better\_stop [\#643](https://github.com/OpenVoiceOS/ovos-core/pull/643) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.3.7a2](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.7a2) (2025-01-04)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.7a1...0.3.7a2)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.8...0.4.0a1)
 
 **Merged pull requests:**
 
-- chore: add warnings [\#641](https://github.com/OpenVoiceOS/ovos-core/pull/641) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.3.7a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.7a1) (2024-12-26)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.6a3...0.3.7a1)
-
-## [0.3.6a3](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.6a3) (2024-12-26)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.6a2...0.3.6a3)
-
-**Merged pull requests:**
-
-- Update skills-extra.txt [\#639](https://github.com/OpenVoiceOS/ovos-core/pull/639) ([JarbasAl](https://github.com/JarbasAl))
-- fix: logs and pipeline query api [\#636](https://github.com/OpenVoiceOS/ovos-core/pull/636) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.3.6a2](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.6a2) (2024-12-19)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.6a1...0.3.6a2)
-
-**Merged pull requests:**
-
-- Update README.md [\#637](https://github.com/OpenVoiceOS/ovos-core/pull/637) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.3.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.3.6a1) (2024-12-13)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.5...0.3.6a1)
-
-**Merged pull requests:**
-
-- Update skills-extra.txt [\#634](https://github.com/OpenVoiceOS/ovos-core/pull/634) ([JarbasAl](https://github.com/JarbasAl))
+- feat:multilang\_match [\#646](https://github.com/OpenVoiceOS/ovos-core/pull/646) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
