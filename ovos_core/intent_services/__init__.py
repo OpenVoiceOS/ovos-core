@@ -267,7 +267,7 @@ class IntentService:
         skill_id = message.data.get("skill_id")
         self._deactivations[sess.session_id].append(skill_id)
 
-    def _emit_match_message(self, match: Union[IntentHandlerMatch, PipelineMatch], message: Message):
+    def _emit_match_message(self, match: Union[IntentHandlerMatch, PipelineMatch], message: Message, lang: str):
         """
         Emit a reply message for a matched intent, updating session and skill activation.
         
@@ -278,6 +278,7 @@ class IntentService:
             match (Union[IntentHandlerMatch, PipelineMatch]): The matched intent object containing
                 utterance and matching information.
             message (Message): The original messagebus message that triggered the intent match.
+            lang (str): The language of the pipeline plugin match
         
         Details:
             - Handles two types of matches: PipelineMatch and IntentHandlerMatch
@@ -296,6 +297,7 @@ class IntentService:
         """
         reply = None
         sess = match.updated_session or SessionManager.get(message)
+        sess.lang = lang  # ensure it is updated
 
         # utterance fully handled by pipeline matcher
         if isinstance(match, PipelineMatch):
@@ -310,6 +312,7 @@ class IntentService:
 
         if reply is not None:
             reply.data["utterance"] = match.utterance
+            reply.data["lang"] = lang
 
             # update active skill list
             if match.skill_id:
@@ -414,10 +417,10 @@ class IntentService:
                 if self.config.get("multilingual_matching"):
                     # if multilingual matching is enabled, attempt to match all user languages if main fails
                     langs += [l for l in get_valid_languages() if l != lang]
-                for l in langs:
-                    match = match_func(utterances, l, message)
+                for intent_lang in langs:
+                    match = match_func(utterances, intent_lang, message)
                     if match:
-                        LOG.info(f"{pipeline} match ({l}): {match}")
+                        LOG.info(f"{pipeline} match ({intent_lang}): {match}")
                         if match.skill_id and match.skill_id in sess.blacklisted_skills:
                             LOG.debug(
                                 f"ignoring match, skill_id '{match.skill_id}' blacklisted by Session '{sess.session_id}'")
@@ -427,7 +430,7 @@ class IntentService:
                                 f"ignoring match, intent '{match.match_type}' blacklisted by Session '{sess.session_id}'")
                             continue
                         try:
-                            self._emit_match_message(match, message)
+                            self._emit_match_message(match, message, intent_lang)
                             break
                         except:
                             LOG.exception(f"{match_func} returned an invalid match")
