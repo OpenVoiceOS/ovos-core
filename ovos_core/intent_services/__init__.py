@@ -296,7 +296,11 @@ class IntentService:
             None
         """
         reply = None
-        sess = match.updated_session or SessionManager.get(message)
+        try:
+            sess = match.updated_session or SessionManager.get(message)
+        except AttributeError:  # old ovos-plugin-manager version
+            LOG.warning("outdated ovos-plugin-manager detected! please update to version 0.8.0")
+            sess = SessionManager.get(message)
         sess.lang = lang  # ensure it is updated
 
         # utterance fully handled by pipeline matcher
