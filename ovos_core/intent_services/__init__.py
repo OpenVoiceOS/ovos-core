@@ -33,6 +33,7 @@ from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG, log_deprecation, deprecated
 from ovos_utils.metrics import Stopwatch
 from padacioso.opm import PadaciosoPipeline as PadaciosoService
+from ovos_persona import PersonaService
 import warnings
 
 
@@ -113,6 +114,7 @@ class IntentService:
         self._common_qa = CommonQAService(self.bus, self.config.get("common_query"))
         self._stop = StopService(self.bus)
         self._ocp = OCPPipelineMatcher(self.bus, config=self.config.get("OCP", {}))
+        self._persona = PersonaService(self.bus, config=self.config.get("persona", {}))
 
     def update_skill_name_dict(self, message):
         """Messagebus handler, updates dict of id to skill name conversions."""
@@ -203,7 +205,9 @@ class IntentService:
             "adapt_medium": self._adapt_service.match_medium,
             "fallback_medium": self._fallback.medium_prio,
             "adapt_low": self._adapt_service.match_low,
-            "fallback_low": self._fallback.low_prio
+            "fallback_low": self._fallback.low_prio,
+            "persona_high": self._persona.match_high,
+            "persona_low": self._persona.match_low
         }
         if self._padacioso_service is not None:
             matchers.update({
@@ -270,28 +274,28 @@ class IntentService:
     def _emit_match_message(self, match: Union[IntentHandlerMatch, PipelineMatch], message: Message, lang: str):
         """
         Emit a reply message for a matched intent, updating session and skill activation.
-        
+
         This method processes matched intents from either a pipeline matcher or an intent handler,
         creating a reply message with matched intent details and managing skill activation.
-        
+
         Args:
             match (Union[IntentHandlerMatch, PipelineMatch]): The matched intent object containing
                 utterance and matching information.
             message (Message): The original messagebus message that triggered the intent match.
             lang (str): The language of the pipeline plugin match
-        
+
         Details:
             - Handles two types of matches: PipelineMatch and IntentHandlerMatch
             - Creates a reply message with matched intent data
             - Activates the corresponding skill if not previously deactivated
             - Updates session information
             - Emits the reply message on the messagebus
-        
+
         Side Effects:
             - Modifies session state
             - Emits a messagebus event
             - Can trigger skill activation events
-        
+
         Returns:
             None
         """
