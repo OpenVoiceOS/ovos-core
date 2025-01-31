@@ -206,8 +206,8 @@ class IntentService:
             "fallback_medium": self._fallback.medium_prio,
             "adapt_low": self._adapt_service.match_low,
             "fallback_low": self._fallback.low_prio,
-            "persona_high": self._persona.match_high,
-            "persona_low": self._persona.match_low
+            "ovos-persona-pipeline-plugin-high": self._persona.match_high,
+            "ovos-persona-pipeline-plugin-low": self._persona.match_low
         }
         if self._padacioso_service is not None:
             matchers.update({
