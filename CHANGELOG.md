@@ -1,12 +1,12 @@
 # Changelog
 
-## [0.4.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.4.0a1) (2025-01-29)
+## [0.5.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.5.0a1) (2025-01-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.3.8...0.4.0a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.4.0...0.5.0a1)
 
 **Merged pull requests:**
 
-- feat:multilang\_match [\#646](https://github.com/OpenVoiceOS/ovos-core/pull/646) ([JarbasAl](https://github.com/JarbasAl))
+- feat:persona pipeline [\#648](https://github.com/OpenVoiceOS/ovos-core/pull/648) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
