@@ -43,6 +43,106 @@ While some skills come pre-installed, most need to be installed explicitly.
 
 ---
 
+## 🤖 Persona Support  
+
+[ovos-persona](https://github.com/OpenVoiceOS/ovos-persona) can be used to generate responses when skills fail to handle user input
+
+> 💡 With Persona you can connect a LLM to ovos-core
+
+**List Personas**
+
+- "What personas are available?"
+- "Can you list the personas?"
+- "What personas can I use?"
+
+**Activate a Persona**
+
+- "Connect me to {persona}"  
+- "Enable {persona}"  
+- "Start a conversation with {persona}"  
+- "Let me chat with {persona}"  
+
+**Stop Conversation**
+- "Stop the interaction"  
+- "Terminate persona"  
+- "Deactivate Large Language Model"  
+
+<details>
+  <summary>Creating a Persona: Click to expand</summary>
+
+#### Persona Files
+
+Personas are configured using JSON files. These can be:  
+1️⃣ Provided by **plugins** (e.g., [OpenAI plugin](https://github.com/OpenVoiceOS/ovos-solver-openai-persona-plugin/pull/12)).  
+2️⃣ Created as **user-defined JSON files** in `~/.config/ovos_persona`.  
+
+Personas rely on [solver plugins](https://openvoiceos.github.io/ovos-technical-manual/solvers/), which attempt to answer queries in sequence until a response is found.  
+
+🛠️ **Example:** Using a local OpenAI-compatible server.  
+
+Save this in `~/.config/ovos_persona/salamandra.json`:  
+
+```json
+{
+  "name": "Salamandra",
+  "solvers": [
+    "ovos-solver-openai-persona-plugin"
+  ],
+  "ovos-solver-openai-persona-plugin": {
+    "api_url": "https://ollama.uoi.io/v1",
+    "model": "hdnh2006/salamandra-7b-instruct",
+    "key": "sk-xxxx",
+    "persona": "helpful, creative, clever, and very friendly."
+  }
+}
+```
+
+Now the `"Salamandra"` persona should be available, the example above is using a demo server, please note no uptime is guaranteed
+
+
+More details on how to create your personas [here](https://github.com/OpenVoiceOS/OVOS-persona?tab=readme-ov-file#-configuring-personas)
+
+</details>
+
+
+<details>
+  <summary>Pipeline Configuration: Click to expand</summary>
+
+
+#### Persona Pipeline
+
+Add the persona pipeline to your mycroft.conf **after** the `_high` pipeline matchers
+
+```json
+{
+  "intents": {
+      "persona": {"handle_fallback":  true},
+      "pipeline": [
+          "stop_high",
+          "converse",
+          "ocp_high",
+          "padatious_high",
+          "adapt_high",
+          "ovos-persona-pipeline-plugin-high",
+          "ocp_medium",
+          "fallback_high",
+          "stop_medium",
+          "adapt_medium",
+          "padatious_medium",
+          "adapt_low",
+          "common_qa",
+          "fallback_medium",
+          "ovos-persona-pipeline-plugin-low",
+          "fallback_low"
+    ]
+  }
+}
+```
+
+</details>
+
+---
+
 ## 🤝 Getting Involved
 
 🌍 OVOS is **open source** and thrives on community contributions. Whether you're a coder, designer, or translator, there's a way to contribute!  
