@@ -1,12 +1,12 @@
 # Changelog
 
-## [0.5.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.5.0a1) (2025-01-31)
+## [0.5.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.5.3a1) (2025-02-16)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.4.0...0.5.0a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.5.2...0.5.3a1)
 
 **Merged pull requests:**
 
-- feat:persona pipeline [\#648](https://github.com/OpenVoiceOS/ovos-core/pull/648) ([JarbasAl](https://github.com/JarbasAl))
+- nl-nl translations [\#651](https://github.com/OpenVoiceOS/ovos-core/pull/651) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
 
 
 
