@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.5.4a1) (2025-03-04)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.5.3a1...0.5.4a1)
+
+**Merged pull requests:**
+
+- fix: intent api indentation error [\#653](https://github.com/OpenVoiceOS/ovos-core/pull/653) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.5.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.5.3a1) (2025-02-16)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.5.2...0.5.3a1)
