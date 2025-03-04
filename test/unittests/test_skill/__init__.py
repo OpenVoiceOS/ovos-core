@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from ovos_workshop.skills.mycroft_skill import MycroftSkill
+from ovos_workshop.skills.ovos import OVOSSkill
 
 
-class LoadTestSkill(MycroftSkill):
+class LoadTestSkill(OVOSSkill):
     pass
 
 
