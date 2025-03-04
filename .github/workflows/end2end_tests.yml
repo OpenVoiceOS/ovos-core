@@ -34,7 +34,7 @@ jobs:
     strategy:
       max-parallel: 3
       matrix:
-        python-version: [3.9]
+        python-version: ["3.11"]
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -60,7 +60,6 @@ jobs:
           uv pip install --system ./test/end2end/skill-new-stop
           uv pip install --system ./test/end2end/skill-old-stop
           uv pip install --system ./test/end2end/skill-fake-fm
-          uv pip install --system ./test/end2end/skill-fake-fm-legacy
           uv pip install --system ./test/end2end/skill-ovos-fakewiki
           uv pip install --system ./test/end2end/metadata-test-plugin
       - name: Install core repo

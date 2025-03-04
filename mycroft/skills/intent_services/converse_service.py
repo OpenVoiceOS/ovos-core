@@ -1,2 +1,0 @@
-from ovos_core.intent_services.converse_service import ConverseService, ConverseActivationMode, ConverseMode
-

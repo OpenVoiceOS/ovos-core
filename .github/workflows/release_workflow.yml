@@ -7,8 +7,32 @@ on:
     branches: [dev]
 
 jobs:
+
+  translations:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+        with:
+          ref: dev
+          fetch-depth: 0 # otherwise, there would be errors pushing refs to the destination repository.
+      - name: Setup Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: "3.11"
+
+      - name: Sync translations by gitlocalize-app[bot]
+        run: |
+          python scripts/sync_translations.py
+
+      - name: Commit to dev
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: Update translations
+          branch: dev
+
   publish_alpha:
-    if: github.event.pull_request.merged == true
+    needs: translations
     uses: TigreGotico/gh-automations/.github/workflows/publish-alpha.yml@master
     secrets: inherit
     with:
@@ -62,7 +86,6 @@ jobs:
         with:
           password: ${{secrets.PYPI_TOKEN}}
 
-
   propose_release:
     needs: publish_alpha
     if: success()  # Ensure this job only runs if the previous job succeeds
@@ -76,7 +99,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v2
         with:
-          python-version: '3.10'
+          python-version: "3.11"
 
       - name: Get version from setup.py
         id: get_version

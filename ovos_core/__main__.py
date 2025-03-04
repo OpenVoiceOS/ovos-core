@@ -26,7 +26,6 @@ from ovos_core.skill_installer import SkillsStore
 from ovos_core.skill_manager import SkillManager, on_error, on_stopping, on_ready, on_alive, on_started
 from ovos_utils import wait_for_exit_signal
 from ovos_utils.log import LOG, init_service_logger
-from ovos_utils.process_utils import reset_sigint_handler
 from ovos_workshop.skills.api import SkillApi
 
 
@@ -38,7 +37,6 @@ def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
         SkillManager instance or None if it couldn't be initialized
     """
     init_service_logger("skills")
-    reset_sigint_handler()
 
     setup_locale()
 
