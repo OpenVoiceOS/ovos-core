@@ -540,7 +540,7 @@ class IntentService:
                     intent_data["handler"] = match_func.__name__
                     self.bus.emit(message.reply("intent.service.intent.reply",
                                                 {"intent": intent_data}))
-                return
+                    return
 
         # signal intent failure
         self.bus.emit(message.reply("intent.service.intent.reply",
