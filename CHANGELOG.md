@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.0a3](https://github.com/OpenVoiceOS/ovos-core/tree/1.0.0a3) (2025-03-06)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.0.0a2...1.0.0a3)
+
+**Merged pull requests:**
+
+- Update skills-media.txt [\#658](https://github.com/OpenVoiceOS/ovos-core/pull/658) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.0.0a2](https://github.com/OpenVoiceOS/ovos-core/tree/1.0.0a2) (2025-03-06)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.0.0a1...1.0.0a2)
