@@ -76,7 +76,6 @@ setup(
     extras_require={
         'mycroft': required('requirements/mycroft.txt'),
         'lgpl': required('requirements/lgpl.txt'),
-        'deprecated': required('requirements/extra-deprecated.txt'),
         'plugins': required('requirements/plugins.txt'),
         'skills-essential': required('requirements/skills-essential.txt'),
         'skills-extra': required('requirements/skills-extra.txt'),
@@ -86,7 +85,7 @@ setup(
         'skills-gui': required('requirements/skills-gui.txt'),
         'skills-media': required('requirements/skills-media.txt')
     },
-    packages=find_packages(include=['mycroft*']) + find_packages(include=['ovos_core*']),
+    packages=find_packages(include=['ovos_core*']),
     include_package_data=True,
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -96,17 +95,7 @@ setup(
     entry_points={
         'opm.pipeline': PLUGIN_ENTRY_POINT,
         'console_scripts': [
-            'ovos-core=ovos_core.__main__:main',
-            # TODO - remove below console_scripts in 1.0.0 (backwards compat)
-            'mycroft-speech-client=mycroft.listener.__main__:main',
-            'mycroft-messagebus=mycroft.messagebus.service.__main__:main',
-            'mycroft-skills=mycroft.skills.__main__:main',
-            'mycroft-audio=mycroft.audio.__main__:main',
-            'mycroft-echo-observer=mycroft.messagebus.client.ws:echo',
-            'mycroft-audio-test=mycroft.util.audio_test:main',
-            'mycroft-enclosure-client=ovos_PHAL.__main__:main',
-            'mycroft-cli-client=mycroft.client.text.__main__:main',
-            'mycroft-gui-service=mycroft.gui.__main__:main'
+            'ovos-core=ovos_core.__main__:main'
         ]
     }
 )

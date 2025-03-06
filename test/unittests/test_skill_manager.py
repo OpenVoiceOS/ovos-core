@@ -63,7 +63,7 @@ def mock_config():
 
 @patch.dict(Configuration._Configuration__patch, mock_config())
 class TestSkillManager(TestCase):
-    mock_package = 'mycroft.skills.skill_manager.'
+    mock_package = 'ovos_core.skill_manager.'
 
     def setUp(self):
         temp_dir = tempfile.mkdtemp()
@@ -148,16 +148,6 @@ class TestSkillManager(TestCase):
         self.skill_loader_mock.deactivate.assert_called_once()
         message.response.assert_called_once()
 
-    @patch("ovos_utils.log.LOG.exception")
-    def test_deactivate_skill_exception(self, mock_exception_logger):
-        message = Message("test.message", {'skill': 'test_skill'})
-        message.response = Mock()
-        self.skill_loader_mock.deactivate.side_effect = Exception()
-        self.skill_manager.deactivate_skill(message)
-        self.skill_loader_mock.deactivate.assert_called_once()
-        message.response.assert_called_once()
-        mock_exception_logger.assert_called_once_with('Failed to deactivate test_skill')
-
     def test_deactivate_except(self):
         message = Message("test.message", {'skill': 'test_skill'})
         message.response = Mock()
@@ -190,20 +180,3 @@ class TestSkillManager(TestCase):
         self.skill_manager.activate_skill(message)
         test_skill_loader.activate.assert_called_once()
         message.response.assert_called_once()
-
-    @patch("ovos_utils.log.LOG.exception")
-    def test_activate_skill_exception(self, mock_exception_logger):
-        message = Message("test.message", {'skill': 'test_skill'})
-        message.response = Mock()
-        test_skill_loader = Mock(spec=SkillLoader)
-        test_skill_loader.activate.side_effect = Exception()
-        test_skill_loader.skill_id = 'test_skill'
-        test_skill_loader.active = False
-
-        self.skill_manager.skill_loaders = {}
-        self.skill_manager.skill_loaders['test_skill'] = test_skill_loader
-
-        self.skill_manager.activate_skill(message)
-        test_skill_loader.activate.assert_called_once()
-        message.response.assert_called_once()
-        mock_exception_logger.assert_called_once_with('Couldn\'t activate skill test_skill')

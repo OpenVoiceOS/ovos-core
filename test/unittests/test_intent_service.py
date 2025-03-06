@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import time
 from copy import deepcopy
 from unittest import TestCase, mock
 
@@ -115,4 +116,5 @@ class TestIntentServiceApi(TestCase):
                       data={'utterance': 'test'})
         self.intent_service.handle_get_intent(msg)
         reply = self.emitted[-1]
+        time.sleep(3)
         self.assertEqual(reply.data['intent']['intent_name'], 'skill:testIntent')
