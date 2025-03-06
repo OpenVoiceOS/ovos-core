@@ -3,3 +3,4 @@ ovos-skill-somafm>=0.1.3,<1.0.0
 skill-news>=0.1.8,<1.0.0
 ovos-skill-pyradios>=0.1.4,<1.0.0
 ovos-skill-local-media>=0.2.4,<1.0.0
+ovos-skill-youtube-music>=0.1.6,<1.0.0
