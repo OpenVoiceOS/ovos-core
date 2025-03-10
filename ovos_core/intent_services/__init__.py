@@ -376,9 +376,12 @@ class IntentService:
             "lang": lang,
             "match_data": match_data
         }
-        response = requests.post(api_url, data=data, headers=headers)
-        LOG.info(f"Uploaded metrics: {data} - Response: {response.status_code}")
-
+        try:
+            # Add a timeout to prevent hanging
+            response = requests.post(api_url, data=data, headers=headers, timeout=3)
+            LOG.info(f"Uploaded metrics - Response: {response.status_code}")
+        except Exception as e:
+            LOG.warning(f"Failed to upload metrics: {e}")
 
     def send_cancel_event(self, message):
         """
