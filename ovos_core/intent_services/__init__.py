@@ -14,7 +14,7 @@
 #
 import warnings
 from collections import defaultdict
-from typing import Tuple, Callable, Union
+from typing import Tuple, Callable, Union, List
 
 import requests
 from ovos_adapt.opm import AdaptPipeline
@@ -363,25 +363,26 @@ class IntentService:
         eg. https://github.com/TigreGotico/metrics-server-docker
         """
         config = self.config.get("open_data", {})
-        api_url = config.get("intents_url") #eg. "http://localhost:8000/intents"
-        if not api_url:
-            return # user didn't configure a endpoint to upload metrics to
-
+        endpoints: List[str] = config.get("intent_urls", []) #eg. "http://localhost:8000/intents"
+        if not endpoints:
+            return # user didn't configure any endpoints to upload metrics to
+        if isinstance(endpoints, str):
+            endpoints = [endpoints]
         headers = {"Content-Type": "application/x-www-form-urlencoded",
                    "User-Agent": config.get("user_agent", "ovos-metrics")}
-        LOG.debug(f"intent metrics api url: {api_url}")
         data = {
             "utterance": utterance,
             "intent": intent,
             "lang": lang,
             "match_data": match_data
         }
-        try:
-            # Add a timeout to prevent hanging
-            response = requests.post(api_url, data=data, headers=headers, timeout=3)
-            LOG.info(f"Uploaded metrics - Response: {response.status_code}")
-        except Exception as e:
-            LOG.warning(f"Failed to upload metrics: {e}")
+        for url in endpoints:
+            try:
+                # Add a timeout to prevent hanging
+                response = requests.post(url, data=data, headers=headers, timeout=3)
+                LOG.info(f"Uploaded intent metrics to '{url}' - Response: {response.status_code}")
+            except Exception as e:
+                LOG.warning(f"Failed to upload metrics: {e}")
 
     def send_cancel_event(self, message):
         """
