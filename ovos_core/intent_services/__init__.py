@@ -12,29 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import warnings
 from collections import defaultdict
 from typing import Tuple, Callable, Union
 
+import requests
 from ovos_adapt.opm import AdaptPipeline
-from ovos_commonqa.opm import CommonQAService
+from ovos_config.config import Configuration
+from ovos_config.locale import get_valid_languages
 
 from ocp_pipeline.opm import OCPPipelineMatcher
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
-from ovos_config.config import Configuration
-from ovos_config.locale import get_valid_languages
+from ovos_commonqa.opm import CommonQAService
 from ovos_core.intent_services.converse_service import ConverseService
 from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
+from ovos_persona import PersonaService
 from ovos_plugin_manager.templates.pipeline import PipelineMatch, IntentHandlerMatch
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG, log_deprecation, deprecated
 from ovos_utils.metrics import Stopwatch
 from padacioso.opm import PadaciosoPipeline as PadaciosoService
-from ovos_persona import PersonaService
-import warnings
 
 
 class IntentService:
@@ -341,6 +342,43 @@ class IntentService:
 
             # finally emit reply message
             self.bus.emit(reply)
+
+            # upload intent metrics if enabled
+            self._upload_match_data(match.utterance,
+                                    match.skill_id if isinstance(match, PipelineMatch) else match.match_type,
+                                    lang,
+                                    match.match_data)
+        else:
+            self._upload_match_data(match.utterance,
+                                    "complete_intent_failure",
+                                    lang,
+                                    match.match_data)
+
+
+    def _upload_match_data(self, utterance, intent, lang, match_data):
+        """if enabled upload the intent match data to a server, allowing users and developers
+        to collect metrics/datasets to improve the pipeline plugins and skills.
+
+        There isn't a default server to upload things too, users needs to explicitly configure one
+        eg. https://github.com/TigreGotico/metrics-server-docker
+        """
+        config = self.config.get("open_data", {})
+        api_url = config.get("intents_url") #eg. "http://localhost:8000/intents"
+        if not api_url:
+            return # user didn't configure a endpoint to upload metrics to
+
+        headers = {"Content-Type": "application/x-www-form-urlencoded",
+                   "User-Agent": config.get("user_agent", "ovos-metrics")}
+        LOG.debug(f"intent metrics api url: {api_url}")
+        data = {
+            "utterance": utterance,
+            "intent": intent,
+            "lang": lang,
+            "match_data": match_data
+        }
+        response = requests.post(api_url, data=data, headers=headers)
+        LOG.info(f"Uploaded metrics: {data} - Response: {response.status_code}")
+
 
     def send_cancel_event(self, message):
         """
