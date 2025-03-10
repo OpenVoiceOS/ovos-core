@@ -362,7 +362,7 @@ class IntentService:
         There isn't a default server to upload things too, users needs to explicitly configure one
         eg. https://github.com/TigreGotico/metrics-server-docker
         """
-        config = self.config.get("open_data", {})
+        config = Configuration().get("open_data", {})
         endpoints: List[str] = config.get("intent_urls", []) #eg. "http://localhost:8000/intents"
         if not endpoints:
             return # user didn't configure any endpoints to upload metrics to
