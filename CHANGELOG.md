@@ -1,20 +1,32 @@
 # Changelog
 
-## [0.5.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.5.4a1) (2025-03-04)
+## [1.1.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.1.0a1) (2025-03-11)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.5.3a1...0.5.4a1)
-
-**Merged pull requests:**
-
-- fix: intent api indentation error [\#653](https://github.com/OpenVoiceOS/ovos-core/pull/653) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.5.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/0.5.3a1) (2025-02-16)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.5.2...0.5.3a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.0.0a3...1.1.0a1)
 
 **Merged pull requests:**
 
-- nl-nl translations [\#651](https://github.com/OpenVoiceOS/ovos-core/pull/651) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- feat:opendata upload [\#660](https://github.com/OpenVoiceOS/ovos-core/pull/660) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.0.0a3](https://github.com/OpenVoiceOS/ovos-core/tree/1.0.0a3) (2025-03-06)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.0.0a2...1.0.0a3)
+
+**Merged pull requests:**
+
+- Update skills-media.txt [\#658](https://github.com/OpenVoiceOS/ovos-core/pull/658) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.0.0a2](https://github.com/OpenVoiceOS/ovos-core/tree/1.0.0a2) (2025-03-06)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.0.0a1...1.0.0a2)
+
+**Merged pull requests:**
+
+- Update skills-essential.txt [\#656](https://github.com/OpenVoiceOS/ovos-core/pull/656) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.0.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.0.0a1) (2025-03-04)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.5.4...1.0.0a1)
 
 
 
