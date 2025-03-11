@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.1.0a1) (2025-03-11)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.0.0a3...1.1.0a1)
+
+**Merged pull requests:**
+
+- feat:opendata upload [\#660](https://github.com/OpenVoiceOS/ovos-core/pull/660) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.0.0a3](https://github.com/OpenVoiceOS/ovos-core/tree/1.0.0a3) (2025-03-06)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.0.0a2...1.0.0a3)
