@@ -1,0 +1,3 @@
+# skills providing catalan specific functionality
+ovos-skill-fuster-quotes
+ovos-skill-word-of-the-day
