@@ -1,32 +1,20 @@
 # Changelog
 
-## [1.1.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.1.0a1) (2025-03-11)
+## [1.2.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.2.1a1) (2025-03-13)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.0.0a3...1.1.0a1)
-
-**Merged pull requests:**
-
-- feat:opendata upload [\#660](https://github.com/OpenVoiceOS/ovos-core/pull/660) ([JarbasAl](https://github.com/JarbasAl))
-
-## [1.0.0a3](https://github.com/OpenVoiceOS/ovos-core/tree/1.0.0a3) (2025-03-06)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.0.0a2...1.0.0a3)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.2.0a1...1.2.1a1)
 
 **Merged pull requests:**
 
-- Update skills-media.txt [\#658](https://github.com/OpenVoiceOS/ovos-core/pull/658) ([JarbasAl](https://github.com/JarbasAl))
+- fix:improve\_metrics\_reporting [\#664](https://github.com/OpenVoiceOS/ovos-core/pull/664) ([JarbasAl](https://github.com/JarbasAl))
 
-## [1.0.0a2](https://github.com/OpenVoiceOS/ovos-core/tree/1.0.0a2) (2025-03-06)
+## [1.2.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.2.0a1) (2025-03-13)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.0.0a1...1.0.0a2)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.1.0...1.2.0a1)
 
 **Merged pull requests:**
 
-- Update skills-essential.txt [\#656](https://github.com/OpenVoiceOS/ovos-core/pull/656) ([JarbasAl](https://github.com/JarbasAl))
-
-## [1.0.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.0.0a1) (2025-03-04)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/0.5.4...1.0.0a1)
+- feat:lang\_specific\_skills\_list [\#662](https://github.com/OpenVoiceOS/ovos-core/pull/662) ([JarbasAl](https://github.com/JarbasAl))
 
 
 

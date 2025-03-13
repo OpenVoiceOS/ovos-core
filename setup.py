@@ -83,7 +83,10 @@ setup(
         'skills-desktop': required('requirements/skills-desktop.txt'),
         'skills-internet': required('requirements/skills-internet.txt'),
         'skills-gui': required('requirements/skills-gui.txt'),
-        'skills-media': required('requirements/skills-media.txt')
+        'skills-media': required('requirements/skills-media.txt'),
+        'skills-ca': required('requirements/skills-ca.txt'),
+        'skills-pt': required('requirements/skills-pt.txt'),
+        'skills-en': required('requirements/skills-en.txt')
     },
     packages=find_packages(include=['ovos_core*']),
     include_package_data=True,

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import json
 import warnings
 from collections import defaultdict
 from typing import Tuple, Callable, Union, List
@@ -312,12 +313,24 @@ class IntentService:
         if isinstance(match, PipelineMatch):
             if match.handled:
                 reply = message.reply("ovos.utterance.handled", {"skill_id": match.skill_id})
+
+            # upload intent metrics if enabled
+            self._upload_match_data(match.utterance,
+                                    match.skill_id,
+                                    lang,
+                                    match.match_data)
         # Launch skill if not handled by the match function
         elif isinstance(match, IntentHandlerMatch) and match.match_type:
             # keep all original message.data and update with intent match
             data = dict(message.data)
             data.update(match.match_data)
             reply = message.reply(match.match_type, data)
+
+            # upload intent metrics if enabled
+            self._upload_match_data(match.utterance,
+                                    match.match_type,
+                                    lang,
+                                    match.match_data)
 
         if reply is not None:
             reply.data["utterance"] = match.utterance
@@ -343,24 +356,20 @@ class IntentService:
             # finally emit reply message
             self.bus.emit(reply)
 
-            # upload intent metrics if enabled
-            self._upload_match_data(match.utterance,
-                                    match.skill_id if isinstance(match, PipelineMatch) else match.match_type,
-                                    lang,
-                                    match.match_data)
-        else:
+        else: # upload intent metrics if enabled
             self._upload_match_data(match.utterance,
                                     "complete_intent_failure",
                                     lang,
                                     match.match_data)
 
-
-    def _upload_match_data(self, utterance, intent, lang, match_data):
+    @staticmethod
+    def _upload_match_data(utterance:str, intent:str, lang:str, match_data: dict):
         """if enabled upload the intent match data to a server, allowing users and developers
         to collect metrics/datasets to improve the pipeline plugins and skills.
 
         There isn't a default server to upload things too, users needs to explicitly configure one
-        eg. https://github.com/TigreGotico/metrics-server-docker
+
+        https://github.com/OpenVoiceOS/ovos-opendata-server
         """
         config = Configuration().get("open_data", {})
         endpoints: List[str] = config.get("intent_urls", []) #eg. "http://localhost:8000/intents"
@@ -374,7 +383,7 @@ class IntentService:
             "utterance": utterance,
             "intent": intent,
             "lang": lang,
-            "match_data": match_data
+            "match_data": json.dumps(match_data, ensure_ascii=False)
         }
         for url in endpoints:
             try:
