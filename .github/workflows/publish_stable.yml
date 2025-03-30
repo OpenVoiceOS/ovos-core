@@ -19,12 +19,12 @@ jobs:
     if: success()  # Ensure this job only runs if the previous job succeeds
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
-          ref: dev
+          ref: master
           fetch-depth: 0 # otherwise, there would be errors pushing refs to the destination repository.
       - name: Setup Python
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - name: Install Build Tools
@@ -47,7 +47,7 @@ jobs:
     if: success()  # Ensure this job only runs if the previous job succeeds
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # otherwise, there would be errors pushing refs to the destination repository.
           ref: master

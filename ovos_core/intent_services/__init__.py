@@ -12,31 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
 import json
 import warnings
 from collections import defaultdict
 from typing import Tuple, Callable, Union, List
 
 import requests
-from ovos_adapt.opm import AdaptPipeline
-from ovos_config.config import Configuration
-from ovos_config.locale import get_valid_languages
-
 from ocp_pipeline.opm import OCPPipelineMatcher
+from ovos_adapt.opm import AdaptPipeline
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
-from ovos_commonqa.opm import CommonQAService
-from ovos_core.intent_services.converse_service import ConverseService
-from ovos_core.intent_services.fallback_service import FallbackService
-from ovos_core.intent_services.stop_service import StopService
-from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
+from ovos_config.config import Configuration
+from ovos_config.locale import get_valid_languages
 from ovos_persona import PersonaService
 from ovos_plugin_manager.templates.pipeline import PipelineMatch, IntentHandlerMatch
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG, log_deprecation, deprecated
 from ovos_utils.metrics import Stopwatch
+from ovos_utils.thread_utils import create_daemon
 from padacioso.opm import PadaciosoPipeline as PadaciosoService
+
+from ovos_commonqa.opm import CommonQAService
+from ovos_core.intent_services.converse_service import ConverseService
+from ovos_core.intent_services.fallback_service import FallbackService
+from ovos_core.intent_services.stop_service import StopService
+from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
 
 
 class IntentService:
@@ -315,10 +317,11 @@ class IntentService:
                 reply = message.reply("ovos.utterance.handled", {"skill_id": match.skill_id})
 
             # upload intent metrics if enabled
-            self._upload_match_data(match.utterance,
-                                    match.skill_id,
-                                    lang,
-                                    match.match_data)
+            create_daemon(self._upload_match_data, (match.utterance,
+                                                    match.skill_id,
+                                                    lang,
+                                                    match.match_data))
+
         # Launch skill if not handled by the match function
         elif isinstance(match, IntentHandlerMatch) and match.match_type:
             # keep all original message.data and update with intent match
@@ -327,10 +330,10 @@ class IntentService:
             reply = message.reply(match.match_type, data)
 
             # upload intent metrics if enabled
-            self._upload_match_data(match.utterance,
-                                    match.match_type,
-                                    lang,
-                                    match.match_data)
+            create_daemon(self._upload_match_data, (match.utterance,
+                                                    match.match_type,
+                                                    lang,
+                                                    match.match_data))
 
         if reply is not None:
             reply.data["utterance"] = match.utterance
@@ -356,14 +359,14 @@ class IntentService:
             # finally emit reply message
             self.bus.emit(reply)
 
-        else: # upload intent metrics if enabled
-            self._upload_match_data(match.utterance,
-                                    "complete_intent_failure",
-                                    lang,
-                                    match.match_data)
+        else:  # upload intent metrics if enabled
+            create_daemon(self._upload_match_data, (match.utterance,
+                                                    "complete_intent_failure",
+                                                    lang,
+                                                    match.match_data))
 
     @staticmethod
-    def _upload_match_data(utterance:str, intent:str, lang:str, match_data: dict):
+    def _upload_match_data(utterance: str, intent: str, lang: str, match_data: dict):
         """if enabled upload the intent match data to a server, allowing users and developers
         to collect metrics/datasets to improve the pipeline plugins and skills.
 
@@ -372,9 +375,9 @@ class IntentService:
         https://github.com/OpenVoiceOS/ovos-opendata-server
         """
         config = Configuration().get("open_data", {})
-        endpoints: List[str] = config.get("intent_urls", []) #eg. "http://localhost:8000/intents"
+        endpoints: List[str] = config.get("intent_urls", [])  # eg. "http://localhost:8000/intents"
         if not endpoints:
-            return # user didn't configure any endpoints to upload metrics to
+            return  # user didn't configure any endpoints to upload metrics to
         if isinstance(endpoints, str):
             endpoints = [endpoints]
         headers = {"Content-Type": "application/x-www-form-urlencoded",
