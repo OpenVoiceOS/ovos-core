@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.3a2](https://github.com/OpenVoiceOS/ovos-core/tree/1.2.3a2) (2025-03-30)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.2.3a1...1.2.3a2)
+
+**Merged pull requests:**
+
+- es-es/translate [\#669](https://github.com/OpenVoiceOS/ovos-core/pull/669) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+
 ## [1.2.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.2.3a1) (2025-03-27)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.2.1...1.2.3a1)
