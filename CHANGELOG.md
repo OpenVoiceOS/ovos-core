@@ -1,20 +1,12 @@
 # Changelog
 
-## [1.2.3a2](https://github.com/OpenVoiceOS/ovos-core/tree/1.2.3a2) (2025-03-30)
+## [1.2.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.2.4a1) (2025-04-21)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.2.3a1...1.2.3a2)
-
-**Merged pull requests:**
-
-- es-es/translate [\#669](https://github.com/OpenVoiceOS/ovos-core/pull/669) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
-
-## [1.2.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.2.3a1) (2025-03-27)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.2.1...1.2.3a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.2.3...1.2.4a1)
 
 **Merged pull requests:**
 
-- fix:move metrics to a thread [\#667](https://github.com/OpenVoiceOS/ovos-core/pull/667) ([JarbasAl](https://github.com/JarbasAl))
+- optimizing German translation for better usage [\#671](https://github.com/OpenVoiceOS/ovos-core/pull/671) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
 
 
 
