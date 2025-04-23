@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.2.6a1) (2025-04-23)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.2.5a2...1.2.6a1)
+
+**Merged pull requests:**
+
+- fix: drop unused alpha package with optional \(unused\) plugins [\#675](https://github.com/OpenVoiceOS/ovos-core/pull/675) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.2.5a2](https://github.com/OpenVoiceOS/ovos-core/tree/1.2.5a2) (2025-04-23)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.2.5a1...1.2.5a2)
+
 ## [1.2.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.2.5a1) (2025-04-23)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.2.4a1...1.2.5a1)
