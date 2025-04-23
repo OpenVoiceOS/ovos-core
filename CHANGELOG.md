@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.2.5a1) (2025-04-23)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.2.4a1...1.2.5a1)
+
+**Merged pull requests:**
+
+- fix: stop lowercase [\#674](https://github.com/OpenVoiceOS/ovos-core/pull/674) ([JarbasAl](https://github.com/JarbasAl))
+- test uppercase vs lowercase [\#673](https://github.com/OpenVoiceOS/ovos-core/pull/673) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+
 ## [1.2.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.2.4a1) (2025-04-21)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.2.3...1.2.4a1)
