@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.3.0a1) (2025-05-06)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.2.6a1...1.3.0a1)
+
+**Merged pull requests:**
+
+- feat: ovos-ollama-intent-pipeline [\#678](https://github.com/OpenVoiceOS/ovos-core/pull/678) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.2.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.2.6a1) (2025-04-23)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.2.5a2...1.2.6a1)
