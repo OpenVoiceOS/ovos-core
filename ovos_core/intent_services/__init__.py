@@ -19,14 +19,9 @@ from collections import defaultdict
 from typing import Tuple, Callable, Union, List
 
 import requests
-from ocp_pipeline.opm import OCPPipelineMatcher
-from ovos_adapt.opm import AdaptPipeline
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
-from ovos_config.config import Configuration
-from ovos_config.locale import get_valid_languages
-from ovos_persona import PersonaService
 from ovos_plugin_manager.templates.pipeline import PipelineMatch, IntentHandlerMatch
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG, log_deprecation, deprecated
@@ -34,11 +29,21 @@ from ovos_utils.metrics import Stopwatch
 from ovos_utils.thread_utils import create_daemon
 from padacioso.opm import PadaciosoPipeline as PadaciosoService
 
+from ocp_pipeline.opm import OCPPipelineMatcher
+from ovos_adapt.opm import AdaptPipeline
 from ovos_commonqa.opm import CommonQAService
+from ovos_config.config import Configuration
+from ovos_config.locale import get_valid_languages
 from ovos_core.intent_services.converse_service import ConverseService
 from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
+from ovos_persona import PersonaService
+
+try:
+    from ovos_ollama_intent_pipeline import LLMIntentPipeline
+except ImportError:
+    LLMIntentPipeline = None
 
 
 class IntentService:
@@ -49,6 +54,15 @@ class IntentService:
     """
 
     def __init__(self, bus, config=None):
+        """
+        Initializes the IntentService with intent parsing pipelines, transformer services, and messagebus event handlers.
+        
+        Args:
+            bus: The messagebus connection for event handling.
+            config: Optional configuration dictionary for intent services.
+        
+        Sets up skill name mapping, loads all supported intent matching pipelines, initializes utterance and metadata transformer services, connects the session manager, and registers all relevant messagebus event handlers for utterance processing, context management, intent queries, and skill tracking.
+        """
         self.bus = bus
         self.config = config or Configuration().get("intents", {})
 
@@ -63,6 +77,7 @@ class IntentService:
         self._common_qa = None
         self._stop = None
         self._ocp = None
+        self._ollama = None
         self._load_pipeline_plugins()
 
         self.utterance_plugins = UtteranceTransformersService(bus)
@@ -91,6 +106,11 @@ class IntentService:
 
     def _load_pipeline_plugins(self):
         # TODO - replace with plugin loader from OPM
+        """
+        Initializes and configures all intent matching pipeline plugins used by the service.
+        
+        Loads and sets up the Adapt, Padatious, Padacioso, Fallback, Converse, CommonQA, Stop, OCP, Persona, and optionally LLM intent pipelines based on the current configuration. Handles conditional loading and disabling of Padatious and Padacioso pipelines, and logs relevant status or errors.
+        """
         self._adapt_service = AdaptPipeline(bus=self.bus, config=self.config.get("adapt", {}))
         if "padatious" not in self.config:
             self.config["padatious"] = Configuration().get("padatious", {})
@@ -119,9 +139,16 @@ class IntentService:
         self._stop = StopService(self.bus)
         self._ocp = OCPPipelineMatcher(self.bus, config=self.config.get("OCP", {}))
         self._persona = PersonaService(self.bus, config=self.config.get("persona", {}))
+        if LLMIntentPipeline is not None:
+            self._ollama = LLMIntentPipeline(self.bus, config=self.config.get("ovos-ollama-intent-pipeline", {}))
 
     def update_skill_name_dict(self, message):
-        """Messagebus handler, updates dict of id to skill name conversions."""
+        """
+        Updates the mapping of skill IDs to skill names based on a messagebus event.
+        
+        Args:
+            message: A message containing 'id' and 'name' fields for the skill.
+        """
         self.skill_names[message.data['id']] = message.data['name']
 
     def get_skill_name(self, skill_id):
@@ -177,10 +204,21 @@ class IntentService:
         return default_lang
 
     def get_pipeline(self, skips=None, session=None) -> Tuple[str, Callable]:
-        """return a list of matcher functions ordered by priority
-        utterances will be sent to each matcher in order until one can handle the utterance
-        the list can be configured in mycroft.conf under intents.pipeline,
-        in the future plugins will be supported for users to define their own pipeline"""
+        """
+        Returns an ordered list of intent matcher functions for the current session pipeline.
+        
+        The pipeline is determined by the session's configuration and may be filtered by
+        the optional `skips` list. Each matcher is paired with its pipeline key, and the
+        resulting list reflects the order in which utterances will be processed for intent
+        matching. If a requested pipeline component is unavailable, it is skipped with a warning.
+        
+        Args:
+            skips: Optional list of pipeline keys to exclude from the matcher sequence.
+            session: Optional session object; if not provided, the current session is used.
+        
+        Returns:
+            A list of (pipeline_key, matcher_function) tuples in the order they will be applied.
+        """
         session = session or SessionManager.get()
 
         # Create matchers
@@ -213,6 +251,8 @@ class IntentService:
             "ovos-persona-pipeline-plugin-high": self._persona.match_high,
             "ovos-persona-pipeline-plugin-low": self._persona.match_low
         }
+        if self._ollama is not None:
+            matchers["ovos-ollama-intent-pipeline"] = self._ollama.match_low
         if self._padacioso_service is not None:
             matchers.update({
                 "padacioso_high": self._padacioso_service.match_high,
