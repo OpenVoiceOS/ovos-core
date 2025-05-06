@@ -19,14 +19,9 @@ from collections import defaultdict
 from typing import Tuple, Callable, Union, List
 
 import requests
-from ocp_pipeline.opm import OCPPipelineMatcher
-from ovos_adapt.opm import AdaptPipeline
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
-from ovos_config.config import Configuration
-from ovos_config.locale import get_valid_languages
-from ovos_persona import PersonaService
 from ovos_plugin_manager.templates.pipeline import PipelineMatch, IntentHandlerMatch
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG, log_deprecation, deprecated
@@ -34,11 +29,17 @@ from ovos_utils.metrics import Stopwatch
 from ovos_utils.thread_utils import create_daemon
 from padacioso.opm import PadaciosoPipeline as PadaciosoService
 
+from ocp_pipeline.opm import OCPPipelineMatcher
+from ovos_adapt.opm import AdaptPipeline
 from ovos_commonqa.opm import CommonQAService
+from ovos_config.config import Configuration
+from ovos_config.locale import get_valid_languages
 from ovos_core.intent_services.converse_service import ConverseService
 from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
+from ovos_persona import PersonaService
+
 try:
     from ovos_ollama_intent_pipeline import LLMIntentPipeline
 except ImportError:
@@ -218,9 +219,10 @@ class IntentService:
             "adapt_low": self._adapt_service.match_low,
             "fallback_low": self._fallback.low_prio,
             "ovos-persona-pipeline-plugin-high": self._persona.match_high,
-            "ovos-persona-pipeline-plugin-low": self._persona.match_low,
-            "ovos-ollama-intent-pipeline": self._ollama.match_low
+            "ovos-persona-pipeline-plugin-low": self._persona.match_low
         }
+        if self._ollama is not None:
+            matchers["ovos-ollama-intent-pipeline"] = self._ollama.match_low
         if self._padacioso_service is not None:
             matchers.update({
                 "padacioso_high": self._padacioso_service.match_high,
