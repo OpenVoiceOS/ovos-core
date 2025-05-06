@@ -14,6 +14,7 @@
 #
 
 import json
+import warnings
 from collections import defaultdict
 from typing import Tuple, Callable, List, Union, Dict
 
@@ -21,21 +22,19 @@ import requests
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
-
+from ovos_plugin_manager.pipeline import OVOSPipelineFactory
+from ovos_plugin_manager.templates.pipeline import PipelineMatch, IntentHandlerMatch
+from ovos_utils.lang import standardize_lang_tag
+from ovos_utils.log import LOG, log_deprecation, deprecated
+from ovos_utils.metrics import Stopwatch
 from ovos_utils.thread_utils import create_daemon
+
 from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
 from ovos_core.intent_services.converse_service import ConverseService
 from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
-from ovos_plugin_manager.pipeline import OVOSPipelineFactory
-from ovos_plugin_manager.templates.pipeline import PipelineMatch, IntentHandlerMatch
-from ovos_utils.lang import standardize_lang_tag
-from ovos_utils.log import LOG, log_deprecation, deprecated
-from ovos_utils.metrics import Stopwatch
-
-import warnings
 
 
 class IntentService:
