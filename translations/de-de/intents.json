@@ -1,12 +1,12 @@
 {
   "stop.intent": [
-    "stopp",
-    "höre auf damit",
+    "stopp\nstop\nStop\nStopp",
+    "höre auf damit\nhre auf damit\nhörre auf damit",
     "stoppe das",
     "Hör auf mit dem, was du tust",
-    "schluß",
-    "Kannst du damit aufhören",
-    "Beende diese Aufgabe",
+    "schluß\nschluss\n",
+    "kannst du damit aufhören",
+    "beende diese aufgabe",
     "Bitte halte die aktuelle Aufgabe an",
     "Stoppe den laufenden Prozess",
     "Beenden Sie die aktuelle Aktivität",

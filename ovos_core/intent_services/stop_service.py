@@ -349,6 +349,9 @@ class StopService(PipelinePlugin):
     def voc_match(self, utt: str, voc_filename: str, lang: str,
                   exact: bool = False):
         """
+        TODO - should use ovos_workshop method instead of reimplementing here
+               look into subclassing from OVOSAbstractApp
+
         Determine if the given utterance contains the vocabulary provided.
 
         By default the method checks if the utterance contains the given vocab
@@ -379,10 +382,10 @@ class StopService(PipelinePlugin):
         if utt and _vocs:
             if exact:
                 # Check for exact match
-                return any(i.strip() == utt
+                return any(i.strip().lower() == utt.lower()
                            for i in _vocs)
             else:
                 # Check for matches against complete words
-                return any([re.match(r'.*\b' + i + r'\b.*', utt)
+                return any([re.match(r'.*\b' + i + r'\b.*', utt, re.IGNORECASE)
                             for i in _vocs])
         return False
