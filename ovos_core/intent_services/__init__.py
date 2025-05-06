@@ -39,6 +39,10 @@ from ovos_core.intent_services.converse_service import ConverseService
 from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
+try:
+    from ovos_ollama_intent_pipeline import LLMIntentPipeline
+except ImportError:
+    LLMIntentPipeline = None
 
 
 class IntentService:
@@ -63,6 +67,7 @@ class IntentService:
         self._common_qa = None
         self._stop = None
         self._ocp = None
+        self._ollama = None
         self._load_pipeline_plugins()
 
         self.utterance_plugins = UtteranceTransformersService(bus)
@@ -119,6 +124,8 @@ class IntentService:
         self._stop = StopService(self.bus)
         self._ocp = OCPPipelineMatcher(self.bus, config=self.config.get("OCP", {}))
         self._persona = PersonaService(self.bus, config=self.config.get("persona", {}))
+        if LLMIntentPipeline is not None:
+            self._ollama = LLMIntentPipeline(self.bus, config=self.config.get("ovos-ollama-intent-pipeline", {}))
 
     def update_skill_name_dict(self, message):
         """Messagebus handler, updates dict of id to skill name conversions."""
@@ -211,7 +218,8 @@ class IntentService:
             "adapt_low": self._adapt_service.match_low,
             "fallback_low": self._fallback.low_prio,
             "ovos-persona-pipeline-plugin-high": self._persona.match_high,
-            "ovos-persona-pipeline-plugin-low": self._persona.match_low
+            "ovos-persona-pipeline-plugin-low": self._persona.match_low,
+            "ovos-ollama-intent-pipeline": self._ollama.match_low
         }
         if self._padacioso_service is not None:
             matchers.update({
