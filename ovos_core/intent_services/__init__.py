@@ -147,9 +147,15 @@ class IntentService:
         self._ocp = OCPPipelineMatcher(self.bus, config=self.config.get("OCP", {}))
         self._persona = PersonaService(self.bus, config=self.config.get("persona", {}))
         if LLMIntentPipeline is not None:
-            self._ollama = LLMIntentPipeline(self.bus, config=self.config.get("ovos-ollama-intent-pipeline", {}))
+            try:
+                self._ollama = LLMIntentPipeline(self.bus, config=self.config.get("ovos-ollama-intent-pipeline", {}))
+            except Exception as e:
+                LOG.error(f"Failed to load LLMIntentPipeline ({e})")
         if Model2VecIntentPipeline is not None:
-            self._m2v = Model2VecIntentPipeline(self.bus, config=self.config.get("ovos-m2v-pipeline", {}))
+            try:
+                self._m2v = Model2VecIntentPipeline(self.bus, config=self.config.get("ovos-m2v-pipeline", {}))
+            except Exception as e:
+                LOG.error(f"Failed to load Model2VecIntentPipeline ({e})")
 
     def update_skill_name_dict(self, message):
         """
