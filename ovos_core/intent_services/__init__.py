@@ -40,10 +40,16 @@ from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
 from ovos_persona import PersonaService
 
+# TODO - to be dropped once pluginified
+# just a placeholder during alphas until https://github.com/OpenVoiceOS/ovos-core/pull/570
 try:
     from ovos_ollama_intent_pipeline import LLMIntentPipeline
 except ImportError:
     LLMIntentPipeline = None
+try:
+    from ovos_m2v_pipeline import Model2VecIntentPipeline
+except ImportError:
+    Model2VecIntentPipeline = None
 
 
 class IntentService:
@@ -78,6 +84,7 @@ class IntentService:
         self._stop = None
         self._ocp = None
         self._ollama = None
+        self._m2v = None
         self._load_pipeline_plugins()
 
         self.utterance_plugins = UtteranceTransformersService(bus)
@@ -141,6 +148,8 @@ class IntentService:
         self._persona = PersonaService(self.bus, config=self.config.get("persona", {}))
         if LLMIntentPipeline is not None:
             self._ollama = LLMIntentPipeline(self.bus, config=self.config.get("ovos-ollama-intent-pipeline", {}))
+        if Model2VecIntentPipeline is not None:
+            self._m2v = Model2VecIntentPipeline(self.bus, config=self.config.get("ovos-m2v-pipeline", {}))
 
     def update_skill_name_dict(self, message):
         """
@@ -253,6 +262,8 @@ class IntentService:
         }
         if self._ollama is not None:
             matchers["ovos-ollama-intent-pipeline"] = self._ollama.match_low
+        if self._m2v is not None:
+            matchers["ovos-m2v-pipeline"] = self._m2v.match_high
         if self._padacioso_service is not None:
             matchers.update({
                 "padacioso_high": self._padacioso_service.match_high,
