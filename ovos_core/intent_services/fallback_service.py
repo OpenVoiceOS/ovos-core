@@ -12,41 +12,43 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""Intent service for Mycroft's fallback system."""
+"""Intent service for OVOS's fallback system."""
 import operator
 import time
 from collections import namedtuple
-from typing import Optional, List
+from typing import Optional, Dict, List, Union
 
+from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_config import Configuration
-from ovos_plugin_manager.templates.pipeline import PipelineMatch, PipelinePlugin
+from ovos_plugin_manager.templates.pipeline import PipelineMatch, PipelineStageConfidenceMatcher
 from ovos_utils import flatten_list
+from ovos_utils.fakebus import FakeBus
 from ovos_utils.lang import standardize_lang_tag
-from ovos_utils.log import LOG
+from ovos_utils.log import LOG, deprecated, log_deprecation
 from ovos_workshop.permissions import FallbackMode
 
 FallbackRange = namedtuple('FallbackRange', ['start', 'stop'])
 
 
-class FallbackService(PipelinePlugin):
+class FallbackService(PipelineStageConfidenceMatcher):
     """Intent Service handling fallback skills."""
 
-    def __init__(self, bus):
-        self.bus = bus
-        self.fallback_config = Configuration()["skills"].get("fallbacks", {})
+    def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
+                 config: Optional[Dict] = None):
+        config = config or Configuration().get("skills", {}).get("fallbacks", {})
+        super().__init__(bus, config)
         self.registered_fallbacks = {}  # skill_id: priority
         self.bus.on("ovos.skills.fallback.register", self.handle_register_fallback)
         self.bus.on("ovos.skills.fallback.deregister", self.handle_deregister_fallback)
-        super().__init__(self.fallback_config)
 
     def handle_register_fallback(self, message: Message):
         skill_id = message.data.get("skill_id")
         priority = message.data.get("priority") or 101
 
         # check if .conf is overriding the priority for this skill
-        priority_overrides = self.fallback_config.get("fallback_priorities", {})
+        priority_overrides = self.config.get("fallback_priorities", {})
         if skill_id in priority_overrides:
             new_priority = priority_overrides.get(skill_id)
             LOG.info(f"forcing {skill_id} fallback priority from {priority} to {new_priority}")
@@ -71,12 +73,12 @@ class FallbackService(PipelinePlugin):
         Returns:
             permitted (bool): True if skill can fallback
         """
-        opmode = self.fallback_config.get("fallback_mode", FallbackMode.ACCEPT_ALL)
+        opmode = self.config.get("fallback_mode", FallbackMode.ACCEPT_ALL)
         if opmode == FallbackMode.BLACKLIST and skill_id in \
-                self.fallback_config.get("fallback_blacklist", []):
+                self.config.get("fallback_blacklist", []):
             return False
         elif opmode == FallbackMode.WHITELIST and skill_id not in \
-                self.fallback_config.get("fallback_whitelist", []):
+                self.config.get("fallback_whitelist", []):
             return False
         return True
 
@@ -147,7 +149,7 @@ class FallbackService(PipelinePlugin):
                                     "lang": lang})
             result = self.bus.wait_for_response(fb_msg,
                                                 f"ovos.skills.fallback.{skill_id}.response",
-                                                timeout=self.fallback_config.get("max_skill_runtime", 10))
+                                                timeout=self.config.get("max_skill_runtime", 10))
             if result and 'error' in result.data:
                 error_msg = result.data['error']
                 LOG.error(f"{skill_id}: {error_msg}")
@@ -202,20 +204,42 @@ class FallbackService(PipelinePlugin):
                                      utterance=utterances[0])
         return None
 
-    def high_prio(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
+    def match_high(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
         """Pre-padatious fallbacks."""
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(0, 5))
 
-    def medium_prio(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
+    def match_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
         """General fallbacks."""
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(5, 90))
 
-    def low_prio(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
+    def match_low(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
         """Low prio fallbacks with general matching such as chat-bot."""
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(90, 101))
+
+    @deprecated("'low_prio' has been renamed to 'match_low'", "2.0.0")
+    def low_prio(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
+        return self.match_low(utterances, lang, message)
+
+    @deprecated("'medium_prio' has been renamed to 'match_medium'", "2.0.0")
+    def medium_prio(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
+        return self.match_medium(utterances, lang, message)
+
+    @deprecated("'high_prio' has been renamed to 'match_high'", "2.0.0")
+    def high_prio(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
+        return self.match_high(utterances, lang, message)
+
+    @property
+    def fallback_config(self) -> Dict:
+        log_deprecation("'self.fallback_config' is deprecated, access 'self.config' directly instead", "1.0.0")
+        return self.config
+
+    @fallback_config.setter
+    def fallback_config(self, val):
+        log_deprecation("'self.fallback_config' is deprecated, access 'self.config' directly instead", "1.0.0")
+        self.config = val
 
     def shutdown(self):
         self.bus.remove("ovos.skills.fallback.register", self.handle_register_fallback)
