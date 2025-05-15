@@ -1,41 +1,12 @@
 # Changelog
 
-## [1.3.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.3.0a1) (2025-05-06)
+## [1.3.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.3.1a1) (2025-05-15)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.2.6a1...1.3.0a1)
-
-**Merged pull requests:**
-
-- feat: ovos-ollama-intent-pipeline [\#678](https://github.com/OpenVoiceOS/ovos-core/pull/678) ([JarbasAl](https://github.com/JarbasAl))
-
-## [1.2.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.2.6a1) (2025-04-23)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.2.5a2...1.2.6a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.3.0...1.3.1a1)
 
 **Merged pull requests:**
 
-- fix: drop unused alpha package with optional \(unused\) plugins [\#675](https://github.com/OpenVoiceOS/ovos-core/pull/675) ([JarbasAl](https://github.com/JarbasAl))
-
-## [1.2.5a2](https://github.com/OpenVoiceOS/ovos-core/tree/1.2.5a2) (2025-04-23)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.2.5a1...1.2.5a2)
-
-## [1.2.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.2.5a1) (2025-04-23)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.2.4a1...1.2.5a1)
-
-**Merged pull requests:**
-
-- fix: stop lowercase [\#674](https://github.com/OpenVoiceOS/ovos-core/pull/674) ([JarbasAl](https://github.com/JarbasAl))
-- test uppercase vs lowercase [\#673](https://github.com/OpenVoiceOS/ovos-core/pull/673) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
-
-## [1.2.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.2.4a1) (2025-04-21)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.2.3...1.2.4a1)
-
-**Merged pull requests:**
-
-- optimizing German translation for better usage [\#671](https://github.com/OpenVoiceOS/ovos-core/pull/671) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+- fix: update requirements skill package names [\#683](https://github.com/OpenVoiceOS/ovos-core/pull/683) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
