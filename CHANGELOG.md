@@ -1,12 +1,12 @@
 # Changelog
 
-## [1.3.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.3.1a1) (2025-05-15)
+## [1.4.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.4.0a1) (2025-05-22)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.3.0...1.3.1a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.3.1...1.4.0a1)
 
 **Merged pull requests:**
 
-- fix: update requirements skill package names [\#683](https://github.com/OpenVoiceOS/ovos-core/pull/683) ([JarbasAl](https://github.com/JarbasAl))
+- feat: m2v pipeline [\#681](https://github.com/OpenVoiceOS/ovos-core/pull/681) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
