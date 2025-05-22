@@ -15,6 +15,7 @@
 
 import json
 import warnings
+import time
 from collections import defaultdict
 from typing import Tuple, Callable, Union, List
 
@@ -157,6 +158,8 @@ class IntentService:
             except Exception as e:
                 LOG.error(f"Failed to load Model2VecIntentPipeline ({e})")
 
+        LOG.debug(f"Default pipeline: {SessionManager.get().pipeline}")
+
     def update_skill_name_dict(self, message):
         """
         Updates the internal mapping of skill IDs to skill names from a message event.
@@ -271,7 +274,9 @@ class IntentService:
         if self._ollama is not None:
             matchers["ovos-ollama-intent-pipeline"] = self._ollama.match_low
         if self._m2v is not None:
-            matchers["ovos-m2v-pipeline"] = self._m2v.match_high
+            matchers["ovos-m2v-pipeline-high"] = self._m2v.match_high
+            matchers["ovos-m2v-pipeline-medium"] = self._m2v.match_medium
+            matchers["ovos-m2v-pipeline-low"] = self._m2v.match_low
         if self._padacioso_service is not None:
             matchers.update({
                 "padacioso_high": self._padacioso_service.match_high,
@@ -635,7 +640,7 @@ class IntentService:
         utterance = message.data["utterance"]
         lang = get_message_lang(message)
         sess = SessionManager.get(message)
-
+        match = None
         # Loop through the matching functions until a match is found.
         for pipeline, match_func in self.get_pipeline(skips=["converse",
                                                              "common_qa",
@@ -643,21 +648,25 @@ class IntentService:
                                                              "fallback_medium",
                                                              "fallback_low"],
                                                       session=sess):
+            s = time.monotonic()
             match = match_func([utterance], lang, message)
+            LOG.debug(f"matching '{pipeline}' took: {time.monotonic() - s} seconds")
             if match:
                 if match.match_type:
-                    intent_data = match.match_data
+                    intent_data = dict(match.match_data)
                     intent_data["intent_name"] = match.match_type
                     intent_data["intent_service"] = pipeline
                     intent_data["skill_id"] = match.skill_id
                     intent_data["handler"] = match_func.__name__
-                    self.bus.emit(message.reply("intent.service.intent.reply",
-                                                {"intent": intent_data}))
+                    LOG.debug(f"final intent match: {intent_data}")
+                    m = message.reply("intent.service.intent.reply",
+                                      {"intent": intent_data, "utterance": utterance})
+                    self.bus.emit(m)
                     return
-
+                LOG.error(f"bad pipeline match! {match}")
         # signal intent failure
         self.bus.emit(message.reply("intent.service.intent.reply",
-                                    {"intent": None}))
+                                    {"intent": None, "utterance": utterance}))
 
     def handle_get_skills(self, message):
         """Send registered skills to caller.
