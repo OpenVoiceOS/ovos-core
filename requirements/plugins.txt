@@ -5,5 +5,5 @@ ovos-translate-server-plugin>=0.0.2, <1.0.0
 ovos-utterance-normalizer>=0.2.1, <1.0.0
 ovos-number-parser>=0.0.1,<1.0.0
 ovos-date-parser>=0.0.3,<1.0.0
-ovos-m2v-pipeline>=0.0.3,<1.0.0
+ovos-m2v-pipeline>=0.0.5,<1.0.0
 ovos-ollama-intent-pipeline-plugin>=0.0.1,<1.0.0
