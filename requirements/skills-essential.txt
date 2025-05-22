@@ -2,7 +2,7 @@
 ovos-skill-fallback-unknown>=0.1.5,<1.0.0
 ovos-skill-alerts>=0.1.10,<1.0.0
 ovos-skill-personal>=0.1.7,<1.0.0
-ovos-skill-date-time>=0.4.2,<1.0.0
+ovos-skill-date-time>=0.4.2,<2.0.0
 ovos-skill-hello-world>=0.1.10,<1.0.0
 ovos-skill-spelling>=0.2.5,<1.0.0
 ovos-skill-diagnostics>=0.0.2,<1.0.0

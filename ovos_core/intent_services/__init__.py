@@ -15,6 +15,7 @@
 
 import json
 import warnings
+import time
 from collections import defaultdict
 from typing import Tuple, Callable, Union, List
 
@@ -40,10 +41,16 @@ from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
 from ovos_persona import PersonaService
 
+# TODO - to be dropped once pluginified
+# just a placeholder during alphas until https://github.com/OpenVoiceOS/ovos-core/pull/570
 try:
     from ovos_ollama_intent_pipeline import LLMIntentPipeline
 except ImportError:
     LLMIntentPipeline = None
+try:
+    from ovos_m2v_pipeline import Model2VecIntentPipeline
+except ImportError:
+    Model2VecIntentPipeline = None
 
 
 class IntentService:
@@ -55,13 +62,13 @@ class IntentService:
 
     def __init__(self, bus, config=None):
         """
-        Initializes the IntentService with intent parsing pipelines, transformer services, and messagebus event handlers.
+        Initializes the IntentService with all intent parsing pipelines, transformer services, and messagebus event handlers.
         
         Args:
-            bus: The messagebus connection for event handling.
+            bus: The messagebus connection used for event-driven communication.
             config: Optional configuration dictionary for intent services.
         
-        Sets up skill name mapping, loads all supported intent matching pipelines, initializes utterance and metadata transformer services, connects the session manager, and registers all relevant messagebus event handlers for utterance processing, context management, intent queries, and skill tracking.
+        Sets up skill name mapping, loads all supported intent matching pipelines (including Adapt, Padatious, Padacioso, Fallback, Converse, CommonQA, Stop, OCP, Persona, and optionally LLM and Model2Vec pipelines), initializes utterance and metadata transformer services, connects the session manager, and registers all relevant messagebus event handlers for utterance processing, context management, intent queries, and skill deactivation tracking.
         """
         self.bus = bus
         self.config = config or Configuration().get("intents", {})
@@ -78,6 +85,7 @@ class IntentService:
         self._stop = None
         self._ocp = None
         self._ollama = None
+        self._m2v = None
         self._load_pipeline_plugins()
 
         self.utterance_plugins = UtteranceTransformersService(bus)
@@ -107,9 +115,9 @@ class IntentService:
     def _load_pipeline_plugins(self):
         # TODO - replace with plugin loader from OPM
         """
-        Initializes and configures all intent matching pipeline plugins used by the service.
+        Initializes and configures all intent matching pipeline plugins for the service.
         
-        Loads and sets up the Adapt, Padatious, Padacioso, Fallback, Converse, CommonQA, Stop, OCP, Persona, and optionally LLM intent pipelines based on the current configuration. Handles conditional loading and disabling of Padatious and Padacioso pipelines, and logs relevant status or errors.
+        Sets up Adapt, Padatious, Padacioso, Fallback, Converse, CommonQA, Stop, OCP, Persona, and optionally LLM and Model2Vec intent pipelines based on the current configuration. Handles conditional loading and disabling of Padatious and Padacioso pipelines, and logs relevant status or errors.
         """
         self._adapt_service = AdaptPipeline(bus=self.bus, config=self.config.get("adapt", {}))
         if "padatious" not in self.config:
@@ -140,14 +148,24 @@ class IntentService:
         self._ocp = OCPPipelineMatcher(self.bus, config=self.config.get("OCP", {}))
         self._persona = PersonaService(self.bus, config=self.config.get("persona", {}))
         if LLMIntentPipeline is not None:
-            self._ollama = LLMIntentPipeline(self.bus, config=self.config.get("ovos-ollama-intent-pipeline", {}))
+            try:
+                self._ollama = LLMIntentPipeline(self.bus, config=self.config.get("ovos-ollama-intent-pipeline", {}))
+            except Exception as e:
+                LOG.error(f"Failed to load LLMIntentPipeline ({e})")
+        if Model2VecIntentPipeline is not None:
+            try:
+                self._m2v = Model2VecIntentPipeline(self.bus, config=self.config.get("ovos-m2v-pipeline", {}))
+            except Exception as e:
+                LOG.error(f"Failed to load Model2VecIntentPipeline ({e})")
+
+        LOG.debug(f"Default pipeline: {SessionManager.get().pipeline}")
 
     def update_skill_name_dict(self, message):
         """
-        Updates the mapping of skill IDs to skill names based on a messagebus event.
+        Updates the internal mapping of skill IDs to skill names from a message event.
         
         Args:
-            message: A message containing 'id' and 'name' fields for the skill.
+            message: A message object containing 'id' and 'name' fields for the skill.
         """
         self.skill_names[message.data['id']] = message.data['name']
 
@@ -205,19 +223,21 @@ class IntentService:
 
     def get_pipeline(self, skips=None, session=None) -> Tuple[str, Callable]:
         """
-        Returns an ordered list of intent matcher functions for the current session pipeline.
+        Constructs and returns the ordered list of intent matcher functions for the current session.
         
-        The pipeline is determined by the session's configuration and may be filtered by
-        the optional `skips` list. Each matcher is paired with its pipeline key, and the
-        resulting list reflects the order in which utterances will be processed for intent
-        matching. If a requested pipeline component is unavailable, it is skipped with a warning.
+        The pipeline sequence is determined by the session's configuration and may be filtered by
+        an optional list of pipeline keys to skip. Each entry in the returned list is a tuple of
+        the pipeline key and its corresponding matcher function, in the order they will be applied
+        for intent matching. If a requested pipeline component is unavailable, it is skipped and a
+        warning is logged.
         
         Args:
             skips: Optional list of pipeline keys to exclude from the matcher sequence.
             session: Optional session object; if not provided, the current session is used.
         
         Returns:
-            A list of (pipeline_key, matcher_function) tuples in the order they will be applied.
+            A list of (pipeline_key, matcher_function) tuples representing the active intent
+            matching pipeline for the session.
         """
         session = session or SessionManager.get()
 
@@ -253,6 +273,10 @@ class IntentService:
         }
         if self._ollama is not None:
             matchers["ovos-ollama-intent-pipeline"] = self._ollama.match_low
+        if self._m2v is not None:
+            matchers["ovos-m2v-pipeline-high"] = self._m2v.match_high
+            matchers["ovos-m2v-pipeline-medium"] = self._m2v.match_medium
+            matchers["ovos-m2v-pipeline-low"] = self._m2v.match_low
         if self._padacioso_service is not None:
             matchers.update({
                 "padacioso_high": self._padacioso_service.match_high,
@@ -616,7 +640,7 @@ class IntentService:
         utterance = message.data["utterance"]
         lang = get_message_lang(message)
         sess = SessionManager.get(message)
-
+        match = None
         # Loop through the matching functions until a match is found.
         for pipeline, match_func in self.get_pipeline(skips=["converse",
                                                              "common_qa",
@@ -624,21 +648,25 @@ class IntentService:
                                                              "fallback_medium",
                                                              "fallback_low"],
                                                       session=sess):
+            s = time.monotonic()
             match = match_func([utterance], lang, message)
+            LOG.debug(f"matching '{pipeline}' took: {time.monotonic() - s} seconds")
             if match:
                 if match.match_type:
-                    intent_data = match.match_data
+                    intent_data = dict(match.match_data)
                     intent_data["intent_name"] = match.match_type
                     intent_data["intent_service"] = pipeline
                     intent_data["skill_id"] = match.skill_id
                     intent_data["handler"] = match_func.__name__
-                    self.bus.emit(message.reply("intent.service.intent.reply",
-                                                {"intent": intent_data}))
+                    LOG.debug(f"final intent match: {intent_data}")
+                    m = message.reply("intent.service.intent.reply",
+                                      {"intent": intent_data, "utterance": utterance})
+                    self.bus.emit(m)
                     return
-
+                LOG.error(f"bad pipeline match! {match}")
         # signal intent failure
         self.bus.emit(message.reply("intent.service.intent.reply",
-                                    {"intent": None}))
+                                    {"intent": None, "utterance": utterance}))
 
     def handle_get_skills(self, message):
         """Send registered skills to caller.
