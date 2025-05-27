@@ -7,3 +7,5 @@ ovos-number-parser>=0.0.1,<1.0.0
 ovos-date-parser>=0.0.3,<1.0.0
 ovos-m2v-pipeline>=0.0.5,<1.0.0
 ovos-ollama-intent-pipeline-plugin>=0.0.1,<1.0.0
+keyword-template-matcher>=0.0.1,<1.0.0
+ahocorasick-ner>=0.0.1,<1.0.0
