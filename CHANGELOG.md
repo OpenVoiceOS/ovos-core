@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.5.0a1) (2025-05-27)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.4.0a1...1.5.0a1)
+
+**Merged pull requests:**
+
+- feat: intent transformers [\#686](https://github.com/OpenVoiceOS/ovos-core/pull/686) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.4.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.4.0a1) (2025-05-22)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.3.1...1.4.0a1)
