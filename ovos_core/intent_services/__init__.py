@@ -55,13 +55,13 @@ class IntentService:
 
     def __init__(self, bus, config=None):
         """
-        Initializes the IntentService with intent parsing pipelines, transformer services, and messagebus event handlers.
+        Initializes the IntentService with all intent parsing pipelines, transformer services, and messagebus event handlers.
         
         Args:
             bus: The messagebus connection for event handling.
             config: Optional configuration dictionary for intent services.
         
-        Sets up skill name mapping, loads all supported intent matching pipelines, initializes utterance and metadata transformer services, connects the session manager, and registers all relevant messagebus event handlers for utterance processing, context management, intent queries, and skill tracking.
+        Loads and configures all supported intent matching pipelines, sets up skill name mapping, initializes utterance, metadata, and intent transformer services, connects the session manager, and registers messagebus event handlers for utterance processing, context management, intent queries, skill tracking, and skill deactivation.
         """
         self.bus = bus
         self.config = config or Configuration().get("intents", {})
@@ -318,31 +318,9 @@ class IntentService:
 
     def _emit_match_message(self, match: Union[IntentHandlerMatch, PipelineMatch], message: Message, lang: str):
         """
-        Emit a reply message for a matched intent, updating session and skill activation.
-
-        This method processes matched intents from either a pipeline matcher or an intent handler,
-        creating a reply message with matched intent details and managing skill activation.
-
-        Args:
-            match (Union[IntentHandlerMatch, PipelineMatch]): The matched intent object containing
-                utterance and matching information.
-            message (Message): The original messagebus message that triggered the intent match.
-            lang (str): The language of the pipeline plugin match
-
-        Details:
-            - Handles two types of matches: PipelineMatch and IntentHandlerMatch
-            - Creates a reply message with matched intent data
-            - Activates the corresponding skill if not previously deactivated
-            - Updates session information
-            - Emits the reply message on the messagebus
-
-        Side Effects:
-            - Modifies session state
-            - Emits a messagebus event
-            - Can trigger skill activation events
-
-        Returns:
-            None
+        Emits a reply message for a matched intent, updating session state and managing skill activation.
+        
+        Transforms the matched intent object, constructs a reply message with intent details, updates the session language and context, and activates the corresponding skill unless it was previously deactivated. Emits the reply message on the messagebus and uploads intent match data for metrics collection. If no reply is generated, uploads a failure metric instead.
         """
         try:
             match = self.intent_plugins.transform(match)

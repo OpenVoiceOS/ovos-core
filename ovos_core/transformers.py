@@ -117,6 +117,17 @@ class MetadataTransformersService:
                 pass
 
     def transform(self, context: Optional[dict] = None):
+        """
+        Sequentially applies all loaded metadata transformer plugins to the provided context.
+        
+        Each plugin's `transform` method is called in order of descending priority, and the resulting data is merged into the context. Sensitive session data is excluded from debug logs. Exceptions raised by plugins are logged as warnings and do not interrupt the transformation process.
+        
+        Args:
+            context: Optional dictionary containing metadata to be transformed.
+        
+        Returns:
+            The updated context dictionary after all transformations.
+        """
         context = context or {}
 
         for module in self.plugins:
@@ -133,6 +144,11 @@ class MetadataTransformersService:
 class IntentTransformersService:
 
     def __init__(self, bus, config=None):
+        """
+        Initializes the IntentTransformersService with the provided message bus and configuration.
+        
+        Loads and prepares intent transformer plugins based on the configuration, making them ready for use.
+        """
         self.config_core = config or Configuration()
         self.loaded_plugins = {}
         self.has_loaded = False
@@ -142,9 +158,20 @@ class IntentTransformersService:
 
     @staticmethod
     def find_plugins():
+        """
+        Discovers and returns available intent transformer plugins.
+        
+        Returns:
+            An iterable of (plugin_name, plugin_class) pairs for all discovered intent transformer plugins.
+        """
         return find_intent_transformer_plugins().items()
 
     def load_plugins(self):
+        """
+        Loads and initializes enabled intent transformer plugins based on the configuration.
+        
+        Plugins marked as inactive in the configuration are skipped. Successfully loaded plugins are added to the internal registry, while failures are logged without interrupting the loading process.
+        """
         for plug_name, plug in self.find_plugins():
             if plug_name in self.config:
                 # if disabled skip it
@@ -160,16 +187,17 @@ class IntentTransformersService:
     @property
     def plugins(self):
         """
-        Return loaded transformers in priority order, such that modules with a
-        higher `priority` rank are called first and changes from lower ranked
-        transformers are applied last.
-
-        A plugin of `priority` 1 will override any existing context keys
+        Returns the loaded intent transformer plugins sorted by descending priority.
+        
+        Plugins with higher priority values are applied first, allowing lower priority plugins to override changes made by higher priority ones.
         """
         return sorted(self.loaded_plugins.values(),
                       key=lambda k: k.priority, reverse=True)
 
     def shutdown(self):
+        """
+        Shuts down all loaded plugins, suppressing any exceptions raised during shutdown.
+        """
         for module in self.plugins:
             try:
                 module.shutdown()
@@ -177,6 +205,17 @@ class IntentTransformersService:
                 pass
 
     def transform(self, intent: Union[IntentHandlerMatch, PipelineMatch]) -> Union[IntentHandlerMatch, PipelineMatch]:
+        """
+        Sequentially applies all loaded intent transformer plugins to the given intent object.
+        
+        Each plugin's `transform` method is called in order of descending priority. Exceptions raised by individual plugins are logged as warnings, and processing continues with the next plugin. The final, transformed intent object is returned.
+        
+        Args:
+            intent: The intent match object to be transformed.
+        
+        Returns:
+            The transformed intent match object after all plugins have been applied.
+        """
         for module in self.plugins:
             try:
                 intent = module.transform(intent)

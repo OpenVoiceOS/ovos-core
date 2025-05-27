@@ -17,6 +17,11 @@ class TestAbortSkill(OVOSSkill):
         self.stop_called = False
 
     def handle_intent_aborted(self):
+        """
+        Handles cleanup when an intent is aborted.
+        
+        Speaks a message indicating the intent was terminated and resets internal state to default values.
+        """
         self.speak("I am dead")
         # handle any cleanup the skill might need, since intent was killed
         # at an arbitrary place of code execution some variables etc. might
@@ -26,6 +31,11 @@ class TestAbortSkill(OVOSSkill):
     @killable_intent(callback=handle_intent_aborted)
     @intent_handler("test.intent")
     def handle_test_abort_intent(self, message):
+        """
+        Handles the 'test.intent' by entering a loop that repeatedly announces presence.
+        
+        This intent is designed to be abortable during execution. It sets internal state variables before entering an infinite loop, where it speaks "still here" every second until aborted.
+        """
         self.stop_called = False
         self.my_special_var = "changed"
         while True:
@@ -35,6 +45,11 @@ class TestAbortSkill(OVOSSkill):
     @intent_handler("test2.intent")
     @killable_intent(callback=handle_intent_aborted)
     def handle_test_get_response_intent(self, message):
+        """
+        Handles the 'test2.intent' by prompting the user for a response with high retry count.
+        
+        If the user aborts the prompt, announces that the question was aborted.
+        """
         self.stop_called = False
         self.my_special_var = "CHANGED"
         ans = self.get_response("question", num_retries=99999)
@@ -45,6 +60,11 @@ class TestAbortSkill(OVOSSkill):
     @killable_intent(msg="my.own.abort.msg", callback=handle_intent_aborted)
     @intent_handler("test3.intent")
     def handle_test_msg_intent(self, message):
+        """
+        Handles the 'test3.intent' intent and demonstrates abortion via a custom message trigger.
+        
+        If the internal state variable is not set to "default", notifies about missing cleanup. Then enters an infinite loop, periodically speaking a message, until externally aborted by the custom message trigger.
+        """
         self.stop_called = False
         if self.my_special_var != "default":
             self.speak("someone forgot to cleanup")
