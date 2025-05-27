@@ -1,6 +1,6 @@
 from ovos_workshop.decorators import killable_intent
 from ovos_workshop.skills.ovos import OVOSSkill
-from ovos_workshop.decorators import intent_file_handler
+from ovos_workshop.decorators import intent_handler
 from time import sleep
 
 
@@ -24,7 +24,7 @@ class TestAbortSkill(OVOSSkill):
         self.my_special_var = "default"
 
     @killable_intent(callback=handle_intent_aborted)
-    @intent_file_handler("test.intent")
+    @intent_handler("test.intent")
     def handle_test_abort_intent(self, message):
         self.stop_called = False
         self.my_special_var = "changed"
@@ -32,7 +32,7 @@ class TestAbortSkill(OVOSSkill):
             sleep(1)
             self.speak("still here")
 
-    @intent_file_handler("test2.intent")
+    @intent_handler("test2.intent")
     @killable_intent(callback=handle_intent_aborted)
     def handle_test_get_response_intent(self, message):
         self.stop_called = False
@@ -43,7 +43,7 @@ class TestAbortSkill(OVOSSkill):
             self.speak("question aborted")
 
     @killable_intent(msg="my.own.abort.msg", callback=handle_intent_aborted)
-    @intent_file_handler("test3.intent")
+    @intent_handler("test3.intent")
     def handle_test_msg_intent(self, message):
         self.stop_called = False
         if self.my_special_var != "default":
