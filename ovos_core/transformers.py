@@ -1,8 +1,10 @@
-from typing import Optional, List
+from typing import Optional, List, Union
 from ovos_config import Configuration
+from ovos_plugin_manager.intent_transformers import find_intent_transformer_plugins
 from ovos_plugin_manager.metadata_transformers import find_metadata_transformer_plugins
 from ovos_plugin_manager.text_transformers import find_utterance_transformer_plugins
 
+from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, PipelineMatch
 from ovos_utils.json_helper import merge_dict
 from ovos_utils.log import LOG
 
@@ -128,3 +130,57 @@ class MetadataTransformersService:
         return context
 
 
+class IntentTransformersService:
+
+    def __init__(self, bus, config=None):
+        self.config_core = config or Configuration()
+        self.loaded_plugins = {}
+        self.has_loaded = False
+        self.bus = bus
+        self.config = self.config_core.get("intent_transformers") or {}
+        self.load_plugins()
+
+    @staticmethod
+    def find_plugins():
+        return find_intent_transformer_plugins().items()
+
+    def load_plugins(self):
+        for plug_name, plug in self.find_plugins():
+            if plug_name in self.config:
+                # if disabled skip it
+                if not self.config[plug_name].get("active", True):
+                    continue
+                try:
+                    self.loaded_plugins[plug_name] = plug()
+                    LOG.info(f"loaded intent transformer plugin: {plug_name}")
+                except Exception as e:
+                    LOG.error(e)
+                    LOG.exception(f"Failed to load intent transformer plugin: {plug_name}")
+
+    @property
+    def plugins(self):
+        """
+        Return loaded transformers in priority order, such that modules with a
+        higher `priority` rank are called first and changes from lower ranked
+        transformers are applied last.
+
+        A plugin of `priority` 1 will override any existing context keys
+        """
+        return sorted(self.loaded_plugins.values(),
+                      key=lambda k: k.priority, reverse=True)
+
+    def shutdown(self):
+        for module in self.plugins:
+            try:
+                module.shutdown()
+            except:
+                pass
+
+    def transform(self, intent: Union[IntentHandlerMatch, PipelineMatch]) -> Union[IntentHandlerMatch, PipelineMatch]:
+        for module in self.plugins:
+            try:
+                intent = module.transform(intent)
+                LOG.debug(f"{module.name}: {intent}")
+            except Exception as e:
+                LOG.warning(f"{module.name} transform exception: {e}")
+        return intent

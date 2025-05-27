@@ -37,7 +37,7 @@ from ovos_config.locale import get_valid_languages
 from ovos_core.intent_services.converse_service import ConverseService
 from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.stop_service import StopService
-from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService
+from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService, IntentTransformersService
 from ovos_persona import PersonaService
 
 try:
@@ -82,6 +82,7 @@ class IntentService:
 
         self.utterance_plugins = UtteranceTransformersService(bus)
         self.metadata_plugins = MetadataTransformersService(bus)
+        self.intent_plugins = IntentTransformersService(bus)
 
         # connection SessionManager to the bus,
         # this will sync default session across all components
@@ -343,12 +344,13 @@ class IntentService:
         Returns:
             None
         """
-        reply = None
         try:
-            sess = match.updated_session or SessionManager.get(message)
-        except AttributeError:  # old ovos-plugin-manager version
-            LOG.warning("outdated ovos-plugin-manager detected! please update to version 0.8.0")
-            sess = SessionManager.get(message)
+            match = self.intent_plugins.transform(match)
+        except Exception as e:
+            LOG.error(f"Error in IntentTransformers: {e}")
+
+        reply = None
+        sess = match.updated_session or SessionManager.get(message)
         sess.lang = lang  # ensure it is updated
 
         # utterance fully handled by pipeline matcher
