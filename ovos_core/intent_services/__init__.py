@@ -40,6 +40,8 @@ from ovos_utils.log import LOG, log_deprecation, deprecated
 from ovos_utils.metrics import Stopwatch
 from ovos_utils.thread_utils import create_daemon
 from padacioso.opm import PadaciosoPipeline as PadaciosoService
+from ovos_core.version import OVOS_VERSION_STR
+
 
 # TODO - to be dropped once pluginified
 # just a placeholder during alphas until https://github.com/OpenVoiceOS/ovos-core/pull/570
@@ -456,7 +458,8 @@ class IntentService:
             "intent": intent,
             "lang": lang,
             "match_data": json.dumps(match_data, ensure_ascii=False),
-            "pipeline": "|".join(pipeline)
+            "pipeline": "|".join(pipeline),
+            "core_version": OVOS_VERSION_STR
         }
         for url in endpoints:
             try:
