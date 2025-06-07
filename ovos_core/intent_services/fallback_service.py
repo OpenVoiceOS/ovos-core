@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""Intent service for OVOS's fallback system."""
 import operator
 import time
 from collections import namedtuple
@@ -22,17 +21,17 @@ from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_config import Configuration
-from ovos_plugin_manager.templates.pipeline import PipelineMatch, PipelineStageConfidenceMatcher
+from ovos_plugin_manager.templates.pipeline import ConfidenceMatcherPipeline, IntentHandlerMatch
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.lang import standardize_lang_tag
-from ovos_utils.log import LOG, deprecated, log_deprecation
+from ovos_utils.log import LOG
 from ovos_workshop.permissions import FallbackMode
 
 FallbackRange = namedtuple('FallbackRange', ['start', 'stop'])
 
 
-class FallbackService(PipelineStageConfidenceMatcher):
+class FallbackService(ConfidenceMatcherPipeline):
     """Intent Service handling fallback skills."""
 
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
@@ -85,7 +84,9 @@ class FallbackService(PipelineStageConfidenceMatcher):
     def _collect_fallback_skills(self, message: Message,
                                  fb_range: FallbackRange = FallbackRange(0, 100)) -> List[str]:
         """use the messagebus api to determine which skills have registered fallback handlers
-        This includes all skills and external applications"""
+
+        Individual skills respond to this request via the `can_answer` method
+        """
         skill_ids = []  # skill_ids that already answered to ping
         fallback_skills = []  # skill_ids that want to handle fallback
 
@@ -111,7 +112,7 @@ class FallbackService(PipelineStageConfidenceMatcher):
         if in_range:  # no need to search if no skills available
             self.bus.on("ovos.skills.fallback.pong", handle_ack)
 
-            LOG.info("checking for FallbackSkillsV2 candidates")
+            LOG.info("checking for FallbackSkill candidates")
             message.data["range"] = (fb_range.start, fb_range.stop)
             # wait for all skills to acknowledge they want to answer fallback queries
             self.bus.emit(message.forward("ovos.skills.fallback.ping",
@@ -124,50 +125,8 @@ class FallbackService(PipelineStageConfidenceMatcher):
             self.bus.remove("ovos.skills.fallback.pong", handle_ack)
         return fallback_skills
 
-    def attempt_fallback(self, utterances: List[str], skill_id: str, lang: str, message: Message) -> bool:
-        """Call skill and ask if they want to process the utterance.
-
-        Args:
-            utterances (list of tuples): utterances paired with normalized
-                                         versions.
-            skill_id: skill to query.
-            lang (str): current language
-            message (Message): message containing interaction info.
-
-        Returns:
-            handled (bool): True if handled otherwise False.
-        """
-        sess = SessionManager.get(message)
-        if skill_id in sess.blacklisted_skills:
-            LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{sess.session_id}'")
-            return False
-        if self._fallback_allowed(skill_id):
-            fb_msg = message.reply(f"ovos.skills.fallback.{skill_id}.request",
-                                   {"skill_id": skill_id,
-                                    "utterances": utterances,
-                                    "utterance": utterances[0],  # backwards compat, we send all transcripts now
-                                    "lang": lang})
-            result = self.bus.wait_for_response(fb_msg,
-                                                f"ovos.skills.fallback.{skill_id}.response",
-                                                timeout=self.config.get("max_skill_runtime", 10))
-            if result and 'error' in result.data:
-                error_msg = result.data['error']
-                LOG.error(f"{skill_id}: {error_msg}")
-                return False
-            elif result is not None:
-                return result.data.get('result', False)
-            else:
-                # abort any ongoing fallback
-                # if skill crashed or returns False, all good
-                # if it is just taking a long time, more than 1 fallback would end up answering
-                self.bus.emit(message.forward("ovos.skills.fallback.force_timeout",
-                                              {"skill_id": skill_id}))
-                LOG.warning(f"{skill_id} took too long to answer, "
-                            f'increasing "max_skill_runtime" in mycroft.conf might help alleviate this issue')
-        return False
-
     def _fallback_range(self, utterances: List[str], lang: str,
-                        message: Message, fb_range: FallbackRange) -> Optional[PipelineMatch]:
+                        message: Message, fb_range: FallbackRange) -> Optional[IntentHandlerMatch]:
         """Send fallback request for a specified priority range.
 
         Args:
@@ -192,54 +151,38 @@ class FallbackService(PipelineStageConfidenceMatcher):
         fallbacks = [(k, v) for k, v in self.registered_fallbacks.items()
                      if k in available_skills]
         sorted_handlers = sorted(fallbacks, key=operator.itemgetter(1))
+
         for skill_id, prio in sorted_handlers:
             if skill_id in sess.blacklisted_skills:
                 LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{sess.session_id}'")
                 continue
-            result = self.attempt_fallback(utterances, skill_id, lang, message)
-            if result:
-                return PipelineMatch(handled=True,
-                                     match_data={},
-                                     skill_id=skill_id,
-                                     utterance=utterances[0])
+
+            if self._fallback_allowed(skill_id):
+                return IntentHandlerMatch(
+                    match_type=f"ovos.skills.fallback.{skill_id}.request",
+                    match_data={"skill_id": skill_id,
+                                "utterances": utterances,
+                                "lang": lang},
+                    utterance=utterances[0],
+                    updated_session=sess
+                )
+
         return None
 
-    def match_high(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
-        """Pre-padatious fallbacks."""
+    def match_high(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
+        """High confidence/quality matchers."""
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(0, 5))
 
-    def match_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
+    def match_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """General fallbacks."""
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(5, 90))
 
-    def match_low(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
+    def match_low(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """Low prio fallbacks with general matching such as chat-bot."""
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(90, 101))
-
-    @deprecated("'low_prio' has been renamed to 'match_low'", "2.0.0")
-    def low_prio(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
-        return self.match_low(utterances, lang, message)
-
-    @deprecated("'medium_prio' has been renamed to 'match_medium'", "2.0.0")
-    def medium_prio(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
-        return self.match_medium(utterances, lang, message)
-
-    @deprecated("'high_prio' has been renamed to 'match_high'", "2.0.0")
-    def high_prio(self, utterances: List[str], lang: str, message: Message = None) -> Optional[PipelineMatch]:
-        return self.match_high(utterances, lang, message)
-
-    @property
-    def fallback_config(self) -> Dict:
-        log_deprecation("'self.fallback_config' is deprecated, access 'self.config' directly instead", "1.0.0")
-        return self.config
-
-    @fallback_config.setter
-    def fallback_config(self, val):
-        log_deprecation("'self.fallback_config' is deprecated, access 'self.config' directly instead", "1.0.0")
-        self.config = val
 
     def shutdown(self):
         self.bus.remove("ovos.skills.fallback.register", self.handle_register_fallback)

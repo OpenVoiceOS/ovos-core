@@ -77,7 +77,6 @@ class IntentService:
         self.bus.on('clear_context', self.handle_clear_context)
 
         # Intents API
-        self.registered_vocab = []
         self.bus.on('intent.service.intent.get', self.handle_get_intent)
 
         # internal, track skills that call self.deactivate to avoid reactivating them again

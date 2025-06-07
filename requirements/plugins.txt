@@ -5,6 +5,15 @@ ovos-translate-server-plugin>=0.0.2, <1.0.0
 ovos-utterance-normalizer>=0.2.1, <1.0.0
 ovos-number-parser>=0.0.1,<1.0.0
 ovos-date-parser>=0.0.3,<1.0.0
+
+# pipeline plugins
 ovos-m2v-pipeline>=0.0.5,<1.0.0
+ovos-common-query-pipeline-plugin>=1.0.5, <2.0.0
+ovos-adapt-parser>=1.0.5, <2.0.0
+ovos_ocp_pipeline_plugin>=1.0.10, <2.0.0
+ovos-persona>=0.4.4,<1.0.0
+padacioso>=1.0.0, <2.0.0
+
+# intent transformer plugins
 keyword-template-matcher>=0.0.1,<1.0.0
 ahocorasick-ner>=0.0.1,<1.0.0
