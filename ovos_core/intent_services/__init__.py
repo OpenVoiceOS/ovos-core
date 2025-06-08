@@ -57,9 +57,16 @@ class IntentService:
         self.bus = bus
         self.config = config or Configuration().get("intents", {})
 
-        self.get_pipeline()  # trigger initial load of pipeline plugins (more may be lazy loaded on demand)
-        for p, c in OVOSPipelineFactory._CACHE.items():
-            LOG.info(f"Loaded pipeline: {p} - {c.__class__.__name__}")
+        pipeline_plugins = OVOSPipelineFactory.get_installed_pipeline_ids()
+        LOG.debug(f"Installed pipeline plugins: {pipeline_plugins}")
+
+        # load and cache the plugins right away to they receive all bus messages
+        for p in pipeline_plugins:
+            try:
+                OVOSPipelineFactory.load_plugin(p, bus=self.bus)
+                LOG.debug(f"Loaded '{p}'")
+            except Exception as e:
+                LOG.error(f"Failed to load {p}: {e}")
 
         self.utterance_plugins = UtteranceTransformersService(bus)
         self.metadata_plugins = MetadataTransformersService(bus)
@@ -124,7 +131,7 @@ class IntentService:
 
         return default_lang
 
-    def get_pipeline(self, skips=None, session=None, skip_stage_matchers=False) -> List[Tuple[str, Callable]]:
+    def get_pipeline(self, session=None) -> List[Tuple[str, Callable]]:
         """return a list of matcher functions ordered by priority
         utterances will be sent to each matcher in order until one can handle the utterance
         the list can be configured in mycroft.conf under intents.pipeline,
@@ -133,15 +140,9 @@ class IntentService:
 
         session = session or SessionManager.get()
 
-        if skips:
-            log_deprecation("'skips' kwarg has been deprecated!", "1.0.0")
-            skips = [OVOSPipelineFactory._MAP.get(p, p) for p in skips]
+        pipeline: List[str] = [OVOSPipelineFactory._MAP.get(p, p) for p in session.pipeline]
+        matchers: List[Tuple[str, Callable]] = OVOSPipelineFactory.create(pipeline, use_cache=True, bus=self.bus)
 
-        pipeline: List[str] = [OVOSPipelineFactory._MAP.get(p, p)
-                               for p in session.pipeline
-                               if p not in skips]
-        matchers: List[Tuple[str, Callable]] = OVOSPipelineFactory.create(pipeline, use_cache=True, bus=self.bus,
-                                                                          skip_stage_matchers=skip_stage_matchers)
         # Sort matchers to ensure the same order as in `pipeline`
         matcher_dict = dict(matchers)
         matchers = [(p, matcher_dict[p]) for p in pipeline if p in matcher_dict]
@@ -490,7 +491,7 @@ class IntentService:
         sess = SessionManager.get(message)
         match = None
         # Loop through the matching functions until a match is found.
-        for pipeline, match_func in self.get_pipeline(session=sess, skip_stage_matchers=True):
+        for pipeline, match_func in self.get_pipeline(session=sess):
             s = time.monotonic()
             match = match_func([utterance], lang, message)
             LOG.debug(f"matching '{pipeline}' took: {time.monotonic() - s} seconds")
