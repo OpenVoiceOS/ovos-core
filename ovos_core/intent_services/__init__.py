@@ -30,9 +30,9 @@ from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService, IntentTransformersService
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
-from ovos_plugin_manager.templates.pipeline import PipelineMatch, IntentHandlerMatch
+from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch
 from ovos_utils.lang import standardize_lang_tag
-from ovos_utils.log import LOG, log_deprecation
+from ovos_utils.log import LOG
 from ovos_utils.metrics import Stopwatch
 from ovos_utils.thread_utils import create_daemon
 
@@ -136,8 +136,6 @@ class IntentService:
         utterances will be sent to each matcher in order until one can handle the utterance
         the list can be configured in mycroft.conf under intents.pipeline,
         in the future plugins will be supported for users to define their own pipeline"""
-        skips = skips or []
-
         session = session or SessionManager.get()
 
         pipeline: List[str] = [OVOSPipelineFactory._MAP.get(p, p) for p in session.pipeline]
@@ -187,7 +185,7 @@ class IntentService:
         skill_id = message.data.get("skill_id")
         self._deactivations[sess.session_id].append(skill_id)
 
-    def _emit_match_message(self, match: Union[IntentHandlerMatch, PipelineMatch], message: Message, lang: str):
+    def _emit_match_message(self, match: IntentHandlerMatch, message: Message, lang: str):
         """
         Emit a reply message for a matched intent, updating session and skill activation.
 
@@ -195,7 +193,7 @@ class IntentService:
         creating a reply message with matched intent details and managing skill activation.
 
         Args:
-            match (Union[IntentHandlerMatch, PipelineMatch]): The matched intent object containing
+            match (IntentHandlerMatch): The matched intent object containing
                 utterance and matching information.
             message (Message): The original messagebus message that triggered the intent match.
             lang (str): The language of the pipeline plugin match
