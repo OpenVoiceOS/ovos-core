@@ -28,6 +28,7 @@ class TestNoSkills(TestCase):
 
     def test_routing(self):
         # this test will validate source and destination are handled properly
+        # done automatically if "source" and "destination" are in message.context
         message = Message("recognizer_loop:utterance",
                           {"utterances": ["hello world"]},
                           {"source": "A", "destination": "B"})
