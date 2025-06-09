@@ -60,10 +60,11 @@ class IntentService:
         pipeline_plugins = OVOSPipelineFactory.get_installed_pipeline_ids()
         LOG.debug(f"Installed pipeline plugins: {pipeline_plugins}")
 
-        # load and cache the plugins right away to they receive all bus messages
+        # load and cache the plugins right away so they receive all bus messages
+        self.pipeline_plugins = {}
         for p in pipeline_plugins:
             try:
-                OVOSPipelineFactory.load_plugin(p, bus=self.bus)
+                self.pipeline_plugins[p] = OVOSPipelineFactory.load_plugin(p, bus=self.bus)
                 LOG.debug(f"Loaded pipeline plugin: '{p}'")
             except Exception as e:
                 LOG.error(f"Failed to load pipeline plugin '{p}': {e}")

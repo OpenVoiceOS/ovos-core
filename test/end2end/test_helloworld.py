@@ -292,7 +292,7 @@ class TestModel2VecIntent(TestCase):
     def test_skill_blacklist(self):
         skill_id = "ovos-skill-hello-world.openvoiceos"
         session = Session("123")
-        session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
+        session.pipeline = ["ovos-m2v-pipeline-high"]
         session.blacklisted_skills = [skill_id]
         message = Message("recognizer_loop:utterance",
                           {"utterances": ["good morning"], "lang": "en-US"},
@@ -316,7 +316,7 @@ class TestModel2VecIntent(TestCase):
     def test_intent_blacklist(self):
         skill_id = "ovos-skill-hello-world.openvoiceos"
         session = Session("123")
-        session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
+        session.pipeline = ["ovos-m2v-pipeline-high"]
         session.blacklisted_intents = [f"{skill_id}:Greetings.intent"]
         message = Message("recognizer_loop:utterance",
                           {"utterances": ["good morning"], "lang": "en-US"},
