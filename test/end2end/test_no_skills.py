@@ -10,6 +10,10 @@ class TestNoSkills(TestCase):
     def setUp(self):
         self.minicroft = get_minicroft([])
 
+    def tearDown(self):
+        if self.minicroft:
+            self.minicroft.stop()
+
     def test_complete_failure(self):
         message = Message("recognizer_loop:utterance",
                           {"utterances": ["hello world"]})

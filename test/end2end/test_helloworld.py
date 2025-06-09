@@ -12,6 +12,10 @@ class TestAdaptIntent(TestCase):
         self.skill_id = "ovos-skill-hello-world.openvoiceos"
         self.minicroft = get_minicroft([self.skill_id])  # reuse for speed, but beware if skills keeping internal state
 
+    def tearDown(self):
+        if self.minicroft:
+            self.minicroft.stop()
+
     def test_adapt_match(self):
         session = Session("123")
         session.pipeline = ['ovos-adapt-pipeline-plugin-high']
@@ -135,6 +139,10 @@ class TestPadatiousIntent(TestCase):
         self.skill_id = "ovos-skill-hello-world.openvoiceos"
         self.minicroft = get_minicroft([self.skill_id])
 
+    def tearDown(self):
+        if self.minicroft:
+            self.minicroft.stop()
+
     def test_padatious_match(self):
         session = Session("123")
         session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
@@ -256,6 +264,10 @@ class TestModel2VecIntent(TestCase):
     def setUp(self):
         self.skill_id = "ovos-skill-hello-world.openvoiceos"
         self.minicroft = get_minicroft([self.skill_id])
+
+    def tearDown(self):
+        if self.minicroft:
+            self.minicroft.stop()
 
     def test_m2v_match(self):
         session = Session("123")
