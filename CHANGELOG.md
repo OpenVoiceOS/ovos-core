@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.5.1a1) (2025-06-09)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.5.0a3...1.5.1a1)
+
+**Merged pull requests:**
+
+- fix: skills-internet.txt [\#695](https://github.com/OpenVoiceOS/ovos-core/pull/695) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.5.0a3](https://github.com/OpenVoiceOS/ovos-core/tree/1.5.0a3) (2025-06-09)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.5.0a2...1.5.0a3)
