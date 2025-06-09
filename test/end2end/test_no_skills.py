@@ -2,16 +2,20 @@ from unittest import TestCase
 
 from ovos_bus_client.message import Message
 
-from ovoscope import End2EndTest
+from ovoscope import End2EndTest, get_minicroft
 
 
 class TestNoSkills(TestCase):
+
+    def setUp(self):
+        self.minicroft = get_minicroft([])
 
     def test_complete_failure(self):
         message = Message("recognizer_loop:utterance",
                           {"utterances": ["hello world"]})
 
         test = End2EndTest(
+            minicroft=self.minicroft,
             skill_ids=[],
             eof_msgs=["ovos.utterance.handled"],
             flip_points=["recognizer_loop:utterance"],
@@ -34,6 +38,7 @@ class TestNoSkills(TestCase):
                           {"source": "A", "destination": "B"})
 
         test = End2EndTest(
+            minicroft=self.minicroft,
             skill_ids=[],
             eof_msgs=["ovos.utterance.handled"],
             flip_points=["recognizer_loop:utterance"],
