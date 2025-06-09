@@ -14,32 +14,34 @@
 #
 
 import json
-import warnings
 import time
+import warnings
 from collections import defaultdict
 from typing import Tuple, Callable, Union, List
 
 import requests
+from ovos_config.config import Configuration
+from ovos_config.locale import get_valid_languages
+
+from ocp_pipeline.opm import OCPPipelineMatcher
+from ovos_adapt.opm import AdaptPipeline
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
+from ovos_commonqa.opm import CommonQAService
+from ovos_core.intent_services.converse_service import ConverseService
+from ovos_core.intent_services.fallback_service import FallbackService
+from ovos_core.intent_services.stop_service import StopService
+from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService, IntentTransformersService
+from ovos_persona import PersonaService
 from ovos_plugin_manager.templates.pipeline import PipelineMatch, IntentHandlerMatch
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG, log_deprecation, deprecated
 from ovos_utils.metrics import Stopwatch
 from ovos_utils.thread_utils import create_daemon
 from padacioso.opm import PadaciosoPipeline as PadaciosoService
+from ovos_core.version import OVOS_VERSION_STR
 
-from ocp_pipeline.opm import OCPPipelineMatcher
-from ovos_adapt.opm import AdaptPipeline
-from ovos_commonqa.opm import CommonQAService
-from ovos_config.config import Configuration
-from ovos_config.locale import get_valid_languages
-from ovos_core.intent_services.converse_service import ConverseService
-from ovos_core.intent_services.fallback_service import FallbackService
-from ovos_core.intent_services.stop_service import StopService
-from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService, IntentTransformersService
-from ovos_persona import PersonaService
 
 # TODO - to be dropped once pluginified
 # just a placeholder during alphas until https://github.com/OpenVoiceOS/ovos-core/pull/570
@@ -386,7 +388,8 @@ class IntentService:
             create_daemon(self._upload_match_data, (match.utterance,
                                                     match.skill_id,
                                                     lang,
-                                                    match.match_data))
+                                                    match.match_data,
+                                                    sess.pipeline))
 
         # Launch skill if not handled by the match function
         elif isinstance(match, IntentHandlerMatch) and match.match_type:
@@ -399,7 +402,8 @@ class IntentService:
             create_daemon(self._upload_match_data, (match.utterance,
                                                     match.match_type,
                                                     lang,
-                                                    match.match_data))
+                                                    match.match_data,
+                                                    sess.pipeline))
 
         if reply is not None:
             reply.data["utterance"] = match.utterance
@@ -429,10 +433,11 @@ class IntentService:
             create_daemon(self._upload_match_data, (match.utterance,
                                                     "complete_intent_failure",
                                                     lang,
-                                                    match.match_data))
+                                                    match.match_data,
+                                                    sess.pipeline))
 
     @staticmethod
-    def _upload_match_data(utterance: str, intent: str, lang: str, match_data: dict):
+    def _upload_match_data(utterance: str, intent: str, lang: str, match_data: dict, pipeline: List[str]):
         """if enabled upload the intent match data to a server, allowing users and developers
         to collect metrics/datasets to improve the pipeline plugins and skills.
 
@@ -452,7 +457,9 @@ class IntentService:
             "utterance": utterance,
             "intent": intent,
             "lang": lang,
-            "match_data": json.dumps(match_data, ensure_ascii=False)
+            "match_data": json.dumps(match_data, ensure_ascii=False),
+            "pipeline": "|".join(pipeline),
+            "core_version": OVOS_VERSION_STR
         }
         for url in endpoints:
             try:
