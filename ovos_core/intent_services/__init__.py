@@ -22,6 +22,7 @@ import requests
 from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
 
+from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
@@ -36,6 +37,25 @@ from ovos_utils.log import LOG
 from ovos_utils.metrics import Stopwatch
 from ovos_utils.thread_utils import create_daemon
 
+def on_started():
+    LOG.info('IntentService is starting up.')
+
+
+def on_alive():
+    LOG.info('IntentService is alive.')
+
+
+def on_ready():
+    LOG.info('IntentService is ready.')
+
+
+def on_error(e='Unknown'):
+    LOG.info(f'IntentService failed to launch ({e})')
+
+
+def on_stopping():
+    LOG.info('IntentService is shutting down...')
+
 
 class IntentService:
     """OVOS intent service. parses utterances using a variety of systems.
@@ -44,7 +64,10 @@ class IntentService:
     querying the intent service.
     """
 
-    def __init__(self, bus, config=None):
+    def __init__(self, bus, config=None, preload_pipelines=True,
+                 alive_hook=on_alive, started_hook=on_started,
+                 ready_hook=on_ready,
+                 error_hook=on_error, stopping_hook=on_stopping):
         """
         Initializes the IntentService with all intent parsing pipelines, transformer services, and messagebus event handlers.
 
@@ -54,20 +77,18 @@ class IntentService:
 
         Sets up skill name mapping, loads all supported intent matching pipelines (including Adapt, Padatious, Padacioso, Fallback, Converse, CommonQA, Stop, OCP, Persona, and optionally LLM and Model2Vec pipelines), initializes utterance and metadata transformer services, connects the session manager, and registers all relevant messagebus event handlers for utterance processing, context management, intent queries, and skill deactivation tracking.
         """
+        callbacks = StatusCallbackMap(on_started=started_hook,
+                                      on_alive=alive_hook,
+                                      on_ready=ready_hook,
+                                      on_error=error_hook,
+                                      on_stopping=stopping_hook)
         self.bus = bus
+        self.status = ProcessStatus('intents', bus=self.bus, callback_map=callbacks)
+        self.status.set_started()
         self.config = config or Configuration().get("intents", {})
-
-        pipeline_plugins = OVOSPipelineFactory.get_installed_pipeline_ids()
-        LOG.debug(f"Installed pipeline plugins: {pipeline_plugins}")
 
         # load and cache the plugins right away so they receive all bus messages
         self.pipeline_plugins = {}
-        for p in pipeline_plugins:
-            try:
-                self.pipeline_plugins[p] = OVOSPipelineFactory.load_plugin(p, bus=self.bus)
-                LOG.debug(f"Loaded pipeline plugin: '{p}'")
-            except Exception as e:
-                LOG.error(f"Failed to load pipeline plugin '{p}': {e}")
 
         self.utterance_plugins = UtteranceTransformersService(bus)
         self.metadata_plugins = MetadataTransformersService(bus)
@@ -90,6 +111,22 @@ class IntentService:
         # internal, track skills that call self.deactivate to avoid reactivating them again
         self._deactivations = defaultdict(list)
         self.bus.on('intent.service.skills.deactivate', self._handle_deactivate)
+        self.bus.on('intent.service.pipelines.reload', self.handle_reload_pipelines)
+
+        self.status.set_alive()
+        if preload_pipelines:
+            self.bus.emit(Message('intent.service.pipelines.reload'))
+
+    def handle_reload_pipelines(self, message: Message):
+        pipeline_plugins = OVOSPipelineFactory.get_installed_pipeline_ids()
+        LOG.debug(f"Installed pipeline plugins: {pipeline_plugins}")
+        for p in pipeline_plugins:
+            try:
+                self.pipeline_plugins[p] = OVOSPipelineFactory.load_plugin(p, bus=self.bus)
+                LOG.debug(f"Loaded pipeline plugin: '{p}'")
+            except Exception as e:
+                LOG.error(f"Failed to load pipeline plugin '{p}': {e}")
+        self.status.set_ready()
 
     def _handle_transformers(self, message):
         """
@@ -547,10 +584,11 @@ class IntentService:
     def shutdown(self):
         self.utterance_plugins.shutdown()
         self.metadata_plugins.shutdown()
-        OVOSPipelineFactory.shutdown()
 
         self.bus.remove('recognizer_loop:utterance', self.handle_utterance)
         self.bus.remove('add_context', self.handle_add_context)
         self.bus.remove('remove_context', self.handle_remove_context)
         self.bus.remove('clear_context', self.handle_clear_context)
         self.bus.remove('intent.service.intent.get', self.handle_get_intent)
+
+        self.status.set_stopping()
