@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.0a3](https://github.com/OpenVoiceOS/ovos-core/tree/1.5.0a3) (2025-06-09)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.5.0a2...1.5.0a3)
+
+**Merged pull requests:**
+
+- refactor: ovoscope [\#691](https://github.com/OpenVoiceOS/ovos-core/pull/691) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.5.0a2](https://github.com/OpenVoiceOS/ovos-core/tree/1.5.0a2) (2025-06-09)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.5.0a1...1.5.0a2)
