@@ -2,19 +2,21 @@ from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
-
+from ovos_utils.log import LOG
 from ovoscope import End2EndTest, get_minicroft
 
 
 class TestAdaptIntent(TestCase):
 
     def setUp(self):
+        LOG.set_level("DEBUG")
         self.skill_id = "ovos-skill-hello-world.openvoiceos"
         self.minicroft = get_minicroft([self.skill_id])  # reuse for speed, but beware if skills keeping internal state
 
     def tearDown(self):
         if self.minicroft:
             self.minicroft.stop()
+        LOG.set_level("CRITICAL")
 
     def test_adapt_match(self):
         session = Session("123")
@@ -136,12 +138,14 @@ class TestAdaptIntent(TestCase):
 class TestPadatiousIntent(TestCase):
 
     def setUp(self):
+        LOG.set_level("DEBUG")
         self.skill_id = "ovos-skill-hello-world.openvoiceos"
         self.minicroft = get_minicroft([self.skill_id])
 
     def tearDown(self):
         if self.minicroft:
             self.minicroft.stop()
+        LOG.set_level("CRITICAL")
 
     def test_padatious_match(self):
         session = Session("123")
@@ -262,12 +266,14 @@ class TestPadatiousIntent(TestCase):
 class TestModel2VecIntent(TestCase):
 
     def setUp(self):
+        LOG.set_level("DEBUG")
         self.skill_id = "ovos-skill-hello-world.openvoiceos"
         self.minicroft = get_minicroft([self.skill_id])
 
     def tearDown(self):
         if self.minicroft:
             self.minicroft.stop()
+        LOG.set_level("CRITICAL")
 
     def test_m2v_match(self):
         session = Session("123")

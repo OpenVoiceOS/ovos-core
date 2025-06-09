@@ -1,6 +1,7 @@
 from unittest import TestCase
 
 from ovos_bus_client.message import Message
+from ovos_utils.log import LOG
 
 from ovoscope import End2EndTest, get_minicroft
 
@@ -8,11 +9,13 @@ from ovoscope import End2EndTest, get_minicroft
 class TestNoSkills(TestCase):
 
     def setUp(self):
-        self.minicroft = get_minicroft([])
+        LOG.set_level("DEBUG")
+        self.minicroft = get_minicroft([])  # reuse for speed, but beware if skills keeping internal state
 
     def tearDown(self):
         if self.minicroft:
             self.minicroft.stop()
+        LOG.set_level("CRITICAL")
 
     def test_complete_failure(self):
         message = Message("recognizer_loop:utterance",
