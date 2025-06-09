@@ -17,7 +17,7 @@ import json
 import time
 from collections import defaultdict
 from typing import Tuple, Callable, List, Union
-
+import re
 import requests
 from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
@@ -30,7 +30,7 @@ from ovos_core.intent_services.fallback_service import FallbackService
 from ovos_core.intent_services.stop_service import StopService
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService, IntentTransformersService
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
-from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch
+from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
 from ovos_utils.metrics import Stopwatch
@@ -132,24 +132,68 @@ class IntentService:
 
         return default_lang
 
+    def get_pipeline_matcher(self, matcher_id: str):
+        """
+        Retrieve a matcher function for a given pipeline matcher ID.
+
+        Args:
+            matcher_id: The configured matcher ID (e.g. `adapt_high`).
+
+        Returns:
+            A callable matcher function.
+        """
+        migration_map = {
+            "converse": "ovos-converse-pipeline-plugin",
+            "common_qa": "ovos-common-query-pipeline-plugin",
+            "fallback_high": "ovos-fallback-pipeline-plugin-high",
+            "fallback_medium": "ovos-fallback-pipeline-plugin-medium",
+            "fallback_low": "ovos-fallback-pipeline-plugin-low",
+            "stop_high": "ovos-stop-pipeline-plugin-high",
+            "stop_medium": "ovos-stop-pipeline-plugin-medium",
+            "stop_low": "ovos-stop-pipeline-plugin-low",
+            "adapt_high": "ovos-adapt-pipeline-plugin-high",
+            "adapt_medium": "ovos-adapt-pipeline-plugin-medium",
+            "adapt_low": "ovos-adapt-pipeline-plugin-low",
+            "padacioso_high": "ovos-padacioso-pipeline-plugin-high",
+            "padacioso_medium": "ovos-padacioso-pipeline-plugin-medium",
+            "padacioso_low": "ovos-padacioso-pipeline-plugin-low",
+            "padatious_high": "ovos-padatious-pipeline-plugin-high",
+            "padatious_medium": "ovos-padatious-pipeline-plugin-medium",
+            "padatious_low": "ovos-padatious-pipeline-plugin-low",
+            "ocp_high": "ovos-ocp-pipeline-plugin-high",
+            "ocp_medium": "ovos-ocp-pipeline-plugin-medium",
+            "ocp_low": "ovos-ocp-pipeline-plugin-low",
+            "ocp_legacy": "ovos-ocp-pipeline-plugin-legacy"
+        }
+
+        matcher_id = migration_map.get(matcher_id, matcher_id)
+        pipe_id = re.sub(r'-(high|medium|low)$', '', matcher_id)
+        plugin = self.pipeline_plugins.get(pipe_id)
+        if not plugin:
+            LOG.error(f"Unknown pipeline matcher: {matcher_id}")
+            return None
+
+        if isinstance(plugin, ConfidenceMatcherPipeline):
+            if matcher_id.endswith("-high"):
+                return plugin.match_high
+            if matcher_id.endswith("-medium"):
+                return plugin.match_medium
+            if matcher_id.endswith("-low"):
+                return plugin.match_low
+        return plugin.match
+
     def get_pipeline(self, session=None) -> List[Tuple[str, Callable]]:
         """return a list of matcher functions ordered by priority
         utterances will be sent to each matcher in order until one can handle the utterance
         the list can be configured in mycroft.conf under intents.pipeline,
         in the future plugins will be supported for users to define their own pipeline"""
         session = session or SessionManager.get()
-
-        pipeline: List[str] = [OVOSPipelineFactory._MAP.get(p, p) for p in session.pipeline]
-        matchers: List[Tuple[str, Callable]] = OVOSPipelineFactory.create(pipeline, use_cache=True, bus=self.bus)
-
-        # Sort matchers to ensure the same order as in `pipeline`
-        matcher_dict = dict(matchers)
-        matchers = [(p, matcher_dict[p]) for p in pipeline if p in matcher_dict]
+        matchers = [(p, self.get_pipeline_matcher(p)) for p in session.pipeline]
+        matchers = [m for m in matchers if m[1] is not None] # filter any that failed to load
         final_pipeline = [k[0] for k in matchers]
-
-        if pipeline != final_pipeline:
+        if session.pipeline != final_pipeline:
             LOG.warning(f"Requested some invalid pipeline components! "
-                        f"filtered: {[k for k in pipeline if k not in final_pipeline]}")
+                        f"filtered: {[k for k in session.pipeline if k not in final_pipeline]}")
         LOG.debug(f"Session final pipeline: {final_pipeline}")
         return matchers
 
