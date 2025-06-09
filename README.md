@@ -1,2 +1,1 @@
-# mycroft-core
-Mycroft A.I. Core Source
+# ovos-core coverage report
