@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.0a2](https://github.com/OpenVoiceOS/ovos-core/tree/1.5.0a2) (2025-06-09)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.5.0a1...1.5.0a2)
+
+**Merged pull requests:**
+
+- publish coverage report under gh-pages [\#692](https://github.com/OpenVoiceOS/ovos-core/pull/692) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.5.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/1.5.0a1) (2025-05-27)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.4.0a1...1.5.0a1)
