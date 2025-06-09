@@ -104,7 +104,7 @@ class TestAdaptIntent(TestCase):
     def test_padatious_no_match(self):
         skill_id = "ovos-skill-hello-world.openvoiceos"
         session = Session("123")
-        session.pipeline = ["ovos-padatious-pipeline-plugin"]
+        session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
         message = Message("recognizer_loop:utterance",
                           {"utterances": ["hello world"], "lang": "en-US"},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
@@ -130,7 +130,7 @@ class TestPadatiousIntent(TestCase):
     def test_padatious_match(self):
         skill_id = "ovos-skill-hello-world.openvoiceos"
         session = Session("123")
-        session.pipeline = ["ovos-padatious-pipeline-plugin"]
+        session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
         message = Message("recognizer_loop:utterance",
                           {"utterances": ["good morning"], "lang": "en-US"},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
@@ -174,7 +174,7 @@ class TestPadatiousIntent(TestCase):
     def test_skill_blacklist(self):
         skill_id = "ovos-skill-hello-world.openvoiceos"
         session = Session("123")
-        session.pipeline = ["ovos-padatious-pipeline-plugin"]
+        session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
         session.blacklisted_skills = [skill_id]
         message = Message("recognizer_loop:utterance",
                           {"utterances": ["good morning"], "lang": "en-US"},
@@ -198,7 +198,7 @@ class TestPadatiousIntent(TestCase):
     def test_intent_blacklist(self):
         skill_id = "ovos-skill-hello-world.openvoiceos"
         session = Session("123")
-        session.pipeline = ["ovos-padatious-pipeline-plugin"]
+        session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
         session.blacklisted_intents = [f"{skill_id}:Greetings.intent"]
         message = Message("recognizer_loop:utterance",
                           {"utterances": ["good morning"], "lang": "en-US"},

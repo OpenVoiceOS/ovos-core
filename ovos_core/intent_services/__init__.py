@@ -64,9 +64,9 @@ class IntentService:
         for p in pipeline_plugins:
             try:
                 OVOSPipelineFactory.load_plugin(p, bus=self.bus)
-                LOG.debug(f"Loaded '{p}'")
+                LOG.debug(f"Loaded pipeline plugin: '{p}'")
             except Exception as e:
-                LOG.error(f"Failed to load {p}: {e}")
+                LOG.error(f"Failed to load pipeline plugin '{p}': {e}")
 
         self.utterance_plugins = UtteranceTransformersService(bus)
         self.metadata_plugins = MetadataTransformersService(bus)

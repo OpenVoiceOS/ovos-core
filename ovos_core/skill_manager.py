@@ -143,8 +143,7 @@ class SkillManager(Thread):
         Returns:
             list: List of blacklisted skill ids.
         """
-        return Configuration().get("skills", {}).get("blacklisted_skills",
-                                                     ["skill-ovos-stop.openvoiceos"])
+        return Configuration().get("skills", {}).get("blacklisted_skills", [])
 
     def _init_filewatcher(self):
         """Initialize the file watcher to monitor skill settings files for changes."""
