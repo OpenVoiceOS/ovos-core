@@ -6,7 +6,7 @@ combo-lock>=0.2.2, <0.4
 padacioso>=1.0.0, <2.0.0
 ovos-adapt-parser>=1.0.5, <2.0.0
 ovos_ocp_pipeline_plugin>=1.0.10, <2.0.0
-ovos-common-query-pipeline-plugin>=1.0.5, <2.0.0
+ovos-common-query-pipeline-plugin>=1.0.5,<2.0.0
 ovos-persona>=0.4.4,<1.0.0
 
 ovos-utils[extras]>=0.6.0,<1.0.0

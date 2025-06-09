@@ -1,31 +1,29 @@
-name: Run UnitTests
+name: Run Tests
 on:
   pull_request:
     branches:
       - dev
     paths-ignore:
       - 'ovos_core/version.py'
-      - 'examples/**'
       - '.github/**'
       - '.gitignore'
       - 'LICENSE'
       - 'CHANGELOG.md'
       - 'MANIFEST.in'
-      - 'readme.md'
+      - 'README.md'
       - 'scripts/**'
   push:
     branches:
-      - master
+      - dev
     paths-ignore:
       - 'ovos_core/version.py'
       - 'requirements/**'
-      - 'examples/**'
       - '.github/**'
       - '.gitignore'
       - 'LICENSE'
       - 'CHANGELOG.md'
       - 'MANIFEST.in'
-      - 'readme.md'
+      - 'README.md'
       - 'scripts/**'
   workflow_dispatch:
 
@@ -34,8 +32,16 @@ jobs:
     strategy:
       max-parallel: 3
       matrix:
-        python-version: ["3.11"]
+        python-version: ["3.11", "3.12"]
     runs-on: ubuntu-latest
+    permissions:
+      # Gives the action the necessary permissions for publishing new
+      # comments in pull requests.
+      pull-requests: write
+      # Gives the action the necessary permissions for pushing data to the
+      # python-coverage-comment-action branch, and for editing existing
+      # comments (to avoid publishing multiple comments in the same PR)
+      contents: write
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
@@ -46,33 +52,26 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt install python3-dev swig libssl-dev portaudio19-dev libpulse-dev
+          sudo apt install python3-dev swig libssl-dev portaudio19-dev libpulse-dev libfann-dev
           python -m pip install build wheel uv
-      - name: Install test dependencies
-        run: |
-          uv pip install --system -r requirements/tests.txt
       - name: Install core repo
         run: |
-          uv pip install --system -e .[mycroft,plugins]
-      - name: Run unittests
+          uv pip install --system -e .[mycroft,plugins,skills-essential,lgpl,test]
+      - name: Run tests
         run: |
-          pytest --cov=ovos_core --cov-report xml test/unittests
-      - name: Install padatious
-        run: |
-          sudo apt install libfann-dev
-          uv pip install --system .[lgpl]
-      - name: Run unittests with padatious
-        run: |
-          pytest --cov-append --cov=ovos_core --cov-report xml test/unittests
-      - name: Upload coverage
-        env:
-          CODECOV_TOKEN: ${{secrets.CODECOV_TOKEN}}
-        uses: codecov/codecov-action@v3
+          pytest --cov=ovos_core --cov-report xml test/
+
+      - name: Coverage comment
+        id: coverage_comment
+        uses: py-cov-action/python-coverage-comment-action@v3
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          directory: ./coverage/reports/
-          fail_ci_if_error: true
-          files: ./coverage.xml,!./cache
-          flags: unittests
-          name: codecov-unittests
-          verbose: true
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Store Pull Request comment to be posted
+        uses: actions/upload-artifact@v4
+        if: steps.coverage_comment.outputs.COMMENT_FILE_WRITTEN == 'true'
+        with:
+          # If you use a different name, update COMMENT_ARTIFACT_NAME accordingly
+          name: python-coverage-comment-action
+          # If you use a different name, update COMMENT_FILENAME accordingly
+          path: python-coverage-comment-action.txt

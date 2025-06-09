@@ -5,22 +5,11 @@ dev.env
 *.pyc
 *.swp
 *~
-mimic
-/skills
-pocketsphinx-python
 *.egg-info/
 build
 dist
 tornado.web
 tornado.ioloop
-mycroft/__version__.py
-scripts/logs/*
-logs/*
-.coverage
-/htmlcov
-test/audio_accuracy/data
-scripts/*.screen
-doc/_build/
 .installed
 .mypy_cache
 .vscode
@@ -28,8 +17,11 @@ doc/_build/
 .venv/
 
 # Created by unit tests
-test/unittests/skills/test_skill/settings.json
-test_conf.json
+coverage.xml
+pytest.ini
+.coverage
+.testmondata*
 .pytest_cache/
+/htmlcov
 /.gtm/
 !/.ruff_cache/
