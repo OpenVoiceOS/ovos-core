@@ -17,11 +17,11 @@ tornado.ioloop
 .venv/
 
 # Created by unit tests
-coverage.xml
+#coverage.xml
 pytest.ini
-.coverage
+#.coverage
 .testmondata*
 .pytest_cache/
-/htmlcov
+#/htmlcov
 /.gtm/
 !/.ruff_cache/
