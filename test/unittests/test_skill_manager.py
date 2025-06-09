@@ -89,7 +89,7 @@ class TestSkillManager(TestCase):
         self.skill_loader_mock.instance.converse = Mock()
         self.skill_loader_mock.instance.converse.return_value = True
         self.skill_loader_mock.skill_id = 'test_skill'
-        self.skill_manager.skill_loaders = {
+        self.skill_manager.plugin_skills = {
             str(self.skill_dir): self.skill_loader_mock
         }
 
@@ -114,11 +114,6 @@ class TestSkillManager(TestCase):
         self.assertListEqual(expected_result,
                              self.message_bus_mock.event_handlers)
 
-    def test_unload_removed_skills(self):
-        self.skill_manager._unload_removed_skills()
-
-        self.assertDictEqual({}, self.skill_manager.skill_loaders)
-        self.skill_loader_mock.unload.assert_called_once_with()
 
     def test_send_skill_list(self):
         self.skill_loader_mock.active = True
@@ -158,9 +153,9 @@ class TestSkillManager(TestCase):
         foo2_skill_loader.skill_id = 'foo2'
         test_skill_loader = Mock(spec=SkillLoader)
         test_skill_loader.skill_id = 'test_skill'
-        self.skill_manager.skill_loaders['foo'] = foo_skill_loader
-        self.skill_manager.skill_loaders['foo2'] = foo2_skill_loader
-        self.skill_manager.skill_loaders['test_skill'] = test_skill_loader
+        self.skill_manager.plugin_skills['foo'] = foo_skill_loader
+        self.skill_manager.plugin_skills['foo2'] = foo2_skill_loader
+        self.skill_manager.plugin_skills['test_skill'] = test_skill_loader
 
         self.skill_manager.deactivate_except(message)
         foo_skill_loader.deactivate.assert_called_once()
@@ -174,8 +169,8 @@ class TestSkillManager(TestCase):
         test_skill_loader.skill_id = 'test_skill'
         test_skill_loader.active = False
 
-        self.skill_manager.skill_loaders = {}
-        self.skill_manager.skill_loaders['test_skill'] = test_skill_loader
+        self.skill_manager.plugin_skills = {}
+        self.skill_manager.plugin_skills['test_skill'] = test_skill_loader
 
         self.skill_manager.activate_skill(message)
         test_skill_loader.activate.assert_called_once()
