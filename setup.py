@@ -74,6 +74,7 @@ setup(
     long_description_content_type="text/markdown",
     install_requires=required('requirements/requirements.txt'),
     extras_require={
+        'test': required('requirements/tests.txt'),
         'mycroft': required('requirements/mycroft.txt'),
         'lgpl': required('requirements/lgpl.txt'),
         'plugins': required('requirements/plugins.txt'),
