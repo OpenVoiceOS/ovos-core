@@ -1,1 +1,0 @@
-# ovos-core coverage report
