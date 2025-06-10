@@ -82,11 +82,13 @@ class FallbackService(ConfidenceMatcherPipeline):
         return True
 
     def _collect_fallback_skills(self, message: Message,
-                                 fb_range: FallbackRange = FallbackRange(0, 100)) -> List[str]:
+                                 fb_range: Optional[FallbackRange] = None) -> List[str]:
         """use the messagebus api to determine which skills have registered fallback handlers
 
         Individual skills respond to this request via the `can_answer` method
         """
+        if fb_range is None:
+            fb_range = FallbackRange(0, 100)
         skill_ids = []  # skill_ids that already answered to ping
         fallback_skills = []  # skill_ids that want to handle fallback
 

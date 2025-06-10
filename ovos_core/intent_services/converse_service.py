@@ -243,10 +243,8 @@ class ConverseService(PipelinePlugin):
         self.bus.on("skill.converse.pong", handle_ack)
 
         # ask skills if they want to converse
-        data = message.data
         for skill_id in active_skills:
-            data["skill_id"] = skill_id
-            self.bus.emit(message.forward(f"{skill_id}.converse.ping", data))
+            self.bus.emit(message.forward(f"{skill_id}.converse.ping", {**message.data, "skill_id": skill_id}))
 
         # wait for all skills to acknowledge they want to converse
         event.wait(timeout=0.5)
