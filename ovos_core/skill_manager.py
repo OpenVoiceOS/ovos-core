@@ -15,7 +15,7 @@
 """Load, update and manage skills on this device."""
 import os
 import threading
-from threading import Thread, Event, Lock
+from threading import Thread, Event
 
 from ovos_bus_client.apis.enclosure import EnclosureAPI
 from ovos_bus_client.client import MessageBusClient
@@ -345,13 +345,15 @@ class SkillManager(Thread):
 
     def wait_for_intent_service(self):
         """ensure IntentService reported ready to accept skill messages"""
-        response = self.bus.wait_for_response(
-            Message(f'mycroft.intents.is_ready',
-                    context={"source": "skills", "destination": "intents"}))
-        if response and response.data['status']:
-            return
-        threading.Event().wait(1)
-        self.wait_for_intent_service()
+        while not self._stop_event.is_set():
+            response = self.bus.wait_for_response(
+                Message('mycroft.intents.is_ready',
+                        context={"source": "skills", "destination": "intents"}),
+                timeout=5)
+            if response and response.data.get('status'):
+                return
+            threading.Event().wait(1)
+        raise RuntimeError("Skill manager stopped while waiting for intent service")
 
     def run(self):
         """Run the skill manager thread."""
