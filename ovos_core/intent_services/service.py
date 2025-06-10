@@ -583,6 +583,17 @@ class IntentService:
     def shutdown(self):
         self.utterance_plugins.shutdown()
         self.metadata_plugins.shutdown()
+        for pipeline in self.pipeline_plugins.values():
+            if hasattr(pipeline, "stop"):
+                try:
+                    pipeline.stop()
+                except:
+                    continue
+            if hasattr(pipeline, "shutdown"):
+                try:
+                    pipeline.shutdown()
+                except:
+                    continue
 
         self.bus.remove('recognizer_loop:utterance', self.handle_utterance)
         self.bus.remove('add_context', self.handle_add_context)
