@@ -1,12 +1,11 @@
 # skills providing non essential functionality
-ovos-skill-wordnet>=0.0.10,<1.0.0
+ovos-skill-wordnet>=0.2.5,<1.0.0
 ovos-skill-randomness>=0.1.1,<1.0.0; python_version >= "3.10"
-ovos-skill-days-in-history>=0.3.6,<1.0.0
 ovos-skill-laugh>=0.1.1,<1.0.0
-ovos-skill-number-facts>=0.1.4,<1.0.0
-ovos-skill-iss-location>=0.2.2,<1.0.0
-ovos-skill-cmd>=0.2.5,<1.0.0
-ovos-skill-moviemaster>=0.0.7,<1.0.0
-ovos-skill-confucius-quotes>=0.1.7,<1.0.0
-ovos-skill-icanhazdadjokes>=0.3.1,<1.0.0
+ovos-skill-number-facts>=0.1.12,<1.0.0
+ovos-skill-iss-location>=0.2.16,<1.0.0
+ovos-skill-cmd>=0.2.11,<1.0.0
+ovos-skill-moviemaster>=0.0.12,<1.0.0
+ovos-skill-confucius-quotes>=0.1.13,<1.0.0
+ovos-skill-icanhazdadjokes>=0.3.7,<1.0.0
 ovos-skill-camera

@@ -99,7 +99,8 @@ setup(
     entry_points={
         'opm.pipeline': PLUGIN_ENTRY_POINT,
         'console_scripts': [
-            'ovos-core=ovos_core.__main__:main'
+            'ovos-core=ovos_core.__main__:main',
+            'ovos-intent-service=ovos_core.intent_services.service:launch_standalone'
         ]
     }
 )

@@ -1,2 +1,4 @@
 # skills providing english specific functionality
 ovos-skill-word-of-the-day
+# skills below need translation before they are moved to skill-extras.txt
+ovos-skill-days-in-history>=0.3.11,<1.0.0
