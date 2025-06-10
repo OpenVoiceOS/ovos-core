@@ -15,7 +15,7 @@ from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.bracket_expansion import expand_template
 from ovos_utils.lang import standardize_lang_tag
-from ovos_utils.log import LOG, deprecated
+from ovos_utils.log import LOG
 from ovos_utils.parse import match_one
 
 

@@ -587,12 +587,14 @@ class IntentService:
             if hasattr(pipeline, "stop"):
                 try:
                     pipeline.stop()
-                except:
+                except Exception as e:
+                    LOG.warning(f"Failed to stop pipeline {pipeline}: {e}")
                     continue
             if hasattr(pipeline, "shutdown"):
                 try:
                     pipeline.shutdown()
-                except:
+                except Exception as e:
+                    LOG.warning(f"Failed to shutdown pipeline {pipeline}: {e}")
                     continue
 
         self.bus.remove('recognizer_loop:utterance', self.handle_utterance)
