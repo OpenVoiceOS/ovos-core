@@ -33,6 +33,9 @@ from ovos_plugin_manager.skills import find_skill_plugins
 
 
 def on_started():
+    """
+    Logs that the Skills Manager is starting up.
+    """
     LOG.info('Skills Manager is starting up.')
 
 
@@ -57,17 +60,11 @@ class SkillManager(Thread):
 
     def __init__(self, bus, watchdog=None, alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
                  error_hook=on_error, stopping_hook=on_stopping):
-        """Constructor
-
-        Args:
-            bus (event emitter): Mycroft messagebus connection
-            watchdog (callable): optional watchdog function
-            alive_hook (callable): callback function for skill alive status
-            started_hook (callable): callback function for skill started status
-            ready_hook (callable): callback function for skill ready status
-            error_hook (callable): callback function for skill error status
-            stopping_hook (callable): callback function for skill stopping status
         """
+                 Initializes the SkillManager thread for managing plugin skill lifecycles.
+                 
+                 Sets up status callbacks, event synchronization primitives, configuration, and internal data structures for plugin skill management. Registers message bus event handlers, initializes a file watcher for skill settings changes, and binds process status to the message bus. Marks the thread as a daemon for asynchronous operation.
+                 """
         super(SkillManager, self).__init__()
         self.bus = bus
         self._settings_watchdog = None
@@ -112,15 +109,20 @@ class SkillManager(Thread):
 
     @property
     def blacklist(self):
-        """Get the list of blacklisted skills from the configuration.
-
+        """
+        Returns the list of skill IDs that are blacklisted in the configuration.
+        
         Returns:
-            list: List of blacklisted skill ids.
+            list: Blacklisted skill IDs.
         """
         return Configuration().get("skills", {}).get("blacklisted_skills", [])
 
     def _init_filewatcher(self):
-        """Initialize the file watcher to monitor skill settings files for changes."""
+        """
+        Initializes a file watcher to monitor skill settings files for changes.
+        
+        Sets up a file watcher on the skills settings directory to detect modifications, triggering a callback when a skill's settings file changes.
+        """
         sspath = f"{get_xdg_config_save_path()}/skills/"
         os.makedirs(sspath, exist_ok=True)
         self._settings_watchdog = FileWatcher([sspath],
@@ -256,11 +258,17 @@ class SkillManager(Thread):
             self._load_on_network()
 
     def load_plugin_skills(self, network=None, internet=None):
-        """Load plugin skills based on network and internet status.
-
+        """
+        Loads new plugin skills according to current network and internet connectivity.
+        
+        If a skill is blacklisted, it is skipped and a warning is logged. Only skills whose runtime requirements are satisfied by the current connectivity state are loaded. Returns True if any new skills were loaded.
+        
         Args:
-            network (bool): Network connection status.
-            internet (bool): Internet connection status.
+            network: If specified, overrides the detected network connection status.
+            internet: If specified, overrides the detected internet connection status.
+        
+        Returns:
+            True if any new plugin skills were loaded; otherwise, False.
         """
         loaded_new = False
         if network is None:
@@ -323,14 +331,17 @@ class SkillManager(Thread):
         return loader
 
     def _load_plugin_skill(self, skill_id, skill_plugin):
-        """Load a plugin skill.
-
+        """
+        Attempts to load a plugin skill and registers its loader.
+        
+        If loading fails, logs the exception and still registers the loader in the internal dictionary.
+        
         Args:
-            skill_id (str): ID of the skill.
-            skill_plugin: Plugin skill instance.
-
+            skill_id: The unique identifier of the skill.
+            skill_plugin: The plugin skill class or instance to be loaded.
+        
         Returns:
-            PluginSkillLoader: Loaded plugin skill loader instance if successful, None otherwise.
+            The PluginSkillLoader instance if the skill was loaded successfully, or None if loading failed.
         """
         skill_loader = self._get_plugin_skill_loader(skill_id, skill_class=skill_plugin)
         try:
@@ -344,7 +355,12 @@ class SkillManager(Thread):
         return skill_loader if load_status else None
 
     def wait_for_intent_service(self):
-        """ensure IntentService reported ready to accept skill messages"""
+        """
+        Blocks execution until the IntentService reports readiness to receive skill messages.
+        
+        This method repeatedly queries the IntentService via the message bus and waits until
+        a positive readiness response is received before returning.
+        """
         response = self.bus.wait_for_response(
             Message(f'mycroft.intents.is_ready',
                     context={"source": "skills", "destination": "intents"}))
@@ -354,7 +370,11 @@ class SkillManager(Thread):
         self.wait_for_intent_service()
 
     def run(self):
-        """Run the skill manager thread."""
+        """
+        Main loop for the SkillManager thread, handling skill loading and lifecycle events.
+        
+        Waits for the IntentService to become ready, loads offline skills, synchronizes skill loading state, emits initialization events, and periodically checks for new or updated skills. Continues running until signaled to stop.
+        """
         self.status.set_alive()
 
         LOG.debug("Waiting for IntentService startup")
@@ -406,30 +426,47 @@ class SkillManager(Thread):
         self._network_loaded.set()
 
     def _unload_on_network_disconnect(self):
-        """Unload skills that require a network connection to work."""
+        """
+        Placeholder for unloading skills that require a network connection when disconnected.
+        
+        Currently not implemented.
+        """
         # TODO - implementation missing
 
     def _unload_on_internet_disconnect(self):
-        """Unload skills that require an internet connection to work."""
+        """
+        Placeholder for unloading skills that require an internet connection when connectivity is lost.
+        """
         # TODO - implementation missing
 
     def _unload_on_gui_disconnect(self):
-        """Unload skills that require a GUI to work."""
+        """
+        Placeholder for unloading skills that require a GUI when the GUI disconnects.
+        
+        This method is not yet implemented.
+        """
         # TODO - implementation missing
 
     def _load_on_startup(self):
-        """Handle offline skills load on startup."""
+        """
+        Loads all offline plugin skills during startup.
+        
+        This method checks for installed skills and initiates loading of skills that do not require network or internet connectivity.
+        """
         if self._detected_installed_skills:  # ensure we have skills installed
             LOG.info('Loading offline skills...')
             self._load_new_skills(network=False, internet=False)
 
     def _load_new_skills(self, network=None, internet=None, gui=None):
-        """Handle loading of skills installed since startup.
-
+        """
+        Loads any newly installed plugin skills based on current connectivity status.
+        
+        If new skills are loaded, triggers intent training and logs the outcome.
+        
         Args:
-            network (bool): Network connection status.
-            internet (bool): Internet connection status.
-            gui (bool): GUI connection status.
+            network: Optional; current network connection status.
+            internet: Optional; current internet connection status.
+            gui: Optional; current GUI connection status.
         """
         if network is None:
             network = self._network_event.is_set()
@@ -456,10 +493,11 @@ class SkillManager(Thread):
                 LOG.exception(f"Error during Intent training: {e}")
 
     def _unload_plugin_skill(self, skill_id):
-        """Unload a plugin skill.
-
+        """
+        Unloads a plugin skill by shutting it down and removing it from the manager.
+        
         Args:
-            skill_id (str): Identifier of the plugin skill to unload.
+            skill_id (str): The identifier of the plugin skill to unload.
         """
         if skill_id in self.plugin_skills:
             LOG.info('Unloading plugin skill: ' + skill_id)
@@ -480,7 +518,11 @@ class SkillManager(Thread):
         return self.status.state == ProcessState.READY
 
     def send_skill_list(self, message=None):
-        """Send list of loaded skills."""
+        """
+        Emits a message containing the list of currently loaded plugin skills and their active status.
+        
+        The message is sent on the bus with the type 'mycroft.skills.list' and includes each skill's ID and whether it is active and loaded.
+        """
         try:
             message_data = {}
             # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
@@ -495,7 +537,11 @@ class SkillManager(Thread):
             LOG.exception('Failed to send skill list')
 
     def deactivate_skill(self, message):
-        """Deactivate a skill."""
+        """
+        Deactivates a specified plugin skill in response to a message.
+        
+        If the skill is found, it is deactivated and a response is emitted on the message bus. If deactivation fails, an error response is emitted.
+        """
         try:
             # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
             skills = self.plugin_skills
@@ -509,7 +555,11 @@ class SkillManager(Thread):
             self.bus.emit(message.response({'error': f'failed: {err}'}))
 
     def deactivate_except(self, message):
-        """Deactivate all skills except the provided."""
+        """
+        Deactivates all plugin skills except the specified one.
+        
+        The skill to remain active is identified by the 'skill' field in the message data.
+        """
         try:
             skill_to_keep = message.data['skill']
             LOG.info(f'Deactivating all skills except {skill_to_keep}')
@@ -523,7 +573,11 @@ class SkillManager(Thread):
             LOG.exception('An error occurred during skill deactivation!')
 
     def activate_skill(self, message):
-        """Activate a deactivated skill."""
+        """
+        Activates a specified deactivated plugin skill or all plugin skills.
+        
+        If the skill name in the message is "all", all inactive plugin skills are activated. Emits a response message upon activation or if an error occurs.
+        """
         try:
             # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
             skills = self.plugin_skills
@@ -537,7 +591,11 @@ class SkillManager(Thread):
             self.bus.emit(message.response({'error': f'failed: {err}'}))
 
     def stop(self):
-        """Tell the manager to shutdown."""
+        """
+        Signals the skill manager to stop and performs a clean shutdown of all plugin skills.
+        
+        Shuts down all loaded plugin skills and the settings file watcher if active.
+        """
         self.status.set_stopping()
         self._stop_event.set()
 

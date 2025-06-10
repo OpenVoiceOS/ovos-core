@@ -36,13 +36,23 @@ class FallbackService(ConfidenceMatcherPipeline):
 
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
                  config: Optional[Dict] = None):
-        config = config or Configuration().get("skills", {}).get("fallbacks", {})
+        """
+                 Initializes the FallbackService with an optional message bus and configuration.
+                 
+                 Registers event handlers for fallback skill registration and deregistration, and sets up internal tracking for registered fallback skills and their priorities.
+                 """
+                 config = config or Configuration().get("skills", {}).get("fallbacks", {})
         super().__init__(bus, config)
         self.registered_fallbacks = {}  # skill_id: priority
         self.bus.on("ovos.skills.fallback.register", self.handle_register_fallback)
         self.bus.on("ovos.skills.fallback.deregister", self.handle_deregister_fallback)
 
     def handle_register_fallback(self, message: Message):
+        """
+        Handles the registration of a fallback skill by storing its priority.
+        
+        If a priority override for the skill exists in the configuration, it is applied; otherwise, the provided or default priority is used.
+        """
         skill_id = message.data.get("skill_id")
         priority = message.data.get("priority") or 101
 
@@ -61,16 +71,16 @@ class FallbackService(ConfidenceMatcherPipeline):
             self.registered_fallbacks.pop(skill_id)
 
     def _fallback_allowed(self, skill_id: str) -> bool:
-        """Checks if a skill_id is allowed to fallback
-
-        - is the skill blacklisted from fallback
-        - is fallback configured to only allow specific skills
-
+        """
+        Determines whether a skill is permitted to handle fallback requests.
+        
+        A skill is allowed if it is not blacklisted when in blacklist mode, or if it is present in the whitelist when in whitelist mode. In accept-all mode, all skills are permitted.
+        
         Args:
-            skill_id (str): identifier of skill that wants to fallback.
-
+            skill_id: The identifier of the skill to check.
+        
         Returns:
-            permitted (bool): True if skill can fallback
+            True if the skill is allowed to handle fallback; otherwise, False.
         """
         opmode = self.config.get("fallback_mode", FallbackMode.ACCEPT_ALL)
         if opmode == FallbackMode.BLACKLIST and skill_id in \
@@ -83,10 +93,16 @@ class FallbackService(ConfidenceMatcherPipeline):
 
     def _collect_fallback_skills(self, message: Message,
                                  fb_range: FallbackRange = FallbackRange(0, 100)) -> List[str]:
-        """use the messagebus api to determine which skills have registered fallback handlers
-
-        Individual skills respond to this request via the `can_answer` method
         """
+                                 Queries registered fallback skills via the message bus to identify those willing to handle a fallback request within a specified priority range.
+                                 
+                                 Args:
+                                     message: The message triggering the fallback query, used for context and session information.
+                                     fb_range: The priority range to filter fallback skills (default is 0 to 100).
+                                 
+                                 Returns:
+                                     A list of skill IDs that have indicated willingness to handle the fallback request.
+                                 """
         skill_ids = []  # skill_ids that already answered to ping
         fallback_skills = []  # skill_ids that want to handle fallback
 
@@ -127,18 +143,20 @@ class FallbackService(ConfidenceMatcherPipeline):
 
     def _fallback_range(self, utterances: List[str], lang: str,
                         message: Message, fb_range: FallbackRange) -> Optional[IntentHandlerMatch]:
-        """Send fallback request for a specified priority range.
-
-        Args:
-            utterances (list): List of tuples,
-                               utterances and normalized version
-            lang (str): Langauge code
-            message: Message for session context
-            fb_range (FallbackRange): fallback order start and stop.
-
-        Returns:
-            PipelineMatch or None
         """
+                        Attempts to find a fallback skill match within a specified priority range.
+                        
+                        Sends a fallback request for the given utterances and language, filtering available fallback skills by priority and session context. Returns an `IntentHandlerMatch` for the first eligible fallback skill, or `None` if no suitable skill is found.
+                        
+                        Args:
+                            utterances: List of utterances to process.
+                            lang: Language code for the utterances.
+                            message: Message object containing session context.
+                            fb_range: Priority range to consider for fallback skills.
+                        
+                        Returns:
+                            An `IntentHandlerMatch` if a suitable fallback skill is found; otherwise, `None`.
+                        """
         lang = standardize_lang_tag(lang)
         # we call flatten in case someone is sending the old style list of tuples
         utterances = flatten_list(utterances)
@@ -170,17 +188,37 @@ class FallbackService(ConfidenceMatcherPipeline):
         return None
 
     def match_high(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
-        """High confidence/quality matchers."""
+        """
+        Attempts to find a high-priority fallback skill match for the given utterances.
+        
+        Searches for a fallback skill within the highest priority range (0 to 5) that is eligible to handle the provided utterances and language, based on current configuration and session context.
+        
+        Args:
+            utterances: List of user utterances to match.
+            lang: Language code for the utterances.
+            message: Message object containing context and session data.
+        
+        Returns:
+            An IntentHandlerMatch if a suitable high-priority fallback skill is found; otherwise, None.
+        """
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(0, 5))
 
     def match_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
-        """General fallbacks."""
+        """
+        Attempts to find a fallback skill match within the medium-priority range.
+        
+        Returns an IntentHandlerMatch if a suitable fallback skill is found for the given utterances and language; otherwise, returns None.
+        """
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(5, 90))
 
     def match_low(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
-        """Low prio fallbacks with general matching such as chat-bot."""
+        """
+        Attempts to find a low-priority fallback skill match for the given utterances.
+        
+        Searches for fallback skills within the lowest priority range (90–101), typically used for general-purpose or chat-bot style responses. Returns an `IntentHandlerMatch` if a suitable fallback skill is found, or `None` if no match is available.
+        """
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(90, 101))
 

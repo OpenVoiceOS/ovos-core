@@ -148,6 +148,11 @@ class TestSkillManager(unittest.TestCase):
     @patch('ovos_core.skill_manager.MessageBusClient', autospec=True)
     def test_get_internal_skill_bus_not_shared_connection(self, mock_MessageBusClient):
         # Set the configuration to use shared_connection=False
+        """
+        Tests that _get_internal_skill_bus creates a new MessageBusClient when shared_connection is False.
+        
+        Verifies that the skill manager instantiates a new MessageBusClient with caching enabled and starts its thread when shared connections are disabled in the configuration.
+        """
         self.skill_manager.config = {'websocket': {'shared_connection': False}}
 
         # Call the method under test

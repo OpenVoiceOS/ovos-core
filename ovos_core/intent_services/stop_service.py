@@ -24,12 +24,24 @@ class StopService(ConfidenceMatcherPipeline):
 
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
                  config: Optional[Dict] = None):
-        config = config or Configuration().get("skills", {}).get("stop") or {}
+        """
+                 Initializes the StopService with optional message bus and configuration.
+                 
+                 Loads stop-related vocabulary resources for multiple languages into a cache for intent matching.
+                 """
+                 config = config or Configuration().get("skills", {}).get("stop") or {}
         super().__init__(config=config, bus=bus)
         self._voc_cache = {}
         self.load_resource_files()
 
     def load_resource_files(self):
+        """
+        Loads and caches stop-related vocabulary files for all supported languages.
+        
+        Scans the locale directory for language folders, reads vocabulary files within each,
+        expands templates, and flattens the resulting lists. The processed vocabulary is
+        stored in an internal cache, organized by standardized language tags and vocabulary names.
+        """
         base = f"{dirname(__file__)}/locale"
         for lang in os.listdir(base):
             lang2 = standardize_lang_tag(lang)
@@ -54,25 +66,9 @@ class StopService(ConfidenceMatcherPipeline):
 
     def _collect_stop_skills(self, message: Message) -> List[str]:
         """
-        Collect skills that can be stopped based on a ping-pong mechanism.
-
-        This method determines which active skills can handle a stop request by sending
-        a stop ping to each active skill and waiting for their acknowledgment.
-
-        Individual skills respond to this request via the `can_stop` method
-
-        Parameters:
-            message (Message): The original message triggering the stop request.
-
-        Returns:
-            List[str]: A list of skill IDs that can be stopped. If no skills explicitly
-                      indicate they can stop, returns all active skills.
-
-        Notes:
-            - Excludes skills that are blacklisted in the current session
-            - Uses a non-blocking event mechanism to collect skill responses
-            - Waits up to 0.5 seconds for skills to respond
-            - Falls back to all active skills if no explicit stop confirmation is received
+        Identifies which active skills can be stopped by sending a stop ping and collecting acknowledgments.
+        
+        Sends a stop request to each active, non-blacklisted skill and waits up to 0.5 seconds for responses indicating their ability to stop. Returns a list of skill IDs that confirm they can handle a stop request; if none explicitly confirm, returns all active skills.
         """
         sess = SessionManager.get(message)
 
@@ -89,21 +85,9 @@ class StopService(ConfidenceMatcherPipeline):
 
         def handle_ack(msg):
             """
-            Handle acknowledgment from skills during the stop process.
-
-            This method is a nested function used in skill stopping negotiation. It validates and tracks skill responses to a stop request.
-
-            Parameters:
-                msg (Message): Message containing skill acknowledgment details.
-
-            Side Effects:
-                - Modifies the `want_stop` list with skills that can handle stopping
-                - Updates the `skill_ids` list to track which skills have responded
-                - Sets the threading event when all active skills have responded
-
-            Notes:
-                - Checks if a skill can handle stopping based on multiple conditions
-                - Ensures all active skills provide a response before proceeding
+            Processes acknowledgment messages from skills during the stop negotiation process.
+            
+            Adds skills that confirm their ability to handle a stop request to the tracking list, records which skills have responded, and signals completion when all active skills have replied.
             """
             nonlocal event, skill_ids
             skill_id = msg.data["skill_id"]
@@ -135,6 +119,11 @@ class StopService(ConfidenceMatcherPipeline):
         return want_stop or active_skills
 
     def handle_stop_confirmation(self, message: Message):
+        """
+        Handles confirmation responses from skills after a stop request.
+        
+        If the response contains an error, logs the error message. If the stop was successful, emits events to abort any ongoing question, conversation, or speech synthesis associated with the skill.
+        """
         skill_id = (message.data.get("skill_id") or
                     message.context.get("skill_id") or
                     message.msg_type.split(".stop.response")[0])
@@ -150,27 +139,17 @@ class StopService(ConfidenceMatcherPipeline):
 
     def match_high(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """
-        Handles high-confidence stop requests by matching exact stop vocabulary and managing skill stopping.
-
-        Attempts to stop skills when an exact "stop" or "global_stop" command is detected. Performs the following actions:
-        - Identifies the closest language match for vocabulary
-        - Checks for global stop command when no active skills exist
-        - Emits a global stop message if applicable
-        - Attempts to stop individual skills if a stop command is detected
-        - Disables response mode for stopped skills
-
-        Parameters:
-            utterances (List[str]): List of user utterances to match against stop vocabulary
-            lang (str): Four-letter ISO language code for language-specific matching
-            message (Message): Message context for generating appropriate responses
-
+        Performs high-confidence matching for stop commands and initiates stopping of active skills.
+        
+        Checks user utterances for exact matches to stop or global stop vocabulary in the closest supported language. If a global stop is detected and no active skills are present, emits a global stop intent. If a stop command is detected and active skills exist, attempts to stop each skill by disabling its response mode and registering a one-time listener for its stop confirmation. Returns an `IntentHandlerMatch` indicating the stop action, or None if no match is found.
+        
+        Args:
+            utterances: User utterances to evaluate for stop intent.
+            lang: Language code used for vocabulary matching.
+            message: Contextual message for the stop request.
+        
         Returns:
-            Optional[PipelineMatch]: Match result indicating whether stop was handled, with optional skill and session information
-            - Returns None if no stop action could be performed
-            - Returns PipelineMatch with handled=True for successful global or skill-specific stop
-
-        Raises:
-            No explicit exceptions raised, but may log debug/info messages during processing
+            An `IntentHandlerMatch` if a stop or global stop intent is detected and handled; otherwise, None.
         """
         lang = self._get_closest_lang(lang)
         if lang is None:  # no vocs registered for this lang
@@ -216,25 +195,9 @@ class StopService(ConfidenceMatcherPipeline):
 
     def match_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """
-        Handle stop intent with additional context beyond simple stop commands.
-
-        This method processes utterances that contain "stop" or global stop vocabulary but may include
-        additional words not explicitly defined in intent files. It performs a medium-confidence
-        intent matching for stop requests.
-
-        Parameters:
-            utterances (List[str]): List of input utterances to analyze
-            lang (str): Four-letter ISO language code for localization
-            message (Message): Message context for generating appropriate responses
-
-        Returns:
-            Optional[PipelineMatch]: A pipeline match if the stop intent is successfully processed,
-            otherwise None if no stop intent is detected
-
-        Notes:
-            - Attempts to match stop vocabulary with fuzzy matching
-            - Falls back to low-confidence matching if medium-confidence match is inconclusive
-            - Handles global stop scenarios when no active skills are present
+        Performs medium-confidence matching for stop intents with fuzzy vocabulary analysis.
+        
+        Analyzes utterances for stop or global stop commands using fuzzy matching, allowing for additional context or words beyond exact stop phrases. If a medium-confidence match is not found, falls back to low-confidence matching. Returns an intent match if a stop intent is detected, or None otherwise.
         """
         lang = self._get_closest_lang(lang)
         if lang is None:  # no vocs registered for this lang
@@ -254,23 +217,17 @@ class StopService(ConfidenceMatcherPipeline):
 
     def match_low(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """
-        Perform a low-confidence fuzzy match for stop intent before fallback processing.
-
-        This method attempts to match stop-related vocabulary with low confidence and handle stopping of active skills.
-
-        Parameters:
-            utterances (List[str]): List of input utterances to match against stop vocabulary
-            lang (str): Four-letter ISO language code for vocabulary matching
-            message (Message): Message context used for generating replies and managing session
-
+        Performs a low-confidence fuzzy match for stop intent and initiates stopping of active skills.
+        
+        Attempts to match user utterances against stop-related vocabulary with low confidence. If the confidence threshold is met, disables response mode for stoppable skills and registers for their stop confirmation. If no skills respond, emits a global stop intent. Returns an intent handler match if a stop action is handled, otherwise None.
+        
+        Args:
+            utterances: List of user utterances to evaluate for stop intent.
+            lang: ISO language code for vocabulary matching.
+            message: Message context for session and reply management.
+        
         Returns:
-            Optional[PipelineMatch]: A pipeline match object if a stop action is handled, otherwise None
-
-        Notes:
-            - Increases confidence if active skills are present
-            - Attempts to stop individual skills before emitting a global stop signal
-            - Handles language-specific vocabulary matching
-            - Configurable minimum confidence threshold for stop intent
+            An IntentHandlerMatch if a stop action is handled; otherwise, None.
         """
         lang = self._get_closest_lang(lang)
         if lang is None:  # no vocs registered for this lang
@@ -311,6 +268,11 @@ class StopService(ConfidenceMatcherPipeline):
         )
 
     def _get_closest_lang(self, lang: str) -> Optional[str]:
+        """
+        Finds the closest matching language tag from the vocabulary cache.
+        
+        Returns the closest language tag if the match score is less than 10, indicating a significant but acceptable regional difference; otherwise, returns None.
+        """
         if self._voc_cache:
             lang = standardize_lang_tag(lang)
             closest, score = closest_match(lang, list(self._voc_cache.keys()))
@@ -325,30 +287,19 @@ class StopService(ConfidenceMatcherPipeline):
     def voc_match(self, utt: str, voc_filename: str, lang: str,
                   exact: bool = False):
         """
-        TODO - should use ovos_workshop method instead of reimplementing here
-               look into subclassing from OVOSAbstractApp
-
-        Determine if the given utterance contains the vocabulary provided.
-
-        By default the method checks if the utterance contains the given vocab
-        thereby allowing the user to say things like "yes, please" and still
-        match against "Yes.voc" containing only "yes". An exact match can be
-        requested.
-
-        The method first checks in the current Skill's .voc files and secondly
-        in the "res/text" folder of mycroft-core. The result is cached to
-        avoid hitting the disk each time the method is called.
-
-        Args:
-            utt (str): Utterance to be tested
-            voc_filename (str): Name of vocabulary file (e.g. 'yes' for
-                                'res/text/en-us/yes.voc')
-            lang (str): Language code, defaults to self.lang
-            exact (bool): Whether the vocab must exactly match the utterance
-
-        Returns:
-            bool: True if the utterance has the given vocabulary it
-        """
+                  Checks if an utterance matches vocabulary from cached files for a given language.
+                  
+                  Searches the cached vocabulary for the specified language and file, supporting exact or partial word boundary matching. Returns True if the utterance matches any vocabulary entry; otherwise, returns False.
+                  
+                  Args:
+                      utt: The utterance to test.
+                      voc_filename: The base name of the vocabulary file (without extension).
+                      lang: The language code to use for matching.
+                      exact: If True, requires an exact match; otherwise, matches on word boundaries.
+                  
+                  Returns:
+                      True if the utterance matches the vocabulary; False otherwise.
+                  """
         lang = self._get_closest_lang(lang)
         if lang is None:  # no vocs registered for this lang
             return False

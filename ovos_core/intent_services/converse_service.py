@@ -20,7 +20,12 @@ class ConverseService(PipelinePlugin):
 
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
                  config: Optional[Dict] = None):
-        config = config or Configuration().get("skills", {}).get("converse", {})
+        """
+                 Initializes the ConverseService with optional message bus and configuration.
+                 
+                 Registers event handlers for skill activation, deactivation, active skill queries, and response mode toggling on the message bus.
+                 """
+                 config = config or Configuration().get("skills", {}).get("converse", {})
         super().__init__(bus, config)
         self._consecutive_activations = {}
         self.bus.on('intent.service.skills.deactivate', self.handle_deactivate_skill_request)
@@ -31,6 +36,12 @@ class ConverseService(PipelinePlugin):
 
     @property
     def active_skills(self):
+        """
+        Gets the list of currently active skill IDs for the current session.
+        
+        Returns:
+            A list of skill IDs representing the active skills in the session.
+        """
         session = SessionManager.get()
         return session.active_skills
 
@@ -208,9 +219,17 @@ class ConverseService(PipelinePlugin):
         return True
 
     def _collect_converse_skills(self, message: Message) -> List[str]:
-        """use the messagebus api to determine which skills want to converse
-
-        Individual skills respond to this request via the `can_converse` method"""
+        """
+        Queries active skills in INTENT state to determine which want to handle the next utterance.
+        
+        Sends a "converse.ping" event to each active skill in INTENT state and collects those that respond affirmatively within 0.5 seconds.
+        
+        Args:
+            message: The message containing session and utterance context.
+        
+        Returns:
+            A list of skill IDs that indicate they want to converse.
+        """
         skill_ids = []
         want_converse = []
         session = SessionManager.get(message)
@@ -255,7 +274,11 @@ class ConverseService(PipelinePlugin):
         return want_converse
 
     def _check_converse_timeout(self, message: Message):
-        """ filter active skill list based on timestamps """
+        """
+        Removes skills from the active skills list if their activation time exceeds the configured timeout.
+        
+        Filters the session's active skills, retaining only those whose activation timestamp is within the allowed timeout period, as specified per skill or by the default timeout.
+        """
         timeouts = self.config.get("skill_timeouts") or {}
         def_timeout = self.config.get("timeout", 300)
         session = SessionManager.get(message)
@@ -265,28 +288,17 @@ class ConverseService(PipelinePlugin):
 
     def match(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """
-        Attempt to converse with active skills for a given set of utterances.
-
-        Iterates through active skills to find one that can handle the utterance. Filters skills based on timeout and blacklist status.
-
+        Attempts to find an active skill to handle the given utterances in the current session.
+        
+        Checks for skills in response mode (get_response), then filters active skills by timeout and blacklist status, and returns an intent match for the first eligible skill allowed to converse. Returns None if no skill matches.
+        
         Args:
-            utterances (List[str]): List of utterance strings to process
-            lang (str): 4-letter ISO language code for the utterances
-            message (Message): Message context for generating a reply
-
+            utterances: List of utterance strings to process.
+            lang: ISO language code for the utterances.
+            message: Message context for the session.
+        
         Returns:
-            PipelineMatch: Match details if a skill successfully handles the utterance, otherwise None
-            - handled (bool): Whether the utterance was fully handled
-            - match_data (dict): Additional match metadata
-            - skill_id (str): ID of the skill that handled the utterance
-            - updated_session (Session): Current session state after skill interaction
-            - utterance (str): The original utterance processed
-
-        Notes:
-            - Standardizes language tag
-            - Filters out blacklisted skills
-            - Checks for skill conversation timeouts
-            - Attempts conversation with each eligible skill
+            An IntentHandlerMatch if a skill is found to handle the utterance; otherwise, None.
         """
         lang = standardize_lang_tag(lang)
         session = SessionManager.get(message)
@@ -365,6 +377,11 @@ class ConverseService(PipelinePlugin):
         # someone can forge this message and emit it raw, but in ovos-core all
         # skill message should have skill_id in context, so let's make sure
         # this doesnt happen accidentally
+        """
+        Handles a request to deactivate a skill within the current session.
+        
+        Removes the specified skill from the active skills list if permitted, using the skill ID from the message data and the source skill from the message context or data. If the session is the default session, synchronizes the session state.
+        """
         skill_id = message.data['skill_id']
         source_skill = message.context.get("skill_id") or skill_id
         self.deactivate_skill(skill_id, source_skill, message)
@@ -373,15 +390,19 @@ class ConverseService(PipelinePlugin):
             SessionManager.sync(message)
 
     def handle_get_active_skills(self, message: Message):
-        """Send active skills to caller.
-
-        Argument:
-            message: query message to reply to.
+        """
+        Sends a reply containing the list of currently active skills for the session.
+        
+        Args:
+            message: The message requesting the list of active skills.
         """
         self.bus.emit(message.reply("intent.service.active_skills.reply",
                                     {"skills": self.get_active_skills(message)}))
 
     def shutdown(self):
+        """
+        Removes all event handlers related to skill activation, deactivation, active skill queries, and response mode toggling from the message bus.
+        """
         self.bus.remove('intent.service.skills.deactivate', self.handle_deactivate_skill_request)
         self.bus.remove('intent.service.skills.activate', self.handle_activate_skill_request)
         self.bus.remove('intent.service.active_skills.get', self.handle_get_active_skills)

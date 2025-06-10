@@ -195,7 +195,7 @@ class IntentTransformersService:
 
     def shutdown(self):
         """
-        Shuts down all loaded plugins, suppressing any exceptions raised during shutdown.
+        Shuts down all loaded plugins, ignoring any exceptions that occur during shutdown.
         """
         for module in self.plugins:
             try:
@@ -205,15 +205,9 @@ class IntentTransformersService:
 
     def transform(self, intent: IntentHandlerMatch) -> IntentHandlerMatch:
         """
-        Sequentially applies all loaded intent transformer plugins to the given intent object.
-
-        Each plugin's `transform` method is called in order of priority. Exceptions raised by individual plugins are logged as warnings, and processing continues with the next plugin. The final, transformed intent object is returned.
-
-        Args:
-            intent: The intent match object to be transformed.
-
-        Returns:
-            The transformed intent match object after all plugins have been applied.
+        Applies all loaded intent transformer plugins in sequence to an intent match object.
+        
+        Each plugin's `transform` method is invoked in descending order of priority. If a plugin raises an exception, it is logged as a warning and processing continues with the next plugin. Returns the final transformed intent match object.
         """
         for module in self.plugins:
             try:

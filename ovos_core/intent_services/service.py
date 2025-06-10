@@ -37,22 +37,40 @@ from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, Confidenc
 
 
 def on_started():
+    """
+    Logs that the IntentService is starting up.
+    """
     LOG.info('IntentService is starting up.')
 
 
 def on_alive():
+    """
+    Logs that the IntentService process is alive.
+    """
     LOG.info('IntentService is alive.')
 
 
 def on_ready():
+    """
+    Logs that the IntentService is ready for operation.
+    """
     LOG.info('IntentService is ready.')
 
 
 def on_error(e='Unknown'):
+    """
+    Logs an informational message indicating that the IntentService failed to launch.
+    
+    Args:
+        e: The error message or exception that caused the failure. Defaults to 'Unknown'.
+    """
     LOG.info(f'IntentService failed to launch ({e})')
 
 
 def on_stopping():
+    """
+    Logs a message indicating that the IntentService is shutting down.
+    """
     LOG.info('IntentService is shutting down...')
 
 
@@ -68,14 +86,10 @@ class IntentService:
                  ready_hook=on_ready,
                  error_hook=on_error, stopping_hook=on_stopping):
         """
-        Initializes the IntentService with all intent parsing pipelines, transformer services, and messagebus event handlers.
-
-        Args:
-            bus: The messagebus connection used for event-driven communication.
-            config: Optional configuration dictionary for intent services.
-
-        Sets up skill name mapping, loads all supported intent matching pipelines (including Adapt, Padatious, Padacioso, Fallback, Converse, CommonQA, Stop, OCP, Persona, and optionally LLM and Model2Vec pipelines), initializes utterance and metadata transformer services, connects the session manager, and registers all relevant messagebus event handlers for utterance processing, context management, intent queries, and skill deactivation tracking.
-        """
+                 Initializes the IntentService with intent parsing pipelines, transformer services, and event handlers.
+                 
+                 Sets up the process status callbacks, loads configuration, initializes utterance, metadata, and intent transformer services, connects the session manager to the message bus, and registers all relevant messagebus event handlers for utterance processing, context management, intent queries, and skill deactivation tracking. Optionally preloads all supported intent matching pipelines.
+                 """
         callbacks = StatusCallbackMap(on_started=started_hook,
                                       on_alive=alive_hook,
                                       on_ready=ready_hook,
@@ -117,6 +131,11 @@ class IntentService:
             self.bus.emit(Message('intent.service.pipelines.reload'))
 
     def handle_reload_pipelines(self, message: Message):
+        """
+        Reloads all installed intent pipeline plugins and updates the internal plugin cache.
+        
+        Iterates through available pipeline plugin IDs, attempts to load each plugin, and stores successfully loaded plugins in the internal cache. Logs the outcome for each plugin. Marks the service as ready after reloading.
+        """
         pipeline_plugins = OVOSPipelineFactory.get_installed_pipeline_ids()
         LOG.debug(f"Installed pipeline plugins: {pipeline_plugins}")
         for p in pipeline_plugins:
@@ -129,8 +148,9 @@ class IntentService:
 
     def _handle_transformers(self, message):
         """
-        Pipe utterance through transformer plugins to get more metadata.
-        Utterances may be modified by any parser and context overwritten
+        Processes the utterance and context through transformer plugins to update utterances and enrich context metadata.
+        
+        The function applies utterance transformers, which may modify the utterances, and metadata transformers, which may update the context. The message is updated in place and returned.
         """
         lang = get_message_lang(message)  # per query lang or default Configuration lang
         original = utterances = message.data.get('utterances', [])
@@ -144,11 +164,10 @@ class IntentService:
 
     @staticmethod
     def disambiguate_lang(message):
-        """ disambiguate language of the query via pre-defined context keys
-        1 - stt_lang -> tagged in stt stage  (STT used this lang to transcribe speech)
-        2 - request_lang -> tagged in source message (wake word/request volunteered lang info)
-        3 - detected_lang -> tagged by transformers  (text classification, free form chat)
-        4 - config lang (or from message.data)
+        """
+        Determines the most appropriate language for a query based on prioritized context keys.
+        
+        Checks for language indicators in the message context in the following order: 'stt_lang', 'request_lang', and 'detected_lang'. Returns the first valid language found that matches the enabled languages; otherwise, falls back to the default language from the message.
         """
         default_lang = get_message_lang(message)
         valid_langs = get_valid_languages()
@@ -170,13 +189,9 @@ class IntentService:
 
     def get_pipeline_matcher(self, matcher_id: str):
         """
-        Retrieve a matcher function for a given pipeline matcher ID.
-
-        Args:
-            matcher_id: The configured matcher ID (e.g. `adapt_high`).
-
-        Returns:
-            A callable matcher function.
+        Returns the matcher function corresponding to the specified pipeline matcher ID.
+        
+        If the matcher ID is recognized, returns the appropriate callable matcher function from the loaded pipeline plugins. Returns None and logs an error if the matcher ID is unknown.
         """
         migration_map = {
             "converse": "ovos-converse-pipeline-plugin",
@@ -219,10 +234,14 @@ class IntentService:
         return plugin.match
 
     def get_pipeline(self, session=None) -> List[Tuple[str, Callable]]:
-        """return a list of matcher functions ordered by priority
-        utterances will be sent to each matcher in order until one can handle the utterance
-        the list can be configured in mycroft.conf under intents.pipeline,
-        in the future plugins will be supported for users to define their own pipeline"""
+        """
+        Returns an ordered list of intent matcher functions for the current session's pipeline.
+        
+        Each matcher is paired with its identifier and filtered to exclude any invalid or missing components. The pipeline order is determined by the session configuration, and a warning is logged if any requested matchers are unavailable.
+        
+        Returns:
+            A list of tuples containing matcher IDs and their corresponding callable functions, ordered by priority.
+        """
         session = session or SessionManager.get()
         matchers = [(p, self.get_pipeline_matcher(p)) for p in session.pipeline]
         matchers = [m for m in matchers if m[1] is not None]  # filter any that failed to load
@@ -236,6 +255,18 @@ class IntentService:
     @staticmethod
     def _validate_session(message, lang):
         # get session
+        """
+        Validates and updates the session associated with a message for the specified language.
+        
+        If the session is the default and expired, it is reset. The session language is updated if necessary, and the session's timestamp is refreshed. The session state is synchronized with the message when changes occur.
+        
+        Args:
+            message: The message containing session context.
+            lang: The language code to set for the session.
+        
+        Returns:
+            The validated and updated session object.
+        """
         lang = standardize_lang_tag(lang)
         sess = SessionManager.get(message)
         if sess.session_id == "default":
@@ -257,10 +288,10 @@ class IntentService:
         return sess
 
     def _handle_deactivate(self, message):
-        """internal helper, track if a skill asked to be removed from active list during intent match
-        in this case we want to avoid reactivating it again
-        This only matters in PipelineMatchers, such as fallback and converse
-        in those cases the activation is only done AFTER the match, not before unlike intents
+        """
+        Tracks skills that request deactivation during intent matching to prevent their reactivation within the same session.
+        
+        This is relevant for pipeline matchers where skill activation occurs after a match, such as fallback and converse pipelines.
         """
         sess = SessionManager.get(message)
         skill_id = message.data.get("skill_id")
@@ -268,31 +299,9 @@ class IntentService:
 
     def _emit_match_message(self, match: IntentHandlerMatch, message: Message, lang: str):
         """
-        Emit a reply message for a matched intent, updating session and skill activation.
-
-        This method processes matched intents from either a pipeline matcher or an intent handler,
-        creating a reply message with matched intent details and managing skill activation.
-
-        Args:
-            match (IntentHandlerMatch): The matched intent object containing
-                utterance and matching information.
-            message (Message): The original messagebus message that triggered the intent match.
-            lang (str): The language of the pipeline plugin match
-
-        Details:
-            - Handles two types of matches: PipelineMatch and IntentHandlerMatch
-            - Creates a reply message with matched intent data
-            - Activates the corresponding skill if not previously deactivated
-            - Updates session information
-            - Emits the reply message on the messagebus
-
-        Side Effects:
-            - Modifies session state
-            - Emits a messagebus event
-            - Can trigger skill activation events
-
-        Returns:
-            None
+        Emits a reply message for a matched intent, updating session state and managing skill activation.
+        
+        Transforms the matched intent, constructs a reply message with intent details, updates the session language and context, and emits the reply on the message bus. Activates the matched skill unless it was previously deactivated in the session. Asynchronously uploads intent match metrics. If no reply is generated, uploads failure metrics instead.
         """
         try:
             match = self.intent_plugins.transform(match)
@@ -348,12 +357,12 @@ class IntentService:
 
     @staticmethod
     def _upload_match_data(utterance: str, intent: str, lang: str, match_data: dict):
-        """if enabled upload the intent match data to a server, allowing users and developers
-        to collect metrics/datasets to improve the pipeline plugins and skills.
-
-        There isn't a default server to upload things too, users needs to explicitly configure one
-
-        https://github.com/OpenVoiceOS/ovos-opendata-server
+        """
+        Uploads intent match data to configured remote endpoints for metrics collection.
+        
+        If one or more upload URLs are specified in the configuration, sends the utterance,
+        intent, language, and match data as a POST request to each endpoint. Skips upload
+        if no endpoints are configured.
         """
         config = Configuration().get("open_data", {})
         endpoints: List[str] = config.get("intent_urls", [])  # eg. "http://localhost:8000/intents"
@@ -379,22 +388,9 @@ class IntentService:
 
     def send_cancel_event(self, message):
         """
-        Emit events and play a sound when an utterance is canceled.
-
-        Logs the cancellation with the specific cancel word, plays a predefined cancel sound,
-        and emits multiple events to signal the utterance cancellation.
-
-        Parameters:
-            message (Message): The original message that triggered the cancellation.
-
-        Events Emitted:
-            - 'mycroft.audio.play_sound': Plays a cancel sound from configuration
-            - 'ovos.utterance.cancelled': Signals that the utterance was canceled
-            - 'ovos.utterance.handled': Indicates the utterance processing is complete
-
-        Notes:
-            - Uses the default cancel sound path 'snd/cancel.mp3' if not specified in configuration
-            - Ensures events are sent as replies to the original message
+        Handles utterance cancellation by playing a cancel sound and emitting cancellation events.
+        
+        Logs the cancellation, plays a configured cancel sound, and emits events to indicate that the utterance was canceled and processing is complete.
         """
         LOG.info("utterance canceled, cancel_word:" + message.context.get("cancel_word"))
         # play dedicated cancel sound
@@ -405,31 +401,16 @@ class IntentService:
         self.bus.emit(message.reply("ovos.utterance.handled"))
 
     def handle_utterance(self, message: Message):
-        """Main entrypoint for handling user utterances
-
-        Monitor the messagebus for 'recognizer_loop:utterance', typically
-        generated by a spoken interaction but potentially also from a CLI
-        or other method of injecting a 'user utterance' into the system.
-
-        Utterances then work through this sequence to be handled:
-        1) UtteranceTransformers can modify the utterance and metadata in message.context
-        2) MetadataTransformers can modify the metadata in message.context
-        3) Language is extracted from message
-        4) Active skills attempt to handle using converse()
-        5) Padatious high match intents (conf > 0.95)
-        6) Adapt intent handlers
-        7) CommonQuery Skills
-        8) High Priority Fallbacks
-        9) Padatious near match intents (conf > 0.8)
-        10) General Fallbacks
-        11) Padatious loose match intents (conf > 0.5)
-        12) Catch all fallbacks including Unknown intent handler
-
-        If all these fail the complete_intent_failure message will be sent
-        and a generic error sound played.
-
+        """
+        Processes a user utterance message, applies transformers, matches intents using configured pipelines, and emits the appropriate response.
+        
+        The function handles utterance transformation, language disambiguation, session validation, and sequentially attempts intent matching across multiple pipelines and languages. If a match is found and not blacklisted, it emits a match message; otherwise, it signals a complete intent failure. Session state is synchronized after processing.
+        
         Args:
-            message (Message): The messagebus data
+            message (Message): The incoming message containing user utterances and context.
+        
+        Returns:
+            A tuple containing the matched intent (or None), the updated message context, and a stopwatch object with timing information.
         """
         # Get utterance utterance_plugins additional context
         message = self._handle_transformers(message)
@@ -496,10 +477,10 @@ class IntentService:
         return match, message.context, stopwatch
 
     def send_complete_intent_failure(self, message):
-        """Send a message that no skill could handle the utterance.
-
-        Args:
-            message (Message): original message to forward from
+        """
+        Emits events indicating that no skill could handle the given utterance.
+        
+        Plays an error sound and notifies listeners of the intent failure and utterance handling completion.
         """
         sound = Configuration().get('sounds', {}).get('error', "snd/error.mp3")
         # NOTE: message.reply to ensure correct message destination
@@ -509,12 +490,10 @@ class IntentService:
 
     @staticmethod
     def handle_add_context(message: Message):
-        """Add context
-
-        Args:
-            message: data contains the 'context' item to add
-                     optionally can include 'word' to be injected as
-                     an alias for the context item.
+        """
+        Adds a context entity to the current session for intent recognition.
+        
+        The context entity is defined by the provided context value and an optional alias word and origin. This enables subsequent utterances to be matched with additional contextual information.
         """
         entity = {'confidence': 1.0}
         context = message.data.get('context')
@@ -532,10 +511,10 @@ class IntentService:
 
     @staticmethod
     def handle_remove_context(message: Message):
-        """Remove specific context
-
-        Args:
-            message: data contains the 'context' item to remove
+        """
+        Removes a specific context item from the current session.
+        
+        The context item to remove is specified in the message data under the 'context' key.
         """
         context = message.data.get('context')
         if context:
@@ -544,15 +523,19 @@ class IntentService:
 
     @staticmethod
     def handle_clear_context(message: Message):
-        """Clears all keywords from context """
+        """
+        Removes all context keywords from the current session.
+        
+        This clears any stored context entities, resetting the session's context state.
+        """
         sess = SessionManager.get(message)
         sess.context.clear_context()
 
     def handle_get_intent(self, message):
-        """Get intent from either adapt or padatious.
-
-        Args:
-            message (Message): message containing utterance
+        """
+        Processes an intent query for a given utterance and emits a reply with the matched intent or failure.
+        
+        Attempts to match the provided utterance against all configured intent pipelines in order. If a match is found, emits a reply message containing intent details; otherwise, emits a reply indicating no intent was matched.
         """
         utterance = message.data["utterance"]
         lang = get_message_lang(message)
@@ -581,6 +564,11 @@ class IntentService:
                                     {"intent": None, "utterance": utterance}))
 
     def shutdown(self):
+        """
+        Shuts down the IntentService and its components.
+        
+        Stops all transformer services and pipeline plugins, unregisters message bus event handlers, and updates the service status to indicate it is stopping.
+        """
         self.utterance_plugins.shutdown()
         self.metadata_plugins.shutdown()
         for pipeline in self.pipeline_plugins.values():
@@ -605,6 +593,11 @@ class IntentService:
 
 
 def launch_standalone():
+    """
+    Runs the IntentService as a standalone process.
+    
+    Initializes logging and locale, connects to the message bus, starts the IntentService, waits for an exit signal, and then shuts down the service cleanly.
+    """
     from ovos_bus_client import MessageBusClient
     from ovos_utils import wait_for_exit_signal
     from ovos_config.locale import setup_locale

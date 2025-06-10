@@ -82,6 +82,11 @@ class TestSkillManager(TestCase):
         rmtree(str(self.temp_dir))
 
     def _mock_skill_loader_instance(self):
+        """
+        Creates and assigns a mocked SkillLoader instance for testing.
+        
+        Sets up a mock SkillLoader with a test skill directory and configures its methods and attributes for use in SkillManager tests.
+        """
         self.skill_dir = self.temp_dir.joinpath('test_skill')
         self.skill_loader_mock = Mock(spec=SkillLoader)
         self.skill_loader_mock.instance = Mock()
@@ -94,6 +99,9 @@ class TestSkillManager(TestCase):
         }
 
     def test_instantiate(self):
+        """
+        Verifies that SkillManager subscribes to the expected set of message bus event handlers upon instantiation.
+        """
         expected_result = [
             'skillmanager.list',
             'skillmanager.deactivate',
@@ -116,6 +124,11 @@ class TestSkillManager(TestCase):
 
 
     def test_send_skill_list(self):
+        """
+        Tests that the skill manager emits a skill list message with correct skill data.
+        
+        Verifies that when `send_skill_list` is called, the message bus receives a `mycroft.skills.list` message containing the test skill marked as active.
+        """
         self.skill_loader_mock.active = True
         self.skill_loader_mock.loaded = True
         self.skill_manager.send_skill_list(None)
@@ -144,6 +157,11 @@ class TestSkillManager(TestCase):
         message.response.assert_called_once()
 
     def test_deactivate_except(self):
+        """
+        Tests that all skills except the specified one are deactivated.
+        
+        Verifies that the `deactivate` method is called on all skill loaders except the one matching the skill specified in the message.
+        """
         message = Message("test.message", {'skill': 'test_skill'})
         message.response = Mock()
         self.skill_loader_mock.active = True
@@ -163,6 +181,11 @@ class TestSkillManager(TestCase):
         self.assertFalse(test_skill_loader.deactivate.called)
 
     def test_activate_skill(self):
+        """
+        Tests that activating a skill calls its activate method and sends a response.
+        
+        Verifies that when a skill is inactive, invoking activate_skill on the SkillManager triggers the skill loader's activate method and sends a response to the original message.
+        """
         message = Message("test.message", {'skill': 'test_skill'})
         message.response = Mock()
         test_skill_loader = Mock(spec=SkillLoader)

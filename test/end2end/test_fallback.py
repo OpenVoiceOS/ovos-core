@@ -10,16 +10,29 @@ from ovoscope import End2EndTest, get_minicroft
 class TestFallback(TestCase):
 
     def setUp(self):
+        """
+        Sets up the test environment for fallback skill testing.
+        
+        Initializes the logging level to DEBUG, sets the fallback skill ID, and creates a MiniCroft instance with the fallback skill loaded for use in end-to-end tests.
+        """
         LOG.set_level("DEBUG")
         self.skill_id = "ovos-skill-fallback-unknown.openvoiceos"
         self.minicroft = get_minicroft([self.skill_id])  # reuse for speed, but beware if skills keeping internal state
 
     def tearDown(self):
+        """
+        Cleans up the test environment by stopping the MiniCroft instance and resetting the logging level to CRITICAL.
+        """
         if self.minicroft:
             self.minicroft.stop()
         LOG.set_level("CRITICAL")
 
     def test_fallback_match(self):
+        """
+        Tests that the fallback skill correctly handles an unrecognized utterance in an end-to-end scenario.
+        
+        Simulates a user utterance that cannot be handled by standard skills, triggering the fallback pipeline. Verifies that the expected sequence of messages is exchanged, including fallback ping/pong, skill request, response, and final handling confirmation.
+        """
         session = Session("123")
         session.pipeline = ['ovos-fallback-pipeline-plugin-low']
         message = Message("recognizer_loop:utterance",
