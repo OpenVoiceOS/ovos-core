@@ -30,6 +30,12 @@ class TestConverse(TestCase):
         message2 = Message("recognizer_loop:utterance",
                           {"utterances": ["echo test"], "lang": "en-US"},
                           {"source": "A", "destination": "B"})
+        message3 = Message("recognizer_loop:utterance",
+                          {"utterances": ["stop parrot"], "lang": "en-US"},
+                          {"source": "A", "destination": "B"})
+        message4 = Message("recognizer_loop:utterance",
+                           {"utterances": ["echo test"], "lang": "en-US"},
+                           {"source": "A", "destination": "B"})
 
         expected1 = [
             message1,
@@ -68,11 +74,9 @@ class TestConverse(TestCase):
             Message(f"{self.skill_id}.activate",
                     data={},
                     context={"skill_id": self.skill_id}),
-
             Message(f"{self.skill_id}.converse.request",
                     data={"utterances": ["echo test"], "lang": "en-US"},
                     context={"skill_id": self.skill_id}),
-
             Message("speak",
                     data={"utterance": "echo test",
                           "expect_response": False,
@@ -81,29 +85,58 @@ class TestConverse(TestCase):
                               "skill": self.skill_id
                           }},
                     context={"skill_id": self.skill_id}),
-
             Message("skill.converse.response",
                     data={"skill_id": self.skill_id},
                     context={"skill_id": self.skill_id}),
-
-            Message("mycroft.skill.handler.complete",
-                    data={"name": "ParrotSkill.handle_start_parrot_intent"},
+        ]
+        expected3 = [
+            message3,
+            Message(f"{self.skill_id}.converse.ping",
+                    data={"utterances": ["stop parrot"], "skill_id": self.skill_id},
+                    context={}),
+            Message("skill.converse.pong",
+                    data={"can_handle": True, "skill_id": self.skill_id},
                     context={"skill_id": self.skill_id}),
-            Message("ovos.utterance.handled",
+            Message(f"{self.skill_id}.activate",
                     data={},
                     context={"skill_id": self.skill_id}),
-        ]
 
+            Message(f"{self.skill_id}.converse.request",
+                    data={"utterances": ["stop parrot"], "lang": "en-US"},
+                    context={"skill_id": self.skill_id}),
+
+            Message("speak",
+                    data={"expect_response": False,
+                          "lang": "en-US",
+                          "meta": {
+                              "dialog": "parrot_stop",
+                              "data": {},
+                              "skill": self.skill_id
+                          }},
+                    context={"skill_id": self.skill_id}),
+            Message("skill.converse.response",
+                    data={"skill_id": self.skill_id},
+                    context={"skill_id": self.skill_id})
+        ]
+        expected4 = [
+            message4,
+            Message(f"{self.skill_id}.converse.ping",
+                    data={"utterances": ["echo test"], "skill_id": self.skill_id},
+                    context={}),
+            Message("skill.converse.pong",
+                    data={"can_handle": False, "skill_id": self.skill_id},
+                    context={"skill_id": self.skill_id}),
+            Message("mycroft.audio.play_sound",  data={"uri": "snd/error.mp3"}),
+            Message("complete_intent_failure"),
+            Message("ovos.utterance.handled")
+        ]
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
             flip_points=["recognizer_loop:utterance"],
-            source_message=[message1, message2],
-            expected_messages=expected1 + expected2,
-            activation_points={
-                f"{self.skill_id}:start_parrot.intent": self.skill_id
-            },
+            source_message=[message1, message2, message3, message4],
+            expected_messages=expected1 + expected2 + expected3 + expected4,
+            activation_points={f"{self.skill_id}:start_parrot.intent": self.skill_id},
             keep_original_src=[f"{self.skill_id}.converse.ping", "skill.converse.response"]
         )
-
         test.execute(timeout=10)
