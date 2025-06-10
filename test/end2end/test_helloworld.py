@@ -28,8 +28,6 @@ class TestAdaptIntent(TestCase):
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
             source_message=message,
             expected_messages=[
                 message,
@@ -74,8 +72,6 @@ class TestAdaptIntent(TestCase):
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
             source_message=message,
             expected_messages=[
                 message,
@@ -98,8 +94,6 @@ class TestAdaptIntent(TestCase):
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
             source_message=message,
             expected_messages=[
                 message,
@@ -121,8 +115,6 @@ class TestAdaptIntent(TestCase):
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
             source_message=message,
             expected_messages=[
                 message,
@@ -157,8 +149,6 @@ class TestPadatiousIntent(TestCase):
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
             source_message=message,
             expected_messages=[
                 message,
@@ -202,8 +192,6 @@ class TestPadatiousIntent(TestCase):
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
             source_message=message,
             expected_messages=[
                 message,
@@ -226,8 +214,6 @@ class TestPadatiousIntent(TestCase):
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
             source_message=message,
             expected_messages=[
                 message,
@@ -249,8 +235,6 @@ class TestPadatiousIntent(TestCase):
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
             source_message=message,
             expected_messages=[
                 message,
@@ -285,8 +269,6 @@ class TestModel2VecIntent(TestCase):
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
             source_message=message,
             expected_messages=[
                 message,
@@ -330,8 +312,6 @@ class TestModel2VecIntent(TestCase):
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
             source_message=message,
             expected_messages=[
                 message,
@@ -354,8 +334,6 @@ class TestModel2VecIntent(TestCase):
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
             source_message=message,
             expected_messages=[
                 message,

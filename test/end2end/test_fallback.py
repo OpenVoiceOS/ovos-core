@@ -29,8 +29,6 @@ class TestFallback(TestCase):
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
             keep_original_src=["ovos.skills.fallback.ping"], # for routing tests this is an exception
             source_message=message,
             expected_messages=[
