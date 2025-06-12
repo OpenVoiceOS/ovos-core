@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.1a1) (2025-06-12)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.0a1...2.0.1a1)
+
+**Merged pull requests:**
+
+- fix: minimum requirements + add galician skills extras [\#699](https://github.com/OpenVoiceOS/ovos-core/pull/699) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.0.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.0a1) (2025-06-10)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/1.5.1a1...2.0.0a1)
