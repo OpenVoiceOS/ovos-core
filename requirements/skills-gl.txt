@@ -1,0 +1,2 @@
+# skills providing galician specific functionality
+ovos-skill-word-of-the-day>=0.2.0

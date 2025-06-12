@@ -20,7 +20,6 @@ BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
 def get_version():
     """ Find the version of ovos-core"""
-    version = None
     version_file = os.path.join(BASEDIR, 'ovos_core', 'version.py')
     major, minor, build, alpha = (0, 0, 0, 0)
     with open(version_file) as f:
@@ -87,6 +86,7 @@ setup(
         'skills-media': required('requirements/skills-media.txt'),
         'skills-ca': required('requirements/skills-ca.txt'),
         'skills-pt': required('requirements/skills-pt.txt'),
+        'skills-gl': required('requirements/skills-gl.txt'),
         'skills-en': required('requirements/skills-en.txt')
     },
     packages=find_packages(include=['ovos_core*']),
