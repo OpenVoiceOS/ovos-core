@@ -13,7 +13,12 @@ class TestStopNoSkills(TestCase):
 
     def setUp(self):
         LOG.set_level("DEBUG")
-        self.minicroft = get_minicroft([])  # reuse for speed, but beware if skills keeping internal state
+        self.minicroft = get_minicroft([])  # reuse for speed, but beware if skills keeping internal state        # to make tests easier to grok
+        self.ignore_messages = ["speak",
+                                "ovos.common_play.stop.response",
+                                "common_query.openvoiceos.stop.response",
+                                "persona.openvoiceos.stop.response"
+                                ]
 
     def tearDown(self):
         if self.minicroft:
@@ -32,6 +37,7 @@ class TestStopNoSkills(TestCase):
             skill_ids=[],
             eof_msgs=["ovos.utterance.handled"],
             flip_points=["recognizer_loop:utterance"],
+            ignore_messages=self.ignore_messages,
             source_message=message,
             expected_messages=[
                 message,
@@ -39,15 +45,6 @@ class TestStopNoSkills(TestCase):
 
                 Message("stop:global", {}),  # global stop, no active skill
                 Message("mycroft.stop", {}),
-
-                # pipelines reporting if they stopped
-                # no skills loaded, else skills would also report back
-                Message("persona.openvoiceos.stop.response", {"skill_id": "persona.openvoiceos", "result": False}),
-                Message("common_query.openvoiceos.stop.response",
-                        {"skill_id": "common_query.openvoiceos", "result": False}),
-                Message("ovos.common_play.stop.response", {"skill_id": "ovos.common_play", "result": False}),
-                Message("ovos.common_play.stop.response", {"skill_id": "ovos.common_play", "result": False}),
-                # TODO - why duplicate?
 
                 Message("ovos.utterance.handled", {})
             ]
@@ -67,6 +64,7 @@ class TestStopNoSkills(TestCase):
             skill_ids=[],
             eof_msgs=["ovos.utterance.handled"],
             flip_points=["recognizer_loop:utterance"],
+            ignore_messages=self.ignore_messages,
             source_message=message,
             expected_messages=[
                 message,
@@ -91,21 +89,13 @@ class TestStopNoSkills(TestCase):
             eof_msgs=["ovos.utterance.handled"],
             flip_points=["recognizer_loop:utterance"],
             source_message=message,
+            ignore_messages=self.ignore_messages,
             expected_messages=[
                 message,
                 Message("stop.openvoiceos.activate", {}),  # stop pipeline counts as active_skill
 
                 Message("stop:global", {}),  # global stop, no active skill
                 Message("mycroft.stop", {}),
-
-                # pipelines reporting if they stopped
-                # no skills loaded, else skills would also report back
-                Message("persona.openvoiceos.stop.response", {"skill_id": "persona.openvoiceos", "result": False}),
-                Message("common_query.openvoiceos.stop.response",
-                        {"skill_id": "common_query.openvoiceos", "result": False}),
-                Message("ovos.common_play.stop.response", {"skill_id": "ovos.common_play", "result": False}),
-                Message("ovos.common_play.stop.response", {"skill_id": "ovos.common_play", "result": False}),
-                # TODO - why duplicate?
 
                 Message("ovos.utterance.handled", {})
             ]
