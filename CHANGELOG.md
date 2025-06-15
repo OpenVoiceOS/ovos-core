@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.1a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.1a2) (2025-06-15)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.1a1...2.0.1a2)
+
+**Merged pull requests:**
+
+- refactor: improve\_stop [\#702](https://github.com/OpenVoiceOS/ovos-core/pull/702) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.0.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.1a1) (2025-06-12)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.0a1...2.0.1a1)
