@@ -28,6 +28,12 @@ class StopService(ConfidenceMatcherPipeline):
         super().__init__(config=config, bus=bus)
         self._voc_cache = {}
         self.load_resource_files()
+        self.bus.on("stop:global", self.handle_global_stop)
+
+    def handle_global_stop(self, message: Message):
+        self.bus.emit(message.forward("mycroft.stop"))
+        # TODO - this needs a confirmation dialog if nothing was stopped
+        self.bus.emit(message.forward("ovos.utterance.handled"))
 
     def load_resource_files(self):
         base = f"{dirname(__file__)}/locale"
@@ -191,7 +197,7 @@ class StopService(ConfidenceMatcherPipeline):
             LOG.info(f"Emitting global stop, {len(self.get_active_skills(message))} active skills")
             # emit a global stop, full stop anything OVOS is doing
             return IntentHandlerMatch(
-                match_type="mycroft.stop",
+                match_type="stop:global",
                 match_data={"conf": conf},
                 updated_session=sess,
                 utterance=utterance,
@@ -303,7 +309,7 @@ class StopService(ConfidenceMatcherPipeline):
         # emit a global stop, full stop anything OVOS is doing
         LOG.debug(f"Emitting global stop signal, {len(self.get_active_skills(message))} active skills")
         return IntentHandlerMatch(
-            match_type="mycroft.stop",
+            match_type="stop:global",
             match_data={"conf": conf},
             updated_session=sess,
             utterance=utterance,

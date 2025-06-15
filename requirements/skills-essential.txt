@@ -7,3 +7,4 @@ ovos-skill-hello-world>=0.1.10,<1.0.0
 ovos-skill-spelling>=0.2.5,<1.0.0
 ovos-skill-diagnostics>=0.0.2,<1.0.0
 ovos-skill-parrot>=0.1.25,<1.0.0
+ovos-skill-count>=0.0.1,<1.0.0
