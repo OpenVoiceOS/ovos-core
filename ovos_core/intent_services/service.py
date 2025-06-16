@@ -20,6 +20,7 @@ from collections import defaultdict
 from typing import Tuple, Callable, List
 
 import requests
+from langcodes import closest_match
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
@@ -159,12 +160,12 @@ class IntentService:
         for k in lang_keys:
             if k in message.context:
                 v = standardize_lang_tag(message.context[k])
-                if v in valid_langs:  # TODO - use lang distance instead to choose best dialect
-                    if v != default_lang:
-                        LOG.info(f"replaced {default_lang} with {k}: {v}")
-                    return v
-                else:
+                best_lang, _ = closest_match(v, valid_langs, max_distance=10)
+                if best_lang == "und":
                     LOG.warning(f"ignoring {k}, {v} is not in enabled languages: {valid_langs}")
+                    continue
+                LOG.info(f"replaced {default_lang} with {k}: {v}")
+                return v
 
         return default_lang
 
