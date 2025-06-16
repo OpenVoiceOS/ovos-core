@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for ovos_core/intent_services/service.py: 64%</title>
+    <title>Coverage for ovos_core/intent_services/service.py: 66%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_58284776.png">
     <link rel="stylesheet" href="style_cb_81f8c14c.css" type="text/css">
     <script src="coverage_html_cb_6fb7b396.js" defer></script>
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>ovos_core/intent_services/service.py</b>:
-            <span class="pc_cov">64%</span>
+            <span class="pc_cov">66%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -55,8 +55,8 @@
         </aside>
         <h2>
             <span class="text">322 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">205<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">117<span class="text"> missing</span></button>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">212<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">110<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
         </h2>
         <p class="text">
@@ -65,7 +65,7 @@
             <a id="nextFileLink" class="nav" href="z_5b704781350e2a59_stop_service_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.9.1">coverage.py v7.9.1</a>,
-            created at 2025-06-16 11:44 +0000
+            created at 2025-06-16 12:36 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -483,13 +483,13 @@
     <p class="pln"><span class="n"><a id="t401" href="#t401">401</a></span><span class="t"><span class="str">            - Uses the default cancel sound path 'snd/cancel.mp3' if not specified in configuration</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t402" href="#t402">402</a></span><span class="t"><span class="str">            - Ensures events are sent as replies to the original message</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t403" href="#t403">403</a></span><span class="t"><span class="str">        """</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t404" href="#t404">404</a></span><span class="t">        <span class="nam">LOG</span><span class="op">.</span><span class="nam">info</span><span class="op">(</span><span class="str">"utterance canceled, cancel_word:"</span> <span class="op">+</span> <span class="nam">message</span><span class="op">.</span><span class="nam">context</span><span class="op">.</span><span class="nam">get</span><span class="op">(</span><span class="str">"cancel_word"</span><span class="op">)</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t404" href="#t404">404</a></span><span class="t">        <span class="nam">LOG</span><span class="op">.</span><span class="nam">info</span><span class="op">(</span><span class="str">"utterance canceled, cancel_word:"</span> <span class="op">+</span> <span class="nam">message</span><span class="op">.</span><span class="nam">context</span><span class="op">.</span><span class="nam">get</span><span class="op">(</span><span class="str">"cancel_word"</span><span class="op">)</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t405" href="#t405">405</a></span><span class="t">        <span class="com"># play dedicated cancel sound</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t406" href="#t406">406</a></span><span class="t">        <span class="nam">sound</span> <span class="op">=</span> <span class="nam">Configuration</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="nam">get</span><span class="op">(</span><span class="str">'sounds'</span><span class="op">,</span> <span class="op">{</span><span class="op">}</span><span class="op">)</span><span class="op">.</span><span class="nam">get</span><span class="op">(</span><span class="str">'cancel'</span><span class="op">,</span> <span class="str">"snd/cancel.mp3"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t406" href="#t406">406</a></span><span class="t">        <span class="nam">sound</span> <span class="op">=</span> <span class="nam">Configuration</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="nam">get</span><span class="op">(</span><span class="str">'sounds'</span><span class="op">,</span> <span class="op">{</span><span class="op">}</span><span class="op">)</span><span class="op">.</span><span class="nam">get</span><span class="op">(</span><span class="str">'cancel'</span><span class="op">,</span> <span class="str">"snd/cancel.mp3"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t407" href="#t407">407</a></span><span class="t">        <span class="com"># NOTE: message.reply to ensure correct message destination</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t408" href="#t408">408</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">bus</span><span class="op">.</span><span class="nam">emit</span><span class="op">(</span><span class="nam">message</span><span class="op">.</span><span class="nam">reply</span><span class="op">(</span><span class="str">'mycroft.audio.play_sound'</span><span class="op">,</span> <span class="op">{</span><span class="str">"uri"</span><span class="op">:</span> <span class="nam">sound</span><span class="op">}</span><span class="op">)</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t409" href="#t409">409</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">bus</span><span class="op">.</span><span class="nam">emit</span><span class="op">(</span><span class="nam">message</span><span class="op">.</span><span class="nam">reply</span><span class="op">(</span><span class="str">"ovos.utterance.cancelled"</span><span class="op">)</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t410" href="#t410">410</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">bus</span><span class="op">.</span><span class="nam">emit</span><span class="op">(</span><span class="nam">message</span><span class="op">.</span><span class="nam">reply</span><span class="op">(</span><span class="str">"ovos.utterance.handled"</span><span class="op">)</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t408" href="#t408">408</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">bus</span><span class="op">.</span><span class="nam">emit</span><span class="op">(</span><span class="nam">message</span><span class="op">.</span><span class="nam">reply</span><span class="op">(</span><span class="str">'mycroft.audio.play_sound'</span><span class="op">,</span> <span class="op">{</span><span class="str">"uri"</span><span class="op">:</span> <span class="nam">sound</span><span class="op">}</span><span class="op">)</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t409" href="#t409">409</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">bus</span><span class="op">.</span><span class="nam">emit</span><span class="op">(</span><span class="nam">message</span><span class="op">.</span><span class="nam">reply</span><span class="op">(</span><span class="str">"ovos.utterance.cancelled"</span><span class="op">)</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t410" href="#t410">410</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">bus</span><span class="op">.</span><span class="nam">emit</span><span class="op">(</span><span class="nam">message</span><span class="op">.</span><span class="nam">reply</span><span class="op">(</span><span class="str">"ovos.utterance.handled"</span><span class="op">)</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t411" href="#t411">411</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t412" href="#t412">412</a></span><span class="t">    <span class="key">def</span> <span class="nam">handle_utterance</span><span class="op">(</span><span class="nam">self</span><span class="op">,</span> <span class="nam">message</span><span class="op">:</span> <span class="nam">Message</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t413" href="#t413">413</a></span><span class="t">        <span class="str">"""Main entrypoint for handling user utterances</span>&nbsp;</span><span class="r"></span></p>
@@ -522,8 +522,8 @@
     <p class="run"><span class="n"><a id="t440" href="#t440">440</a></span><span class="t">        <span class="nam">message</span> <span class="op">=</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_handle_transformers</span><span class="op">(</span><span class="nam">message</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t441" href="#t441">441</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t442" href="#t442">442</a></span><span class="t">        <span class="key">if</span> <span class="nam">message</span><span class="op">.</span><span class="nam">context</span><span class="op">.</span><span class="nam">get</span><span class="op">(</span><span class="str">"canceled"</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t443" href="#t443">443</a></span><span class="t">            <span class="nam">self</span><span class="op">.</span><span class="nam">send_cancel_event</span><span class="op">(</span><span class="nam">message</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t444" href="#t444">444</a></span><span class="t">            <span class="key">return</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t443" href="#t443">443</a></span><span class="t">            <span class="nam">self</span><span class="op">.</span><span class="nam">send_cancel_event</span><span class="op">(</span><span class="nam">message</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t444" href="#t444">444</a></span><span class="t">            <span class="key">return</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t445" href="#t445">445</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t446" href="#t446">446</a></span><span class="t">        <span class="com"># tag language of this utterance</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t447" href="#t447">447</a></span><span class="t">        <span class="nam">lang</span> <span class="op">=</span> <span class="nam">self</span><span class="op">.</span><span class="nam">disambiguate_lang</span><span class="op">(</span><span class="nam">message</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
@@ -728,7 +728,7 @@
             <a class="nav" href="z_5b704781350e2a59_stop_service_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.9.1">coverage.py v7.9.1</a>,
-            created at 2025-06-16 11:44 +0000
+            created at 2025-06-16 12:36 +0000
         </p>
     </div>
 </footer>
