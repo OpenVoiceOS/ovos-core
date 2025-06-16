@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for ovos_core/intent_services/stop_service.py: 89%</title>
+    <title>Coverage for ovos_core/intent_services/stop_service.py: 88%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_58284776.png">
     <link rel="stylesheet" href="style_cb_81f8c14c.css" type="text/css">
     <script src="coverage_html_cb_6fb7b396.js" defer></script>
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>ovos_core/intent_services/stop_service.py</b>:
-            <span class="pc_cov">89%</span>
+            <span class="pc_cov">88%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -54,9 +54,9 @@
             </div>
         </aside>
         <h2>
-            <span class="text">149 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">132<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">17<span class="text"> missing</span></button>
+            <span class="text">152 statements &nbsp;</span>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">133<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">19<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
         </h2>
         <p class="text">
@@ -65,7 +65,7 @@
             <a id="nextFileLink" class="nav" href="z_1888b61c1dd10548_skill_installer_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.9.1">coverage.py v7.9.1</a>,
-            created at 2025-06-16 12:36 +0000
+            created at 2025-06-16 14:12 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -469,6 +469,9 @@
     <p class="pln"><span class="n"><a id="t387" href="#t387">387</a></span><span class="t">                            <span class="key">for</span> <span class="nam">i</span> <span class="key">in</span> <span class="nam">_vocs</span><span class="op">]</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t388" href="#t388">388</a></span><span class="t">        <span class="key">return</span> <span class="key">False</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t389" href="#t389">389</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t390" href="#t390">390</a></span><span class="t">    <span class="key">def</span> <span class="nam">shutdown</span><span class="op">(</span><span class="nam">self</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t391" href="#t391">391</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">bus</span><span class="op">.</span><span class="nam">remove</span><span class="op">(</span><span class="str">"stop:global"</span><span class="op">,</span> <span class="nam">self</span><span class="op">.</span><span class="nam">handle_global_stop</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t392" href="#t392">392</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">bus</span><span class="op">.</span><span class="nam">remove</span><span class="op">(</span><span class="str">"stop:skill"</span><span class="op">,</span> <span class="nam">self</span><span class="op">.</span><span class="nam">handle_skill_stop</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
 </main>
 <footer>
     <div class="content">
@@ -478,7 +481,7 @@
             <a class="nav" href="z_1888b61c1dd10548_skill_installer_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.9.1">coverage.py v7.9.1</a>,
-            created at 2025-06-16 12:36 +0000
+            created at 2025-06-16 14:12 +0000
         </p>
     </div>
 </footer>
