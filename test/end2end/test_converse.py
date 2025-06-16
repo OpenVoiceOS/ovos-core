@@ -91,6 +91,9 @@ class TestConverse(TestCase):
             Message("skill.converse.response",
                     data={"skill_id": self.skill_id},
                     context={"skill_id": self.skill_id}),
+            Message("ovos.utterance.handled",
+                    data={},
+                    context={"skill_id": self.skill_id})
         ]
         expected3 = [
             message3,
@@ -122,6 +125,9 @@ class TestConverse(TestCase):
                     context={"skill_id": self.skill_id}),
             Message("skill.converse.response",
                     data={"skill_id": self.skill_id},
+                    context={"skill_id": self.skill_id}),
+            Message("ovos.utterance.handled",
+                    data={},
                     context={"skill_id": self.skill_id})
         ]
         expected4 = [
