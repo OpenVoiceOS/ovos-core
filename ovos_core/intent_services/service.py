@@ -159,8 +159,12 @@ class IntentService:
                      "detected_lang"]
         for k in lang_keys:
             if k in message.context:
-                v = standardize_lang_tag(message.context[k])
-                best_lang, _ = closest_match(v, valid_langs, max_distance=10)
+                try:
+                    v = standardize_lang_tag(message.context[k])
+                    best_lang, _ = closest_match(v, valid_langs, max_distance=10)
+                except:
+                    v = message.context[k]
+                    best_lang = "und"
                 if best_lang == "und":
                     LOG.warning(f"ignoring {k}, {v} is not in enabled languages: {valid_langs}")
                     continue
