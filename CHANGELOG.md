@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.2a1) (2025-06-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.1a2...2.0.2a1)
+
+**Merged pull requests:**
+
+- fix: improve language disambiguation [\#704](https://github.com/OpenVoiceOS/ovos-core/pull/704) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.0.1a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.1a2) (2025-06-15)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.1a1...2.0.1a2)
