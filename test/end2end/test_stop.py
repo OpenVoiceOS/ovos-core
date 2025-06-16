@@ -27,9 +27,10 @@ class TestStopNoSkills(TestCase):
 
     def test_exact(self):
         session = Session("123")
+        session.lang = "en-US"
         session.pipeline = ['ovos-stop-pipeline-plugin-high']
         message = Message("recognizer_loop:utterance",
-                          {"utterances": ["stop"], "lang": "en-US"},
+                          {"utterances": ["stop"], "lang": session.lang},
                           {"session": session.serialize()})
 
         test = End2EndTest(
@@ -54,9 +55,10 @@ class TestStopNoSkills(TestCase):
 
     def test_not_exact_high(self):
         session = Session("123")
+        session.lang = "en-US"
         session.pipeline = ['ovos-stop-pipeline-plugin-high']
         message = Message("recognizer_loop:utterance",
-                          {"utterances": ["could you stop that"], "lang": "en-US"},
+                          {"utterances": ["could you stop that"], "lang": session.lang},
                           {"session": session.serialize()})
 
         test = End2EndTest(
@@ -78,9 +80,10 @@ class TestStopNoSkills(TestCase):
 
     def test_not_exact_med(self):
         session = Session("123")
+        session.lang = "en-US"
         session.pipeline = ['ovos-stop-pipeline-plugin-medium']
         message = Message("recognizer_loop:utterance",
-                          {"utterances": ["could you stop that"], "lang": "en-US"},
+                          {"utterances": ["could you stop that"], "lang": session.lang},
                           {"session": session.serialize()})
 
         test = End2EndTest(
@@ -124,10 +127,11 @@ class TestCountSkills(TestCase):
 
     def test_count(self):
         session = Session("123")
+        session.lang = "en-US"
         session.pipeline = ['ovos-stop-pipeline-plugin-high', "ovos-padatious-pipeline-plugin-high"]
 
         message = Message("recognizer_loop:utterance",
-                          {"utterances": ["count to 3"], "lang": "en-US"},
+                          {"utterances": ["count to 3"], "lang": session.lang},
                           {"session": session.serialize()})
 
         # first count to 10 to validate skill is working
@@ -159,13 +163,14 @@ class TestCountSkills(TestCase):
 
     def test_count_infinity_active(self):
         session = Session("123")
+        session.lang = "en-US"
         session.pipeline = ['ovos-stop-pipeline-plugin-high',
                             "ovos-padatious-pipeline-plugin-high"]
 
         def make_it_count():
             nonlocal session
             message = Message("recognizer_loop:utterance",
-                              {"utterances": ["count to infinity"], "lang": "en-US"},
+                              {"utterances": ["count to infinity"], "lang": session.lang},
                               {"session": session.serialize(), "source": "A", "destination": "B"})
             session.activate_skill(self.skill_id)  # ensure in active skill list
             self.minicroft.bus.emit(message)
@@ -176,7 +181,7 @@ class TestCountSkills(TestCase):
         time.sleep(3)
 
         message = Message("recognizer_loop:utterance",
-                          {"utterances": ["stop"], "lang": "en-US"},
+                          {"utterances": ["stop"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
         stop_skill_active = [
@@ -239,12 +244,13 @@ class TestCountSkills(TestCase):
 
     def test_count_infinity_global(self):
         session = Session("123")
+        session.lang = "en-US"
         session.pipeline = ['ovos-stop-pipeline-plugin-high',
                             "ovos-padatious-pipeline-plugin-high"]
 
         def make_it_count():
             message = Message("recognizer_loop:utterance",
-                              {"utterances": ["count to infinity"], "lang": "en-US"},
+                              {"utterances": ["count to infinity"], "lang": session.lang},
                               {"session": session.serialize()})
             self.minicroft.bus.emit(message)
 
@@ -256,7 +262,7 @@ class TestCountSkills(TestCase):
         # NOTE: skill not in active skill list for this Session, global stop will match instead
         # this doesnt typically happen at runtime, but possible since clients send whatever Session they want
         message = Message("recognizer_loop:utterance",
-                          {"utterances": ["stop"], "lang": "en-US"},
+                          {"utterances": ["stop"], "lang": session.lang},
                           {"session": session.serialize()})
         stop_skill_from_global = [
             message,
@@ -282,13 +288,14 @@ class TestCountSkills(TestCase):
 
     def test_count_infinity_stop_low(self):
         session = Session("123")
+        session.lang = "en-US"
         session.pipeline = ["ovos-padatious-pipeline-plugin-high",
                             'ovos-stop-pipeline-plugin-low']
 
         def make_it_count():
             nonlocal session
             message = Message("recognizer_loop:utterance",
-                              {"utterances": ["count to infinity"], "lang": "en-US"},
+                              {"utterances": ["count to infinity"], "lang": session.lang},
                               {"session": session.serialize(), "source": "A", "destination": "B"})
             session.activate_skill(self.skill_id)  # ensure in active skill list
             self.minicroft.bus.emit(message)
@@ -299,7 +306,7 @@ class TestCountSkills(TestCase):
         time.sleep(3)
 
         message = Message("recognizer_loop:utterance",
-                          {"utterances": ["full stop"], "lang": "en-US"},
+                          {"utterances": ["full stop"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
         stop_skill_active = [

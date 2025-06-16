@@ -21,9 +21,10 @@ class TestAdaptIntent(TestCase):
 
     def test_adapt_match(self):
         session = Session("123")
+        session.lang = "en-US"
         session.pipeline = ['ovos-adapt-pipeline-plugin-high']
         message = Message("recognizer_loop:utterance",
-                          {"utterances": ["hello world"], "lang": "en-US"},
+                          {"utterances": ["hello world"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
         test = End2EndTest(
@@ -36,14 +37,14 @@ class TestAdaptIntent(TestCase):
                         data={},
                         context={"skill_id": self.skill_id}),
                 Message(f"{self.skill_id}:HelloWorldIntent",
-                        data={"utterance": "hello world", "lang": "en-US"},
+                        data={"utterance": "hello world", "lang": session.lang},
                         context={"skill_id": self.skill_id}),
                 Message("mycroft.skill.handler.start",
                         data={"name": "HelloWorldSkill.handle_hello_world_intent"},
                         context={"skill_id": self.skill_id}),
                 Message("speak",
                         data={"utterance": "Hello world",
-                              "lang": "en-US",
+                              "lang": session.lang,
                               "expect_response": False,
                               "meta": {
                                   "dialog": "hello.world",
@@ -64,10 +65,11 @@ class TestAdaptIntent(TestCase):
 
     def test_skill_blacklist(self):
         session = Session("123")
+        session.lang = "en-US"
         session.pipeline = ['ovos-adapt-pipeline-plugin-high']
         session.blacklisted_skills = [self.skill_id]
         message = Message("recognizer_loop:utterance",
-                          {"utterances": ["hello world"], "lang": "en-US"},
+                          {"utterances": ["hello world"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
         test = End2EndTest(
@@ -86,10 +88,11 @@ class TestAdaptIntent(TestCase):
 
     def test_intent_blacklist(self):
         session = Session("123")
+        session.lang = "en-US"
         session.pipeline = ['ovos-adapt-pipeline-plugin-high']
         session.blacklisted_intents = [f"{self.skill_id}:HelloWorldIntent"]
         message = Message("recognizer_loop:utterance",
-                          {"utterances": ["hello world"], "lang": "en-US"},
+                          {"utterances": ["hello world"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
         test = End2EndTest(
@@ -108,9 +111,10 @@ class TestAdaptIntent(TestCase):
 
     def test_padatious_no_match(self):
         session = Session("123")
+        session.lang = "en-US"
         session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
         message = Message("recognizer_loop:utterance",
-                          {"utterances": ["hello world"], "lang": "en-US"},
+                          {"utterances": ["hello world"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
         test = End2EndTest(

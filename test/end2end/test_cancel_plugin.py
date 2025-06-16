@@ -20,8 +20,9 @@ class TestCancelIntentMidSentence(TestCase):
 
     def test_cancel_match(self):
         session = Session("123")
+        session.lang = "en-US"
         message = Message("recognizer_loop:utterance",
-                          {"utterances": ["can you tell me the...ummm...oh, nevermind that"], "lang": "en-US"},
+                          {"utterances": ["can you tell me the...ummm...oh, nevermind that"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
         # utterance cancelled -> no complete_intent_failure

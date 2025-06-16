@@ -21,9 +21,10 @@ class TestPadatiousIntent(TestCase):
 
     def test_padatious_match(self):
         session = Session("123")
+        session.lang = "en-US"
         session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
         message = Message("recognizer_loop:utterance",
-                          {"utterances": ["good morning"], "lang": "en-US"},
+                          {"utterances": ["good morning"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
         test = End2EndTest(
@@ -36,13 +37,13 @@ class TestPadatiousIntent(TestCase):
                         data={},
                         context={"skill_id": self.skill_id}),
                 Message(f"{self.skill_id}:Greetings.intent",
-                        data={"utterance": "good morning", "lang": "en-US"},
+                        data={"utterance": "good morning", "lang": session.lang},
                         context={"skill_id": self.skill_id}),
                 Message("mycroft.skill.handler.start",
                         data={"name": "HelloWorldSkill.handle_greetings"},
                         context={"skill_id": self.skill_id}),
                 Message("speak",
-                        data={"lang": "en-US",
+                        data={"lang": session.lang,
                               "expect_response": False,
                               "meta": {
                                   "dialog": "hello",
@@ -63,10 +64,11 @@ class TestPadatiousIntent(TestCase):
 
     def test_skill_blacklist(self):
         session = Session("123")
+        session.lang = "en-US"
         session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
         session.blacklisted_skills = [self.skill_id]
         message = Message("recognizer_loop:utterance",
-                          {"utterances": ["good morning"], "lang": "en-US"},
+                          {"utterances": ["good morning"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
         test = End2EndTest(
@@ -85,10 +87,11 @@ class TestPadatiousIntent(TestCase):
 
     def test_intent_blacklist(self):
         session = Session("123")
+        session.lang = "en-US"
         session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
         session.blacklisted_intents = [f"{self.skill_id}:Greetings.intent"]
         message = Message("recognizer_loop:utterance",
-                          {"utterances": ["good morning"], "lang": "en-US"},
+                          {"utterances": ["good morning"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
         test = End2EndTest(
@@ -107,9 +110,10 @@ class TestPadatiousIntent(TestCase):
 
     def test_adapt_no_match(self):
         session = Session("123")
+        session.lang = "en-US"
         session.pipeline = ['ovos-adapt-pipeline-plugin-high']
         message = Message("recognizer_loop:utterance",
-                          {"utterances": ["good morning"], "lang": "en-US"},
+                          {"utterances": ["good morning"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
         test = End2EndTest(
