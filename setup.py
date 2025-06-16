@@ -100,7 +100,8 @@ setup(
         'opm.pipeline': PLUGIN_ENTRY_POINT,
         'console_scripts': [
             'ovos-core=ovos_core.__main__:main',
-            'ovos-intent-service=ovos_core.intent_services.service:launch_standalone'
+            'ovos-intent-service=ovos_core.intent_services.service:launch_standalone',
+            'ovos-skill-installer=ovos_core.skill_installer:launch_standalone'
         ]
     }
 )
