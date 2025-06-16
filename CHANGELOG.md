@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.2a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.2a2) (2025-06-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.2a1...2.0.2a2)
+
+**Merged pull requests:**
+
+- Update ovos-config requirement from \<2.0.0,\>=0.0.13 to \>=0.0.13,\<3.0.0 in /requirements [\#707](https://github.com/OpenVoiceOS/ovos-core/pull/707) ([dependabot[bot]](https://github.com/apps/dependabot))
+
 ## [2.0.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.2a1) (2025-06-16)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.1a2...2.0.2a1)
