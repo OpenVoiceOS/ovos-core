@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.3a1) (2025-06-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.2a2...2.0.3a1)
+
+**Merged pull requests:**
+
+- fix: stop message.context source/destination [\#706](https://github.com/OpenVoiceOS/ovos-core/pull/706) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.0.2a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.2a2) (2025-06-16)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.2a1...2.0.2a2)
