@@ -387,3 +387,6 @@ class StopService(ConfidenceMatcherPipeline):
                             for i in _vocs])
         return False
 
+    def shutdown(self):
+        self.bus.remove("stop:global", self.handle_global_stop)
+        self.bus.remove("stop:skill", self.handle_skill_stop)

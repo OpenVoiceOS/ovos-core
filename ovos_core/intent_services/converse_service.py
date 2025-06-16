@@ -385,6 +385,7 @@ class ConverseService(PipelinePlugin):
                                     {"skills": self.get_active_skills(message)}))
 
     def shutdown(self):
+        self.bus.remove("converse:skill", self.handle_converse)
         self.bus.remove('intent.service.skills.deactivate', self.handle_deactivate_skill_request)
         self.bus.remove('intent.service.skills.activate', self.handle_activate_skill_request)
         self.bus.remove('intent.service.active_skills.get', self.handle_get_active_skills)
