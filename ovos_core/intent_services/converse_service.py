@@ -28,6 +28,11 @@ class ConverseService(PipelinePlugin):
         self.bus.on('intent.service.active_skills.get', self.handle_get_active_skills)
         self.bus.on("skill.converse.get_response.enable", self.handle_get_response_enable)
         self.bus.on("skill.converse.get_response.disable", self.handle_get_response_disable)
+        self.bus.on("converse:skill", self.handle_converse)
+
+    def handle_converse(self, message: Message):
+        skill_id = message.data["skill_id"]
+        self.bus.emit(message.reply(f"{skill_id}.converse.request", message.data))
 
     @property
     def active_skills(self):
@@ -321,8 +326,8 @@ class ConverseService(PipelinePlugin):
             LOG.debug(f"Attempting to converse with skill: {skill_id}")
             if self._converse_allowed(skill_id):
                 return IntentHandlerMatch(
-                    match_type=f"{skill_id}.converse.request",
-                    match_data={"utterances": utterances, "lang": lang},
+                    match_type="converse:skill",
+                    match_data={"utterances": utterances, "lang": lang, "skill_id": skill_id},
                     skill_id=skill_id,
                     utterance=utterances[0],
                     updated_session=session
