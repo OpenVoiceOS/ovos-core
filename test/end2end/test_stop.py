@@ -280,3 +280,82 @@ class TestCountSkills(TestCase):
         )
         test.execute()
 
+    def test_count_infinity_stop_low(self):
+        session = Session("123")
+        session.pipeline = ["ovos-padatious-pipeline-plugin-high",
+                            'ovos-stop-pipeline-plugin-low']
+
+        def make_it_count():
+            nonlocal session
+            message = Message("recognizer_loop:utterance",
+                              {"utterances": ["count to infinity"], "lang": "en-US"},
+                              {"session": session.serialize(), "source": "A", "destination": "B"})
+            session.activate_skill(self.skill_id)  # ensure in active skill list
+            self.minicroft.bus.emit(message)
+
+        # count to infinity, the skill will keep running in the background
+        create_daemon(make_it_count)
+
+        time.sleep(3)
+
+        message = Message("recognizer_loop:utterance",
+                          {"utterances": ["full stop"], "lang": "en-US"},
+                          {"session": session.serialize(), "source": "A", "destination": "B"})
+
+        stop_skill_active = [
+            message,
+            Message(f"{self.skill_id}.stop.ping",
+                    {"skill_id":self.skill_id}),
+            Message("skill.stop.pong",
+                    {"skill_id": self.skill_id, "can_handle": True},
+                    {"skill_id": self.skill_id}),
+
+            Message("stop.openvoiceos.activate",
+                    context={"skill_id": "stop.openvoiceos"}),
+            Message("stop:skill",
+                    context={"skill_id": "stop.openvoiceos"}),
+            Message(f"{self.skill_id}.stop",
+                    context={"skill_id": "stop.openvoiceos"}),
+            Message(f"{self.skill_id}.stop.response",
+                    {"skill_id": self.skill_id, "result": True},
+                    {"skill_id": self.skill_id}),
+
+            # stop pipeline callback to stop everything
+
+            # if skill is in middle of get_response
+            #Message("mycroft.skills.abort_question", {"skill_id": self.skill_id},
+            #        {"skill_id": self.skill_id}),
+
+            # if skill is in active_list
+            Message("ovos.skills.converse.force_timeout",
+                    {"skill_id": self.skill_id},
+                    {"skill_id": self.skill_id}),
+
+            # if skill is executing TTS
+            #Message("mycroft.audio.speech.stop", {"skill_id": self.skill_id},
+            #        {"skill_id": self.skill_id}),
+
+            # the intent running in the daemon thread exits cleanly
+            Message("mycroft.skill.handler.complete",
+                    {"name": "CountSkill.handle_how_are_you_intent"},
+                    {"skill_id": self.skill_id}),
+            Message("ovos.utterance.handled",
+                    {"name": "CountSkill.handle_how_are_you_intent"},
+                    {"skill_id": self.skill_id})
+        ]
+        test = End2EndTest(
+            minicroft=self.minicroft,
+            skill_ids=[],
+            eof_msgs=[],
+            flip_points=["recognizer_loop:utterance"],
+            # messages in 'keep_original_src' would not be sent to hivemind clients
+            # i.e. they are directed towards ovos-core
+            keep_original_src=[f"{self.skill_id}.stop.ping",
+                               f"{self.skill_id}.stop",
+                               "mycroft.skills.abort_question",
+                               "ovos.skills.converse.force_timeout"],
+            ignore_messages=self.ignore_messages,
+            source_message=message,
+            expected_messages=stop_skill_active
+        )
+        test.execute()
