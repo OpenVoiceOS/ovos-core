@@ -52,7 +52,7 @@ class TestFallback(TestCase):
                         data={"fallback_handler":"UnknownSkill.handle_fallback"},
                         context={"skill_id": self.skill_id}),
 
-                #vMessage("ovos.utterance.handled", {})  # TODO (ovos-workshop) - missing
+                Message("ovos.utterance.handled", {})
             ]
         )
 

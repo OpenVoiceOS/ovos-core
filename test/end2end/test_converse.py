@@ -43,7 +43,7 @@ class TestConverse(TestCase):
                     data={},
                     context={"skill_id": self.skill_id}),
             Message(f"{self.skill_id}:start_parrot.intent",
-                    data={"utterance": "start parrot mode", "lang": "en-US"},
+                    data={"utterance": "start parrot mode", "lang": session.lang},
                     context={"skill_id": self.skill_id}),
             Message("mycroft.skill.handler.start",
                     data={"name": "ParrotSkill.handle_start_parrot_intent"},
@@ -74,13 +74,16 @@ class TestConverse(TestCase):
             Message(f"{self.skill_id}.activate",
                     data={},
                     context={"skill_id": self.skill_id}),
+            Message("converse:skill",
+                    data={"utterances": ["echo test"], "lang": session.lang, "skill_id": self.skill_id},
+                    context={"skill_id": self.skill_id}),
             Message(f"{self.skill_id}.converse.request",
-                    data={"utterances": ["echo test"], "lang": "en-US"},
+                    data={"utterances": ["echo test"], "lang": session.lang},
                     context={"skill_id": self.skill_id}),
             Message("speak",
                     data={"utterance": "echo test",
                           "expect_response": False,
-                          "lang": "en-US",
+                          "lang": session.lang,
                           "meta": {
                               "skill": self.skill_id
                           }},
@@ -88,6 +91,9 @@ class TestConverse(TestCase):
             Message("skill.converse.response",
                     data={"skill_id": self.skill_id},
                     context={"skill_id": self.skill_id}),
+            Message("ovos.utterance.handled",
+                    data={},
+                    context={"skill_id": self.skill_id})
         ]
         expected3 = [
             message3,
@@ -101,13 +107,16 @@ class TestConverse(TestCase):
                     data={},
                     context={"skill_id": self.skill_id}),
 
+            Message("converse:skill",
+                    data={"utterances": ["stop parrot"], "lang": session.lang, "skill_id": self.skill_id},
+                    context={"skill_id": self.skill_id}),
             Message(f"{self.skill_id}.converse.request",
-                    data={"utterances": ["stop parrot"], "lang": "en-US"},
+                    data={"utterances": ["stop parrot"], "lang": session.lang},
                     context={"skill_id": self.skill_id}),
 
             Message("speak",
                     data={"expect_response": False,
-                          "lang": "en-US",
+                          "lang": session.lang,
                           "meta": {
                               "dialog": "parrot_stop",
                               "data": {},
@@ -116,6 +125,9 @@ class TestConverse(TestCase):
                     context={"skill_id": self.skill_id}),
             Message("skill.converse.response",
                     data={"skill_id": self.skill_id},
+                    context={"skill_id": self.skill_id}),
+            Message("ovos.utterance.handled",
+                    data={},
                     context={"skill_id": self.skill_id})
         ]
         expected4 = [
@@ -133,10 +145,13 @@ class TestConverse(TestCase):
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
+            eof_msgs=["ovos.utterance.handled"],
             flip_points=["recognizer_loop:utterance"],
             source_message=[message1, message2, message3, message4],
             expected_messages=expected1 + expected2 + expected3 + expected4,
             activation_points={f"{self.skill_id}:start_parrot.intent": self.skill_id},
-            keep_original_src=[f"{self.skill_id}.converse.ping", "skill.converse.response"]
+            # messages internal to ovos-core, i.e. would not be sent to clients such as hivemind
+            keep_original_src=[f"{self.skill_id}.converse.ping",
+                               f"{self.skill_id}.converse.request"]
         )
         test.execute(timeout=10)
