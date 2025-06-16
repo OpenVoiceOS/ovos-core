@@ -166,7 +166,7 @@ class TestCountSkills(TestCase):
             nonlocal session
             message = Message("recognizer_loop:utterance",
                               {"utterances": ["count to infinity"], "lang": "en-US"},
-                              {"session": session.serialize()})
+                              {"session": session.serialize(), "source": "A", "destination": "B"})
             session.activate_skill(self.skill_id)  # ensure in active skill list
             self.minicroft.bus.emit(message)
 
@@ -177,17 +177,19 @@ class TestCountSkills(TestCase):
 
         message = Message("recognizer_loop:utterance",
                           {"utterances": ["stop"], "lang": "en-US"},
-                          {"session": session.serialize()})  # skill in active list now
+                          {"session": session.serialize(), "source": "A", "destination": "B"})
 
         stop_skill_active = [
             message,
-            Message("ovos-skill-count.openvoiceos.stop.ping",
+            Message(f"{self.skill_id}.stop.ping",
                     {"skill_id":self.skill_id}),
             Message("skill.stop.pong",
                     {"skill_id": self.skill_id, "can_handle": True},
                     {"skill_id": self.skill_id}),
 
             Message("stop.openvoiceos.activate",
+                    context={"skill_id": "stop.openvoiceos"}),
+            Message("stop:skill",
                     context={"skill_id": "stop.openvoiceos"}),
             Message(f"{self.skill_id}.stop",
                     context={"skill_id": "stop.openvoiceos"}),
@@ -202,7 +204,8 @@ class TestCountSkills(TestCase):
             #        {"skill_id": self.skill_id}),
 
             # if skill is in active_list
-            Message("ovos.skills.converse.force_timeout", {"skill_id": self.skill_id},
+            Message("ovos.skills.converse.force_timeout",
+                    {"skill_id": self.skill_id},
                     {"skill_id": self.skill_id}),
 
             # if skill is executing TTS
@@ -219,10 +222,15 @@ class TestCountSkills(TestCase):
         ]
         test = End2EndTest(
             minicroft=self.minicroft,
-            # inject_active=[self.skill_id],  # ensure this skill is in active skills list for the test
             skill_ids=[],
             eof_msgs=[],
             flip_points=["recognizer_loop:utterance"],
+            # messages in 'keep_original_src' would not be sent to hivemind clients
+            # i.e. they are directed towards ovos-core
+            keep_original_src=[f"{self.skill_id}.stop.ping",
+                               f"{self.skill_id}.stop",
+                               "mycroft.skills.abort_question",
+                               "ovos.skills.converse.force_timeout"],
             ignore_messages=self.ignore_messages,
             source_message=message,
             expected_messages=stop_skill_active

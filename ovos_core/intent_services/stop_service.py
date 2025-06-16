@@ -29,11 +29,16 @@ class StopService(ConfidenceMatcherPipeline):
         self._voc_cache = {}
         self.load_resource_files()
         self.bus.on("stop:global", self.handle_global_stop)
+        self.bus.on("stop:skill", self.handle_skill_stop)
 
     def handle_global_stop(self, message: Message):
         self.bus.emit(message.forward("mycroft.stop"))
         # TODO - this needs a confirmation dialog if nothing was stopped
         self.bus.emit(message.forward("ovos.utterance.handled"))
+
+    def handle_skill_stop(self, message: Message):
+        skill_id = message.data["skill_id"]
+        self.bus.emit(message.reply(f"{skill_id}.stop"))
 
     def load_resource_files(self):
         base = f"{dirname(__file__)}/locale"
@@ -152,15 +157,17 @@ class StopService(ConfidenceMatcherPipeline):
             utt_state = sess.utterance_states.get(skill_id, UtteranceState.INTENT)
             if utt_state == UtteranceState.RESPONSE:
                 LOG.debug("Forcing get_response timeout")
-                # force-kill any ongoing get_response/converse/TTS - see @killable_event decorator
-                self.bus.emit(message.forward("mycroft.skills.abort_question", {"skill_id": skill_id}))
+                # force-kill any ongoing get_response - see @killable_event decorator (ovos-workshop)
+                self.bus.emit(message.reply("mycroft.skills.abort_question", {"skill_id": skill_id}))
             if sess.is_active(skill_id):
                 LOG.debug("Forcing converse timeout")
-                self.bus.emit(message.forward("ovos.skills.converse.force_timeout", {"skill_id": skill_id}))
+                # force-kill any ongoing converse - see @killable_event decorator (ovos-workshop)
+                self.bus.emit(message.reply("ovos.skills.converse.force_timeout", {"skill_id": skill_id}))
 
             # TODO - track if speech is coming from this skill! not currently tracked (ovos-audio)
             if sess.is_speaking:
-                self.bus.emit(message.reply("mycroft.audio.speech.stop", {"skill_id": skill_id}))
+                # force-kill any ongoing TTS
+                self.bus.emit(message.forward("mycroft.audio.speech.stop", {"skill_id": skill_id}))
 
     def match_high(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """
@@ -219,8 +226,8 @@ class StopService(ConfidenceMatcherPipeline):
                 sess.disable_response_mode(skill_id)
                 self.bus.once(f"{skill_id}.stop.response", self.handle_stop_confirmation)
                 return IntentHandlerMatch(
-                    match_type=f"{skill_id}.stop",
-                    match_data={"conf": conf},
+                    match_type="stop:skill",
+                    match_data={"conf": conf, "skill_id": skill_id},
                     updated_session=sess,
                     utterance=utterance,
                     skill_id="stop.openvoiceos"
@@ -307,8 +314,8 @@ class StopService(ConfidenceMatcherPipeline):
             sess.disable_response_mode(skill_id)
             self.bus.once(f"{skill_id}.stop.response", self.handle_stop_confirmation)
             return IntentHandlerMatch(
-                match_type=f"{skill_id}.stop",
-                match_data={"conf": conf},
+                match_type="stop:skill",
+                match_data={"conf": conf, "skill_id": skill_id},
                 updated_session=sess,
                 utterance=utterance,
                 skill_id="stop.openvoiceos"
