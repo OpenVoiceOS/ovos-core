@@ -195,14 +195,19 @@ class TestCountSkills(TestCase):
                     {"skill_id": self.skill_id, "result": True},
                     {"skill_id": self.skill_id}),
 
-            # skill callback to stop everything
-            # TODO - clean up! most arent needed/can check session if needed (ovos-workshop)
-            Message("mycroft.skills.abort_question", {"skill_id": self.skill_id},
-                    {"skill_id": self.skill_id}),
+            # stop pipeline callback to stop everything
+
+            # if skill is in middle of get_response
+            #Message("mycroft.skills.abort_question", {"skill_id": self.skill_id},
+            #        {"skill_id": self.skill_id}),
+
+            # if skill is in active_list
             Message("ovos.skills.converse.force_timeout", {"skill_id": self.skill_id},
                     {"skill_id": self.skill_id}),
-            Message("mycroft.audio.speech.stop", {"skill_id": self.skill_id},
-                    {"skill_id": self.skill_id}),
+
+            # if skill is executing TTS
+            #Message("mycroft.audio.speech.stop", {"skill_id": self.skill_id},
+            #        {"skill_id": self.skill_id}),
 
             # the intent running in the daemon thread exits cleanly
             Message("mycroft.skill.handler.complete",

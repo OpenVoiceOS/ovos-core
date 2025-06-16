@@ -7,7 +7,7 @@ from typing import Optional, Dict, List, Union
 from langcodes import closest_match
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import SessionManager
+from ovos_bus_client.session import SessionManager, UtteranceState
 
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import ConfidenceMatcherPipeline, IntentHandlerMatch
@@ -148,11 +148,19 @@ class StopService(ConfidenceMatcherPipeline):
             error_msg = message.data['error']
             LOG.error(f"{skill_id}: {error_msg}")
         elif message.data.get('result', False):
-            # force-kill any ongoing get_response/converse/TTS - see @killable_event decorator
-            self.bus.emit(message.forward("mycroft.skills.abort_question", {"skill_id": skill_id}))
-            self.bus.emit(message.forward("ovos.skills.converse.force_timeout", {"skill_id": skill_id}))
-            # TODO - track if speech is coming from this skill! not currently tracked
-            self.bus.emit(message.reply("mycroft.audio.speech.stop", {"skill_id": skill_id}))
+            sess = SessionManager.get(message)
+            utt_state = sess.utterance_states.get(skill_id, UtteranceState.INTENT)
+            if utt_state == UtteranceState.RESPONSE:
+                LOG.debug("Forcing get_response timeout")
+                # force-kill any ongoing get_response/converse/TTS - see @killable_event decorator
+                self.bus.emit(message.forward("mycroft.skills.abort_question", {"skill_id": skill_id}))
+            if sess.is_active(skill_id):
+                LOG.debug("Forcing converse timeout")
+                self.bus.emit(message.forward("ovos.skills.converse.force_timeout", {"skill_id": skill_id}))
+
+            # TODO - track if speech is coming from this skill! not currently tracked (ovos-audio)
+            if sess.is_speaking:
+                self.bus.emit(message.reply("mycroft.audio.speech.stop", {"skill_id": skill_id}))
 
     def match_high(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """
