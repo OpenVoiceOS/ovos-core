@@ -20,6 +20,7 @@ from threading import Thread, Event
 from ovos_bus_client.apis.enclosure import EnclosureAPI
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
+from ovos_bus_client.util.scheduler import EventScheduler
 from ovos_config.config import Configuration
 from ovos_config.locations import get_xdg_config_save_path
 from ovos_utils.file_utils import FileWatcher
@@ -28,6 +29,9 @@ from ovos_utils.log import LOG
 from ovos_utils.network_utils import is_connected_http
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap, ProcessState
 from ovos_workshop.skill_launcher import PluginSkillLoader
+from ovos_core.skill_installer import SkillsStore
+from ovos_core.intent_services import IntentService
+from ovos_workshop.skills.api import SkillApi
 
 from ovos_plugin_manager.skills import find_skill_plugins
 
@@ -56,7 +60,12 @@ class SkillManager(Thread):
     """Manages the loading, activation, and deactivation of Mycroft skills."""
 
     def __init__(self, bus, watchdog=None, alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
-                 error_hook=on_error, stopping_hook=on_stopping):
+                 error_hook=on_error, stopping_hook=on_stopping,
+                 enable_installer=False,
+                 enable_intent_service=True,
+                 enable_event_scheduler=True,
+                 enable_file_watcher=True,
+                 enable_skill_api=True):
         """Constructor
 
         Args:
@@ -108,7 +117,18 @@ class SkillManager(Thread):
         self.daemon = True
 
         self.status.bind(self.bus)
-        self._init_filewatcher()
+
+        # init subsystems
+        self.osm = SkillsStore(self.bus) if enable_installer else None
+        self.event_scheduler = EventScheduler(self.bus, autostart=False) if enable_event_scheduler else None
+        if self.event_scheduler:
+            self.event_scheduler.daemon = True # TODO - add kwarg in EventScheduler
+            self.event_scheduler.start()
+        self.intents = IntentService(self.bus) if enable_intent_service else None
+        if enable_skill_api:
+            SkillApi.connect_bus(self.bus)
+        if enable_file_watcher:
+            self._init_filewatcher()
 
     @property
     def blacklist(self):
@@ -539,13 +559,37 @@ class SkillManager(Thread):
             self.bus.emit(message.response({'error': f'failed: {err}'}))
 
     def stop(self):
+        """alias for shutdown (backwards compat)"""
+        return self.shutdown()
+
+    def shutdown(self):
         """Tell the manager to shutdown."""
         self.status.set_stopping()
         self._stop_event.set()
 
         # Do a clean shutdown of all skills
         for skill_id in list(self.plugin_skills.keys()):
-            self._unload_plugin_skill(skill_id)
-
+            try:
+                self._unload_plugin_skill(skill_id)
+            except Exception as e:
+                LOG.error(f"Failed to cleanly unload skill '{skill_id}' ({e})")
+        if self.intents:
+            try:
+                self.intents.shutdown()
+            except Exception as e:
+                LOG.error(f"Failed to cleanly unload intent service ({e})")
+        if self.osm:
+            try:
+                self.osm.shutdown()
+            except Exception as e:
+                LOG.error(f"Failed to cleanly unload skill installer ({e})")
+        if self.event_scheduler:
+            try:
+                self.event_scheduler.shutdown()
+            except Exception as e:
+                LOG.error(f"Failed to cleanly unload event scheduler ({e})")
         if self._settings_watchdog:
-            self._settings_watchdog.shutdown()
+            try:
+                self._settings_watchdog.shutdown()
+            except Exception as e:
+                LOG.error(f"Failed to cleanly unload settings watchdog ({e})")
