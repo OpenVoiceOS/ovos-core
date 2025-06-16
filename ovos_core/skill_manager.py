@@ -62,10 +62,10 @@ class SkillManager(Thread):
     def __init__(self, bus, watchdog=None, alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
                  error_hook=on_error, stopping_hook=on_stopping,
                  enable_installer=False,
-                 enable_intent_service=True,
-                 enable_event_scheduler=True,
+                 enable_intent_service=False,
+                 enable_event_scheduler=False,
                  enable_file_watcher=True,
-                 enable_skill_api=True):
+                 enable_skill_api=False):
         """Constructor
 
         Args:
@@ -523,7 +523,7 @@ class SkillManager(Thread):
             skills = self.plugin_skills
             for skill_loader in skills.values():
                 if message.data['skill'] == skill_loader.skill_id:
-                    LOG.info("Deactivating skill: " + skill_loader.skill_id)
+                    LOG.info("Deactivating (unloading) skill: " + skill_loader.skill_id)
                     skill_loader.deactivate()
                     self.bus.emit(message.response())
         except Exception as err:
@@ -534,7 +534,7 @@ class SkillManager(Thread):
         """Deactivate all skills except the provided."""
         try:
             skill_to_keep = message.data['skill']
-            LOG.info(f'Deactivating all skills except {skill_to_keep}')
+            LOG.info(f'Deactivating (unloading) all skills except {skill_to_keep}')
             # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
             skills = self.plugin_skills
             for skill in skills.values():
@@ -555,7 +555,7 @@ class SkillManager(Thread):
                     skill_loader.activate()
                     self.bus.emit(message.response())
         except Exception as err:
-            LOG.exception(f'Couldn\'t activate skill {message.data["skill"]}')
+            LOG.exception(f'Couldn\'t activate (load) skill {message.data["skill"]}')
             self.bus.emit(message.response({'error': f'failed: {err}'}))
 
     def stop(self):
