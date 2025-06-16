@@ -25,6 +25,9 @@ class MessageBusMock:
     def on(self, event, _):
         self.event_handlers.append(event)
 
+    def remove(self, event, _):
+        self.event_handlers.remove(event)
+
     def once(self, event, _):
         self.event_handlers.append(event)
 

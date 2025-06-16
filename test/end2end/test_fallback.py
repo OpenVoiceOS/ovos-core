@@ -21,9 +21,10 @@ class TestFallback(TestCase):
 
     def test_fallback_match(self):
         session = Session("123")
+        session.lang = "en-US"
         session.pipeline = ['ovos-fallback-pipeline-plugin-low']
         message = Message("recognizer_loop:utterance",
-                          {"utterances": ["hello world"], "lang": "en-US"},
+                          {"utterances": ["hello world"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
         test = End2EndTest(
@@ -34,13 +35,13 @@ class TestFallback(TestCase):
             expected_messages=[
                 message,
                 Message("ovos.skills.fallback.ping",
-                        {"utterances": ["hello world"], "lang": "en-US", "range": [90, 101]}),
+                        {"utterances": ["hello world"], "lang": session.lang, "range": [90, 101]}),
                 Message("ovos.skills.fallback.pong", {"skill_id": self.skill_id, "can_handle": True}),
                 Message(f"ovos.skills.fallback.{self.skill_id}.request",
-                        {"utterances": ["hello world"], "lang": "en-US", "range": [90, 101], "skill_id": self.skill_id}),
+                        {"utterances": ["hello world"], "lang": session.lang, "range": [90, 101], "skill_id": self.skill_id}),
                 Message(f"ovos.skills.fallback.{self.skill_id}.start", {}),
                 Message("speak",
-                        data={"lang": "en-US",
+                        data={"lang": session.lang,
                               "expect_response": False,
                               "meta": {
                                   "dialog": "unknown",

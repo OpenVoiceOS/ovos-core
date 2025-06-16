@@ -21,20 +21,21 @@ class TestConverse(TestCase):
 
     def test_parrot_mode(self):
         session = Session("123")
+        session.lang = "en-US"
         session.pipeline = ["ovos-converse-pipeline-plugin", "ovos-padatious-pipeline-plugin-high"]
 
         message1 = Message("recognizer_loop:utterance",
-                          {"utterances": ["start parrot mode"], "lang": "en-US"},
+                          {"utterances": ["start parrot mode"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
         # NOTE: we dont pass session, End2EndTest will inject/update the session from message1
         message2 = Message("recognizer_loop:utterance",
-                          {"utterances": ["echo test"], "lang": "en-US"},
+                          {"utterances": ["echo test"], "lang": session.lang},
                           {"source": "A", "destination": "B"})
         message3 = Message("recognizer_loop:utterance",
-                          {"utterances": ["stop parrot"], "lang": "en-US"},
+                          {"utterances": ["stop parrot"], "lang": session.lang},
                           {"source": "A", "destination": "B"})
         message4 = Message("recognizer_loop:utterance",
-                           {"utterances": ["echo test"], "lang": "en-US"},
+                           {"utterances": ["echo test"], "lang": session.lang},
                            {"source": "A", "destination": "B"})
 
         expected1 = [
