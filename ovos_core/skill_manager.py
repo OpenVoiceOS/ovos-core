@@ -488,9 +488,13 @@ class SkillManager(Thread):
             skill_loader = self.plugin_skills[skill_id]
             if skill_loader.instance is not None:
                 try:
+                    skill_loader.instance.shutdown()
+                except Exception:
+                    LOG.exception('Failed to run skill specific shutdown code: ' + skill_loader.skill_id)
+                try:
                     skill_loader.instance.default_shutdown()
                 except Exception:
-                    LOG.exception('Failed to shutdown plugin skill: ' + skill_loader.skill_id)
+                    LOG.exception('Failed to shutdown skill: ' + skill_loader.skill_id)
             self.plugin_skills.pop(skill_id)
 
     def is_alive(self, message=None):
