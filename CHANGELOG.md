@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.4a1) (2025-06-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.3a2...2.0.4a1)
+
+**Merged pull requests:**
+
+- fix: converse\_routing [\#712](https://github.com/OpenVoiceOS/ovos-core/pull/712) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.0.3a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.3a2) (2025-06-16)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.3a1...2.0.3a2)
