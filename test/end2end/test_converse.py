@@ -145,6 +145,7 @@ class TestConverse(TestCase):
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
+            eof_msgs=["ovos.utterance.handled"],
             flip_points=["recognizer_loop:utterance"],
             source_message=[message1, message2, message3, message4],
             expected_messages=expected1 + expected2 + expected3 + expected4,
