@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for ovos_core/intent_services/service.py: 66%</title>
+    <title>Coverage for ovos_core/intent_services/service.py: 65%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_58284776.png">
     <link rel="stylesheet" href="style_cb_81f8c14c.css" type="text/css">
     <script src="coverage_html_cb_6fb7b396.js" defer></script>
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>ovos_core/intent_services/service.py</b>:
-            <span class="pc_cov">66%</span>
+            <span class="pc_cov">65%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -55,8 +55,8 @@
         </aside>
         <h2>
             <span class="text">322 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">212<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">110<span class="text"> missing</span></button>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">208<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">114<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
         </h2>
         <p class="text">
@@ -65,7 +65,7 @@
             <a id="nextFileLink" class="nav" href="z_5b704781350e2a59_stop_service_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.9.1">coverage.py v7.9.1</a>,
-            created at 2025-06-16 14:12 +0000
+            created at 2025-06-16 15:44 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -552,13 +552,13 @@
     <p class="run"><span class="n"><a id="t470" href="#t470">470</a></span><span class="t">                    <span class="key">if</span> <span class="nam">match</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t471" href="#t471">471</a></span><span class="t">                        <span class="nam">LOG</span><span class="op">.</span><span class="nam">info</span><span class="op">(</span><span class="str">f"{pipeline} match ({intent_lang}): {match}"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t472" href="#t472">472</a></span><span class="t">                        <span class="key">if</span> <span class="nam">match</span><span class="op">.</span><span class="nam">skill_id</span> <span class="key">and</span> <span class="nam">match</span><span class="op">.</span><span class="nam">skill_id</span> <span class="key">in</span> <span class="nam">sess</span><span class="op">.</span><span class="nam">blacklisted_skills</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t473" href="#t473">473</a></span><span class="t">                            <span class="nam">LOG</span><span class="op">.</span><span class="nam">debug</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t473" href="#t473">473</a></span><span class="t">                            <span class="nam">LOG</span><span class="op">.</span><span class="nam">debug</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t474" href="#t474">474</a></span><span class="t">                                <span class="str">f"ignoring match, skill_id '{match.skill_id}' blacklisted by Session '{sess.session_id}'"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t475" href="#t475">475</a></span><span class="t">                            <span class="key">continue</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t475" href="#t475">475</a></span><span class="t">                            <span class="key">continue</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t476" href="#t476">476</a></span><span class="t">                        <span class="key">if</span> <span class="nam">isinstance</span><span class="op">(</span><span class="nam">match</span><span class="op">,</span> <span class="nam">IntentHandlerMatch</span><span class="op">)</span> <span class="key">and</span> <span class="nam">match</span><span class="op">.</span><span class="nam">match_type</span> <span class="key">in</span> <span class="nam">sess</span><span class="op">.</span><span class="nam">blacklisted_intents</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t477" href="#t477">477</a></span><span class="t">                            <span class="nam">LOG</span><span class="op">.</span><span class="nam">debug</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t477" href="#t477">477</a></span><span class="t">                            <span class="nam">LOG</span><span class="op">.</span><span class="nam">debug</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t478" href="#t478">478</a></span><span class="t">                                <span class="str">f"ignoring match, intent '{match.match_type}' blacklisted by Session '{sess.session_id}'"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t479" href="#t479">479</a></span><span class="t">                            <span class="key">continue</span>&nbsp;</span><span class="r"></span></p>
+    <p class="mis show_mis"><span class="n"><a id="t479" href="#t479">479</a></span><span class="t">                            <span class="key">continue</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t480" href="#t480">480</a></span><span class="t">                        <span class="key">try</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t481" href="#t481">481</a></span><span class="t">                            <span class="nam">self</span><span class="op">.</span><span class="nam">_emit_match_message</span><span class="op">(</span><span class="nam">match</span><span class="op">,</span> <span class="nam">message</span><span class="op">,</span> <span class="nam">intent_lang</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t482" href="#t482">482</a></span><span class="t">                            <span class="key">break</span>&nbsp;</span><span class="r"></span></p>
@@ -728,7 +728,7 @@
             <a class="nav" href="z_5b704781350e2a59_stop_service_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.9.1">coverage.py v7.9.1</a>,
-            created at 2025-06-16 14:12 +0000
+            created at 2025-06-16 15:44 +0000
         </p>
     </div>
 </footer>
