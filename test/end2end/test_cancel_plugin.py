@@ -30,6 +30,7 @@ class TestCancelIntentMidSentence(TestCase):
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
             source_message=message,
+            final_session=session,
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/cancel.mp3"}),

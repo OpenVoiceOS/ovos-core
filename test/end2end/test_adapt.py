@@ -1,5 +1,5 @@
 from unittest import TestCase
-
+from copy import deepcopy
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
 from ovos_utils.log import LOG
@@ -27,10 +27,16 @@ class TestAdaptIntent(TestCase):
                           {"utterances": ["hello world"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
+        final_session = deepcopy(session)
+        final_session.active_skills = [(self.skill_id, 0.0)]
+
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
             source_message=message,
+            final_session=final_session,
+            activation_points=[f"{self.skill_id}:HelloWorldIntent"],
+            # keep_original_src=[f"{self.skill_id}.activate"], # TODO
             expected_messages=[
                 message,
                 Message(f"{self.skill_id}.activate",
@@ -76,6 +82,7 @@ class TestAdaptIntent(TestCase):
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
             source_message=message,
+            final_session=session,
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
@@ -99,6 +106,7 @@ class TestAdaptIntent(TestCase):
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
             source_message=message,
+            final_session=session,
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
@@ -120,6 +128,7 @@ class TestAdaptIntent(TestCase):
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
+            final_session=session,
             source_message=message,
             expected_messages=[
                 message,

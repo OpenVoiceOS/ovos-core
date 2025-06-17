@@ -1,5 +1,5 @@
 from unittest import TestCase
-
+from copy import deepcopy
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
 from ovos_utils.log import LOG
@@ -27,10 +27,16 @@ class TestPadatiousIntent(TestCase):
                           {"utterances": ["good morning"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
+        final_session = deepcopy(session)
+        final_session.active_skills = [(self.skill_id, 0.0)]
+
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
             source_message=message,
+            final_session=final_session,
+            activation_points=[f"{self.skill_id}:Greetings.intent"],
+            # keep_original_src=[f"{self.skill_id}.activate"], # TODO
             expected_messages=[
                 message,
                 Message(f"{self.skill_id}.activate",
@@ -75,6 +81,7 @@ class TestPadatiousIntent(TestCase):
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
             source_message=message,
+            final_session=session,
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
@@ -98,6 +105,7 @@ class TestPadatiousIntent(TestCase):
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
             source_message=message,
+            final_session=session,
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
@@ -120,6 +128,7 @@ class TestPadatiousIntent(TestCase):
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
             source_message=message,
+            final_session=session,
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),

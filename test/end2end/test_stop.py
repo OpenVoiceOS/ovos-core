@@ -40,6 +40,7 @@ class TestStopNoSkills(TestCase):
             flip_points=["recognizer_loop:utterance"],
             ignore_messages=self.ignore_messages,
             source_message=message,
+            # keep_original_src=["stop.openvoiceos.activate"], # TODO
             expected_messages=[
                 message,
                 Message("stop.openvoiceos.activate", {}),  # stop pipeline counts as active_skill
@@ -93,6 +94,7 @@ class TestStopNoSkills(TestCase):
             flip_points=["recognizer_loop:utterance"],
             source_message=message,
             ignore_messages=self.ignore_messages,
+            # keep_original_src=["stop.openvoiceos.activate"], # TODO
             expected_messages=[
                 message,
                 Message("stop.openvoiceos.activate", {}),  # stop pipeline counts as active_skill
@@ -137,8 +139,8 @@ class TestCountSkills(TestCase):
         # first count to 10 to validate skill is working
         activate_skill = [
             message,
-            Message("ovos-skill-count.openvoiceos.activate", {}),  # skill is activated
-            Message("ovos-skill-count.openvoiceos:count_to_N.intent", {}),  # intent triggers
+            Message(f"{self.skill_id}.activate", {}),  # skill is activated
+            Message(f"{self.skill_id}:count_to_N.intent", {}),  # intent triggers
 
             Message("mycroft.skill.handler.start", {
                 "name": "CountSkill.handle_how_are_you_intent"
@@ -157,6 +159,7 @@ class TestCountSkills(TestCase):
             flip_points=["recognizer_loop:utterance"],
             ignore_messages=self.ignore_messages,
             source_message=message,
+            # keep_original_src=[f"{self.skill_id}.activate"], # TODO
             expected_messages=activate_skill
         )
         test.execute()
@@ -235,7 +238,9 @@ class TestCountSkills(TestCase):
             keep_original_src=[f"{self.skill_id}.stop.ping",
                                f"{self.skill_id}.stop",
                                "mycroft.skills.abort_question",
-                               "ovos.skills.converse.force_timeout"],
+                               "ovos.skills.converse.force_timeout",
+                               # "stop.openvoiceos.activate" # TODO
+                               ],
             ignore_messages=self.ignore_messages,
             source_message=message,
             expected_messages=stop_skill_active
@@ -282,7 +287,8 @@ class TestCountSkills(TestCase):
             flip_points=["recognizer_loop:utterance"],
             ignore_messages=self.ignore_messages,
             source_message=message,
-            expected_messages=stop_skill_from_global
+            expected_messages=stop_skill_from_global,
+            #keep_original_src=["stop.openvoiceos.activate"],  # TODO
         )
         test.execute()
 
@@ -360,6 +366,7 @@ class TestCountSkills(TestCase):
             keep_original_src=[f"{self.skill_id}.stop.ping",
                                f"{self.skill_id}.stop",
                                "mycroft.skills.abort_question",
+                               # "stop.openvoiceos.activate", # TODO
                                "ovos.skills.converse.force_timeout"],
             ignore_messages=self.ignore_messages,
             source_message=message,

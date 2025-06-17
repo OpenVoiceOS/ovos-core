@@ -50,11 +50,16 @@ class TestDeactivate(TestCase):
                           context={"session": session.serialize(),
                                    "source": "A", "destination": "B"})
 
+        final_session = Session("123")
+        final_session.lang = "en-US"
+        final_session.active_skills = [(self.skill_id, 0.0)]
+
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
             source_message=message,
             deactivation_points=[message.msg_type],
+            final_session=final_session,
             activation_points=["intent.service.skills.activated"],
             # messages internal to ovos-core, i.e. would not be sent to clients such as hivemind
             keep_original_src=[
@@ -87,10 +92,15 @@ class TestDeactivate(TestCase):
                           context={"session": session.serialize(),
                                    "source": "A", "destination": "B"})
 
+        final_session = Session("123")
+        final_session.lang = "en-US"
+        final_session.active_skills = []
+
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
             source_message=message,
+            final_session=final_session,
             activation_points=[message.msg_type], # starts activated
             deactivation_points=["intent.service.skills.deactivated"],
             # messages internal to ovos-core, i.e. would not be sent to clients such as hivemind
@@ -125,10 +135,15 @@ class TestDeactivate(TestCase):
                           {"utterances": ["deactivate skill from within converse"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
+        final_session = Session("123")
+        final_session.lang = "en-US"
+        final_session.active_skills = []
+
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
             source_message=message,
+            final_session=final_session,
             activation_points=[message.msg_type], # starts activated
             deactivation_points=["intent.service.skills.deactivated"],
             # messages internal to ovos-core, i.e. would not be sent to clients such as hivemind
