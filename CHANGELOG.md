@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.4a4](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.4a4) (2025-06-17)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.4a3...2.0.4a4)
+
+**Merged pull requests:**
+
+- active skill end2end tests [\#717](https://github.com/OpenVoiceOS/ovos-core/pull/717) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.0.4a3](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.4a3) (2025-06-17)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.4a2...2.0.4a3)
