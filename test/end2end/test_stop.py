@@ -181,7 +181,7 @@ class TestCountSkills(TestCase):
         # count to infinity, the skill will keep running in the background
         create_daemon(make_it_count)
 
-        time.sleep(3)
+        time.sleep(2)
 
         message = Message("recognizer_loop:utterance",
                           {"utterances": ["stop"], "lang": session.lang},
@@ -205,19 +205,22 @@ class TestCountSkills(TestCase):
                     {"skill_id": self.skill_id, "result": True},
                     {"skill_id": self.skill_id}),
 
-            # stop pipeline callback to stop everything
+            # async stop pipeline callback emits these messages
+            # but we cant guarantee where in the test they will be emitted
 
             # if skill is in middle of get_response
-            #Message("mycroft.skills.abort_question", {"skill_id": self.skill_id},
+            #Message("mycroft.skills.abort_question",
+            #        {"skill_id": self.skill_id},
             #        {"skill_id": self.skill_id}),
 
             # if skill is in active_list
-            Message("ovos.skills.converse.force_timeout",
-                    {"skill_id": self.skill_id},
-                    {"skill_id": self.skill_id}),
+            #Message("ovos.skills.converse.force_timeout",
+            #        {"skill_id": self.skill_id},
+            #        {"skill_id": self.skill_id}),
 
             # if skill is executing TTS
-            #Message("mycroft.audio.speech.stop", {"skill_id": self.skill_id},
+            #Message("mycroft.audio.speech.stop",
+            #        {"skill_id": self.skill_id},
             #        {"skill_id": self.skill_id}),
 
             # the intent running in the daemon thread exits cleanly
@@ -241,6 +244,9 @@ class TestCountSkills(TestCase):
                                "ovos.skills.converse.force_timeout",
                                # "stop.openvoiceos.activate" # TODO
                                ],
+            async_messages=[
+                "ovos.skills.converse.force_timeout"
+            ], # order that it wil be received unknown
             ignore_messages=self.ignore_messages,
             source_message=message,
             expected_messages=stop_skill_active
@@ -309,7 +315,7 @@ class TestCountSkills(TestCase):
         # count to infinity, the skill will keep running in the background
         create_daemon(make_it_count)
 
-        time.sleep(3)
+        time.sleep(2)
 
         message = Message("recognizer_loop:utterance",
                           {"utterances": ["full stop"], "lang": session.lang},
@@ -333,19 +339,22 @@ class TestCountSkills(TestCase):
                     {"skill_id": self.skill_id, "result": True},
                     {"skill_id": self.skill_id}),
 
-            # stop pipeline callback to stop everything
+            # async stop pipeline callback emits these messages
+            # but we cant guarantee where in the test they will be emitted
 
             # if skill is in middle of get_response
-            #Message("mycroft.skills.abort_question", {"skill_id": self.skill_id},
+            #Message("mycroft.skills.abort_question",
+            #        {"skill_id": self.skill_id},
             #        {"skill_id": self.skill_id}),
 
             # if skill is in active_list
-            Message("ovos.skills.converse.force_timeout",
-                    {"skill_id": self.skill_id},
-                    {"skill_id": self.skill_id}),
+            #Message("ovos.skills.converse.force_timeout",
+            #        {"skill_id": self.skill_id},
+            #        {"skill_id": self.skill_id}),
 
             # if skill is executing TTS
-            #Message("mycroft.audio.speech.stop", {"skill_id": self.skill_id},
+            #Message("mycroft.audio.speech.stop",
+            #        {"skill_id": self.skill_id},
             #        {"skill_id": self.skill_id}),
 
             # the intent running in the daemon thread exits cleanly
@@ -369,6 +378,9 @@ class TestCountSkills(TestCase):
                                # "stop.openvoiceos.activate", # TODO
                                "ovos.skills.converse.force_timeout"],
             ignore_messages=self.ignore_messages,
+            async_messages=[
+                "ovos.skills.converse.force_timeout"
+            ], # order that it wil be received unknown
             source_message=message,
             expected_messages=stop_skill_active
         )
