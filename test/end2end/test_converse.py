@@ -1,3 +1,4 @@
+from copy import deepcopy
 from unittest import TestCase
 
 from ovos_bus_client.message import Message
@@ -25,15 +26,16 @@ class TestConverse(TestCase):
         session.pipeline = ["ovos-converse-pipeline-plugin", "ovos-padatious-pipeline-plugin-high"]
 
         message1 = Message("recognizer_loop:utterance",
-                          {"utterances": ["start parrot mode"], "lang": session.lang},
-                          {"session": session.serialize(), "source": "A", "destination": "B"})
-        # NOTE: we dont pass session, End2EndTest will inject/update the session from message1
+                           {"utterances": ["start parrot mode"], "lang": session.lang},
+                           {"session": session.serialize(), "source": "A", "destination": "B"})
+        # NOTE: we dont pass session after first message
+        # End2EndTest will inject/update the session from message1
         message2 = Message("recognizer_loop:utterance",
-                          {"utterances": ["echo test"], "lang": session.lang},
-                          {"source": "A", "destination": "B"})
+                           {"utterances": ["echo test"], "lang": session.lang},
+                           {"source": "A", "destination": "B"})
         message3 = Message("recognizer_loop:utterance",
-                          {"utterances": ["stop parrot"], "lang": session.lang},
-                          {"source": "A", "destination": "B"})
+                           {"utterances": ["stop parrot"], "lang": session.lang},
+                           {"source": "A", "destination": "B"})
         message4 = Message("recognizer_loop:utterance",
                            {"utterances": ["echo test"], "lang": session.lang},
                            {"source": "A", "destination": "B"})
@@ -139,20 +141,27 @@ class TestConverse(TestCase):
             Message("skill.converse.pong",
                     data={"can_handle": False, "skill_id": self.skill_id},
                     context={"skill_id": self.skill_id}),
-            Message("mycroft.audio.play_sound",  data={"uri": "snd/error.mp3"}),
+            Message("mycroft.audio.play_sound", data={"uri": "snd/error.mp3"}),
             Message("complete_intent_failure"),
             Message("ovos.utterance.handled")
         ]
+
+        final_session = deepcopy(session)
+        final_session.active_skills = [(self.skill_id, 0.0)]
+
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
             eof_msgs=["ovos.utterance.handled"],
             flip_points=["recognizer_loop:utterance"],
+            final_session=final_session,
             source_message=[message1, message2, message3, message4],
             expected_messages=expected1 + expected2 + expected3 + expected4,
-            activation_points={f"{self.skill_id}:start_parrot.intent": self.skill_id},
+            activation_points=[f"{self.skill_id}:start_parrot.intent"],
             # messages internal to ovos-core, i.e. would not be sent to clients such as hivemind
             keep_original_src=[f"{self.skill_id}.converse.ping",
-                               f"{self.skill_id}.converse.request"]
+                               f"{self.skill_id}.converse.request"
+                               # f"{self.skill_id}.activate",  # TODO
+                               ]
         )
         test.execute(timeout=10)

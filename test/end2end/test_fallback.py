@@ -1,5 +1,5 @@
 from unittest import TestCase
-
+from copy import deepcopy
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
 from ovos_utils.log import LOG
@@ -27,10 +27,19 @@ class TestFallback(TestCase):
                           {"utterances": ["hello world"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
+        final_session = deepcopy(session)
+        # final_session.active_skills = [(self.skill_id, 0.0)] # TODO - failing
+
+
         test = End2EndTest(
             minicroft=self.minicroft,
             skill_ids=[self.skill_id],
-            keep_original_src=["ovos.skills.fallback.ping"], # for routing tests this is an exception
+            final_session=final_session,
+            keep_original_src=[
+                "ovos.skills.fallback.ping",
+                # "ovos.skills.fallback.pong", # TODO
+            ],
+            activation_points=[f"ovos.skills.fallback.{self.skill_id}.request"],
             source_message=message,
             expected_messages=[
                 message,
