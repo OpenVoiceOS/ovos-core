@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.5a1) (2025-09-05)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.4a5...2.0.5a1)
+
+**Merged pull requests:**
+
+- fix: less requirements [\#724](https://github.com/OpenVoiceOS/ovos-core/pull/724) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.0.4a5](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.4a5) (2025-09-05)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.4a4...2.0.4a5)
