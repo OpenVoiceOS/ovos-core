@@ -8,3 +8,4 @@ ovos-skill-spelling>=0.2.5,<1.0.0
 ovos-skill-diagnostics>=0.0.2,<1.0.0
 ovos-skill-parrot>=0.1.25,<1.0.0
 ovos-skill-count>=0.0.1,<1.0.0
+ovos-skill-randomness>=0.1.2,<1.0.0; python_version >= "3.10"

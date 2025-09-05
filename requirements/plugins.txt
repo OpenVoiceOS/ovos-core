@@ -10,7 +10,7 @@ ovos-date-parser>=0.0.3,<1.0.0
 ovos-m2v-pipeline>=0.0.6,<1.0.0
 ovos-common-query-pipeline-plugin>=1.1.8, <2.0.0
 ovos-adapt-parser>=1.0.6, <2.0.0
-ovos_ocp_pipeline_plugin>=1.1.16, <2.0.0
+ovos_ocp_pipeline_plugin>=1.1.18a1, <2.0.0
 ovos-persona>=0.6.23,<1.0.0
 padacioso>=1.0.0, <2.0.0
 
