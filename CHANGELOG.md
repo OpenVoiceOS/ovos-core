@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.4a5](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.4a5) (2025-09-05)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.4a4...2.0.4a5)
+
+**Closed issues:**
+
+- ovos-core should restart itself when it detects a new skill [\#720](https://github.com/OpenVoiceOS/ovos-core/issues/720)
+
+**Merged pull requests:**
+
+- Fix/orjson optional [\#722](https://github.com/OpenVoiceOS/ovos-core/pull/722) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.0.4a4](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.4a4) (2025-06-17)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.4a3...2.0.4a4)
