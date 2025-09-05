@@ -4,7 +4,7 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>Coverage for test/unittests/test_manager.py: 99%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_58284776.png">
-    <link rel="stylesheet" href="style_cb_81f8c14c.css" type="text/css">
+    <link rel="stylesheet" href="style_cb_6b508a39.css" type="text/css">
     <script src="coverage_html_cb_6fb7b396.js" defer></script>
 </head>
 <body class="pyfile">
@@ -64,8 +64,8 @@
             <a id="indexLink" class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
             <a id="nextFileLink" class="nav" href="z_37cf5ca434e71413_test_skill_installer_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
-            <a class="nav" href="https://coverage.readthedocs.io/en/7.9.1">coverage.py v7.9.1</a>,
-            created at 2025-06-17 13:44 +0000
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.10.6">coverage.py v7.10.6</a>,
+            created at 2025-09-05 21:38 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -201,8 +201,8 @@
     <p class="run"><span class="n"><a id="t119" href="#t119">119</a></span><span class="t">    <span class="op">@</span><span class="nam">patch</span><span class="op">(</span><span class="str">'ovos_core.skill_manager.is_gui_connected'</span><span class="op">,</span> <span class="nam">return_value</span><span class="op">=</span><span class="key">True</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t120" href="#t120">120</a></span><span class="t">    <span class="key">def</span> <span class="nam">test_sync_skill_loading_state_gui_no_internet_but_network</span><span class="op">(</span><span class="nam">self</span><span class="op">,</span> <span class="nam">mock_is_gui_connected</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t121" href="#t121">121</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">bus</span><span class="op">.</span><span class="nam">wait_for_response</span><span class="op">.</span><span class="nam">return_value</span> <span class="op">=</span> <span class="nam">Message</span><span class="op">(</span><span class="str">"ovos.PHAL.internet_check"</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t122" href="#t122">122</a></span><span class="t">                                                          <span class="nam">data</span><span class="op">=</span><span class="op">{</span><span class="str">"internet_connected"</span><span class="op">:</span> <span class="key">False</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t123" href="#t123">123</a></span><span class="t">                                                                <span class="str">"network_connected"</span><span class="op">:</span> <span class="key">True</span><span class="op">}</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t122" href="#t122">122</a></span><span class="t">                                                          <span class="nam">data</span><span class="op">=</span><span class="op">{</span><span class="str">"internet_connected"</span><span class="op">:</span> <span class="key">False</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t123" href="#t123">123</a></span><span class="t">                                                                <span class="str">"network_connected"</span><span class="op">:</span> <span class="key">True</span><span class="op">}</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t124" href="#t124">124</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t125" href="#t125">125</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">skill_manager</span><span class="op">.</span><span class="nam">_gui_event</span><span class="op">.</span><span class="nam">clear</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t126" href="#t126">126</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">skill_manager</span><span class="op">.</span><span class="nam">_connected_event</span><span class="op">.</span><span class="nam">clear</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
@@ -250,8 +250,8 @@
             <a class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
             <a class="nav" href="z_37cf5ca434e71413_test_skill_installer_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
-            <a class="nav" href="https://coverage.readthedocs.io/en/7.9.1">coverage.py v7.9.1</a>,
-            created at 2025-06-17 13:44 +0000
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.10.6">coverage.py v7.10.6</a>,
+            created at 2025-09-05 21:38 +0000
         </p>
     </div>
 </footer>
