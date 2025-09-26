@@ -1,12 +1,12 @@
 {
   "stop.intent": [
     "(basta|stop|interrompiti|fermati)",
-    "smettila (di fare|) (ciò|quello che stai facendo|)",
-    "smettila di farlo",
+    "smetti(|la) (di fare|) (ciò|quello che stai facendo|)",
+    "smetti(|la) di farlo",
     "termina quello che stavi facendo",
     "piantala",
     "puoi fermarti ora",
-    "(Interrompi l'esecuzione di|smettila di eseguire) tale (attività|azione)",
+    "(smetti|stop|fermati)",
     "(per favore|per piacere|) (Interrompi l'esecuzione di|smettila di eseguire) l'(attuale|) (attività|azione) (corrente|attuale|) (per favore|per piacere|)",
     "(Interrompi|termina|stoppa|ferma) (i|il|le) (processo|processi|azioni|attività) in corso",
     "(Interrompi|termina|stoppa|ferma) (i|il|le) (processo|processi|azioni|attività) corrente",
