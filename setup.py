@@ -22,7 +22,7 @@ def get_version():
     """ Find the version of ovos-core"""
     version_file = os.path.join(BASEDIR, 'ovos_core', 'version.py')
     major, minor, build, alpha = (0, 0, 0, 0)
-    with open(version_file) as f:
+    with open(version_file, encoding='utf-8') as f:
         for line in f:
             if 'VERSION_MAJOR' in line:
                 major = line.split('=')[1].strip()
@@ -44,7 +44,7 @@ def get_version():
 
 def required(requirements_file):
     """ Read requirements file and remove comments and empty lines. """
-    with open(os.path.join(BASEDIR, requirements_file), 'r') as f:
+    with open(os.path.join(BASEDIR, requirements_file), 'r', encoding='utf-8') as f:
         requirements = f.read().splitlines()
         if 'MYCROFT_LOOSE_REQUIREMENTS' in os.environ:
             print('USING LOOSE REQUIREMENTS!')
@@ -53,7 +53,7 @@ def required(requirements_file):
                 if pkg.strip() and not pkg.startswith("#")]
 
 
-with open(os.path.join(BASEDIR, "README.md"), "r") as f:
+with open(os.path.join(BASEDIR, "README.md"), "r", encoding='utf-8') as f:
     long_description = f.read()
 
 PLUGIN_ENTRY_POINT = [
