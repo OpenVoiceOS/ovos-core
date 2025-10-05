@@ -269,8 +269,8 @@ class TestSkillManager(TestCase):
         # Call the method
         result = self.skill_manager._load_plugin_skill(skill_id, mock_plugin)
 
-        # Verify message WAS emitted (happens before status check)
-        self.assertIn('mycroft.skill.loaded', self.message_bus_mock.message_types)
+        # Verify NO success message was emitted (load returned False)
+        self.assertNotIn('mycroft.skill.loaded', self.message_bus_mock.message_types)
 
         # Verify skill was added to plugin_skills
         self.assertIn(skill_id, self.skill_manager.plugin_skills)
