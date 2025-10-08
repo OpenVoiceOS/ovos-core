@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.5a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.5a2) (2025-10-08)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.5a1...2.0.5a2)
+
+**Closed issues:**
+
+- Does this project support custom AI Agent APIs? [\#726](https://github.com/OpenVoiceOS/ovos-core/issues/726)
+
+**Merged pull requests:**
+
+- translated ovos core [\#729](https://github.com/OpenVoiceOS/ovos-core/pull/729) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
+
 ## [2.0.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.5a1) (2025-09-05)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.4a5...2.0.5a1)
