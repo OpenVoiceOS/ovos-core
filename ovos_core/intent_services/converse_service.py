@@ -1,33 +1,38 @@
 import time
 from threading import Event
-from typing import Optional, List
+from typing import Optional, Dict, List, Union
 
+from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, UtteranceState, Session
-from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
-from ovos_config.locale import setup_locale
-from ovos_plugin_manager.templates.pipeline import PipelineMatch, PipelinePlugin
 from ovos_utils import flatten_list
+from ovos_utils.fakebus import FakeBus
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
+
+from ovos_plugin_manager.templates.pipeline import PipelinePlugin, IntentHandlerMatch
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
 
 
 class ConverseService(PipelinePlugin):
     """Intent Service handling conversational skills."""
 
-    def __init__(self, bus):
-        self.bus = bus
+    def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
+                 config: Optional[Dict] = None):
+        config = config or Configuration().get("skills", {}).get("converse", {})
+        super().__init__(bus, config)
         self._consecutive_activations = {}
-        self.bus.on('mycroft.speech.recognition.unknown', self.reset_converse)
         self.bus.on('intent.service.skills.deactivate', self.handle_deactivate_skill_request)
         self.bus.on('intent.service.skills.activate', self.handle_activate_skill_request)
-        self.bus.on('active_skill_request', self.handle_activate_skill_request)  # TODO backwards compat, deprecate
         self.bus.on('intent.service.active_skills.get', self.handle_get_active_skills)
         self.bus.on("skill.converse.get_response.enable", self.handle_get_response_enable)
         self.bus.on("skill.converse.get_response.disable", self.handle_get_response_disable)
-        super().__init__(config=Configuration().get("skills", {}).get("converse") or {})
+        self.bus.on("converse:skill", self.handle_converse)
+
+    def handle_converse(self, message: Message):
+        skill_id = message.data["skill_id"]
+        self.bus.emit(message.reply(f"{skill_id}.converse.request", message.data))
 
     @property
     def active_skills(self):
@@ -209,17 +214,15 @@ class ConverseService(PipelinePlugin):
 
     def _collect_converse_skills(self, message: Message) -> List[str]:
         """use the messagebus api to determine which skills want to converse
-        This includes all skills and external applications"""
+
+        Individual skills respond to this request via the `can_converse` method"""
+        skill_ids = []
+        want_converse = []
         session = SessionManager.get(message)
 
-        skill_ids = []
-        # include all skills in get_response state
-        want_converse = [skill_id for skill_id, state in session.utterance_states.items()
-                         if state == UtteranceState.RESPONSE]
-        skill_ids += want_converse  # dont wait for these pong answers (optimization)
-
-        active_skills = self.get_active_skills()
-
+        # note: this is sorted by priority already
+        active_skills = [skill_id for skill_id in self.get_active_skills(message)
+                     if session.utterance_states.get(skill_id, UtteranceState.INTENT) == UtteranceState.INTENT]
         if not active_skills:
             return want_converse
 
@@ -246,8 +249,7 @@ class ConverseService(PipelinePlugin):
 
         # ask skills if they want to converse
         for skill_id in active_skills:
-            self.bus.emit(message.forward(f"{skill_id}.converse.ping",
-                                          {"skill_id": skill_id}))
+            self.bus.emit(message.forward(f"{skill_id}.converse.ping", {**message.data, "skill_id": skill_id}))
 
         # wait for all skills to acknowledge they want to converse
         event.wait(timeout=0.5)
@@ -264,65 +266,17 @@ class ConverseService(PipelinePlugin):
             skill for skill in session.active_skills
             if time.time() - skill[1] <= timeouts.get(skill[0], def_timeout)]
 
-    def converse(self, utterances: List[str], skill_id: str, lang: str, message: Message) -> bool:
-        """Call skill and ask if they want to process the utterance.
-
-        Args:
-            utterances (list of tuples): utterances paired with normalized
-                                         versions.
-            skill_id: skill to query.
-            lang (str): current language
-            message (Message): message containing interaction info.
-
-        Returns:
-            handled (bool): True if handled otherwise False.
-        """
-        lang = standardize_lang_tag(lang)
-        session = SessionManager.get(message)
-        session.lang = lang
-
-        state = session.utterance_states.get(skill_id, UtteranceState.INTENT)
-        if state == UtteranceState.RESPONSE:
-            converse_msg = message.reply(f"{skill_id}.converse.get_response",
-                                         {"utterances": utterances,
-                                          "lang": lang})
-            self.bus.emit(converse_msg)
-            return True
-
-        if self._converse_allowed(skill_id):
-            converse_msg = message.reply(f"{skill_id}.converse.request",
-                                         {"utterances": utterances,
-                                          "lang": lang})
-            result = self.bus.wait_for_response(converse_msg,
-                                                'skill.converse.response',
-                                                timeout=self.config.get("max_skill_runtime", 10))
-            if result and 'error' in result.data:
-                error_msg = result.data['error']
-                LOG.error(f"{skill_id}: {error_msg}")
-                return False
-            elif result is not None:
-                return result.data.get('result', False)
-            else:
-                # abort any ongoing converse
-                # if skill crashed or returns False, all good
-                # if it is just taking a long time, more than 1 skill would end up answering
-                self.bus.emit(message.forward("ovos.skills.converse.force_timeout",
-                                              {"skill_id": skill_id}))
-                LOG.warning(f"{skill_id} took too long to answer, "
-                            f'increasing "max_skill_runtime" in mycroft.conf might help alleviate this issue')
-        return False
-
-    def converse_with_skills(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
+    def match(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """
         Attempt to converse with active skills for a given set of utterances.
-        
+
         Iterates through active skills to find one that can handle the utterance. Filters skills based on timeout and blacklist status.
-        
+
         Args:
             utterances (List[str]): List of utterance strings to process
             lang (str): 4-letter ISO language code for the utterances
             message (Message): Message context for generating a reply
-        
+
         Returns:
             PipelineMatch: Match details if a skill successfully handles the utterance, otherwise None
             - handled (bool): Whether the utterance was fully handled
@@ -330,7 +284,7 @@ class ConverseService(PipelinePlugin):
             - skill_id (str): ID of the skill that handled the utterance
             - updated_session (Session): Current session state after skill interaction
             - utterance (str): The original utterance processed
-        
+
         Notes:
             - Standardizes language tag
             - Filters out blacklisted skills
@@ -342,22 +296,43 @@ class ConverseService(PipelinePlugin):
 
         # we call flatten in case someone is sending the old style list of tuples
         utterances = flatten_list(utterances)
+
+        # note: this is sorted by priority already
+        gr_skills = [skill_id for skill_id in self.get_active_skills(message)
+                     if session.utterance_states.get(skill_id, UtteranceState.INTENT) == UtteranceState.RESPONSE]
+
+        # check if any skill wants to capture utterance for self.get_response method
+        for skill_id in gr_skills:
+            if skill_id in session.blacklisted_skills:
+                LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{session.session_id}'")
+                continue
+            LOG.debug(f"utterance captured by skill.get_response method: {skill_id}")
+            return IntentHandlerMatch(
+                match_type=f"{skill_id}.converse.get_response",
+                match_data={"utterances": utterances, "lang": lang},
+                skill_id=skill_id,
+                utterance=utterances[0],
+                updated_session=session
+            )
+
         # filter allowed skills
         self._check_converse_timeout(message)
-        # check if any skill wants to handle utterance
+
+        # check if any skill wants to converse
         for skill_id in self._collect_converse_skills(message):
             if skill_id in session.blacklisted_skills:
                 LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{session.session_id}'")
                 continue
             LOG.debug(f"Attempting to converse with skill: {skill_id}")
-            if self.converse(utterances, skill_id, lang, message):
-                state = session.utterance_states.get(skill_id, UtteranceState.INTENT)
-                return PipelineMatch(handled=state != UtteranceState.RESPONSE,
-                                     # handled == True -> emit "ovos.utterance.handled"
-                                     match_data={},
-                                     skill_id=skill_id,
-                                     updated_session=session,
-                                     utterance=utterances[0])
+            if self._converse_allowed(skill_id):
+                return IntentHandlerMatch(
+                    match_type="converse:skill",
+                    match_data={"utterances": utterances, "lang": lang, "skill_id": skill_id},
+                    skill_id=skill_id,
+                    utterance=utterances[0],
+                    updated_session=session
+                )
+
         return None
 
     @staticmethod
@@ -400,11 +375,6 @@ class ConverseService(PipelinePlugin):
         if sess.session_id == "default":
             SessionManager.sync(message)
 
-    def reset_converse(self, message: Message):
-        """Let skills know there was a problem with speech recognition"""
-        lang = get_message_lang()
-        self.converse_with_skills([], lang, message)
-
     def handle_get_active_skills(self, message: Message):
         """Send active skills to caller.
 
@@ -415,10 +385,9 @@ class ConverseService(PipelinePlugin):
                                     {"skills": self.get_active_skills(message)}))
 
     def shutdown(self):
-        self.bus.remove('mycroft.speech.recognition.unknown', self.reset_converse)
+        self.bus.remove("converse:skill", self.handle_converse)
         self.bus.remove('intent.service.skills.deactivate', self.handle_deactivate_skill_request)
         self.bus.remove('intent.service.skills.activate', self.handle_activate_skill_request)
-        self.bus.remove('active_skill_request', self.handle_activate_skill_request)  # TODO backwards compat, deprecate
         self.bus.remove('intent.service.active_skills.get', self.handle_get_active_skills)
         self.bus.remove("skill.converse.get_response.enable", self.handle_get_response_enable)
         self.bus.remove("skill.converse.get_response.disable", self.handle_get_response_disable)

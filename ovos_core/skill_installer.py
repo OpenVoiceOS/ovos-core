@@ -8,11 +8,11 @@ from typing import Optional
 
 import requests
 from combo_lock import NamedLock
-
-import ovos_plugin_manager
 from ovos_bus_client import Message
 from ovos_config.config import Configuration
 from ovos_utils.log import LOG
+
+import ovos_plugin_manager
 
 
 class InstallError(str, enum.Enum):
@@ -37,7 +37,10 @@ class SkillsStore:
         self.bus.on("ovos.pip.uninstall", self.handle_uninstall_python)
 
     def shutdown(self):
-        pass
+        self.bus.remove("ovos.skills.install", self.handle_install_skill)
+        self.bus.remove("ovos.skills.uninstall", self.handle_uninstall_skill)
+        self.bus.remove("ovos.pip.install", self.handle_install_python)
+        self.bus.remove("ovos.pip.uninstall", self.handle_uninstall_python)
 
     def play_error_sound(self):
         snd = self.config.get("sounds", {}).get("pip_error", "snd/error.mp3")
@@ -265,3 +268,29 @@ class SkillsStore:
         else:
             self.bus.emit(message.reply("ovos.pip.uninstall.failed",
                                         {"error": InstallError.NO_PKGS.value}))
+
+
+def launch_standalone():
+    # TODO - add docker detection and warn user
+    from ovos_bus_client import MessageBusClient
+    from ovos_utils import wait_for_exit_signal
+    from ovos_utils.log import init_service_logger
+
+    LOG.info("Launching SkillsStore in standalone mode")
+    init_service_logger("skill-installer")
+
+    bus = MessageBusClient()
+    bus.run_in_thread()
+    bus.connected_event.wait()
+
+    store = SkillsStore(bus)
+
+    wait_for_exit_signal()
+
+    store.shutdown()
+
+    LOG.info('SkillsStore shutdown complete!')
+
+
+if __name__ == "__main__":
+    launch_standalone()

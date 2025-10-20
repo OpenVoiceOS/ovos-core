@@ -1,8 +1,11 @@
 # skills providing core functionality (offline)
-ovos-skill-fallback-unknown>=0.1.5,<1.0.0
+ovos-skill-fallback-unknown>=0.1.9,<1.0.0
 ovos-skill-alerts>=0.1.10,<1.0.0
-ovos-skill-personal>=0.1.7,<1.0.0
-ovos-skill-date-time>=0.4.2,<1.0.0
+ovos-skill-personal>=0.1.19,<1.0.0
+ovos-skill-date-time>=1.1.3,<2.0.0
 ovos-skill-hello-world>=0.1.10,<1.0.0
 ovos-skill-spelling>=0.2.5,<1.0.0
 ovos-skill-diagnostics>=0.0.2,<1.0.0
+ovos-skill-parrot>=0.1.25,<1.0.0
+ovos-skill-count>=0.0.1,<1.0.0
+ovos-skill-randomness>=0.1.2,<1.0.0; python_version >= "3.10"

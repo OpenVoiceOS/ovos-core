@@ -89,7 +89,7 @@ class TestSkillManager(TestCase):
         self.skill_loader_mock.instance.converse = Mock()
         self.skill_loader_mock.instance.converse.return_value = True
         self.skill_loader_mock.skill_id = 'test_skill'
-        self.skill_manager.skill_loaders = {
+        self.skill_manager.plugin_skills = {
             str(self.skill_dir): self.skill_loader_mock
         }
 
@@ -114,11 +114,6 @@ class TestSkillManager(TestCase):
         self.assertListEqual(expected_result,
                              self.message_bus_mock.event_handlers)
 
-    def test_unload_removed_skills(self):
-        self.skill_manager._unload_removed_skills()
-
-        self.assertDictEqual({}, self.skill_manager.skill_loaders)
-        self.skill_loader_mock.unload.assert_called_once_with()
 
     def test_send_skill_list(self):
         self.skill_loader_mock.active = True
@@ -158,9 +153,9 @@ class TestSkillManager(TestCase):
         foo2_skill_loader.skill_id = 'foo2'
         test_skill_loader = Mock(spec=SkillLoader)
         test_skill_loader.skill_id = 'test_skill'
-        self.skill_manager.skill_loaders['foo'] = foo_skill_loader
-        self.skill_manager.skill_loaders['foo2'] = foo2_skill_loader
-        self.skill_manager.skill_loaders['test_skill'] = test_skill_loader
+        self.skill_manager.plugin_skills['foo'] = foo_skill_loader
+        self.skill_manager.plugin_skills['foo2'] = foo2_skill_loader
+        self.skill_manager.plugin_skills['test_skill'] = test_skill_loader
 
         self.skill_manager.deactivate_except(message)
         foo_skill_loader.deactivate.assert_called_once()
@@ -174,9 +169,111 @@ class TestSkillManager(TestCase):
         test_skill_loader.skill_id = 'test_skill'
         test_skill_loader.active = False
 
-        self.skill_manager.skill_loaders = {}
-        self.skill_manager.skill_loaders['test_skill'] = test_skill_loader
+        self.skill_manager.plugin_skills = {}
+        self.skill_manager.plugin_skills['test_skill'] = test_skill_loader
 
         self.skill_manager.activate_skill(message)
         test_skill_loader.activate.assert_called_once()
         message.response.assert_called_once()
+
+    def test_load_plugin_skill_success(self):
+        """Test successful plugin skill loading emits the correct message."""
+        skill_id = 'test.plugin.skill'
+        mock_plugin = Mock()
+
+        # Setup mock loader following existing patterns
+        mock_loader = Mock(spec=SkillLoader)
+        mock_loader.skill_id = skill_id
+        mock_loader.load.return_value = True
+
+        # Mock _get_plugin_skill_loader to return our mock
+        self.skill_manager._get_plugin_skill_loader = Mock(return_value=mock_loader)
+
+        # Reset message tracking
+        self.message_bus_mock.message_types = []
+        self.message_bus_mock.message_data = []
+        self.skill_manager.plugin_skills = {}
+
+        # Call the method
+        result = self.skill_manager._load_plugin_skill(skill_id, mock_plugin)
+
+        # Verify message was emitted
+        self.assertIn('mycroft.skill.loaded', self.message_bus_mock.message_types)
+        loaded_msg_idx = self.message_bus_mock.message_types.index('mycroft.skill.loaded')
+        self.assertEqual(
+            {'skill_id': skill_id},
+            self.message_bus_mock.message_data[loaded_msg_idx]
+        )
+
+        # Verify loader was called
+        mock_loader.load.assert_called_once_with(mock_plugin)
+
+        # Verify skill was added to plugin_skills
+        self.assertIn(skill_id, self.skill_manager.plugin_skills)
+        self.assertEqual(mock_loader, self.skill_manager.plugin_skills[skill_id])
+
+        # Verify return value
+        self.assertEqual(result, mock_loader)
+
+    def test_load_plugin_skill_failure(self):
+        """Test failed plugin skill loading is handled gracefully."""
+        skill_id = 'test.failing.skill'
+        mock_plugin = Mock()
+
+        # Setup mock loader to raise exception
+        mock_loader = Mock(spec=SkillLoader)
+        mock_loader.skill_id = skill_id
+        mock_loader.load.side_effect = Exception("Skill load failed!")
+
+        # Mock _get_plugin_skill_loader to return our mock
+        self.skill_manager._get_plugin_skill_loader = Mock(return_value=mock_loader)
+
+        # Reset message tracking
+        self.message_bus_mock.message_types = []
+        self.message_bus_mock.message_data = []
+        self.skill_manager.plugin_skills = {}
+
+        # Call the method
+        result = self.skill_manager._load_plugin_skill(skill_id, mock_plugin)
+
+        # Verify NO success message was emitted
+        self.assertNotIn('mycroft.skill.loaded', self.message_bus_mock.message_types)
+
+        # Verify exception was logged
+        self.log_mock.exception.assert_called_once()
+
+        # Verify skill was still added to plugin_skills (even on failure)
+        self.assertIn(skill_id, self.skill_manager.plugin_skills)
+        self.assertEqual(mock_loader, self.skill_manager.plugin_skills[skill_id])
+
+        # Verify return value is None on failure
+        self.assertIsNone(result)
+
+    def test_load_plugin_skill_returns_false(self):
+        """Test plugin skill loading that returns False (load failed gracefully)."""
+        skill_id = 'test.false.skill'
+        mock_plugin = Mock()
+
+        # Setup mock loader to return False (failed but no exception)
+        mock_loader = Mock(spec=SkillLoader)
+        mock_loader.skill_id = skill_id
+        mock_loader.load.return_value = False
+
+        # Mock _get_plugin_skill_loader to return our mock
+        self.skill_manager._get_plugin_skill_loader = Mock(return_value=mock_loader)
+
+        # Reset message tracking
+        self.message_bus_mock.message_types = []
+        self.skill_manager.plugin_skills = {}
+
+        # Call the method
+        result = self.skill_manager._load_plugin_skill(skill_id, mock_plugin)
+
+        # Verify NO success message was emitted (load returned False)
+        self.assertNotIn('mycroft.skill.loaded', self.message_bus_mock.message_types)
+
+        # Verify skill was added to plugin_skills
+        self.assertIn(skill_id, self.skill_manager.plugin_skills)
+
+        # Verify return value is None when load returns False
+        self.assertIsNone(result)

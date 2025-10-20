@@ -1,0 +1,46 @@
+name: Publish Coverage to gh-pages
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: write  # Required to push to gh-pages
+
+jobs:
+  test-and-publish-coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt install python3-dev swig libssl-dev portaudio19-dev libpulse-dev libfann-dev
+          python -m pip install build wheel uv
+
+      - name: Install core repo
+        run: |
+          uv pip install --system -e .[mycroft,plugins,skills-essential,lgpl,test]
+
+      - name: Run tests and collect coverage
+        run: |
+          coverage run -m pytest test/
+          coverage html
+          rm ./htmlcov/.gitignore
+
+      - name: Deploy coverage report to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./htmlcov
+          publish_branch: gh-pages

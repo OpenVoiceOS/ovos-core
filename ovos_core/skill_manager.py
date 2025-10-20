@@ -14,46 +14,26 @@
 #
 """Load, update and manage skills on this device."""
 import os
-from os.path import basename
-from threading import Thread, Event, Lock
-from time import monotonic
+import threading
+from threading import Thread, Event
 
 from ovos_bus_client.apis.enclosure import EnclosureAPI
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
+from ovos_bus_client.util.scheduler import EventScheduler
 from ovos_config.config import Configuration
 from ovos_config.locations import get_xdg_config_save_path
-from ovos_plugin_manager.skills import find_skill_plugins
-from ovos_plugin_manager.skills import get_skill_directories
 from ovos_utils.file_utils import FileWatcher
 from ovos_utils.gui import is_gui_connected
-from ovos_utils.log import LOG, deprecated
+from ovos_utils.log import LOG
 from ovos_utils.network_utils import is_connected_http
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap, ProcessState
-from ovos_workshop.skill_launcher import SKILL_MAIN_MODULE
-from ovos_workshop.skill_launcher import SkillLoader, PluginSkillLoader
-import warnings
+from ovos_workshop.skill_launcher import PluginSkillLoader
+from ovos_core.skill_installer import SkillsStore
+from ovos_core.intent_services import IntentService
+from ovos_workshop.skills.api import SkillApi
 
-
-def _shutdown_skill(instance):
-    """Shutdown a skill.
-
-    Call the default_shutdown method of the skill, will produce a warning if
-    the shutdown process takes longer than 1 second.
-
-    Args:
-        instance (MycroftSkill): Skill instance to shutdown
-    """
-    try:
-        ref_time = monotonic()
-        # Perform the shutdown
-        instance.default_shutdown()
-
-        shutdown_time = monotonic() - ref_time
-        if shutdown_time > 1:
-            LOG.warning(f'{instance.skill_id} shutdown took {shutdown_time} seconds')
-    except Exception:
-        LOG.exception(f'Failed to shut down skill: {instance.skill_id}')
+from ovos_plugin_manager.skills import find_skill_plugins
 
 
 def on_started():
@@ -80,7 +60,12 @@ class SkillManager(Thread):
     """Manages the loading, activation, and deactivation of Mycroft skills."""
 
     def __init__(self, bus, watchdog=None, alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
-                 error_hook=on_error, stopping_hook=on_stopping):
+                 error_hook=on_error, stopping_hook=on_stopping,
+                 enable_installer=False,
+                 enable_intent_service=False,
+                 enable_event_scheduler=False,
+                 enable_file_watcher=True,
+                 enable_skill_api=False):
         """Constructor
 
         Args:
@@ -105,7 +90,6 @@ class SkillManager(Thread):
         self.status = ProcessStatus('skills', callback_map=callbacks)
         self.status.set_started()
 
-        self._lock = Lock()
         self._setup_event = Event()
         self._stop_event = Event()
         self._connected_event = Event()
@@ -124,7 +108,6 @@ class SkillManager(Thread):
 
         self.config = Configuration()
 
-        self.skill_loaders = {}
         self.plugin_skills = {}
         self.enclosure = EnclosureAPI(bus)
         self.num_install_retries = 0
@@ -134,7 +117,18 @@ class SkillManager(Thread):
         self.daemon = True
 
         self.status.bind(self.bus)
-        self._init_filewatcher()
+
+        # init subsystems
+        self.osm = SkillsStore(self.bus) if enable_installer else None
+        self.event_scheduler = EventScheduler(self.bus, autostart=False) if enable_event_scheduler else None
+        if self.event_scheduler:
+            self.event_scheduler.daemon = True # TODO - add kwarg in EventScheduler
+            self.event_scheduler.start()
+        self.intents = IntentService(self.bus) if enable_intent_service else None
+        if enable_skill_api:
+            SkillApi.connect_bus(self.bus)
+        if enable_file_watcher:
+            self._init_filewatcher()
 
     @property
     def blacklist(self):
@@ -143,8 +137,7 @@ class SkillManager(Thread):
         Returns:
             list: List of blacklisted skill ids.
         """
-        return Configuration().get("skills", {}).get("blacklisted_skills",
-                                                     ["skill-ovos-stop.openvoiceos"])
+        return Configuration().get("skills", {}).get("blacklisted_skills", [])
 
     def _init_filewatcher(self):
         """Initialize the file watcher to monitor skill settings files for changes."""
@@ -295,7 +288,6 @@ class SkillManager(Thread):
         if internet is None:
             internet = self._connected_event.is_set()
         plugins = find_skill_plugins()
-        loaded_skill_ids = [basename(p) for p in self.skill_loaders]
         for skill_id, plug in plugins.items():
             if skill_id in self.blacklist:
                 if skill_id not in self._logged_skill_warnings:
@@ -303,7 +295,7 @@ class SkillManager(Thread):
                     LOG.warning(f"{skill_id} is blacklisted, it will NOT be loaded")
                     LOG.info(f"Consider uninstalling {skill_id} instead of blacklisting it")
                 continue
-            if skill_id not in self.plugin_skills and skill_id not in loaded_skill_ids:
+            if skill_id not in self.plugin_skills:
                 skill_loader = self._get_plugin_skill_loader(skill_id, init_bus=False,
                                                              skill_class=plug)
                 requirements = skill_loader.runtime_requirements
@@ -363,6 +355,8 @@ class SkillManager(Thread):
         skill_loader = self._get_plugin_skill_loader(skill_id, skill_class=skill_plugin)
         try:
             load_status = skill_loader.load(skill_plugin)
+            if load_status:
+                self.bus.emit(Message("mycroft.skill.loaded", {"skill_id": skill_id}))
         except Exception:
             LOG.exception(f'Load of skill {skill_id} failed!')
             load_status = False
@@ -371,9 +365,25 @@ class SkillManager(Thread):
 
         return skill_loader if load_status else None
 
+    def wait_for_intent_service(self):
+        """ensure IntentService reported ready to accept skill messages"""
+        while not self._stop_event.is_set():
+            response = self.bus.wait_for_response(
+                Message('mycroft.intents.is_ready',
+                        context={"source": "skills", "destination": "intents"}),
+                timeout=5)
+            if response and response.data.get('status'):
+                return
+            threading.Event().wait(1)
+        raise RuntimeError("Skill manager stopped while waiting for intent service")
+
     def run(self):
         """Run the skill manager thread."""
         self.status.set_alive()
+
+        LOG.debug("Waiting for IntentService startup")
+        self.wait_for_intent_service()
+        LOG.debug("IntentService reported ready")
 
         self._load_on_startup()
 
@@ -397,7 +407,6 @@ class SkillManager(Thread):
         # unload the existing version from memory and reload from the disk.
         while not self._stop_event.wait(30):
             try:
-                self._unload_removed_skills()
                 self._load_new_skills()
                 self._watchdog()
             except Exception:
@@ -422,39 +431,15 @@ class SkillManager(Thread):
 
     def _unload_on_network_disconnect(self):
         """Unload skills that require a network connection to work."""
-        with self._lock:
-            for skill_dir in self._get_skill_directories():
-                skill_id = os.path.basename(skill_dir)
-                skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
-                requirements = skill_loader.runtime_requirements
-                if requirements.requires_network and \
-                        not requirements.no_network_fallback:
-                    # Unload skills until the network is back
-                    self._unload_skill(skill_dir)
+        # TODO - implementation missing
 
     def _unload_on_internet_disconnect(self):
         """Unload skills that require an internet connection to work."""
-        with self._lock:
-            for skill_dir in self._get_skill_directories():
-                skill_id = os.path.basename(skill_dir)
-                skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
-                requirements = skill_loader.runtime_requirements
-                if requirements.requires_internet and \
-                        not requirements.no_internet_fallback:
-                    # Unload skills until the internet is back
-                    self._unload_skill(skill_dir)
+        # TODO - implementation missing
 
     def _unload_on_gui_disconnect(self):
         """Unload skills that require a GUI to work."""
-        with self._lock:
-            for skill_dir in self._get_skill_directories():
-                skill_id = os.path.basename(skill_dir)
-                skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
-                requirements = skill_loader.runtime_requirements
-                if requirements.requires_gui and \
-                        not requirements.no_gui_fallback:
-                    # Unload skills until the GUI is back
-                    self._unload_skill(skill_dir)
+        # TODO - implementation missing
 
     def _load_on_startup(self):
         """Handle offline skills load on startup."""
@@ -477,164 +462,22 @@ class SkillManager(Thread):
         if gui is None:
             gui = self._gui_event.is_set() or is_gui_connected(self.bus)
 
-        # A lock is used because this can be called via state events or as part of the main loop.
-        # There is a possible race condition where this handler would be executing several times otherwise.
-        with self._lock:
-
-            loaded_new = self.load_plugin_skills(network=network, internet=internet)
-
-            for skill_dir in self._get_skill_directories():
-                replaced_skills = []
-                skill_id = os.path.basename(skill_dir)
-                skill_loader = self._get_skill_loader(skill_dir, init_bus=False)
-                requirements = skill_loader.runtime_requirements
-                if not network and requirements.network_before_load:
-                    continue
-                if not internet and requirements.internet_before_load:
-                    continue
-                if not gui and requirements.gui_before_load:
-                    # TODO - companion PR adding this one
-                    continue
-
-                # A local source install is replacing this plugin, unload it!
-                if skill_id in self.plugin_skills:
-                    LOG.info(f"{skill_id} plugin will be replaced by a local version: {skill_dir}")
-                    self._unload_plugin_skill(skill_id)
-
-                for old_skill_dir, skill_loader in self.skill_loaders.items():
-                    if old_skill_dir != skill_dir and \
-                            skill_loader.skill_id == skill_id:
-                        # A higher priority equivalent has been detected!
-                        replaced_skills.append(old_skill_dir)
-
-                for old_skill_dir in replaced_skills:
-                    # Unload the old skill
-                    self._unload_skill(old_skill_dir)
-
-                if skill_dir not in self.skill_loaders:
-                    self._load_skill(skill_dir)
-                    loaded_new = True
+        loaded_new = self.load_plugin_skills(network=network, internet=internet)
 
         if loaded_new:
-            LOG.info("Requesting padatious intent training")
+            LOG.debug("Requesting pipeline intent training")
             try:
                 response = self.bus.wait_for_response(Message("mycroft.skills.train"),
                                                       "mycroft.skills.trained",
                                                       timeout=60)  # 60 second timeout
                 if not response:
-                    LOG.error("Padatious training timed out")
+                    LOG.error("Intent training timed out")
                 elif response.data.get('error'):
-                    LOG.error(f"Padatious training failed: {response.data['error']}")
+                    LOG.error(f"Intent training failed: {response.data['error']}")
+                else:
+                    LOG.debug(f"pipelines trained and ready to go")
             except Exception as e:
-                LOG.exception(f"Error during padatious training: {e}")
-
-    def _get_skill_loader(self, skill_directory, init_bus=True):
-        """Get a skill loader instance.
-
-        Args:
-            skill_directory (str): Directory path of the skill.
-            init_bus (bool): Whether to initialize the internal skill bus.
-
-        Returns:
-            SkillLoader: Skill loader instance.
-        """
-        bus = None
-        if init_bus:
-            bus = self._get_internal_skill_bus()
-        return SkillLoader(bus, skill_directory)
-
-    def _load_skill(self, skill_directory):
-        """Load an old-style skill.
-
-        Args:
-            skill_directory (str): Directory path of the skill.
-
-        Returns:
-            SkillLoader: Loaded skill loader instance if successful, None otherwise.
-        """
-        LOG.warning(f"Found deprecated skill directory: {skill_directory}\n"
-                    f"please create a setup.py for this skill")
-        skill_id = basename(skill_directory)
-        if skill_id in self.blacklist:
-            if skill_id not in self._logged_skill_warnings:
-                self._logged_skill_warnings.append(skill_id)
-                LOG.warning(f"{skill_id} is blacklisted, it will NOT be loaded")
-                LOG.info(f"Consider deleting {skill_directory} instead of blacklisting it")
-            return None
-
-        skill_loader = self._get_skill_loader(skill_directory)
-        try:
-            load_status = skill_loader.load()
-        except Exception:
-            LOG.exception(f'Load of skill {skill_directory} failed!')
-            load_status = False
-        finally:
-            self.skill_loaders[skill_directory] = skill_loader
-        if load_status:
-            LOG.info(f"Loaded old style skill: {skill_directory}")
-        else:
-            LOG.error(f"Failed to load old style skill: {skill_directory}")
-        return skill_loader if load_status else None
-
-    def _unload_skill(self, skill_dir):
-        """Unload a skill.
-
-        Args:
-            skill_dir (str): Directory path of the skill.
-        """
-        if skill_dir in self.skill_loaders:
-            skill = self.skill_loaders[skill_dir]
-            LOG.info(f'Removing {skill.skill_id}')
-            try:
-                skill.unload()
-            except Exception:
-                LOG.exception('Failed to shutdown skill ' + skill.id)
-            del self.skill_loaders[skill_dir]
-
-    def _get_skill_directories(self):
-        """Get valid skill directories.
-
-        Returns:
-            list: List of valid skill directories.
-        """
-        skillmap = {}
-        valid_skill_roots = ["/opt/mycroft/skills"] + get_skill_directories()
-        for skills_dir in valid_skill_roots:
-            if not os.path.isdir(skills_dir):
-                continue
-            for skill_id in os.listdir(skills_dir):
-                skill = os.path.join(skills_dir, skill_id)
-                # NOTE: empty folders mean the skill should NOT be loaded
-                if os.path.isdir(skill):
-                    skillmap[skill_id] = skill
-
-        for skill_id, skill_dir in skillmap.items():
-            # TODO: all python packages must have __init__.py!  Better way?
-            # check if folder is a skill (must have __init__.py)
-            if SKILL_MAIN_MODULE in os.listdir(skill_dir):
-                if skill_dir in self.empty_skill_dirs:
-                    self.empty_skill_dirs.discard(skill_dir)
-            else:
-                if skill_dir not in self.empty_skill_dirs:
-                    self.empty_skill_dirs.add(skill_dir)
-                    LOG.debug('Found skills directory with no skill: ' +
-                              skill_dir)
-
-        return skillmap.values()
-
-    def _unload_removed_skills(self):
-        """Shutdown removed skills.
-
-        Finds and unloads skills that were removed from the disk.
-        """
-        skill_dirs = self._get_skill_directories()
-        # Find loaded skills that don't exist on disk
-        removed_skills = [
-            s for s in self.skill_loaders.keys() if s not in skill_dirs
-        ]
-        for skill_dir in removed_skills:
-            self._unload_skill(skill_dir)
-        return removed_skills
+                LOG.exception(f"Error during Intent training: {e}")
 
     def _unload_plugin_skill(self, skill_id):
         """Unload a plugin skill.
@@ -647,9 +490,13 @@ class SkillManager(Thread):
             skill_loader = self.plugin_skills[skill_id]
             if skill_loader.instance is not None:
                 try:
+                    skill_loader.instance.shutdown()
+                except Exception:
+                    LOG.exception('Failed to run skill specific shutdown code: ' + skill_loader.skill_id)
+                try:
                     skill_loader.instance.default_shutdown()
                 except Exception:
-                    LOG.exception('Failed to shutdown plugin skill: ' + skill_loader.skill_id)
+                    LOG.exception('Failed to shutdown skill: ' + skill_loader.skill_id)
             self.plugin_skills.pop(skill_id)
 
     def is_alive(self, message=None):
@@ -665,8 +512,7 @@ class SkillManager(Thread):
         try:
             message_data = {}
             # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
-            skills = {**self.skill_loaders, **self.plugin_skills}
-
+            skills = self.plugin_skills
             for skill_loader in skills.values():
                 message_data[skill_loader.skill_id] = {
                     "active": skill_loader.active and skill_loader.loaded,
@@ -680,10 +526,10 @@ class SkillManager(Thread):
         """Deactivate a skill."""
         try:
             # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
-            skills = {**self.skill_loaders, **self.plugin_skills}
+            skills = self.plugin_skills
             for skill_loader in skills.values():
                 if message.data['skill'] == skill_loader.skill_id:
-                    LOG.info("Deactivating skill: " + skill_loader.skill_id)
+                    LOG.info("Deactivating (unloading) skill: " + skill_loader.skill_id)
                     skill_loader.deactivate()
                     self.bus.emit(message.response())
         except Exception as err:
@@ -694,9 +540,9 @@ class SkillManager(Thread):
         """Deactivate all skills except the provided."""
         try:
             skill_to_keep = message.data['skill']
-            LOG.info(f'Deactivating all skills except {skill_to_keep}')
+            LOG.info(f'Deactivating (unloading) all skills except {skill_to_keep}')
             # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
-            skills = {**self.skill_loaders, **self.plugin_skills}
+            skills = self.plugin_skills
             for skill in skills.values():
                 if skill.skill_id != skill_to_keep:
                     skill.deactivate()
@@ -708,79 +554,48 @@ class SkillManager(Thread):
         """Activate a deactivated skill."""
         try:
             # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
-            skills = {**self.skill_loaders, **self.plugin_skills}
+            skills = self.plugin_skills
             for skill_loader in skills.values():
                 if (message.data['skill'] in ('all', skill_loader.skill_id)
                         and not skill_loader.active):
                     skill_loader.activate()
                     self.bus.emit(message.response())
         except Exception as err:
-            LOG.exception(f'Couldn\'t activate skill {message.data["skill"]}')
+            LOG.exception(f'Couldn\'t activate (load) skill {message.data["skill"]}')
             self.bus.emit(message.response({'error': f'failed: {err}'}))
 
     def stop(self):
+        """alias for shutdown (backwards compat)"""
+        return self.shutdown()
+
+    def shutdown(self):
         """Tell the manager to shutdown."""
         self.status.set_stopping()
         self._stop_event.set()
 
         # Do a clean shutdown of all skills
-        for skill_loader in self.skill_loaders.values():
-            if skill_loader.instance is not None:
-                _shutdown_skill(skill_loader.instance)
-
-        # Do a clean shutdown of all plugin skills
         for skill_id in list(self.plugin_skills.keys()):
-            self._unload_plugin_skill(skill_id)
-
+            try:
+                self._unload_plugin_skill(skill_id)
+            except Exception as e:
+                LOG.error(f"Failed to cleanly unload skill '{skill_id}' ({e})")
+        if self.intents:
+            try:
+                self.intents.shutdown()
+            except Exception as e:
+                LOG.error(f"Failed to cleanly unload intent service ({e})")
+        if self.osm:
+            try:
+                self.osm.shutdown()
+            except Exception as e:
+                LOG.error(f"Failed to cleanly unload skill installer ({e})")
+        if self.event_scheduler:
+            try:
+                self.event_scheduler.shutdown()
+            except Exception as e:
+                LOG.error(f"Failed to cleanly unload event scheduler ({e})")
         if self._settings_watchdog:
-            self._settings_watchdog.shutdown()
-
-    ############
-    # Deprecated stuff
-    @deprecated("priority skills have been deprecated for a long time", "1.0.0")
-    def load_priority(self):
-        warnings.warn(
-            "priority skills have been deprecated",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-    @deprecated("mycroft.ready event has moved to finished booting skill", "1.0.0")
-    def is_device_ready(self):
-        """Check if the device is ready by waiting for various services to start.
-
-        Returns:
-            bool: True if the device is ready, False otherwise.
-        Raises:
-            TimeoutError: If the device is not ready within a specified timeout.
-        """
-        warnings.warn(
-            "mycroft.ready event has moved to finished booting skill",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return True
-
-    @deprecated("mycroft.ready event has moved to finished booting skill", "1.0.0")
-    def handle_check_device_readiness(self, message):
-        warnings.warn(
-            "mycroft.ready event has moved to finished booting skill",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-    @deprecated("mycroft.ready event has moved to finished booting skill", "1.0.0")
-    def check_services_ready(self, services):
-        """Report if all specified services are ready.
-
-        Args:
-            services (iterable): Service names to check.
-        Returns:
-            bool: True if all specified services are ready, False otherwise.
-        """
-        warnings.warn(
-            "mycroft.ready event has moved to finished booting skill",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return True
+            try:
+                self._settings_watchdog.shutdown()
+            except Exception as e:
+                LOG.error(f"Failed to cleanly unload settings watchdog ({e})")

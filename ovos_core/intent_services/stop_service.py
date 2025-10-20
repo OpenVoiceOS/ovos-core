@@ -2,29 +2,43 @@ import os
 import re
 from os.path import dirname
 from threading import Event
-from typing import Optional, List
+from typing import Optional, Dict, List, Union
 
 from langcodes import closest_match
-
+from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import SessionManager
+from ovos_bus_client.session import SessionManager, UtteranceState
+
 from ovos_config.config import Configuration
-from ovos_plugin_manager.templates.pipeline import PipelineMatch, PipelinePlugin
+from ovos_plugin_manager.templates.pipeline import ConfidenceMatcherPipeline, IntentHandlerMatch
 from ovos_utils import flatten_list
+from ovos_utils.fakebus import FakeBus
 from ovos_utils.bracket_expansion import expand_template
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
 from ovos_utils.parse import match_one
 
 
-class StopService(PipelinePlugin):
+class StopService(ConfidenceMatcherPipeline):
     """Intent Service thats handles stopping skills."""
 
-    def __init__(self, bus):
-        self.bus = bus
+    def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
+                 config: Optional[Dict] = None):
+        config = config or Configuration().get("skills", {}).get("stop") or {}
+        super().__init__(config=config, bus=bus)
         self._voc_cache = {}
         self.load_resource_files()
-        super().__init__(config=Configuration().get("skills", {}).get("stop") or {})
+        self.bus.on("stop:global", self.handle_global_stop)
+        self.bus.on("stop:skill", self.handle_skill_stop)
+
+    def handle_global_stop(self, message: Message):
+        self.bus.emit(message.forward("mycroft.stop"))
+        # TODO - this needs a confirmation dialog if nothing was stopped
+        self.bus.emit(message.forward("ovos.utterance.handled"))
+
+    def handle_skill_stop(self, message: Message):
+        skill_id = message.data["skill_id"]
+        self.bus.emit(message.reply(f"{skill_id}.stop"))
 
     def load_resource_files(self):
         base = f"{dirname(__file__)}/locale"
@@ -52,17 +66,19 @@ class StopService(PipelinePlugin):
     def _collect_stop_skills(self, message: Message) -> List[str]:
         """
         Collect skills that can be stopped based on a ping-pong mechanism.
-        
+
         This method determines which active skills can handle a stop request by sending
         a stop ping to each active skill and waiting for their acknowledgment.
-        
+
+        Individual skills respond to this request via the `can_stop` method
+
         Parameters:
             message (Message): The original message triggering the stop request.
-        
+
         Returns:
             List[str]: A list of skill IDs that can be stopped. If no skills explicitly
                       indicate they can stop, returns all active skills.
-        
+
         Notes:
             - Excludes skills that are blacklisted in the current session
             - Uses a non-blocking event mechanism to collect skill responses
@@ -85,17 +101,17 @@ class StopService(PipelinePlugin):
         def handle_ack(msg):
             """
             Handle acknowledgment from skills during the stop process.
-            
+
             This method is a nested function used in skill stopping negotiation. It validates and tracks skill responses to a stop request.
-            
+
             Parameters:
                 msg (Message): Message containing skill acknowledgment details.
-            
+
             Side Effects:
                 - Modifies the `want_stop` list with skills that can handle stopping
                 - Updates the `skill_ids` list to track which skills have responded
                 - Sets the threading event when all active skills have responded
-            
+
             Notes:
                 - Checks if a skill can handle stopping based on multiple conditions
                 - Ensures all active skills provide a response before proceeding
@@ -129,77 +145,51 @@ class StopService(PipelinePlugin):
         self.bus.remove("skill.stop.pong", handle_ack)
         return want_stop or active_skills
 
-    def stop_skill(self, skill_id: str, message: Message) -> bool:
-        """
-        Stop a skill's ongoing activities and manage its session state.
-        
-        Sends a stop command to a specific skill and handles its response, ensuring
-        that any active interactions or processes are terminated. The method checks
-        for errors, verifies the skill's stopped status, and emits additional signals
-        to forcibly abort ongoing actions like conversations, questions, or speech.
-        
-        Args:
-            skill_id (str): Unique identifier of the skill to be stopped.
-            message (Message): The original message context containing interaction details.
-        
-        Returns:
-            bool: True if the skill was successfully stopped, False otherwise.
-        
-        Raises:
-            Logs error if skill stop request encounters an issue.
-        
-        Notes:
-            - Emits multiple bus messages to ensure complete skill termination
-            - Checks and handles different skill interaction states
-            - Supports force-stopping of conversations, questions, and speech
-        """
-        stop_msg = message.reply(f"{skill_id}.stop")
-        result = self.bus.wait_for_response(stop_msg, f"{skill_id}.stop.response")
-        if result and 'error' in result.data:
-            error_msg = result.data['error']
+    def handle_stop_confirmation(self, message: Message):
+        skill_id = (message.data.get("skill_id") or
+                    message.context.get("skill_id") or
+                    message.msg_type.split(".stop.response")[0])
+        if 'error' in message.data:
+            error_msg = message.data['error']
             LOG.error(f"{skill_id}: {error_msg}")
-            return False
-        elif result is not None:
-            stopped = result.data.get('result', False)
-        else:
-            stopped = False
-
-        if stopped:
+        elif message.data.get('result', False):
             sess = SessionManager.get(message)
-            state = sess.utterance_states.get(skill_id, "intent")
-            LOG.debug(f"skill response status: {state}")
-            if state == "response":  # TODO this is never happening and it should...
-                LOG.debug(f"stopping {skill_id} in middle of get_response!")
+            utt_state = sess.utterance_states.get(skill_id, UtteranceState.INTENT)
+            if utt_state == UtteranceState.RESPONSE:
+                LOG.debug("Forcing get_response timeout")
+                # force-kill any ongoing get_response - see @killable_event decorator (ovos-workshop)
+                self.bus.emit(message.reply("mycroft.skills.abort_question", {"skill_id": skill_id}))
+            if sess.is_active(skill_id):
+                LOG.debug("Forcing converse timeout")
+                # force-kill any ongoing converse - see @killable_event decorator (ovos-workshop)
+                self.bus.emit(message.reply("ovos.skills.converse.force_timeout", {"skill_id": skill_id}))
 
-            # force-kill any ongoing get_response/converse/TTS - see @killable_event decorator
-            self.bus.emit(message.forward("mycroft.skills.abort_question", {"skill_id": skill_id}))
-            self.bus.emit(message.forward("ovos.skills.converse.force_timeout", {"skill_id": skill_id}))
-            # TODO - track if speech is coming from this skill! not currently tracked
-            self.bus.emit(message.reply("mycroft.audio.speech.stop",{"skill_id": skill_id}))
+            # TODO - track if speech is coming from this skill! not currently tracked (ovos-audio)
+            if sess.is_speaking:
+                # force-kill any ongoing TTS
+                self.bus.emit(message.forward("mycroft.audio.speech.stop", {"skill_id": skill_id}))
 
-        return stopped
-
-    def match_stop_high(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
+    def match_high(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """
         Handles high-confidence stop requests by matching exact stop vocabulary and managing skill stopping.
-        
+
         Attempts to stop skills when an exact "stop" or "global_stop" command is detected. Performs the following actions:
         - Identifies the closest language match for vocabulary
         - Checks for global stop command when no active skills exist
         - Emits a global stop message if applicable
         - Attempts to stop individual skills if a stop command is detected
         - Disables response mode for stopped skills
-        
+
         Parameters:
             utterances (List[str]): List of user utterances to match against stop vocabulary
             lang (str): Four-letter ISO language code for language-specific matching
             message (Message): Message context for generating appropriate responses
-        
+
         Returns:
             Optional[PipelineMatch]: Match result indicating whether stop was handled, with optional skill and session information
             - Returns None if no stop action could be performed
             - Returns PipelineMatch with handled=True for successful global or skill-specific stop
-        
+
         Raises:
             No explicit exceptions raised, but may log debug/info messages during processing
         """
@@ -221,43 +211,47 @@ class StopService(PipelinePlugin):
         if is_global_stop:
             LOG.info(f"Emitting global stop, {len(self.get_active_skills(message))} active skills")
             # emit a global stop, full stop anything OVOS is doing
-            self.bus.emit(message.reply("mycroft.stop", {}))
-            return PipelineMatch(handled=True,
-                                 match_data={"conf": conf},
-                                 skill_id=None,
-                                 utterance=utterance)
+            return IntentHandlerMatch(
+                match_type="stop:global",
+                match_data={"conf": conf},
+                updated_session=sess,
+                utterance=utterance,
+                skill_id="stop.openvoiceos"
+            )
 
         if is_stop:
             # check if any skill can stop
             for skill_id in self._collect_stop_skills(message):
-                LOG.debug(f"Checking if skill wants to stop: {skill_id}")
-                if self.stop_skill(skill_id, message):
-                    LOG.info(f"Skill stopped: {skill_id}")
-                    sess.disable_response_mode(skill_id)
-                    return PipelineMatch(handled=True,
-                                         match_data={"conf": conf},
-                                         skill_id=skill_id,
-                                         utterance=utterance,
-                                         updated_session=sess)
+                LOG.debug(f"Telling skill to stop: {skill_id}")
+                sess.disable_response_mode(skill_id)
+                self.bus.once(f"{skill_id}.stop.response", self.handle_stop_confirmation)
+                return IntentHandlerMatch(
+                    match_type="stop:skill",
+                    match_data={"conf": conf, "skill_id": skill_id},
+                    updated_session=sess,
+                    utterance=utterance,
+                    skill_id="stop.openvoiceos"
+                )
+
         return None
 
-    def match_stop_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
+    def match_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """
         Handle stop intent with additional context beyond simple stop commands.
-        
+
         This method processes utterances that contain "stop" or global stop vocabulary but may include
         additional words not explicitly defined in intent files. It performs a medium-confidence
         intent matching for stop requests.
-        
+
         Parameters:
             utterances (List[str]): List of input utterances to analyze
             lang (str): Four-letter ISO language code for localization
             message (Message): Message context for generating appropriate responses
-        
+
         Returns:
             Optional[PipelineMatch]: A pipeline match if the stop intent is successfully processed,
             otherwise None if no stop intent is detected
-        
+
         Notes:
             - Attempts to match stop vocabulary with fuzzy matching
             - Falls back to low-confidence matching if medium-confidence match is inconclusive
@@ -277,34 +271,22 @@ class StopService(PipelinePlugin):
             if not is_global_stop:
                 return None
 
-        return self.match_stop_low(utterances, lang, message)
+        return self.match_low(utterances, lang, message)
 
-    def _get_closest_lang(self, lang: str) -> Optional[str]:
-        if self._voc_cache:
-            lang = standardize_lang_tag(lang)
-            closest, score = closest_match(lang, list(self._voc_cache.keys()))
-            # https://langcodes-hickford.readthedocs.io/en/sphinx/index.html#distance-values
-            # 0 -> These codes represent the same language, possibly after filling in values and normalizing.
-            # 1- 3 -> These codes indicate a minor regional difference.
-            # 4 - 10 -> These codes indicate a significant but unproblematic regional difference.
-            if score < 10:
-                return closest
-        return None
-
-    def match_stop_low(self, utterances: List[str], lang: str, message: Message) -> Optional[PipelineMatch]:
+    def match_low(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """
         Perform a low-confidence fuzzy match for stop intent before fallback processing.
-        
+
         This method attempts to match stop-related vocabulary with low confidence and handle stopping of active skills.
-        
+
         Parameters:
             utterances (List[str]): List of input utterances to match against stop vocabulary
             lang (str): Four-letter ISO language code for vocabulary matching
             message (Message): Message context used for generating replies and managing session
-        
+
         Returns:
             Optional[PipelineMatch]: A pipeline match object if a stop action is handled, otherwise None
-        
+
         Notes:
             - Increases confidence if active skills are present
             - Attempts to stop individual skills before emitting a global stop signal
@@ -328,23 +310,38 @@ class StopService(PipelinePlugin):
 
         # check if any skill can stop
         for skill_id in self._collect_stop_skills(message):
-            LOG.debug(f"Checking if skill wants to stop: {skill_id}")
-            if self.stop_skill(skill_id, message):
-                sess.disable_response_mode(skill_id)
-                return PipelineMatch(handled=True,
-                                     match_data={"conf": conf},
-                                     skill_id=skill_id,
-                                     utterance=utterance,
-                                     updated_session=sess)
+            LOG.debug(f"Telling skill to stop: {skill_id}")
+            sess.disable_response_mode(skill_id)
+            self.bus.once(f"{skill_id}.stop.response", self.handle_stop_confirmation)
+            return IntentHandlerMatch(
+                match_type="stop:skill",
+                match_data={"conf": conf, "skill_id": skill_id},
+                updated_session=sess,
+                utterance=utterance,
+                skill_id="stop.openvoiceos"
+            )
 
         # emit a global stop, full stop anything OVOS is doing
         LOG.debug(f"Emitting global stop signal, {len(self.get_active_skills(message))} active skills")
-        self.bus.emit(message.reply("mycroft.stop", {}))
-        return PipelineMatch(handled=True,
-                             # emit instead of intent message {"conf": conf},
-                             match_data={"conf": conf},
-                             skill_id=None,
-                             utterance=utterance)
+        return IntentHandlerMatch(
+            match_type="stop:global",
+            match_data={"conf": conf},
+            updated_session=sess,
+            utterance=utterance,
+            skill_id="stop.openvoiceos"
+        )
+
+    def _get_closest_lang(self, lang: str) -> Optional[str]:
+        if self._voc_cache:
+            lang = standardize_lang_tag(lang)
+            closest, score = closest_match(lang, list(self._voc_cache.keys()))
+            # https://langcodes-hickford.readthedocs.io/en/sphinx/index.html#distance-values
+            # 0 -> These codes represent the same language, possibly after filling in values and normalizing.
+            # 1- 3 -> These codes indicate a minor regional difference.
+            # 4 - 10 -> These codes indicate a significant but unproblematic regional difference.
+            if score < 10:
+                return closest
+        return None
 
     def voc_match(self, utt: str, voc_filename: str, lang: str,
                   exact: bool = False):
@@ -389,3 +386,7 @@ class StopService(PipelinePlugin):
                 return any([re.match(r'.*\b' + i + r'\b.*', utt, re.IGNORECASE)
                             for i in _vocs])
         return False
+
+    def shutdown(self):
+        self.bus.remove("stop:global", self.handle_global_stop)
+        self.bus.remove("stop:skill", self.handle_skill_stop)
