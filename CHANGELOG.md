@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.6a1) (2025-10-20)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.5a2...2.0.6a1)
+
+**Closed issues:**
+
+- Fixed a bug where file encoding was not specified. [\#721](https://github.com/OpenVoiceOS/ovos-core/issues/721)
+
+**Merged pull requests:**
+
+- fix\(setup\): set utf-8 encoding when opening files [\#728](https://github.com/OpenVoiceOS/ovos-core/pull/728) ([mikejgray](https://github.com/mikejgray))
+
 ## [2.0.5a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.5a2) (2025-10-08)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.5a1...2.0.5a2)
