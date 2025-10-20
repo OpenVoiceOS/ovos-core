@@ -355,6 +355,8 @@ class SkillManager(Thread):
         skill_loader = self._get_plugin_skill_loader(skill_id, skill_class=skill_plugin)
         try:
             load_status = skill_loader.load(skill_plugin)
+            if load_status:
+                self.bus.emit(Message("mycroft.skill.loaded", {"skill_id": skill_id}))
         except Exception:
             LOG.exception(f'Load of skill {skill_id} failed!')
             load_status = False
