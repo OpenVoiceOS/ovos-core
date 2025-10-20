@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.0a1) (2025-10-20)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.6a1...2.1.0a1)
+
+**Merged pull requests:**
+
+- feat: send bus message on skill load [\#727](https://github.com/OpenVoiceOS/ovos-core/pull/727) ([mikejgray](https://github.com/mikejgray))
+
 ## [2.0.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.6a1) (2025-10-20)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.5a2...2.0.6a1)
