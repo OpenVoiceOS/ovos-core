@@ -64,7 +64,7 @@ PLUGIN_ENTRY_POINT = [
 
 
 setup(
-    name='ovos-core',
+    name='ovos_core',
     version=get_version(),
     license='Apache-2.0',
     url='https://github.com/OpenVoiceOS/ovos-core',
