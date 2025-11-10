@@ -1,12 +1,12 @@
 # Changelog
 
-## [2.1.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.1a1) (2025-11-05)
+## [2.1.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.2a1) (2025-11-10)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.0...2.1.1a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.1...2.1.2a1)
 
 **Merged pull requests:**
 
-- Update ovos-plugin-manager version range [\#734](https://github.com/OpenVoiceOS/ovos-core/pull/734) ([JarbasAl](https://github.com/JarbasAl))
+- Update ovos-workshop requirement from \<8.0.0,\>=7.0.6 to \>=7.0.6,\<9.0.0 in /requirements [\#736](https://github.com/OpenVoiceOS/ovos-core/pull/736) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 
 
