@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.3a1) (2026-03-04)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.2a2...2.1.3a1)
+
+**Merged pull requests:**
+
+- fix: skill dependencies [\#742](https://github.com/OpenVoiceOS/ovos-core/pull/742) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.1.2a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.2a2) (2026-01-19)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.2a1...2.1.2a2)
