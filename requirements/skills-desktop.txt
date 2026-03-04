@@ -1,4 +1,5 @@
 # skills that require a linux desktop environment
-ovos-skill-application-launcher>=0.5.14,<1.0.0
-ovos-skill-wallpapers>=1.0.2,<3.0.0
-ovos-skill-screenshot>=0.0.2,<1.0.0
+# NOTE: we do not set upper range on purpose, it is up to release channel being used to do that
+ovos-skill-application-launcher>=0.5.14
+ovos-skill-wallpapers>=1.0.2
+ovos-skill-screenshot>=0.0.2

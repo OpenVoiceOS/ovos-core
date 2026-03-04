@@ -1,10 +1,11 @@
 # skills providing non essential functionality
-ovos-skill-wordnet>=0.2.5,<1.0.0
-ovos-skill-laugh>=0.1.1,<1.0.0
-ovos-skill-number-facts>=0.1.12,<1.0.0
-ovos-skill-iss-location>=0.2.16,<1.0.0
-ovos-skill-cmd>=0.2.11,<1.0.0
-ovos-skill-moviemaster>=0.0.12,<1.0.0
-ovos-skill-confucius-quotes>=0.1.13,<1.0.0
-ovos-skill-icanhazdadjokes>=0.3.7,<1.0.0
+# NOTE: we do not set upper range on purpose, it is up to release channel being used to do that
+ovos-skill-wordnet>=0.2.5
+ovos-skill-laugh>=0.1.1
+ovos-skill-number-facts>=0.1.12
+ovos-skill-iss-location>=0.2.16
+ovos-skill-cmd>=0.2.11
+ovos-skill-moviemaster>=0.0.12
+ovos-skill-confucius-quotes>=0.1.13
+ovos-skill-icanhazdadjokes>=0.3.7
 ovos-skill-camera
