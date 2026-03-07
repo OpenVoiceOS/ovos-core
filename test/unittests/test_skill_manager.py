@@ -16,6 +16,7 @@ import tempfile
 from copy import deepcopy
 from pathlib import Path
 from shutil import rmtree
+from threading import Event, Thread
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
@@ -215,6 +216,84 @@ class TestSkillManager(TestCase):
         # Verify return value
         self.assertEqual(result, mock_loader)
 
+    @patch('ovos_core.skill_manager.find_skill_plugins')
+    def test_load_plugin_skills_skips_skill_already_loading(self, mock_find_skill_plugins):
+        """Test plugin discovery skips a skill that is already being loaded."""
+        skill_id = 'test.loading.skill'
+        mock_find_skill_plugins.return_value = {skill_id: Mock()}
+        self.skill_manager.plugin_skills = {}
+        self.skill_manager._loading_plugin_skills.add(skill_id)
+        self.skill_manager._get_plugin_skill_loader = Mock()
+        self.skill_manager._load_plugin_skill = Mock()
+
+        loaded_new = self.skill_manager.load_plugin_skills(network=True, internet=True)
+
+        self.assertFalse(loaded_new)
+        self.skill_manager._get_plugin_skill_loader.assert_not_called()
+        self.skill_manager._load_plugin_skill.assert_not_called()
+
+    def test_load_plugin_skill_tracks_loading_state(self):
+        """Test a skill is marked loading before PluginSkillLoader.load runs."""
+        skill_id = 'test.tracked.skill'
+        mock_plugin = Mock()
+        mock_loader = Mock(spec=SkillLoader)
+        mock_loader.skill_id = skill_id
+
+        def load_side_effect(plugin):
+            self.assertEqual(plugin, mock_plugin)
+            self.assertIn(skill_id, self.skill_manager._loading_plugin_skills)
+            return True
+
+        mock_loader.load.side_effect = load_side_effect
+        self.skill_manager._get_plugin_skill_loader = Mock(return_value=mock_loader)
+        self.skill_manager.plugin_skills = {}
+
+        result = self.skill_manager._load_plugin_skill(skill_id, mock_plugin)
+
+        self.assertEqual(result, mock_loader)
+        self.assertNotIn(skill_id, self.skill_manager._loading_plugin_skills)
+        self.assertEqual(mock_loader, self.skill_manager.plugin_skills[skill_id])
+
+    def test_load_plugin_skill_skips_concurrent_duplicate_attempt(self):
+        """Test concurrent loads for the same skill only execute once."""
+        skill_id = 'test.concurrent.skill'
+        mock_plugin = Mock()
+        mock_loader = Mock(spec=SkillLoader)
+        mock_loader.skill_id = skill_id
+        load_started = Event()
+        allow_finish = Event()
+        results = {}
+
+        def load_side_effect(plugin):
+            self.assertEqual(plugin, mock_plugin)
+            load_started.set()
+            self.assertTrue(allow_finish.wait(2))
+            return True
+
+        mock_loader.load.side_effect = load_side_effect
+        self.skill_manager._get_plugin_skill_loader = Mock(return_value=mock_loader)
+        self.skill_manager.plugin_skills = {}
+
+        def first_load():
+            results['first'] = self.skill_manager._load_plugin_skill(skill_id, mock_plugin)
+
+        thread = Thread(target=first_load)
+        thread.start()
+        self.assertTrue(load_started.wait(1))
+
+        results['second'] = self.skill_manager._load_plugin_skill(skill_id, mock_plugin)
+
+        allow_finish.set()
+        thread.join(timeout=2)
+
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(results['first'], mock_loader)
+        self.assertIsNone(results['second'])
+        self.assertEqual(1, self.skill_manager._get_plugin_skill_loader.call_count)
+        mock_loader.load.assert_called_once_with(mock_plugin)
+        self.assertNotIn(skill_id, self.skill_manager._loading_plugin_skills)
+        self.assertEqual(mock_loader, self.skill_manager.plugin_skills[skill_id])
+
     def test_load_plugin_skill_failure(self):
         """Test failed plugin skill loading is handled gracefully."""
         skill_id = 'test.failing.skill'
@@ -245,6 +324,7 @@ class TestSkillManager(TestCase):
         # Verify skill was still added to plugin_skills (even on failure)
         self.assertIn(skill_id, self.skill_manager.plugin_skills)
         self.assertEqual(mock_loader, self.skill_manager.plugin_skills[skill_id])
+        self.assertNotIn(skill_id, self.skill_manager._loading_plugin_skills)
 
         # Verify return value is None on failure
         self.assertIsNone(result)
@@ -274,6 +354,7 @@ class TestSkillManager(TestCase):
 
         # Verify skill was added to plugin_skills
         self.assertIn(skill_id, self.skill_manager.plugin_skills)
+        self.assertNotIn(skill_id, self.skill_manager._loading_plugin_skills)
 
         # Verify return value is None when load returns False
         self.assertIsNone(result)
