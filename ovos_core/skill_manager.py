@@ -176,6 +176,7 @@ class SkillManager(Thread):
             LOG.debug(f"Failed to query GUI status: {e}")
             return False
         if response and response.data.get("connected"):
+            self._allow_state_reloads = not response.data.get("permanent", False)
             self._gui_event.set()
             return True
         return False

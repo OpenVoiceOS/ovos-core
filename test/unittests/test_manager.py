@@ -89,7 +89,8 @@ class TestSkillManager(unittest.TestCase):
     def test_sync_skill_loading_state_no_phal_plugin(self, mock_is_connected):
         self.bus.wait_for_response.side_effect = [
             None,
-            Message("gui.status.request.response", data={"connected": True})
+            Message("gui.status.request.response",
+                    data={"connected": True, "permanent": True})
         ]
 
         self.skill_manager._gui_event.clear()
@@ -98,7 +99,22 @@ class TestSkillManager(unittest.TestCase):
 
         self.skill_manager._sync_skill_loading_state()
 
+        self.assertEqual(
+            [
+                unittest.mock.call(
+                    Message("ovos.PHAL.internet_check"),
+                    timeout=self.skill_manager._status_query_timeout
+                ),
+                unittest.mock.call(
+                    Message("gui.status.request"),
+                    "gui.status.request.response",
+                    timeout=self.skill_manager._status_query_timeout
+                )
+            ],
+            self.bus.wait_for_response.call_args_list
+        )
         self.assertTrue(self.skill_manager._gui_event.is_set())
+        self.assertFalse(self.skill_manager._allow_state_reloads)
         self.assertTrue(self.bus.emit.called)
         self.assertEqual(self.bus.emit.call_args[0][0].msg_type, 'mycroft.internet.connected')
         self.assertEqual(2, self.bus.wait_for_response.call_count)
@@ -115,6 +131,20 @@ class TestSkillManager(unittest.TestCase):
 
         self.skill_manager._sync_skill_loading_state()
 
+        self.assertEqual(
+            [
+                unittest.mock.call(
+                    Message("ovos.PHAL.internet_check"),
+                    timeout=self.skill_manager._status_query_timeout
+                ),
+                unittest.mock.call(
+                    Message("gui.status.request"),
+                    "gui.status.request.response",
+                    timeout=self.skill_manager._status_query_timeout
+                )
+            ],
+            self.bus.wait_for_response.call_args_list
+        )
         self.assertFalse(self.skill_manager._gui_event.is_set())
         self.assertTrue(self.bus.emit.called)
         self.assertEqual(self.bus.emit.call_args[0][0].msg_type, 'mycroft.internet.connected')
@@ -133,6 +163,20 @@ class TestSkillManager(unittest.TestCase):
 
         self.skill_manager._sync_skill_loading_state()
 
+        self.assertEqual(
+            [
+                unittest.mock.call(
+                    Message("ovos.PHAL.internet_check"),
+                    timeout=self.skill_manager._status_query_timeout
+                ),
+                unittest.mock.call(
+                    Message("gui.status.request"),
+                    "gui.status.request.response",
+                    timeout=self.skill_manager._status_query_timeout
+                )
+            ],
+            self.bus.wait_for_response.call_args_list
+        )
         self.assertTrue(self.skill_manager._gui_event.is_set())
         self.assertTrue(self.bus.emit.called)
         self.assertEqual(self.bus.emit.call_args[0][0].msg_type, 'mycroft.network.connected')
