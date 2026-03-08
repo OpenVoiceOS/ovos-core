@@ -24,7 +24,6 @@ from ovos_bus_client.util.scheduler import EventScheduler
 from ovos_config.config import Configuration
 from ovos_config.locations import get_xdg_config_save_path
 from ovos_utils.file_utils import FileWatcher
-from ovos_utils.gui import is_gui_connected
 from ovos_utils.log import LOG
 from ovos_utils.network_utils import is_connected_http
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap, ProcessState
@@ -58,6 +57,7 @@ def on_stopping():
 
 class SkillManager(Thread):
     """Manages the loading, activation, and deactivation of Mycroft skills."""
+    STATUS_QUERY_TIMEOUT = 0.5
 
     def __init__(self, bus, watchdog=None, alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
                  error_hook=on_error, stopping_hook=on_stopping,
@@ -107,6 +107,7 @@ class SkillManager(Thread):
                 " otherwise you probably want to install skills first!")
 
         self.config = Configuration()
+        self._status_query_timeout = self.STATUS_QUERY_TIMEOUT
 
         self.plugin_skills = {}
         self.enclosure = EnclosureAPI(bus)
@@ -160,13 +161,38 @@ class SkillManager(Thread):
             self.bus.emit(Message("ovos.skills.settings_changed",
                                   {"skill_id": skill_id}))
 
+    def _sync_gui_state(self):
+        """Refresh cached GUI availability without blocking skill scans."""
+        if self._gui_event.is_set():
+            return True
+
+        try:
+            response = self.bus.wait_for_response(
+                Message("gui.status.request"),
+                "gui.status.request.response",
+                timeout=self._status_query_timeout
+            )
+        except Exception as e:
+            LOG.debug(f"Failed to query GUI status: {e}")
+            return False
+        if response and response.data.get("connected"):
+            self._gui_event.set()
+            return True
+        return False
+
     def _sync_skill_loading_state(self):
         """Synchronize the loading state of skills with the current system state."""
-        resp = self.bus.wait_for_response(Message("ovos.PHAL.internet_check"))
+        try:
+            resp = self.bus.wait_for_response(
+                Message("ovos.PHAL.internet_check"),
+                timeout=self._status_query_timeout
+            )
+        except Exception as e:
+            LOG.debug(f"PHAL internet check failed: {e}")
+            resp = None
         network = False
         internet = False
-        if not self._gui_event.is_set() and is_gui_connected(self.bus):
-            self._gui_event.set()
+        self._sync_gui_state()
 
         if resp:
             if resp.data.get('internet_connected'):
@@ -287,9 +313,10 @@ class SkillManager(Thread):
             network = self._network_event.is_set()
         if internet is None:
             internet = self._connected_event.is_set()
+        blacklist = set(self.blacklist)
         plugins = find_skill_plugins()
         for skill_id, plug in plugins.items():
-            if skill_id in self.blacklist:
+            if skill_id in blacklist:
                 if skill_id not in self._logged_skill_warnings:
                     self._logged_skill_warnings.append(skill_id)
                     LOG.warning(f"{skill_id} is blacklisted, it will NOT be loaded")
@@ -460,7 +487,7 @@ class SkillManager(Thread):
         if internet is None:
             internet = self._connected_event.is_set()
         if gui is None:
-            gui = self._gui_event.is_set() or is_gui_connected(self.bus)
+            gui = self._gui_event.is_set()
 
         loaded_new = self.load_plugin_skills(network=network, internet=internet)
 

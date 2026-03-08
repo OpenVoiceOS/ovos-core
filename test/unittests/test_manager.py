@@ -31,8 +31,7 @@ class TestSkillManager(unittest.TestCase):
         self.assertTrue(self.skill_manager._load_plugin_skill.called)
         mock_find_skill_plugins.assert_called_once()
 
-    @patch('ovos_core.skill_manager.is_gui_connected', return_value=True)
-    def test_handle_gui_connected(self, mock_is_gui_connected):
+    def test_handle_gui_connected(self):
         self.skill_manager._allow_state_reloads = True
         self.skill_manager._gui_event.clear()
         self.skill_manager._load_new_skills = MagicMock()
@@ -40,8 +39,7 @@ class TestSkillManager(unittest.TestCase):
         self.assertTrue(self.skill_manager._gui_event.is_set())
         self.assertTrue(self.skill_manager._load_new_skills.called)
 
-    @patch('ovos_core.skill_manager.is_gui_connected', return_value=False)
-    def test_handle_gui_disconnected(self, mock_is_gui_connected):
+    def test_handle_gui_disconnected(self):
         self.skill_manager._allow_state_reloads = True
         self.skill_manager._gui_event.set()
         self.skill_manager._unload_on_gui_disconnect = MagicMock()
@@ -87,10 +85,12 @@ class TestSkillManager(unittest.TestCase):
         self.assertFalse(self.skill_manager._network_event.is_set())
         self.assertTrue(self.skill_manager._unload_on_network_disconnect.called)
 
-    @patch('ovos_core.skill_manager.is_gui_connected', return_value=True)
     @patch('ovos_core.skill_manager.is_connected_http', return_value=True)
-    def test_sync_skill_loading_state_no_phal_plugin(self, mock_is_connected, mock_is_gui_connected):
-        self.bus.wait_for_response.return_value = None
+    def test_sync_skill_loading_state_no_phal_plugin(self, mock_is_connected):
+        self.bus.wait_for_response.side_effect = [
+            None,
+            Message("gui.status.request.response", data={"connected": True})
+        ]
 
         self.skill_manager._gui_event.clear()
         self.skill_manager._connected_event.clear()
@@ -101,10 +101,13 @@ class TestSkillManager(unittest.TestCase):
         self.assertTrue(self.skill_manager._gui_event.is_set())
         self.assertTrue(self.bus.emit.called)
         self.assertEqual(self.bus.emit.call_args[0][0].msg_type, 'mycroft.internet.connected')
+        self.assertEqual(2, self.bus.wait_for_response.call_count)
 
-    @patch('ovos_core.skill_manager.is_gui_connected', return_value=False)
-    def test_sync_skill_loading_state_phal_plugin_no_gui(self, mock_is_gui_connected):
-        self.bus.wait_for_response.return_value = Message("ovos.PHAL.internet_check", data={"internet_connected": True})
+    def test_sync_skill_loading_state_phal_plugin_no_gui(self):
+        self.bus.wait_for_response.side_effect = [
+            Message("ovos.PHAL.internet_check", data={"internet_connected": True}),
+            None
+        ]
 
         self.skill_manager._gui_event.clear()
         self.skill_manager._connected_event.clear()
@@ -116,11 +119,13 @@ class TestSkillManager(unittest.TestCase):
         self.assertTrue(self.bus.emit.called)
         self.assertEqual(self.bus.emit.call_args[0][0].msg_type, 'mycroft.internet.connected')
 
-    @patch('ovos_core.skill_manager.is_gui_connected', return_value=True)
-    def test_sync_skill_loading_state_gui_no_internet_but_network(self, mock_is_gui_connected):
-        self.bus.wait_for_response.return_value = Message("ovos.PHAL.internet_check",
-                                                          data={"internet_connected": False,
-                                                                "network_connected": True})
+    def test_sync_skill_loading_state_gui_no_internet_but_network(self):
+        self.bus.wait_for_response.side_effect = [
+            Message("ovos.PHAL.internet_check",
+                    data={"internet_connected": False,
+                          "network_connected": True}),
+            Message("gui.status.request.response", data={"connected": True})
+        ]
 
         self.skill_manager._gui_event.clear()
         self.skill_manager._connected_event.clear()
@@ -131,6 +136,14 @@ class TestSkillManager(unittest.TestCase):
         self.assertTrue(self.skill_manager._gui_event.is_set())
         self.assertTrue(self.bus.emit.called)
         self.assertEqual(self.bus.emit.call_args[0][0].msg_type, 'mycroft.network.connected')
+
+    def test_load_new_skills_does_not_query_gui_status(self):
+        self.skill_manager.load_plugin_skills = MagicMock(return_value=False)
+        self.bus.wait_for_response.reset_mock()
+
+        self.skill_manager._load_new_skills(network=False, internet=False)
+
+        self.bus.wait_for_response.assert_not_called()
 
     @patch('ovos_core.skill_manager.MessageBusClient', autospec=True)
     def test_get_internal_skill_bus_shared_connection(self, mock_MessageBusClient):
