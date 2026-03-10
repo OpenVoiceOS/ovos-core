@@ -33,3 +33,5 @@ def check_version(version_string):
     """
     version_tuple = tuple(map(int, version_string.split('.')))
     return OVOS_VERSION_TUPLE >= version_tuple
+
+__version__ = f"{VERSION_MAJOR}.{VERSION_MINOR}.{VERSION_BUILD}" + (f"a{VERSION_ALPHA}" if VERSION_ALPHA else "")

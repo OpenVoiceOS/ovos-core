@@ -16,6 +16,7 @@
 import os
 import threading
 from threading import Thread, Event
+from typing import Callable, List, Optional
 
 from ovos_bus_client.apis.enclosure import EnclosureAPI
 from ovos_bus_client.client import MessageBusClient
@@ -36,36 +37,41 @@ from ovos_workshop.skills.api import SkillApi
 from ovos_plugin_manager.skills import find_skill_plugins
 
 
-def on_started():
+def on_started() -> None:
     LOG.info('Skills Manager is starting up.')
 
 
-def on_alive():
+def on_alive() -> None:
     LOG.info('Skills Manager is alive.')
 
 
-def on_ready():
+def on_ready() -> None:
     LOG.info('Skills Manager is ready.')
 
 
-def on_error(e='Unknown'):
+def on_error(e: str = 'Unknown') -> None:
     LOG.info(f'Skills Manager failed to launch ({e})')
 
 
-def on_stopping():
+def on_stopping() -> None:
     LOG.info('Skills Manager is shutting down...')
 
 
 class SkillManager(Thread):
     """Manages the loading, activation, and deactivation of Mycroft skills."""
 
-    def __init__(self, bus, watchdog=None, alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
-                 error_hook=on_error, stopping_hook=on_stopping,
-                 enable_installer=False,
-                 enable_intent_service=False,
-                 enable_event_scheduler=False,
-                 enable_file_watcher=True,
-                 enable_skill_api=False):
+    def __init__(self, bus: MessageBusClient,
+                 watchdog: Optional[Callable[[], None]] = None,
+                 alive_hook: Callable[[], None] = on_alive,
+                 started_hook: Callable[[], None] = on_started,
+                 ready_hook: Callable[[], None] = on_ready,
+                 error_hook: Callable[..., None] = on_error,
+                 stopping_hook: Callable[[], None] = on_stopping,
+                 enable_installer: bool = False,
+                 enable_intent_service: bool = False,
+                 enable_event_scheduler: bool = False,
+                 enable_file_watcher: bool = True,
+                 enable_skill_api: bool = False) -> None:
         """Constructor
 
         Args:
@@ -109,8 +115,6 @@ class SkillManager(Thread):
         self.config = Configuration()
 
         self.plugin_skills = {}
-        self._plugin_skills_lock = threading.RLock()
-        self._loading_plugin_skills = set()
         self.enclosure = EnclosureAPI(bus)
         self.num_install_retries = 0
         self.empty_skill_dirs = set()  # Save a record of empty skill dirs.
@@ -133,7 +137,7 @@ class SkillManager(Thread):
             self._init_filewatcher()
 
     @property
-    def blacklist(self):
+    def blacklist(self) -> List[str]:
         """Get the list of blacklisted skills from the configuration.
 
         Returns:
@@ -141,7 +145,7 @@ class SkillManager(Thread):
         """
         return Configuration().get("skills", {}).get("blacklisted_skills", [])
 
-    def _init_filewatcher(self):
+    def _init_filewatcher(self) -> None:
         """Initialize the file watcher to monitor skill settings files for changes."""
         sspath = f"{get_xdg_config_save_path()}/skills/"
         os.makedirs(sspath, exist_ok=True)
@@ -150,7 +154,7 @@ class SkillManager(Thread):
                                               recursive=True,
                                               ignore_creation=True)
 
-    def _handle_settings_file_change(self, path: str):
+    def _handle_settings_file_change(self, path: str) -> None:
         """Handle changes to skill settings files.
 
         Args:
@@ -162,7 +166,7 @@ class SkillManager(Thread):
             self.bus.emit(Message("ovos.skills.settings_changed",
                                   {"skill_id": skill_id}))
 
-    def _sync_skill_loading_state(self):
+    def _sync_skill_loading_state(self) -> None:
         """Synchronize the loading state of skills with the current system state."""
         resp = self.bus.wait_for_response(Message("ovos.PHAL.internet_check"))
         network = False
@@ -186,7 +190,7 @@ class SkillManager(Thread):
             LOG.debug("Notify network connected")
             self.bus.emit(Message("mycroft.network.connected"))
 
-    def _define_message_bus_events(self):
+    def _define_message_bus_events(self) -> None:
         """Define message bus events with handlers defined in this class."""
         # Update upon request
         self.bus.on('skillmanager.list', self.send_skill_list)
@@ -203,7 +207,7 @@ class SkillManager(Thread):
         self.bus.on("mycroft.gui.unavailable", self.handle_gui_disconnected)
 
     @property
-    def skills_config(self):
+    def skills_config(self) -> dict:
         """Get the skills service configuration.
 
         Returns:
@@ -211,26 +215,7 @@ class SkillManager(Thread):
         """
         return self.config['skills']
 
-    def _is_plugin_skill_tracked(self, skill_id):
-        """Check whether a skill is loaded or currently being loaded."""
-        with self._plugin_skills_lock:
-            return (skill_id in self.plugin_skills or
-                    skill_id in self._loading_plugin_skills)
-
-    def _reserve_plugin_skill_load(self, skill_id):
-        """Mark a skill as loading so overlapping scans skip it."""
-        with self._plugin_skills_lock:
-            if skill_id in self.plugin_skills or skill_id in self._loading_plugin_skills:
-                return False
-            self._loading_plugin_skills.add(skill_id)
-            return True
-
-    def _release_plugin_skill_load(self, skill_id):
-        """Clear the in-progress marker for a skill load attempt."""
-        with self._plugin_skills_lock:
-            self._loading_plugin_skills.discard(skill_id)
-
-    def handle_gui_connected(self, message):
+    def handle_gui_connected(self, message: Message) -> None:
         """Handle GUI connection event.
 
         Args:
@@ -243,7 +228,7 @@ class SkillManager(Thread):
             self._gui_event.set()
             self._load_new_skills()
 
-    def handle_gui_disconnected(self, message):
+    def handle_gui_disconnected(self, message: Message) -> None:
         """Handle GUI disconnection event.
 
         Args:
@@ -253,7 +238,7 @@ class SkillManager(Thread):
             self._gui_event.clear()
             self._unload_on_gui_disconnect()
 
-    def handle_internet_disconnected(self, message):
+    def handle_internet_disconnected(self, message: Message) -> None:
         """Handle internet disconnection event.
 
         Args:
@@ -263,7 +248,7 @@ class SkillManager(Thread):
             self._connected_event.clear()
             self._unload_on_internet_disconnect()
 
-    def handle_network_disconnected(self, message):
+    def handle_network_disconnected(self, message: Message) -> None:
         """Handle network disconnection event.
 
         Args:
@@ -273,7 +258,7 @@ class SkillManager(Thread):
             self._network_event.clear()
             self._unload_on_network_disconnect()
 
-    def handle_internet_connected(self, message):
+    def handle_internet_connected(self, message: Message) -> None:
         """Handle internet connection event.
 
         Args:
@@ -285,7 +270,7 @@ class SkillManager(Thread):
             self._connected_event.set()
             self._load_on_internet()
 
-    def handle_network_connected(self, message):
+    def handle_network_connected(self, message: Message) -> None:
         """Handle network connection event.
 
         Args:
@@ -296,12 +281,15 @@ class SkillManager(Thread):
             self._network_event.set()
             self._load_on_network()
 
-    def load_plugin_skills(self, network=None, internet=None):
+    def load_plugin_skills(self, network: Optional[bool] = None, internet: Optional[bool] = None) -> bool:
         """Load plugin skills based on network and internet status.
 
         Args:
             network (bool): Network connection status.
             internet (bool): Internet connection status.
+
+        Returns:
+            bool: True if new skills were loaded, False otherwise.
         """
         loaded_new = False
         if network is None:
@@ -316,22 +304,19 @@ class SkillManager(Thread):
                     LOG.warning(f"{skill_id} is blacklisted, it will NOT be loaded")
                     LOG.info(f"Consider uninstalling {skill_id} instead of blacklisting it")
                 continue
-            if self._is_plugin_skill_tracked(skill_id):
-                continue
-            skill_loader = self._get_plugin_skill_loader(skill_id, init_bus=False,
-                                                         skill_class=plug)
-            requirements = skill_loader.runtime_requirements
-            if not network and requirements.network_before_load:
-                continue
-            if not internet and requirements.internet_before_load:
-                continue
-            if not self._reserve_plugin_skill_load(skill_id):
-                continue
-            self._load_plugin_skill(skill_id, plug, reserved=True)
-            loaded_new = True
+            if skill_id not in self.plugin_skills:
+                skill_loader = self._get_plugin_skill_loader(skill_id, init_bus=False,
+                                                             skill_class=plug)
+                requirements = skill_loader.runtime_requirements
+                if not network and requirements.network_before_load:
+                    continue
+                if not internet and requirements.internet_before_load:
+                    continue
+                self._load_plugin_skill(skill_id, plug)
+                loaded_new = True
         return loaded_new
 
-    def _get_internal_skill_bus(self):
+    def _get_internal_skill_bus(self) -> MessageBusClient:
         """Get a dedicated skill bus connection per skill.
 
         Returns:
@@ -348,12 +333,14 @@ class SkillManager(Thread):
             bus = self.bus
         return bus
 
-    def _get_plugin_skill_loader(self, skill_id, init_bus=True, skill_class=None):
+    def _get_plugin_skill_loader(self, skill_id: str, init_bus: bool = True,
+                                  skill_class: Optional[type] = None) -> PluginSkillLoader:
         """Get a plugin skill loader.
 
         Args:
             skill_id (str): ID of the skill.
             init_bus (bool): Whether to initialize the internal skill bus.
+            skill_class (type): Optional skill class to use.
 
         Returns:
             PluginSkillLoader: Plugin skill loader instance.
@@ -366,24 +353,18 @@ class SkillManager(Thread):
             loader.skill_class = skill_class
         return loader
 
-    def _load_plugin_skill(self, skill_id, skill_plugin, reserved=False):
+    def _load_plugin_skill(self, skill_id: str, skill_plugin: type) -> Optional[PluginSkillLoader]:
         """Load a plugin skill.
 
         Args:
             skill_id (str): ID of the skill.
-            skill_plugin: Plugin skill instance.
-            reserved (bool): True if the caller already marked the skill as loading.
+            skill_plugin: Plugin skill class.
 
         Returns:
             PluginSkillLoader: Loaded plugin skill loader instance if successful, None otherwise.
         """
-        if not reserved and not self._reserve_plugin_skill_load(skill_id):
-            LOG.debug(f"Skipping duplicate load attempt for {skill_id}; load already in progress")
-            return None
-
-        skill_loader = None
+        skill_loader = self._get_plugin_skill_loader(skill_id, skill_class=skill_plugin)
         try:
-            skill_loader = self._get_plugin_skill_loader(skill_id, skill_class=skill_plugin)
             load_status = skill_loader.load(skill_plugin)
             if load_status:
                 self.bus.emit(Message("mycroft.skill.loaded", {"skill_id": skill_id}))
@@ -391,14 +372,11 @@ class SkillManager(Thread):
             LOG.exception(f'Load of skill {skill_id} failed!')
             load_status = False
         finally:
-            if skill_loader is not None:
-                with self._plugin_skills_lock:
-                    self.plugin_skills[skill_id] = skill_loader
-            self._release_plugin_skill_load(skill_id)
+            self.plugin_skills[skill_id] = skill_loader
 
         return skill_loader if load_status else None
 
-    def wait_for_intent_service(self):
+    def wait_for_intent_service(self) -> None:
         """ensure IntentService reported ready to accept skill messages"""
         while not self._stop_event.is_set():
             response = self.bus.wait_for_response(
@@ -410,7 +388,7 @@ class SkillManager(Thread):
             threading.Event().wait(1)
         raise RuntimeError("Skill manager stopped while waiting for intent service")
 
-    def run(self):
+    def run(self) -> None:
         """Run the skill manager thread."""
         self.status.set_alive()
 
@@ -447,14 +425,14 @@ class SkillManager(Thread):
                               'and the skill manager loop safety harness was '
                               'hit.')
 
-    def _load_on_network(self):
+    def _load_on_network(self) -> None:
         """Load skills that require a network connection."""
         if self._detected_installed_skills:  # ensure we have skills installed
             LOG.info('Loading skills that require network...')
             self._load_new_skills(network=True, internet=False)
         self._network_loaded.set()
 
-    def _load_on_internet(self):
+    def _load_on_internet(self) -> None:
         """Load skills that require both internet and network connections."""
         if self._detected_installed_skills:  # ensure we have skills installed
             LOG.info('Loading skills that require internet (and network)...')
@@ -462,25 +440,27 @@ class SkillManager(Thread):
         self._internet_loaded.set()
         self._network_loaded.set()
 
-    def _unload_on_network_disconnect(self):
+    def _unload_on_network_disconnect(self) -> None:
         """Unload skills that require a network connection to work."""
         # TODO - implementation missing
 
-    def _unload_on_internet_disconnect(self):
+    def _unload_on_internet_disconnect(self) -> None:
         """Unload skills that require an internet connection to work."""
         # TODO - implementation missing
 
-    def _unload_on_gui_disconnect(self):
+    def _unload_on_gui_disconnect(self) -> None:
         """Unload skills that require a GUI to work."""
         # TODO - implementation missing
 
-    def _load_on_startup(self):
+    def _load_on_startup(self) -> None:
         """Handle offline skills load on startup."""
         if self._detected_installed_skills:  # ensure we have skills installed
             LOG.info('Loading offline skills...')
             self._load_new_skills(network=False, internet=False)
 
-    def _load_new_skills(self, network=None, internet=None, gui=None):
+    def _load_new_skills(self, network: Optional[bool] = None,
+                          internet: Optional[bool] = None,
+                          gui: Optional[bool] = None) -> None:
         """Handle loading of skills installed since startup.
 
         Args:
@@ -512,7 +492,7 @@ class SkillManager(Thread):
             except Exception as e:
                 LOG.exception(f"Error during Intent training: {e}")
 
-    def _unload_plugin_skill(self, skill_id):
+    def _unload_plugin_skill(self, skill_id: str) -> None:
         """Unload a plugin skill.
 
         Args:
@@ -532,15 +512,15 @@ class SkillManager(Thread):
                     LOG.exception('Failed to shutdown skill: ' + skill_loader.skill_id)
             self.plugin_skills.pop(skill_id)
 
-    def is_alive(self, message=None):
+    def is_alive(self, message: Optional[Message] = None) -> bool:
         """Respond to is_alive status request."""
         return self.status.state >= ProcessState.ALIVE
 
-    def is_all_loaded(self, message=None):
-        """ Respond to all_loaded status request."""
+    def is_all_loaded(self, message: Optional[Message] = None) -> bool:
+        """Respond to all_loaded status request."""
         return self.status.state == ProcessState.READY
 
-    def send_skill_list(self, message=None):
+    def send_skill_list(self, message: Optional[Message] = None) -> None:
         """Send list of loaded skills."""
         try:
             message_data = {}
@@ -555,7 +535,7 @@ class SkillManager(Thread):
         except Exception:
             LOG.exception('Failed to send skill list')
 
-    def deactivate_skill(self, message):
+    def deactivate_skill(self, message: Message) -> None:
         """Deactivate a skill."""
         try:
             # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
@@ -569,7 +549,7 @@ class SkillManager(Thread):
             LOG.exception('Failed to deactivate ' + message.data['skill'])
             self.bus.emit(message.response({'error': f'failed: {err}'}))
 
-    def deactivate_except(self, message):
+    def deactivate_except(self, message: Message) -> None:
         """Deactivate all skills except the provided."""
         try:
             skill_to_keep = message.data['skill']
@@ -583,7 +563,7 @@ class SkillManager(Thread):
         except Exception:
             LOG.exception('An error occurred during skill deactivation!')
 
-    def activate_skill(self, message):
+    def activate_skill(self, message: Message) -> None:
         """Activate a deactivated skill."""
         try:
             # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
@@ -597,11 +577,11 @@ class SkillManager(Thread):
             LOG.exception(f'Couldn\'t activate (load) skill {message.data["skill"]}')
             self.bus.emit(message.response({'error': f'failed: {err}'}))
 
-    def stop(self):
+    def stop(self) -> None:
         """alias for shutdown (backwards compat)"""
         return self.shutdown()
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         """Tell the manager to shutdown."""
         self.status.set_stopping()
         self._stop_event.set()

@@ -17,7 +17,8 @@ class TestStopNoSkills(TestCase):
         self.ignore_messages = ["speak",
                                 "ovos.common_play.stop.response",
                                 "common_query.openvoiceos.stop.response",
-                                "persona.openvoiceos.stop.response"
+                                "persona.openvoiceos.stop.response",
+                                "ovos-hivemind-pipeline-plugin.stop.response",
                                 ]
 
     def tearDown(self):
@@ -119,7 +120,8 @@ class TestCountSkills(TestCase):
         self.ignore_messages = ["speak",
                                 "ovos.common_play.stop.response",
                                 "common_query.openvoiceos.stop.response",
-                                "persona.openvoiceos.stop.response"
+                                "persona.openvoiceos.stop.response",
+                                "ovos-hivemind-pipeline-plugin.stop.response",
                                 ]
 
     def tearDown(self):

@@ -162,7 +162,7 @@ class IntentService:
                 try:
                     v = standardize_lang_tag(message.context[k])
                     best_lang, _ = closest_match(v, valid_langs, max_distance=10)
-                except:
+                except Exception:
                     v = message.context[k]
                     best_lang = "und"
                 if best_lang == "und":
@@ -480,7 +480,7 @@ class IntentService:
                         try:
                             self._emit_match_message(match, message, intent_lang)
                             break
-                        except:
+                        except Exception:
                             LOG.exception(f"{match_func} returned an invalid match")
                 else:
                     LOG.debug(f"no match from {match_func}")
