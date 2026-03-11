@@ -96,19 +96,25 @@ class TestSkillManager(TestCase):
 
     def test_instantiate(self):
         # With default config (deferred_loading: false), connectivity handlers are NOT registered
-        expected_result = [
-            'skillmanager.list',
-            'skillmanager.deactivate',
-            'skillmanager.keep',
-            'skillmanager.activate',
-            #'mycroft.skills.initialized',
-            'mycroft.skills.is_alive',
-            'mycroft.skills.is_ready',
-            'mycroft.skills.all_loaded'
-        ]
+        # Ensure deferred_loading is explicitly False to isolate from other tests
+        config = mock_config()
+        config['skills']['use_deferred_loading'] = False
+        with patch.dict(Configuration._Configuration__patch, config):
+            bus_mock = MessageBusMock()
+            skill_manager = SkillManager(bus_mock)
 
-        self.assertListEqual(expected_result,
-                             self.message_bus_mock.event_handlers)
+            expected_result = [
+                'skillmanager.list',
+                'skillmanager.deactivate',
+                'skillmanager.keep',
+                'skillmanager.activate',
+                #'mycroft.skills.initialized',
+                'mycroft.skills.is_alive',
+                'mycroft.skills.is_ready',
+                'mycroft.skills.all_loaded'
+            ]
+
+            self.assertListEqual(expected_result, bus_mock.event_handlers)
 
 
     def test_send_skill_list(self):
