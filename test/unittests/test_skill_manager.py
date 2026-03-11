@@ -527,7 +527,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
             result = skill_manager.load_plugin_skills(network=True, internet=True)
 
             # Skill should be loaded despite having network/internet requirements
-            skill_manager._load_plugin_skill.assert_called_once_with('test.skill', mock_plugin)
+            skill_manager._load_plugin_skill.assert_called_once_with('test.skill', mock_plugin, reserved=True)
             self.assertTrue(result)
 
     @patch('ovos_core.skill_manager.find_skill_plugins')

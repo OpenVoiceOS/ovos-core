@@ -124,6 +124,8 @@ class SkillManager(Thread):
         self._use_deferred_loading = self.config.get("skills", {}).get("use_deferred_loading", False)
 
         self.plugin_skills = {}
+        self._plugin_skills_lock = threading.RLock()
+        self._loading_plugin_skills = set()
         self.enclosure = EnclosureAPI(bus)
         self.num_install_retries = 0
         self.empty_skill_dirs = set()  # Save a record of empty skill dirs.
@@ -364,16 +366,19 @@ class SkillManager(Thread):
                     LOG.warning(f"{skill_id} is blacklisted, it will NOT be loaded")
                     LOG.info(f"Consider uninstalling {skill_id} instead of blacklisting it")
                 continue
-            if skill_id not in self.plugin_skills:
-                skill_loader = self._get_plugin_skill_loader(skill_id, init_bus=False,
-                                                             skill_class=plug)
-                requirements = skill_loader.runtime_requirements
-                if not network and requirements.network_before_load:
-                    continue
-                if not internet and requirements.internet_before_load:
-                    continue
-                self._load_plugin_skill(skill_id, plug)
-                loaded_new = True
+            if self._is_plugin_skill_tracked(skill_id):
+                continue
+            skill_loader = self._get_plugin_skill_loader(skill_id, init_bus=False,
+                                                         skill_class=plug)
+            requirements = skill_loader.runtime_requirements
+            if not network and requirements.network_before_load:
+                continue
+            if not internet and requirements.internet_before_load:
+                continue
+            if not self._reserve_plugin_skill_load(skill_id):
+                continue
+            self._load_plugin_skill(skill_id, plug, reserved=True)
+            loaded_new = True
         return loaded_new
 
     def _get_internal_skill_bus(self) -> MessageBusClient:
@@ -413,18 +418,24 @@ class SkillManager(Thread):
             loader.skill_class = skill_class
         return loader
 
-    def _load_plugin_skill(self, skill_id: str, skill_plugin: type) -> Optional[PluginSkillLoader]:
+    def _load_plugin_skill(self, skill_id: str, skill_plugin: type, reserved: bool = False) -> Optional[PluginSkillLoader]:
         """Load a plugin skill.
 
         Args:
             skill_id (str): ID of the skill.
             skill_plugin: Plugin skill class.
+            reserved (bool): True if the caller already marked the skill as loading.
 
         Returns:
             PluginSkillLoader: Loaded plugin skill loader instance if successful, None otherwise.
         """
-        skill_loader = self._get_plugin_skill_loader(skill_id, skill_class=skill_plugin)
+        if not reserved and not self._reserve_plugin_skill_load(skill_id):
+            LOG.debug(f"Skipping duplicate load attempt for {skill_id}; load already in progress")
+            return None
+
+        skill_loader = None
         try:
+            skill_loader = self._get_plugin_skill_loader(skill_id, skill_class=skill_plugin)
             load_status = skill_loader.load(skill_plugin)
             if load_status:
                 self.bus.emit(Message("mycroft.skill.loaded", {"skill_id": skill_id}))
@@ -432,7 +443,10 @@ class SkillManager(Thread):
             LOG.exception(f'Load of skill {skill_id} failed!')
             load_status = False
         finally:
-            self.plugin_skills[skill_id] = skill_loader
+            if skill_loader is not None:
+                with self._plugin_skills_lock:
+                    self.plugin_skills[skill_id] = skill_loader
+            self._release_plugin_skill_load(skill_id)
 
         return skill_loader if load_status else None
 
