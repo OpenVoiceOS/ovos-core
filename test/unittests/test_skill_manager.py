@@ -436,9 +436,10 @@ class TestDeferredLoadingConfigFlag(TestCase):
 
     def test_deferred_loading_disabled_by_default(self):
         """Test that deferred loading is disabled by default (use_deferred_loading: false)."""
-        with patch.dict(Configuration._Configuration__patch, mock_config()):
+        config = mock_config()
+        config['skills']['use_deferred_loading'] = False  # Explicitly set to False
+        with patch.dict(Configuration._Configuration__patch, config):
             skill_manager = SkillManager(self.message_bus_mock)
-
             self.assertFalse(skill_manager._use_deferred_loading)
 
     def test_deferred_loading_enabled_via_config(self):
@@ -451,7 +452,9 @@ class TestDeferredLoadingConfigFlag(TestCase):
 
     def test_connectivity_handlers_not_registered_when_deferred_loading_disabled(self):
         """Test that connectivity event handlers are NOT registered when deferred loading is disabled."""
-        with patch.dict(Configuration._Configuration__patch, mock_config()):
+        config = mock_config()
+        config['skills']['use_deferred_loading'] = False  # Explicitly set to False
+        with patch.dict(Configuration._Configuration__patch, config):
             SkillManager(self.message_bus_mock)
 
             # When deferred loading is disabled, connectivity handlers should not be registered
@@ -500,7 +503,9 @@ class TestDeferredLoadingConfigFlag(TestCase):
     @patch('ovos_core.skill_manager.find_skill_plugins')
     def test_load_plugin_skills_no_gating_when_deferred_loading_disabled(self, mock_find):
         """Test that load_plugin_skills does not gate when deferred loading is disabled."""
-        with patch.dict(Configuration._Configuration__patch, mock_config()):
+        config = mock_config()
+        config['skills']['use_deferred_loading'] = False  # Explicitly set to False
+        with patch.dict(Configuration._Configuration__patch, config):
             skill_manager = SkillManager(self.message_bus_mock)
 
             # Mock a skill plugin
@@ -556,7 +561,9 @@ class TestDeferredLoadingConfigFlag(TestCase):
 
     def test_run_calls_load_new_skills_when_deferred_loading_disabled(self):
         """Test that run() calls _load_new_skills directly when deferred loading is disabled."""
-        with patch.dict(Configuration._Configuration__patch, mock_config()):
+        config = mock_config()
+        config['skills']['use_deferred_loading'] = False  # Explicitly set to False
+        with patch.dict(Configuration._Configuration__patch, config):
             skill_manager = SkillManager(self.message_bus_mock)
 
             # Mock dependencies
