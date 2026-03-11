@@ -98,6 +98,9 @@ class SkillManager(Thread):
 
         self._setup_event = Event()
         self._stop_event = Event()
+        self._startup_complete_event = Event()
+        self._deferred_skill_load_event = Event()
+        self._startup_lock = threading.Lock()
         self._connected_event = Event()
         self._network_event = Event()
         self._gui_event = Event()
@@ -215,7 +218,51 @@ class SkillManager(Thread):
         """
         return self.config['skills']
 
-    def handle_gui_connected(self, message: Message) -> None:
+    def _is_plugin_skill_tracked(self, skill_id):
+        """Check whether a skill is loaded or currently being loaded."""
+        with self._plugin_skills_lock:
+            return (skill_id in self.plugin_skills or
+                    skill_id in self._loading_plugin_skills)
+
+    def _reserve_plugin_skill_load(self, skill_id):
+        """Mark a skill as loading so overlapping scans skip it."""
+        with self._plugin_skills_lock:
+            if skill_id in self.plugin_skills or skill_id in self._loading_plugin_skills:
+                return False
+            self._loading_plugin_skills.add(skill_id)
+            return True
+
+    def _release_plugin_skill_load(self, skill_id):
+        """Clear the in-progress marker for a skill load attempt."""
+        with self._plugin_skills_lock:
+            self._loading_plugin_skills.discard(skill_id)
+
+    def _defer_skill_load_until_startup_complete(self):
+        """Queue connectivity-triggered skill loads until the intent service is ready."""
+        with self._startup_lock:
+            if self._startup_complete_event.is_set():
+                return False
+            self._deferred_skill_load_event.set()
+            return True
+
+    def _mark_startup_complete_and_consume_deferred(self):
+        """Atomically mark startup complete and consume any deferred load request."""
+        with self._startup_lock:
+            self._startup_complete_event.set()
+            deferred_skill_load_pending = self._deferred_skill_load_event.is_set()
+            self._deferred_skill_load_event.clear()
+            return deferred_skill_load_pending
+
+    def _process_deferred_skill_load(self):
+        """Replay the earliest deferred connectivity-triggered load after startup."""
+        if self._connected_event.is_set():
+            self._load_on_internet()
+        elif self._network_event.is_set():
+            self._load_on_network()
+        elif self._gui_event.is_set():
+            self._load_new_skills()
+
+    def handle_gui_connected(self, message):
         """Handle GUI connection event.
 
         Args:
@@ -226,6 +273,8 @@ class SkillManager(Thread):
         if not self._gui_event.is_set():
             LOG.debug("GUI Connected")
             self._gui_event.set()
+            if self._defer_skill_load_until_startup_complete():
+                return
             self._load_new_skills()
 
     def handle_gui_disconnected(self, message: Message) -> None:
@@ -268,6 +317,8 @@ class SkillManager(Thread):
             LOG.debug("Internet Connected")
             self._network_event.set()
             self._connected_event.set()
+            if self._defer_skill_load_until_startup_complete():
+                return
             self._load_on_internet()
 
     def handle_network_connected(self, message: Message) -> None:
@@ -279,6 +330,8 @@ class SkillManager(Thread):
         if not self._network_event.is_set():
             LOG.debug("Network Connected")
             self._network_event.set()
+            if self._defer_skill_load_until_startup_complete():
+                return
             self._load_on_network()
 
     def load_plugin_skills(self, network: Optional[bool] = None, internet: Optional[bool] = None) -> bool:
@@ -397,6 +450,8 @@ class SkillManager(Thread):
         LOG.debug("IntentService reported ready")
 
         self._load_on_startup()
+        if self._mark_startup_complete_and_consume_deferred():
+            self._process_deferred_skill_load()
 
         # trigger a sync so we dont need to wait for the plugin to volunteer info
         self._sync_skill_loading_state()
