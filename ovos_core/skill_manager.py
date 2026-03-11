@@ -108,7 +108,7 @@ class SkillManager(Thread):
         self._internet_loaded = Event()
         self._network_skill_timeout = 300
         self._allow_state_reloads = True
-        self._logged_skill_warnings = list()
+        self._logged_skill_warnings = set()
         self._detected_installed_skills = bool(find_skill_plugins())
         if not self._detected_installed_skills:
             LOG.warning(
@@ -359,10 +359,11 @@ class SkillManager(Thread):
         if internet is None:
             internet = self._connected_event.is_set()
         plugins = find_skill_plugins()
+        blacklist = self.blacklist
         for skill_id, plug in plugins.items():
-            if skill_id in self.blacklist:
+            if skill_id in blacklist:
                 if skill_id not in self._logged_skill_warnings:
-                    self._logged_skill_warnings.append(skill_id)
+                    self._logged_skill_warnings.add(skill_id)
                     LOG.warning(f"{skill_id} is blacklisted, it will NOT be loaded")
                     LOG.info(f"Consider uninstalling {skill_id} instead of blacklisting it")
                 continue
@@ -459,7 +460,7 @@ class SkillManager(Thread):
                 timeout=5)
             if response and response.data.get('status'):
                 return
-            threading.Event().wait(1)
+            self._stop_event.wait(1)
         raise RuntimeError("Skill manager stopped while waiting for intent service")
 
     def run(self) -> None:
@@ -588,19 +589,20 @@ class SkillManager(Thread):
         Args:
             skill_id (str): Identifier of the plugin skill to unload.
         """
-        if skill_id in self.plugin_skills:
-            LOG.info('Unloading plugin skill: ' + skill_id)
-            skill_loader = self.plugin_skills[skill_id]
-            if skill_loader.instance is not None:
-                try:
-                    skill_loader.instance.shutdown()
-                except Exception:
-                    LOG.exception('Failed to run skill specific shutdown code: ' + skill_loader.skill_id)
-                try:
-                    skill_loader.instance.default_shutdown()
-                except Exception:
-                    LOG.exception('Failed to shutdown skill: ' + skill_loader.skill_id)
-            self.plugin_skills.pop(skill_id)
+        with self._plugin_skills_lock:
+            if skill_id in self.plugin_skills:
+                LOG.info('Unloading plugin skill: ' + skill_id)
+                skill_loader = self.plugin_skills[skill_id]
+                if skill_loader.instance is not None:
+                    try:
+                        skill_loader.instance.shutdown()
+                    except Exception:
+                        LOG.exception('Failed to run skill specific shutdown code: ' + skill_loader.skill_id)
+                    try:
+                        skill_loader.instance.default_shutdown()
+                    except Exception:
+                        LOG.exception('Failed to shutdown skill: ' + skill_loader.skill_id)
+                self.plugin_skills.pop(skill_id)
 
     def is_alive(self, message: Optional[Message] = None) -> bool:
         """Respond to is_alive status request."""
@@ -615,7 +617,8 @@ class SkillManager(Thread):
         try:
             message_data = {}
             # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
-            skills = self.plugin_skills
+            with self._plugin_skills_lock:
+                skills = dict(self.plugin_skills)
             for skill_loader in skills.values():
                 message_data[skill_loader.skill_id] = {
                     "active": skill_loader.active and skill_loader.loaded,
@@ -629,7 +632,8 @@ class SkillManager(Thread):
         """Deactivate a skill."""
         try:
             # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
-            skills = self.plugin_skills
+            with self._plugin_skills_lock:
+                skills = dict(self.plugin_skills)
             for skill_loader in skills.values():
                 if message.data['skill'] == skill_loader.skill_id:
                     LOG.info("Deactivating (unloading) skill: " + skill_loader.skill_id)
@@ -645,7 +649,8 @@ class SkillManager(Thread):
             skill_to_keep = message.data['skill']
             LOG.info(f'Deactivating (unloading) all skills except {skill_to_keep}')
             # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
-            skills = self.plugin_skills
+            with self._plugin_skills_lock:
+                skills = dict(self.plugin_skills)
             for skill in skills.values():
                 if skill.skill_id != skill_to_keep:
                     skill.deactivate()
@@ -657,7 +662,8 @@ class SkillManager(Thread):
         """Activate a deactivated skill."""
         try:
             # TODO handle external skills, OVOSAbstractApp/Hivemind skills are not accounted for
-            skills = self.plugin_skills
+            with self._plugin_skills_lock:
+                skills = dict(self.plugin_skills)
             for skill_loader in skills.values():
                 if (message.data['skill'] in ('all', skill_loader.skill_id)
                         and not skill_loader.active):

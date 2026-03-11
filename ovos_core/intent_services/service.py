@@ -36,6 +36,33 @@ from ovos_core.transformers import MetadataTransformersService, UtteranceTransfo
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
 
+# Module-level constants for pipeline matcher migration and optimization
+_PIPELINE_MIGRATION_MAP = {
+    "converse": "ovos-converse-pipeline-plugin",
+    "common_qa": "ovos-common-query-pipeline-plugin",
+    "fallback_high": "ovos-fallback-pipeline-plugin-high",
+    "fallback_medium": "ovos-fallback-pipeline-plugin-medium",
+    "fallback_low": "ovos-fallback-pipeline-plugin-low",
+    "stop_high": "ovos-stop-pipeline-plugin-high",
+    "stop_medium": "ovos-stop-pipeline-plugin-medium",
+    "stop_low": "ovos-stop-pipeline-plugin-low",
+    "adapt_high": "ovos-adapt-pipeline-plugin-high",
+    "adapt_medium": "ovos-adapt-pipeline-plugin-medium",
+    "adapt_low": "ovos-adapt-pipeline-plugin-low",
+    "padacioso_high": "ovos-padacioso-pipeline-plugin-high",
+    "padacioso_medium": "ovos-padacioso-pipeline-plugin-medium",
+    "padacioso_low": "ovos-padacioso-pipeline-plugin-low",
+    "padatious_high": "ovos-padatious-pipeline-plugin-high",
+    "padatious_medium": "ovos-padatious-pipeline-plugin-medium",
+    "padatious_low": "ovos-padatious-pipeline-plugin-low",
+    "ocp_high": "ovos-ocp-pipeline-plugin-high",
+    "ocp_medium": "ovos-ocp-pipeline-plugin-medium",
+    "ocp_low": "ovos-ocp-pipeline-plugin-low",
+    "ocp_legacy": "ovos-ocp-pipeline-plugin-legacy"
+}
+
+_PIPELINE_RE = re.compile(r'-(high|medium|low)$')
+
 
 def on_started():
     LOG.info('IntentService is starting up.')
@@ -183,32 +210,8 @@ class IntentService:
         Returns:
             A callable matcher function.
         """
-        migration_map = {
-            "converse": "ovos-converse-pipeline-plugin",
-            "common_qa": "ovos-common-query-pipeline-plugin",
-            "fallback_high": "ovos-fallback-pipeline-plugin-high",
-            "fallback_medium": "ovos-fallback-pipeline-plugin-medium",
-            "fallback_low": "ovos-fallback-pipeline-plugin-low",
-            "stop_high": "ovos-stop-pipeline-plugin-high",
-            "stop_medium": "ovos-stop-pipeline-plugin-medium",
-            "stop_low": "ovos-stop-pipeline-plugin-low",
-            "adapt_high": "ovos-adapt-pipeline-plugin-high",
-            "adapt_medium": "ovos-adapt-pipeline-plugin-medium",
-            "adapt_low": "ovos-adapt-pipeline-plugin-low",
-            "padacioso_high": "ovos-padacioso-pipeline-plugin-high",
-            "padacioso_medium": "ovos-padacioso-pipeline-plugin-medium",
-            "padacioso_low": "ovos-padacioso-pipeline-plugin-low",
-            "padatious_high": "ovos-padatious-pipeline-plugin-high",
-            "padatious_medium": "ovos-padatious-pipeline-plugin-medium",
-            "padatious_low": "ovos-padatious-pipeline-plugin-low",
-            "ocp_high": "ovos-ocp-pipeline-plugin-high",
-            "ocp_medium": "ovos-ocp-pipeline-plugin-medium",
-            "ocp_low": "ovos-ocp-pipeline-plugin-low",
-            "ocp_legacy": "ovos-ocp-pipeline-plugin-legacy"
-        }
-
-        matcher_id = migration_map.get(matcher_id, matcher_id)
-        pipe_id = re.sub(r'-(high|medium|low)$', '', matcher_id)
+        matcher_id = _PIPELINE_MIGRATION_MAP.get(matcher_id, matcher_id)
+        pipe_id = _PIPELINE_RE.sub('', matcher_id)
         plugin = self.pipeline_plugins.get(pipe_id)
         if not plugin:
             LOG.error(f"Unknown pipeline matcher: {matcher_id}")
@@ -316,10 +319,11 @@ class IntentService:
             reply = message.reply(match.match_type, data)
 
             # upload intent metrics if enabled
-            create_daemon(self._upload_match_data, (match.utterance,
-                                                    match.match_type,
-                                                    lang,
-                                                    match.match_data))
+            if self.config.get("open_data", {}).get("intent_urls"):
+                create_daemon(self._upload_match_data, (match.utterance,
+                                                        match.match_type,
+                                                        lang,
+                                                        match.match_data))
 
         if reply is not None:
             reply.data["utterance"] = match.utterance
@@ -346,10 +350,11 @@ class IntentService:
             self.bus.emit(reply)
 
         else:  # upload intent metrics if enabled
-            create_daemon(self._upload_match_data, (match.utterance,
-                                                    "complete_intent_failure",
-                                                    lang,
-                                                    match.match_data))
+            if self.config.get("open_data", {}).get("intent_urls"):
+                create_daemon(self._upload_match_data, (match.utterance,
+                                                        "complete_intent_failure",
+                                                        lang,
+                                                        match.match_data))
 
     @staticmethod
     def _upload_match_data(utterance: str, intent: str, lang: str, match_data: dict):
