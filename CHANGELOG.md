@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.3a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.3a2) (2026-03-07)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.3a1...2.1.3a2)
+
+**Merged pull requests:**
+
+- Prevent duplicate skill loads during overlapping rescans [\#744](https://github.com/OpenVoiceOS/ovos-core/pull/744) ([goldyfruit](https://github.com/goldyfruit))
+
 ## [2.1.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.3a1) (2026-03-04)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.2a2...2.1.3a1)

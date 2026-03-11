@@ -251,7 +251,6 @@ class SkillManager(Thread):
             self._load_on_network()
         elif self._gui_event.is_set():
             self._load_new_skills()
-
     def handle_gui_connected(self, message):
         """Handle GUI connection event.
 
