@@ -409,3 +409,180 @@ class TestSkillManager(TestCase):
 
         # Verify return value is None when load returns False
         self.assertIsNone(result)
+
+
+class TestDeferredLoadingConfigFlag(TestCase):
+    """Test suite for the optional deferred loading config flag."""
+
+    mock_package = 'ovos_core.skill_manager.'
+
+    def setUp(self):
+        self.message_bus_mock = MessageBusMock()
+        self._mock_log()
+
+    def _mock_log(self):
+        log_patch = patch(self.mock_package + 'LOG')
+        self.addCleanup(log_patch.stop)
+        self.log_mock = log_patch.start()
+
+    @patch.dict(Configuration._Configuration__patch, mock_config())
+    def test_deferred_loading_disabled_by_default(self):
+        """Test that deferred loading is disabled by default (use_deferred_loading: false)."""
+        skill_manager = SkillManager(self.message_bus_mock)
+
+        self.assertFalse(skill_manager._use_deferred_loading)
+
+    @patch.dict(Configuration._Configuration__patch, {
+        **mock_config(),
+        'skills': {**mock_config()['skills'], 'use_deferred_loading': True}
+    })
+    def test_deferred_loading_enabled_via_config(self):
+        """Test that deferred loading can be enabled via config."""
+        skill_manager = SkillManager(self.message_bus_mock)
+
+        self.assertTrue(skill_manager._use_deferred_loading)
+
+    @patch.dict(Configuration._Configuration__patch, mock_config())
+    def test_connectivity_handlers_not_registered_when_deferred_loading_disabled(self):
+        """Test that connectivity event handlers are NOT registered when deferred loading is disabled."""
+        skill_manager = SkillManager(self.message_bus_mock)
+
+        # When deferred loading is disabled, connectivity handlers should not be registered
+        expected_handlers = [
+            'skillmanager.list',
+            'skillmanager.deactivate',
+            'skillmanager.keep',
+            'skillmanager.activate',
+            'mycroft.skills.is_alive',
+            'mycroft.skills.is_ready',
+            'mycroft.skills.all_loaded'
+        ]
+
+        self.assertListEqual(expected_handlers, self.message_bus_mock.event_handlers)
+        # Connectivity handlers should NOT be in the list
+        self.assertNotIn('mycroft.network.connected', self.message_bus_mock.event_handlers)
+        self.assertNotIn('mycroft.internet.connected', self.message_bus_mock.event_handlers)
+        self.assertNotIn('mycroft.gui.available', self.message_bus_mock.event_handlers)
+
+    @patch.dict(Configuration._Configuration__patch, {
+        **mock_config(),
+        'skills': {**mock_config()['skills'], 'use_deferred_loading': True}
+    })
+    def test_connectivity_handlers_registered_when_deferred_loading_enabled(self):
+        """Test that connectivity event handlers ARE registered when deferred loading is enabled."""
+        skill_manager = SkillManager(self.message_bus_mock)
+
+        # When deferred loading is enabled, connectivity handlers should be registered
+        expected_handlers = [
+            'skillmanager.list',
+            'skillmanager.deactivate',
+            'skillmanager.keep',
+            'skillmanager.activate',
+            'mycroft.network.connected',
+            'mycroft.internet.connected',
+            'mycroft.gui.available',
+            'mycroft.network.disconnected',
+            'mycroft.internet.disconnected',
+            'mycroft.gui.unavailable',
+            'mycroft.skills.is_alive',
+            'mycroft.skills.is_ready',
+            'mycroft.skills.all_loaded'
+        ]
+
+        self.assertListEqual(expected_handlers, self.message_bus_mock.event_handlers)
+
+    @patch.dict(Configuration._Configuration__patch, mock_config())
+    @patch('ovos_core.skill_manager.find_skill_plugins')
+    def test_load_plugin_skills_no_gating_when_deferred_loading_disabled(self, mock_find):
+        """Test that load_plugin_skills does NOT gate on network/internet when disabled."""
+        skill_manager = SkillManager(self.message_bus_mock)
+
+        # Mock a skill plugin
+        mock_plugin = Mock()
+        mock_find.return_value = {'test.skill': mock_plugin}
+
+        # Mock skill loader with network requirement
+        mock_loader = Mock(spec=SkillLoader)
+        mock_loader.runtime_requirements = Mock()
+        mock_loader.runtime_requirements.network_before_load = True
+        mock_loader.runtime_requirements.internet_before_load = True
+        mock_loader.load.return_value = True
+
+        skill_manager._get_plugin_skill_loader = Mock(return_value=mock_loader)
+        skill_manager._load_plugin_skill = Mock(return_value=mock_loader)
+
+        # Call load_plugin_skills without explicit network/internet params
+        result = skill_manager.load_plugin_skills()
+
+        # Skill should be loaded regardless of network/internet requirements
+        skill_manager._load_plugin_skill.assert_called_once_with('test.skill', mock_plugin)
+        self.assertTrue(result)
+
+    @patch.dict(Configuration._Configuration__patch, {
+        **mock_config(),
+        'skills': {**mock_config()['skills'], 'use_deferred_loading': True}
+    })
+    @patch('ovos_core.skill_manager.find_skill_plugins')
+    def test_load_plugin_skills_gating_when_deferred_loading_enabled(self, mock_find):
+        """Test that load_plugin_skills DOES gate on network/internet when enabled."""
+        skill_manager = SkillManager(self.message_bus_mock)
+
+        # Mock a skill plugin with network requirement
+        mock_plugin = Mock()
+        mock_find.return_value = {'test.skill': mock_plugin}
+
+        # Mock skill loader with network requirement
+        mock_loader = Mock(spec=SkillLoader)
+        mock_loader.runtime_requirements = Mock()
+        mock_loader.runtime_requirements.network_before_load = True
+        mock_loader.runtime_requirements.internet_before_load = False
+        mock_loader.load.return_value = True
+
+        skill_manager._get_plugin_skill_loader = Mock(return_value=mock_loader)
+        skill_manager._load_plugin_skill = Mock(return_value=mock_loader)
+
+        # Call load_plugin_skills without network (not connected)
+        result = skill_manager.load_plugin_skills(network=False, internet=False)
+
+        # Skill should NOT be loaded due to network requirement not being met
+        skill_manager._load_plugin_skill.assert_not_called()
+        self.assertFalse(result)
+
+    @patch.dict(Configuration._Configuration__patch, mock_config())
+    def test_run_calls_load_new_skills_when_deferred_loading_disabled(self):
+        """Test that run() calls _load_new_skills directly when deferred loading is disabled."""
+        skill_manager = SkillManager(self.message_bus_mock)
+
+        # Mock dependencies
+        skill_manager.wait_for_intent_service = Mock()
+        skill_manager._load_new_skills = Mock()
+        skill_manager._stop_event.set()  # Stop immediately to avoid infinite loop
+
+        # Run should call _load_new_skills directly
+        skill_manager.run()
+
+        # Verify _load_new_skills was called
+        skill_manager._load_new_skills.assert_called()
+
+    @patch.dict(Configuration._Configuration__patch, {
+        **mock_config(),
+        'skills': {**mock_config()['skills'], 'use_deferred_loading': True}
+    })
+    def test_run_uses_deferred_loading_when_enabled(self):
+        """Test that run() uses deferred loading flow when flag is enabled."""
+        skill_manager = SkillManager(self.message_bus_mock)
+
+        # Mock dependencies
+        skill_manager.wait_for_intent_service = Mock()
+        skill_manager._load_on_startup = Mock()
+        skill_manager._sync_skill_loading_state = Mock()
+        skill_manager._mark_startup_complete_and_consume_deferred = Mock(return_value=False)
+        skill_manager._stop_event.set()  # Stop immediately to avoid infinite loop
+
+        # Run should use the deferred loading path
+        skill_manager.run()
+
+        # Verify deferred loading methods were called
+        skill_manager._load_on_startup.assert_called()
+        skill_manager._sync_skill_loading_state.assert_called()
+        skill_manager._mark_startup_complete_and_consume_deferred.assert_called()
