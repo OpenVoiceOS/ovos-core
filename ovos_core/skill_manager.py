@@ -117,6 +117,12 @@ class SkillManager(Thread):
 
         self.config = Configuration()
 
+        # Config flag to enable deferred skill loading based on network/internet/GUI requirements.
+        # When disabled (default), all skills load unconditionally at startup.
+        # When enabled, skills with network_before_load, internet_before_load, or GUI requirements
+        # are deferred until those conditions are met.
+        self._use_deferred_loading = self.config.get("skills", {}).get("use_deferred_loading", False)
+
         self.plugin_skills = {}
         self.enclosure = EnclosureAPI(bus)
         self.num_install_retries = 0
@@ -201,13 +207,14 @@ class SkillManager(Thread):
         self.bus.on('skillmanager.keep', self.deactivate_except)
         self.bus.on('skillmanager.activate', self.activate_skill)
 
-        # Load skills waiting for connectivity
-        self.bus.on("mycroft.network.connected", self.handle_network_connected)
-        self.bus.on("mycroft.internet.connected", self.handle_internet_connected)
-        self.bus.on("mycroft.gui.available", self.handle_gui_connected)
-        self.bus.on("mycroft.network.disconnected", self.handle_network_disconnected)
-        self.bus.on("mycroft.internet.disconnected", self.handle_internet_disconnected)
-        self.bus.on("mycroft.gui.unavailable", self.handle_gui_disconnected)
+        # Load skills waiting for connectivity (only if deferred loading is enabled)
+        if self._use_deferred_loading:
+            self.bus.on("mycroft.network.connected", self.handle_network_connected)
+            self.bus.on("mycroft.internet.connected", self.handle_internet_connected)
+            self.bus.on("mycroft.gui.available", self.handle_gui_connected)
+            self.bus.on("mycroft.network.disconnected", self.handle_network_disconnected)
+            self.bus.on("mycroft.internet.disconnected", self.handle_internet_disconnected)
+            self.bus.on("mycroft.gui.unavailable", self.handle_gui_disconnected)
 
     @property
     def skills_config(self) -> dict:
@@ -449,19 +456,24 @@ class SkillManager(Thread):
         self.wait_for_intent_service()
         LOG.debug("IntentService reported ready")
 
-        self._load_on_startup()
-        if self._mark_startup_complete_and_consume_deferred():
-            self._process_deferred_skill_load()
+        if self._use_deferred_loading:
+            # Legacy deferred loading: defer connectivity-triggered loads until intent service is ready
+            self._load_on_startup()
+            if self._mark_startup_complete_and_consume_deferred():
+                self._process_deferred_skill_load()
 
-        # trigger a sync so we dont need to wait for the plugin to volunteer info
-        self._sync_skill_loading_state()
+            # trigger a sync so we dont need to wait for the plugin to volunteer info
+            self._sync_skill_loading_state()
 
-        if not all((self._network_loaded.is_set(),
-                    self._internet_loaded.is_set())):
-            self.bus.emit(Message(
-                'mycroft.skills.error',
-                {'internet_loaded': self._internet_loaded.is_set(),
-                 'network_loaded': self._network_loaded.is_set()}))
+            if not all((self._network_loaded.is_set(),
+                        self._internet_loaded.is_set())):
+                self.bus.emit(Message(
+                    'mycroft.skills.error',
+                    {'internet_loaded': self._internet_loaded.is_set(),
+                     'network_loaded': self._network_loaded.is_set()}))
+        else:
+            # Default: load all skills unconditionally at startup
+            self._load_new_skills()
 
         self.bus.emit(Message('mycroft.skills.initialized'))
 
