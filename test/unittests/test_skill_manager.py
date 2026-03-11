@@ -177,6 +177,41 @@ class TestSkillManager(TestCase):
         test_skill_loader.activate.assert_called_once()
         message.response.assert_called_once()
 
+    def test_handle_gui_connected_defers_skill_loading_until_startup_complete(self):
+        self.skill_manager._load_new_skills = Mock()
+
+        self.skill_manager.handle_gui_connected(
+            Message("mycroft.gui.available", {"permanent": False})
+        )
+
+        self.assertTrue(self.skill_manager._gui_event.is_set())
+        self.assertTrue(self.skill_manager._deferred_skill_load_event.is_set())
+        self.skill_manager._load_new_skills.assert_not_called()
+
+        self.skill_manager._startup_complete_event.set()
+        self.skill_manager._process_deferred_skill_load()
+
+        self.assertFalse(self.skill_manager._deferred_skill_load_event.is_set())
+        self.skill_manager._load_new_skills.assert_called_once_with()
+
+    def test_handle_internet_connected_defers_skill_loading_until_startup_complete(self):
+        self.skill_manager._load_on_internet = Mock()
+
+        self.skill_manager.handle_internet_connected(
+            Message("mycroft.internet.connected")
+        )
+
+        self.assertTrue(self.skill_manager._network_event.is_set())
+        self.assertTrue(self.skill_manager._connected_event.is_set())
+        self.assertTrue(self.skill_manager._deferred_skill_load_event.is_set())
+        self.skill_manager._load_on_internet.assert_not_called()
+
+        self.skill_manager._startup_complete_event.set()
+        self.skill_manager._process_deferred_skill_load()
+
+        self.assertFalse(self.skill_manager._deferred_skill_load_event.is_set())
+        self.skill_manager._load_on_internet.assert_called_once_with()
+
     def test_load_plugin_skill_success(self):
         """Test successful plugin skill loading emits the correct message."""
         skill_id = 'test.plugin.skill'

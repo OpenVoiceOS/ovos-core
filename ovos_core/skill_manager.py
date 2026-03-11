@@ -92,6 +92,8 @@ class SkillManager(Thread):
 
         self._setup_event = Event()
         self._stop_event = Event()
+        self._startup_complete_event = Event()
+        self._deferred_skill_load_event = Event()
         self._connected_event = Event()
         self._network_event = Event()
         self._gui_event = Event()
@@ -230,6 +232,26 @@ class SkillManager(Thread):
         with self._plugin_skills_lock:
             self._loading_plugin_skills.discard(skill_id)
 
+    def _defer_skill_load_until_startup_complete(self):
+        """Queue connectivity-triggered skill loads until the intent service is ready."""
+        if self._startup_complete_event.is_set():
+            return False
+        self._deferred_skill_load_event.set()
+        return True
+
+    def _process_deferred_skill_load(self):
+        """Replay the earliest deferred connectivity-triggered load after startup."""
+        if not self._deferred_skill_load_event.is_set():
+            return
+
+        self._deferred_skill_load_event.clear()
+        if self._connected_event.is_set():
+            self._load_on_internet()
+        elif self._network_event.is_set():
+            self._load_on_network()
+        elif self._gui_event.is_set():
+            self._load_new_skills()
+
     def handle_gui_connected(self, message):
         """Handle GUI connection event.
 
@@ -241,6 +263,8 @@ class SkillManager(Thread):
         if not self._gui_event.is_set():
             LOG.debug("GUI Connected")
             self._gui_event.set()
+            if self._defer_skill_load_until_startup_complete():
+                return
             self._load_new_skills()
 
     def handle_gui_disconnected(self, message):
@@ -283,6 +307,8 @@ class SkillManager(Thread):
             LOG.debug("Internet Connected")
             self._network_event.set()
             self._connected_event.set()
+            if self._defer_skill_load_until_startup_complete():
+                return
             self._load_on_internet()
 
     def handle_network_connected(self, message):
@@ -294,6 +320,8 @@ class SkillManager(Thread):
         if not self._network_event.is_set():
             LOG.debug("Network Connected")
             self._network_event.set()
+            if self._defer_skill_load_until_startup_complete():
+                return
             self._load_on_network()
 
     def load_plugin_skills(self, network=None, internet=None):
@@ -419,6 +447,8 @@ class SkillManager(Thread):
         LOG.debug("IntentService reported ready")
 
         self._load_on_startup()
+        self._startup_complete_event.set()
+        self._process_deferred_skill_load()
 
         # trigger a sync so we dont need to wait for the plugin to volunteer info
         self._sync_skill_loading_state()
