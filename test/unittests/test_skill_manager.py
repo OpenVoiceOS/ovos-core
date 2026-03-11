@@ -188,7 +188,9 @@ class TestSkillManager(TestCase):
         self.assertTrue(self.skill_manager._deferred_skill_load_event.is_set())
         self.skill_manager._load_new_skills.assert_not_called()
 
-        self.skill_manager._startup_complete_event.set()
+        self.assertTrue(
+            self.skill_manager._mark_startup_complete_and_consume_deferred()
+        )
         self.skill_manager._process_deferred_skill_load()
 
         self.assertFalse(self.skill_manager._deferred_skill_load_event.is_set())
@@ -206,11 +208,25 @@ class TestSkillManager(TestCase):
         self.assertTrue(self.skill_manager._deferred_skill_load_event.is_set())
         self.skill_manager._load_on_internet.assert_not_called()
 
-        self.skill_manager._startup_complete_event.set()
+        self.assertTrue(
+            self.skill_manager._mark_startup_complete_and_consume_deferred()
+        )
         self.skill_manager._process_deferred_skill_load()
 
         self.assertFalse(self.skill_manager._deferred_skill_load_event.is_set())
         self.skill_manager._load_on_internet.assert_called_once_with()
+
+    def test_mark_startup_complete_and_consume_deferred_is_atomic(self):
+        self.skill_manager._deferred_skill_load_event.set()
+
+        self.assertTrue(
+            self.skill_manager._mark_startup_complete_and_consume_deferred()
+        )
+        self.assertTrue(self.skill_manager._startup_complete_event.is_set())
+        self.assertFalse(self.skill_manager._deferred_skill_load_event.is_set())
+        self.assertFalse(
+            self.skill_manager._mark_startup_complete_and_consume_deferred()
+        )
 
     def test_load_plugin_skill_success(self):
         """Test successful plugin skill loading emits the correct message."""
