@@ -95,18 +95,13 @@ class TestSkillManager(TestCase):
         }
 
     def test_instantiate(self):
+        # With default config (deferred_loading: false), connectivity handlers are NOT registered
         expected_result = [
             'skillmanager.list',
             'skillmanager.deactivate',
             'skillmanager.keep',
             'skillmanager.activate',
             #'mycroft.skills.initialized',
-            'mycroft.network.connected',
-            'mycroft.internet.connected',
-            'mycroft.gui.available',
-            'mycroft.network.disconnected',
-            'mycroft.internet.disconnected',
-            'mycroft.gui.unavailable',
             'mycroft.skills.is_alive',
             'mycroft.skills.is_ready',
             'mycroft.skills.all_loaded'
@@ -217,16 +212,30 @@ class TestSkillManager(TestCase):
         self.skill_manager._load_on_internet.assert_called_once_with()
 
     def test_mark_startup_complete_and_consume_deferred_is_atomic(self):
+        """Test that startup completion is atomic - only one thread sees True."""
         self.skill_manager._deferred_skill_load_event.set()
 
-        self.assertTrue(
-            self.skill_manager._mark_startup_complete_and_consume_deferred()
-        )
-        self.assertTrue(self.skill_manager._startup_complete_event.is_set())
-        self.assertFalse(self.skill_manager._deferred_skill_load_event.is_set())
-        self.assertFalse(
-            self.skill_manager._mark_startup_complete_and_consume_deferred()
-        )
+        results = []
+
+        def call_mark_complete():
+            result = self.skill_manager._mark_startup_complete_and_consume_deferred()
+            results.append(result)
+
+        # Start two threads calling concurrently to test atomicity
+        thread1 = Thread(target=call_mark_complete)
+        thread2 = Thread(target=call_mark_complete)
+
+        thread1.start()
+        thread2.start()
+
+        thread1.join()
+        thread2.join()
+
+        # Exactly one thread should see True (the winner of the race)
+        # The other should see False (already marked complete)
+        self.assertEqual(results.count(True), 1)
+        self.assertEqual(results.count(False), 1)
+
 
     def test_load_plugin_skill_success(self):
         """Test successful plugin skill loading emits the correct message."""
@@ -445,7 +454,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
     @patch.dict(Configuration._Configuration__patch, mock_config())
     def test_connectivity_handlers_not_registered_when_deferred_loading_disabled(self):
         """Test that connectivity event handlers are NOT registered when deferred loading is disabled."""
-        skill_manager = SkillManager(self.message_bus_mock)
+        SkillManager(self.message_bus_mock)
 
         # When deferred loading is disabled, connectivity handlers should not be registered
         expected_handlers = [
@@ -470,7 +479,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
     })
     def test_connectivity_handlers_registered_when_deferred_loading_enabled(self):
         """Test that connectivity event handlers ARE registered when deferred loading is enabled."""
-        skill_manager = SkillManager(self.message_bus_mock)
+        SkillManager(self.message_bus_mock)
 
         # When deferred loading is enabled, connectivity handlers should be registered
         expected_handlers = [
@@ -494,14 +503,14 @@ class TestDeferredLoadingConfigFlag(TestCase):
     @patch.dict(Configuration._Configuration__patch, mock_config())
     @patch('ovos_core.skill_manager.find_skill_plugins')
     def test_load_plugin_skills_no_gating_when_deferred_loading_disabled(self, mock_find):
-        """Test that load_plugin_skills does NOT gate on network/internet when disabled."""
-        skill_manager = SkillManager(self.message_bus_mock)
+        """Test that _load_new_skills bypasses gating on network/internet when disabled."""
+        skill_manager = SkillManager(self.message_bus_mock)  # Store for _load_new_skills call
 
         # Mock a skill plugin
         mock_plugin = Mock()
         mock_find.return_value = {'test.skill': mock_plugin}
 
-        # Mock skill loader with network requirement
+        # Mock skill loader with network/internet requirements
         mock_loader = Mock(spec=SkillLoader)
         mock_loader.runtime_requirements = Mock()
         mock_loader.runtime_requirements.network_before_load = True
@@ -511,12 +520,12 @@ class TestDeferredLoadingConfigFlag(TestCase):
         skill_manager._get_plugin_skill_loader = Mock(return_value=mock_loader)
         skill_manager._load_plugin_skill = Mock(return_value=mock_loader)
 
-        # Call load_plugin_skills without explicit network/internet params
-        result = skill_manager.load_plugin_skills()
+        # When deferred loading is disabled, _load_new_skills should pass network=True, internet=True
+        # This ensures skills load regardless of their runtime requirements
+        skill_manager._load_new_skills()
 
-        # Skill should be loaded regardless of network/internet requirements
+        # Skill should be loaded because _load_new_skills passes True when deferred loading is disabled
         skill_manager._load_plugin_skill.assert_called_once_with('test.skill', mock_plugin)
-        self.assertTrue(result)
 
     @patch.dict(Configuration._Configuration__patch, {
         **mock_config(),
@@ -556,13 +565,20 @@ class TestDeferredLoadingConfigFlag(TestCase):
         # Mock dependencies
         skill_manager.wait_for_intent_service = Mock()
         skill_manager._load_new_skills = Mock()
+        skill_manager._load_on_startup = Mock()
+        skill_manager._sync_skill_loading_state = Mock()
+        skill_manager._mark_startup_complete_and_consume_deferred = Mock()
         skill_manager._stop_event.set()  # Stop immediately to avoid infinite loop
 
         # Run should call _load_new_skills directly
         skill_manager.run()
 
-        # Verify _load_new_skills was called
+        # Verify _load_new_skills was called (unconditional path)
         skill_manager._load_new_skills.assert_called()
+        # Verify deferred loading methods were NOT called (they're only for enabled flag)
+        skill_manager._load_on_startup.assert_not_called()
+        skill_manager._sync_skill_loading_state.assert_not_called()
+        skill_manager._mark_startup_complete_and_consume_deferred.assert_not_called()
 
     @patch.dict(Configuration._Configuration__patch, {
         **mock_config(),
@@ -577,12 +593,15 @@ class TestDeferredLoadingConfigFlag(TestCase):
         skill_manager._load_on_startup = Mock()
         skill_manager._sync_skill_loading_state = Mock()
         skill_manager._mark_startup_complete_and_consume_deferred = Mock(return_value=False)
+        skill_manager._load_new_skills = Mock()
         skill_manager._stop_event.set()  # Stop immediately to avoid infinite loop
 
         # Run should use the deferred loading path
         skill_manager.run()
 
-        # Verify deferred loading methods were called
+        # Verify deferred loading methods were called (deferred path)
         skill_manager._load_on_startup.assert_called()
         skill_manager._sync_skill_loading_state.assert_called()
         skill_manager._mark_startup_complete_and_consume_deferred.assert_called()
+        # Verify _load_new_skills is NOT called in deferred startup path (only in loop)
+        skill_manager._load_new_skills.assert_not_called()

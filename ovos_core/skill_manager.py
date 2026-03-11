@@ -535,10 +535,19 @@ class SkillManager(Thread):
             internet (bool): Internet connection status.
             gui (bool): GUI connection status.
         """
-        if network is None:
-            network = self._network_event.is_set()
-        if internet is None:
-            internet = self._connected_event.is_set()
+        if self._use_deferred_loading:
+            # When deferred loading is enabled, check event flags for gating
+            if network is None:
+                network = self._network_event.is_set()
+            if internet is None:
+                internet = self._connected_event.is_set()
+        else:
+            # When deferred loading is disabled, bypass gating and load all skills
+            if network is None:
+                network = True
+            if internet is None:
+                internet = True
+
         if gui is None:
             gui = self._gui_event.is_set() or is_gui_connected(self.bus)
 
