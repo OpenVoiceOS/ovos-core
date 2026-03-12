@@ -344,12 +344,14 @@ class StopService(ConfidenceMatcherPipeline):
         return None
 
     def voc_match(self, utt: str, voc_filename: str, lang: str,
-                  exact: bool = False):
-        """
-        TODO - should use ovos_workshop method instead of reimplementing here
-               look into subclassing from OVOSAbstractApp
+                  exact: bool = False) -> bool:
+        """Determine if the given utterance contains the vocabulary provided.
 
-        Determine if the given utterance contains the vocabulary provided.
+        NOTE: Similar to `OVOSSkill.voc_match()` from ovos_workshop, but implemented
+        here for the StopService pipeline plugin (which is not a skill). If this grows,
+        consider extracting to a shared utility module in ovos_utils or ovos_workshop.
+
+
 
         By default the method checks if the utterance contains the given vocab
         thereby allowing the user to say things like "yes, please" and still

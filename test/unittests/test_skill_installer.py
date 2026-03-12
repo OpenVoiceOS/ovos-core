@@ -180,10 +180,11 @@ def test_handle_uninstall_skill_not_allowed(skills_store):
 @pytest.mark.parametrize('skills_store', [{"allow_pip": True}], indirect=True)
 def test_handle_uninstall_skill(skills_store):
     skills_store.play_error_sound = Mock()
+    # Test with no skill specified
     skills_store.handle_uninstall_skill(Message(msg_type="test", data={}))
     skills_store.play_error_sound.assert_called_once()
     assert skills_store.bus.message_types[-1] == "ovos.skills.uninstall.failed"
-    assert skills_store.bus.message_data[-1] == {"error": "not implemented"}
+    assert skills_store.bus.message_data[-1]["error"] == "no packages to install"
 
 
 @pytest.mark.parametrize('skills_store', [{"allow_pip": False}], indirect=True)

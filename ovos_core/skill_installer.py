@@ -263,18 +263,37 @@ class SkillsStore:
                                         {"error": InstallError.BAD_URL.value}))
 
     def handle_uninstall_skill(self, message: Message) -> None:
-        """Handle a request to uninstall a skill (not yet implemented)."""
+        """Handle a request to uninstall a skill.
+
+        Args:
+            message (Message): Bus message with data containing 'skill' (skill_id or package name).
+        """
         if not self.config.get("allow_pip"):
             LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()
             self.bus.emit(message.reply("ovos.skills.uninstall.failed",
                                         {"error": InstallError.DISABLED.value}))
             return
-        # TODO
-        LOG.error("pip uninstall not yet implemented")
-        self.play_error_sound()
-        self.bus.emit(message.reply("ovos.skills.uninstall.failed",
-                                    {"error": "not implemented"}))
+
+        skill = message.data.get("skill")
+        if not skill:
+            LOG.error("no skill specified for uninstall")
+            self.play_error_sound()
+            self.bus.emit(message.reply("ovos.skills.uninstall.failed",
+                                        {"error": InstallError.NO_PKGS.value}))
+            return
+
+        # Treat skill_id as a package name (e.g., 'skill-name.author' -> 'skill-name-author')
+        # or accept directly as package name
+        pkg_name = skill.replace(".", "-") if "." in skill else skill
+
+        if self.pip_uninstall([pkg_name]):
+            LOG.info(f"Successfully uninstalled skill: {skill}")
+            self.bus.emit(message.reply("ovos.skills.uninstall.complete"))
+        else:
+            LOG.error(f"Failed to uninstall skill: {skill}")
+            self.bus.emit(message.reply("ovos.skills.uninstall.failed",
+                                        {"error": InstallError.PIP_ERROR.value}))
 
     def handle_install_python(self, message: Message) -> None:
         """Handle a request to install arbitrary Python packages via pip."""
@@ -316,10 +335,22 @@ class SkillsStore:
 
 
 def launch_standalone():
-    # TODO - add docker detection and warn user
+    """Launch SkillsStore as a standalone service on the messagebus.
+
+    Warns the user if running in a container (Docker/Podman) where pip may
+    fail due to filesystem or permission issues.
+    """
     from ovos_bus_client import MessageBusClient
     from ovos_utils import wait_for_exit_signal
     from ovos_utils.log import init_service_logger
+
+    # Warn if running in a container
+    if exists("/.dockerenv") or exists("/run/.containerenv"):
+        LOG.warning(
+            "⚠️  SkillsStore is running inside a container (Docker/Podman). "
+            "Pip install/uninstall may fail if the container filesystem is read-only. "
+            "Mount a writable volume or use 'pip' with appropriate flags."
+        )
 
     LOG.info("Launching SkillsStore in standalone mode")
     init_service_logger("skill-installer")
