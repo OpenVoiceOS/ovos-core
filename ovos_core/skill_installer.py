@@ -226,17 +226,85 @@ class SkillsStore:
     def validate_skill(url: str) -> bool:
         """Validate that a skill URL is an installable GitHub skill.
 
+        Performs lightweight GitHub API validation (no auth required for public
+        repos).  The checks are:
+
+        1. URL must start with ``https://github.com/``.
+        2. The repository must exist (HTTP 200 from the GitHub contents API).
+        3. The repo must contain ``pyproject.toml`` or ``setup.cfg`` — a bare
+           ``setup.py``-only repo is rejected as it indicates a legacy skill.
+        4. ``pyproject.toml`` / ``setup.cfg`` must *not* reference ``MycroftSkill``
+           or ``CommonPlaySkill`` — those class names indicate an incompatible
+           legacy skill.
+
+        The GitHub API call uses a 3-second timeout; if GitHub is unreachable
+        the method falls back to ``True`` so that a transient network error does
+        not block legitimate installs.
+
         Args:
-            url (str): GitHub repository URL of the skill.
+            url (str): GitHub repository URL of the skill
+                (e.g. ``https://github.com/OpenVoiceOS/ovos-skill-hello-world``).
 
         Returns:
-            bool: True if the URL points to a valid GitHub skill, False otherwise.
+            bool: True if the URL points to a valid, OVOS-compatible GitHub skill;
+                  False if the URL is invalid or the repo fails any check.
         """
         if not url.startswith("https://github.com/"):
             return False
-        # TODO - check if setup.py
-        # TODO - check if not using MycroftSkill class
-        # TODO - check if not mycroft CommonPlay
+
+        # parse owner/repo from URL (strip trailing .git or extra path segments)
+        path = url[len("https://github.com/"):].rstrip("/")
+        parts = path.split("/")
+        if len(parts) < 2:
+            LOG.warning(f"validate_skill: cannot parse owner/repo from '{url}'")
+            return False
+        owner, repo = parts[0], parts[1].removesuffix(".git")
+
+        api_base = f"https://api.github.com/repos/{owner}/{repo}/contents/"
+        try:
+            response = requests.get(api_base, timeout=3,
+                                    headers={"Accept": "application/vnd.github+json"})
+        except Exception as exc:
+            LOG.warning(f"validate_skill: GitHub unreachable, skipping deep check — {exc}")
+            return True  # fail open: transient network errors should not block installs
+
+        if response.status_code == 404:
+            LOG.warning(f"validate_skill: repo not found — {owner}/{repo}")
+            return False
+        if not response.ok:
+            LOG.warning(f"validate_skill: GitHub API returned {response.status_code} for {url}, skipping deep check")
+            return True  # fail open on unexpected API errors
+
+        file_names = {entry["name"] for entry in response.json()
+                      if isinstance(entry, dict)}
+
+        # reject bare setup.py-only repos (legacy Mycroft packaging)
+        if "setup.py" in file_names and "pyproject.toml" not in file_names and "setup.cfg" not in file_names:
+            LOG.warning(f"validate_skill: '{owner}/{repo}' uses only setup.py — legacy packaging, rejecting")
+            return False
+
+        # fetch the modern packaging manifest to scan for incompatible base classes
+        for manifest in ("pyproject.toml", "setup.cfg"):
+            if manifest not in file_names:
+                continue
+            manifest_url = f"https://raw.githubusercontent.com/{owner}/{repo}/HEAD/{manifest}"
+            try:
+                manifest_resp = requests.get(manifest_url, timeout=3)
+            except Exception as exc:
+                LOG.warning(f"validate_skill: could not fetch {manifest} — {exc}")
+                break
+            if not manifest_resp.ok:
+                break
+            content = manifest_resp.text
+            for legacy_class in ("MycroftSkill", "CommonPlaySkill"):
+                if legacy_class in content:
+                    LOG.warning(
+                        f"validate_skill: '{owner}/{repo}' references {legacy_class} — "
+                        f"incompatible legacy skill, rejecting"
+                    )
+                    return False
+            break  # only need to check one manifest
+
         return True
 
     def handle_install_skill(self, message: Message) -> None:

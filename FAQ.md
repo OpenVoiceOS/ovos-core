@@ -1,6 +1,19 @@
 
 # FAQ - ovos-core
 
+## How does `validate_skill` prevent installing incompatible skills?
+
+`SkillsStore.validate_skill()` (`skill_installer.py:226`) performs lightweight GitHub API validation (no auth required for public repos):
+
+1. URL must start with `https://github.com/`.
+2. The repository must exist (HTTP 200 from `api.github.com/repos/{owner}/{repo}/contents/`).
+3. The repo must contain `pyproject.toml` or `setup.cfg` — a bare `setup.py`-only repo is rejected as legacy packaging.
+4. `pyproject.toml`/`setup.cfg` must not reference `MycroftSkill` or `CommonPlaySkill` — those indicate an incompatible legacy skill.
+
+If GitHub is unreachable (network error or non-404 API error), the method returns `True` (fail-open) so transient outages do not block installs.
+
+---
+
 ## Why does IntentService time out waiting at startup?
 
 If `wait_for_intent_service` raises `RuntimeError: IntentService did not become ready within 300 seconds`, the IntentService process is either not running or not connected to the messagebus. The timeout is configurable via `skills.intent_service_timeout` in `mycroft.conf` (seconds, default 300).

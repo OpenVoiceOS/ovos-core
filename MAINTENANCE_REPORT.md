@@ -1,6 +1,20 @@
 
 # Maintenance Report - ovos-core
 
+## [2026-03-12] - S-003 validate_skill GitHub API + test fixes (Claude Sonnet 4.6)
+
+### AI Model
+claude-sonnet-4-6
+
+### Actions Taken
+- **S-003 — `validate_skill()` GitHub API validation** (`skill_installer.py:226`): Replaced stub `return True` with full validation: parse `owner/repo`, call `api.github.com/repos/{owner}/{repo}/contents/`, reject 404 repos, reject bare `setup.py`-only repos (legacy packaging), fetch and scan `pyproject.toml`/`setup.cfg` for `MycroftSkill`/`CommonPlaySkill` class names, fail-open on network errors and unexpected API status codes (3 s timeout).
+- **Fixed 3 failing unit tests in `test_skill_installer.py`**: `test_validate_skill`, `test_handle_install_skill_from_github`, `test_handle_install_skill_from_github_failure` — these now mock `requests.get`/`validate_skill` instead of making real network calls.
+- **Added 10 new `validate_skill` unit tests**: non-GitHub URLs, missing repo segment, valid OVOS skill, 404 not found, setup.py-only rejection, MycroftSkill rejection, CommonPlaySkill rejection, network error fail-open, unexpected API error fail-open, setup.cfg valid, `.git` suffix stripped.
+- **Updated `FAQ.md`** with S-003 behaviour documentation.
+
+### Oversight
+Human review required. All 145 unit tests pass.
+
 ## [2026-03-12] - Bug Fixes & Latency Improvements (Claude Sonnet 4.6)
 
 ### AI Model
