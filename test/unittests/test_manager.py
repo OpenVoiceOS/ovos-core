@@ -34,6 +34,7 @@ class TestSkillManager(unittest.TestCase):
     @patch('ovos_core.skill_manager.is_gui_connected', return_value=True)
     def test_handle_gui_connected(self, mock_is_gui_connected):
         self.skill_manager._allow_state_reloads = True
+        self.skill_manager._startup_complete_event.set()
         self.skill_manager._gui_event.clear()
         self.skill_manager._load_new_skills = MagicMock()
         self.skill_manager.handle_gui_connected(Message("", data={"permanent": False}))
@@ -51,6 +52,7 @@ class TestSkillManager(unittest.TestCase):
 
     @patch('ovos_core.skill_manager.is_connected_http', return_value=True)
     def test_handle_internet_connected(self, mock_is_connected):
+        self.skill_manager._startup_complete_event.set()
         self.skill_manager._connected_event.clear()
         self.skill_manager._network_event.clear()
         self.skill_manager._network_loaded.set()
@@ -72,6 +74,7 @@ class TestSkillManager(unittest.TestCase):
 
     @patch('ovos_core.skill_manager.is_connected_http', return_value=True)
     def test_handle_network_connected(self, mock_is_connected):
+        self.skill_manager._startup_complete_event.set()
         self.skill_manager._network_event.clear()
         self.skill_manager._load_on_network = MagicMock()
         self.skill_manager.handle_network_connected(Message(""))

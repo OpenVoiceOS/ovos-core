@@ -1,42 +1,16 @@
 name: Run Build Tests
 on:
   push:
-    branches:
-      - master
+    branches: [master]
   pull_request:
-    branches:
-      - dev
-    paths:
-      - 'requirements/**'
-      - 'setup.py'
+    branches: [dev]
   workflow_dispatch:
 
 jobs:
   build_tests:
-    strategy:
-      max-parallel: 2
-      matrix:
-        python-version: ["3.10", "3.11"]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install Build Tools
-        run: |
-          python -m pip install build wheel uv
-      - name: Install System Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt install python3-dev swig libssl-dev libfann-dev portaudio19-dev libpulse-dev python3-fann2
-      - name: Build Source Packages
-        run: |
-          python setup.py sdist
-      - name: Build Distribution Packages
-        run: |
-          python setup.py bdist_wheel
-      - name: Install package
-        run: |
-          uv pip install --system .[mycroft,lgpl,plugins,skills-essential,skills-extra,skills-audio,skills-gui,skills-internet,skills-media,skills-desktop,skills-en,skills-ca,skills-pt]
+    uses: OpenVoiceOS/gh-automations/.github/workflows/build-tests.yml@dev
+    secrets: inherit
+    with:
+      system_deps: 'swig libssl-dev portaudio19-dev libpulse-dev libfann-dev'
+      install_extras: 'mycroft,plugins,skills-essential,lgpl,test'
+      test_path: 'test/unittests'

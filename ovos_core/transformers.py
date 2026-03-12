@@ -11,7 +11,7 @@ from ovos_utils.log import LOG
 
 class UtteranceTransformersService:
 
-    def __init__(self, bus, config=None):
+    def __init__(self, bus, config=None) -> None:
         self.config_core = config or Configuration()
         self.loaded_plugins = {}
         self.has_loaded = False
@@ -20,10 +20,10 @@ class UtteranceTransformersService:
         self.load_plugins()
 
     @staticmethod
-    def find_plugins():
+    def find_plugins() -> any:
         return find_utterance_transformer_plugins().items()
 
-    def load_plugins(self):
+    def load_plugins(self) -> None:
         for plug_name, plug in self.find_plugins():
             if plug_name in self.config:
                 # if disabled skip it
@@ -49,11 +49,11 @@ class UtteranceTransformersService:
         return sorted(self.loaded_plugins.values(),
                       key=lambda k: k.priority, reverse=True)
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         for module in self.plugins:
             try:
                 module.shutdown()
-            except:
+            except Exception:
                 pass
 
     def transform(self, utterances: List[str], context: Optional[dict] = None):
@@ -72,7 +72,7 @@ class UtteranceTransformersService:
 
 class MetadataTransformersService:
 
-    def __init__(self, bus, config=None):
+    def __init__(self, bus, config=None) -> None:
         self.config_core = config or Configuration()
         self.loaded_plugins = {}
         self.has_loaded = False
@@ -81,10 +81,10 @@ class MetadataTransformersService:
         self.load_plugins()
 
     @staticmethod
-    def find_plugins():
+    def find_plugins() -> any:
         return find_metadata_transformer_plugins().items()
 
-    def load_plugins(self):
+    def load_plugins(self) -> None:
         for plug_name, plug in self.find_plugins():
             if plug_name in self.config:
                 # if disabled skip it
@@ -109,11 +109,11 @@ class MetadataTransformersService:
         return sorted(self.loaded_plugins.values(),
                       key=lambda k: k.priority, reverse=True)
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         for module in self.plugins:
             try:
                 module.shutdown()
-            except:
+            except Exception:
                 pass
 
     def transform(self, context: Optional[dict] = None):
@@ -193,14 +193,14 @@ class IntentTransformersService:
         return sorted(self.loaded_plugins.values(),
                       key=lambda k: k.priority, reverse=True)
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         """
         Shuts down all loaded plugins, suppressing any exceptions raised during shutdown.
         """
         for module in self.plugins:
             try:
                 module.shutdown()
-            except:
+            except Exception:
                 pass
 
     def transform(self, intent: IntentHandlerMatch) -> IntentHandlerMatch:

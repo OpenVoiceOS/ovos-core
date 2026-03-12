@@ -36,22 +36,33 @@ class SkillsStore:
         self.bus.on("ovos.pip.install", self.handle_install_python)
         self.bus.on("ovos.pip.uninstall", self.handle_uninstall_python)
 
-    def shutdown(self):
+    def shutdown(self) -> None:
+        """Unregister all message bus event handlers."""
         self.bus.remove("ovos.skills.install", self.handle_install_skill)
         self.bus.remove("ovos.skills.uninstall", self.handle_uninstall_skill)
         self.bus.remove("ovos.pip.install", self.handle_install_python)
         self.bus.remove("ovos.pip.uninstall", self.handle_uninstall_python)
 
-    def play_error_sound(self):
+    def play_error_sound(self) -> None:
+        """Emit a message to play the configured error sound."""
         snd = self.config.get("sounds", {}).get("pip_error", "snd/error.mp3")
         self.bus.emit(Message("mycroft.audio.play_sound", {"uri": snd}))
 
-    def play_success_sound(self):
+    def play_success_sound(self) -> None:
+        """Emit a message to play the configured success sound."""
         snd = self.config.get("sounds", {}).get("pip_success", "snd/acknowledge.mp3")
         self.bus.emit(Message("mycroft.audio.play_sound", {"uri": snd}))
 
     @staticmethod
-    def validate_constrainsts(constraints: str):
+    def validate_constraints(constraints: str) -> bool:
+        """Validate a constraints file path or URL.
+
+        Args:
+            constraints (str): Local file path or HTTP URL to a pip constraints file.
+
+        Returns:
+            bool: True if the constraints file is accessible, False otherwise.
+        """
         if constraints.startswith('http'):
             LOG.debug(f"Constraints url: {constraints}")
             try:
@@ -73,7 +84,17 @@ class SkillsStore:
 
     def pip_install(self, packages: list,
                     constraints: Optional[str] = None,
-                    print_logs: bool = True):
+                    print_logs: bool = True) -> bool:
+        """Install Python packages via pip or uv.
+
+        Args:
+            packages (list): List of package specifiers to install.
+            constraints (str): Optional constraints file path or URL.
+            print_logs (bool): Whether to print pip output to stdout.
+
+        Returns:
+            bool: True if all packages were installed successfully, False otherwise.
+        """
         if not len(packages):
             LOG.error("no package list provided to install")
             self.play_error_sound()
@@ -82,7 +103,7 @@ class SkillsStore:
         # can be set in mycroft.conf to change to testing/alpha channels
         constraints = constraints or self.config.get("constraints", SkillsStore.DEFAULT_CONSTRAINTS)
 
-        if not self.validate_constrainsts(constraints):
+        if not self.validate_constraints(constraints):
             self.play_error_sound()
             return False
 
@@ -125,7 +146,19 @@ class SkillsStore:
 
     def pip_uninstall(self, packages: list,
                       constraints: Optional[str] = None,
-                      print_logs: bool = True):
+                      print_logs: bool = True) -> bool:
+        """Uninstall Python packages via pip or uv.
+
+        Protected packages (listed in the constraints file) cannot be removed.
+
+        Args:
+            packages (list): List of package names to uninstall.
+            constraints (str): Optional constraints file path or URL used to identify protected packages.
+            print_logs (bool): Whether to print pip output to stdout.
+
+        Returns:
+            bool: True if all packages were uninstalled successfully, False otherwise.
+        """
         if not len(packages):
             LOG.error("no package list provided to uninstall")
             self.play_error_sound()
@@ -134,7 +167,7 @@ class SkillsStore:
         # can be set in mycroft.conf to change to testing/alpha channels
         constraints = constraints or self.config.get("constraints", SkillsStore.DEFAULT_CONSTRAINTS)
 
-        if not self.validate_constrainsts(constraints):
+        if not self.validate_constraints(constraints):
             self.play_error_sound()
             return False
 
@@ -190,7 +223,15 @@ class SkillsStore:
         return True
 
     @staticmethod
-    def validate_skill(url):
+    def validate_skill(url: str) -> bool:
+        """Validate that a skill URL is an installable GitHub skill.
+
+        Args:
+            url (str): GitHub repository URL of the skill.
+
+        Returns:
+            bool: True if the URL points to a valid GitHub skill, False otherwise.
+        """
         if not url.startswith("https://github.com/"):
             return False
         # TODO - check if setup.py
@@ -198,7 +239,8 @@ class SkillsStore:
         # TODO - check if not mycroft CommonPlay
         return True
 
-    def handle_install_skill(self, message: Message):
+    def handle_install_skill(self, message: Message) -> None:
+        """Handle a request to install a skill from a GitHub URL."""
         if not self.config.get("allow_pip"):
             LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()
@@ -220,7 +262,8 @@ class SkillsStore:
             self.bus.emit(message.reply("ovos.skills.install.failed",
                                         {"error": InstallError.BAD_URL.value}))
 
-    def handle_uninstall_skill(self, message: Message):
+    def handle_uninstall_skill(self, message: Message) -> None:
+        """Handle a request to uninstall a skill (not yet implemented)."""
         if not self.config.get("allow_pip"):
             LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()
@@ -233,7 +276,8 @@ class SkillsStore:
         self.bus.emit(message.reply("ovos.skills.uninstall.failed",
                                     {"error": "not implemented"}))
 
-    def handle_install_python(self, message: Message):
+    def handle_install_python(self, message: Message) -> None:
+        """Handle a request to install arbitrary Python packages via pip."""
         if not self.config.get("allow_pip"):
             LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()
@@ -251,7 +295,8 @@ class SkillsStore:
             self.bus.emit(message.reply("ovos.pip.install.failed",
                                         {"error": InstallError.NO_PKGS.value}))
 
-    def handle_uninstall_python(self, message: Message):
+    def handle_uninstall_python(self, message: Message) -> None:
+        """Handle a request to uninstall Python packages via pip."""
         if not self.config.get("allow_pip"):
             LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()

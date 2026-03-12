@@ -1,5 +1,0 @@
-recursive-include mycroft/ *
-recursive-include ovos_core/ *
-recursive-include requirements/ *
-include CHANGELOG.md
-include LICENSE
