@@ -228,13 +228,15 @@ class ConverseService(PipelinePlugin):
 
         event = Event()
 
-        def handle_ack(msg):
+        def handle_ack(msg: Message) -> None:
             nonlocal event
-            skill_id = msg.data["skill_id"]
+            skill_id = msg.data.get("skill_id")
+            if not skill_id:
+                return  # guard against malformed pong messages
 
-            # validate the converse pong
+            # validate the converse pong; default False — a non-responding skill should not converse
             if all((skill_id not in want_converse,
-                    msg.data.get("can_handle", True),
+                    msg.data.get("can_handle", False),
                     skill_id in active_skills)):
                 want_converse.append(skill_id)
 
@@ -246,15 +248,15 @@ class ConverseService(PipelinePlugin):
                 event.set()
 
         self.bus.on("skill.converse.pong", handle_ack)
+        try:
+            # ask skills if they want to converse
+            for skill_id in active_skills:
+                self.bus.emit(message.forward(f"{skill_id}.converse.ping", {**message.data, "skill_id": skill_id}))
 
-        # ask skills if they want to converse
-        for skill_id in active_skills:
-            self.bus.emit(message.forward(f"{skill_id}.converse.ping", {**message.data, "skill_id": skill_id}))
-
-        # wait for all skills to acknowledge they want to converse
-        event.wait(timeout=0.5)
-
-        self.bus.remove("skill.converse.pong", handle_ack)
+            # wait for all skills to acknowledge they want to converse
+            event.wait(timeout=0.5)
+        finally:
+            self.bus.remove("skill.converse.pong", handle_ack)
         return want_converse
 
     def _check_converse_timeout(self, message: Message):

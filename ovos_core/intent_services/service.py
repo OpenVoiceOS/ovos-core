@@ -406,7 +406,7 @@ class IntentService:
             - Uses the default cancel sound path 'snd/cancel.mp3' if not specified in configuration
             - Ensures events are sent as replies to the original message
         """
-        LOG.info("utterance canceled, cancel_word:" + message.context.get("cancel_word"))
+        LOG.info(f"utterance canceled, cancel_word:{message.context.get('cancel_word')}")
         # play dedicated cancel sound
         sound = Configuration().get('sounds', {}).get('cancel', "snd/cancel.mp3")
         # NOTE: message.reply to ensure correct message destination

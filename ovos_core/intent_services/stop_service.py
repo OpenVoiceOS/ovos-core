@@ -98,7 +98,7 @@ class StopService(ConfidenceMatcherPipeline):
 
         event = Event()
 
-        def handle_ack(msg):
+        def handle_ack(msg: Message) -> None:
             """
             Handle acknowledgment from skills during the stop process.
 
@@ -117,11 +117,13 @@ class StopService(ConfidenceMatcherPipeline):
                 - Ensures all active skills provide a response before proceeding
             """
             nonlocal event, skill_ids
-            skill_id = msg.data["skill_id"]
+            skill_id = msg.data.get("skill_id")
+            if not skill_id:
+                return  # guard against malformed pong messages
 
-            # validate the stop pong
+            # validate the stop pong; default False — a non-responding skill should not be assumed stoppable
             if all((skill_id not in want_stop,
-                    msg.data.get("can_handle", True),
+                    msg.data.get("can_handle", False),
                     skill_id in active_skills)):
                 want_stop.append(skill_id)
 
@@ -133,16 +135,16 @@ class StopService(ConfidenceMatcherPipeline):
                 event.set()
 
         self.bus.on("skill.stop.pong", handle_ack)
+        try:
+            # ask skills if they can stop
+            for skill_id in active_skills:
+                self.bus.emit(message.forward(f"{skill_id}.stop.ping",
+                                              {"skill_id": skill_id}))
 
-        # ask skills if they can stop
-        for skill_id in active_skills:
-            self.bus.emit(message.forward(f"{skill_id}.stop.ping",
-                                          {"skill_id": skill_id}))
-
-        # wait for all skills to acknowledge they can stop
-        event.wait(timeout=0.5)
-
-        self.bus.remove("skill.stop.pong", handle_ack)
+            # wait for all skills to acknowledge they can stop
+            event.wait(timeout=0.5)
+        finally:
+            self.bus.remove("skill.stop.pong", handle_ack)
         return want_stop or active_skills
 
     def handle_stop_confirmation(self, message: Message):

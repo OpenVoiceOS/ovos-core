@@ -453,7 +453,9 @@ class SkillManager(Thread):
 
     def wait_for_intent_service(self) -> None:
         """ensure IntentService reported ready to accept skill messages"""
-        while not self._stop_event.is_set():
+        max_wait: int = self.config.get("skills", {}).get("intent_service_timeout", 300)
+        elapsed: int = 0
+        while not self._stop_event.is_set() and elapsed < max_wait:
             response = self.bus.wait_for_response(
                 Message('mycroft.intents.is_ready',
                         context={"source": "skills", "destination": "intents"}),
@@ -461,7 +463,13 @@ class SkillManager(Thread):
             if response and response.data.get('status'):
                 return
             self._stop_event.wait(1)
-        raise RuntimeError("Skill manager stopped while waiting for intent service")
+            elapsed += 1
+        if self._stop_event.is_set():
+            raise RuntimeError("Skill manager stopped while waiting for intent service")
+        raise RuntimeError(
+            f"IntentService did not become ready within {max_wait} seconds; "
+            "check that the intent service process is running and connected to the bus"
+        )
 
     def run(self) -> None:
         """Run the skill manager thread."""

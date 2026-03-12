@@ -1,6 +1,16 @@
 
 # FAQ - ovos-core
 
+## Why does IntentService time out waiting at startup?
+
+If `wait_for_intent_service` raises `RuntimeError: IntentService did not become ready within 300 seconds`, the IntentService process is either not running or not connected to the messagebus. The timeout is configurable via `skills.intent_service_timeout` in `mycroft.conf` (seconds, default 300).
+
+## Why does converse/stop skip a skill that doesn't respond to the ping?
+
+Since 2026-03-12, `_collect_converse_skills` and `_collect_stop_skills` use `can_handle` default `False`. A skill that does not respond to the converse/stop ping within 0.5 s is excluded — it is not assumed to want to handle the utterance. This avoids stale listeners and unexpected behaviour when a skill process is unresponsive.
+
+---
+
 ## What is ovos-core?
 `ovos-core` is the central component of the OpenVoiceOS platform, responsible for skill management, intent parsing, and orchestration of the voice assistant's features. It is a fork of the original Mycroft AI core.
 

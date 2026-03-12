@@ -1,6 +1,31 @@
 
 # Maintenance Report - ovos-core
 
+## [2026-03-12] - Bug Fixes & Latency Improvements (Claude Sonnet 4.6)
+
+### AI Model
+claude-sonnet-4-6
+
+### Actions Taken
+**Priority 1 — Real Bugs Fixed:**
+- **Bus listener leak — `_collect_converse_skills`** (`converse_service.py:248`): Wrapped `bus.on`/`event.wait`/`bus.remove` in `try/finally` so the listener is always removed even if `handle_ack` raises. Added `.get("skill_id")` guard to avoid `KeyError` on malformed pong messages. Changed `can_handle` default from `True` → `False` so a non-responding skill is not assumed to want to converse.
+- **Bus listener leak — `_collect_stop_skills`** (`stop_service.py:135`): Same `try/finally` fix. Added `.get("skill_id")` guard. Changed `can_handle` default from `True` → `False`.
+
+**Priority 2 — Latency:**
+- Sound config caching was NOT applied — `Configuration()` in OVOS is a live object that reflects runtime config changes without restart; caching at init time would break that behaviour.
+
+**Priority 3 — Quality:**
+- **`wait_for_intent_service` infinite retry** (`skill_manager.py:454`): Added configurable `max_wait` (default 300 s, via `skills.intent_service_timeout` config key). Raises a descriptive `RuntimeError` with instructions if the timeout is exceeded.
+- **Log string concat crash** (`service.py:409`): `"cancel_word:" + message.context.get("cancel_word")` crashes when `cancel_word` is `None`. Changed to f-string.
+
+### Not Changed (per plan)
+- 1a (`handle_stop_confirmation` order) — already correct in current code
+- 3b (log level in `handle_stop_confirmation`) — already `LOG.debug` in current code
+- S-001/S-003/S-006 — deferred per plan
+
+### Oversight
+Human review of diff + all 65 unit tests pass.
+
 ## [2026-03-12] - Fix S-002: Implement Skill Uninstall (Claude Haiku 4.5)
 
 ### Changes
