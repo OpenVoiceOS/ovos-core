@@ -21,15 +21,19 @@ This file documents proposed improvements, refactors, and feature enhancements f
 
 ---
 
-## [S-002] Implement skill uninstall via bus API
+## [S-002] Implement skill uninstall via bus API [ADDRESSED 2026-03-12]
 
-**Problem/Opportunity**: `handle_uninstall_skill()` in `skill_installer.py` always returns a "not implemented" error. The `ovos.skills.uninstall` bus event is wired up but non-functional.
+**Status**: Fully implemented — `handle_uninstall_skill()` now calls `pip_uninstall()` to remove skill packages.
 
-**Proposed Solution**: Implement `pip_uninstall([package])` call inside `handle_uninstall_skill`, using the existing `pip_uninstall` method. Optionally derive the package name from the skill's entry point metadata.
+**Solution Implemented**:
+- `handle_uninstall_skill()` validates 'skill' parameter in message data
+- Converts skill_id to package name (e.g., 'skill-name.author' → 'skill-name-author')
+- Calls `pip_uninstall([pkg_name])` with protected package constraints
+- Emits success (`ovos.skills.uninstall.complete`) or failure responses
 
-**Estimated Impact**: Medium — unblocks skill lifecycle management from remote clients and Hivemind.
+**Impact**: ✅ Unblocks remote skill lifecycle management (Hivemind, CLI clients).
 
-**Reference**: `ovos_core/skill_installer.py:223-234`
+**Reference**: `ovos_core/skill_installer.py:265-296`, commit `ffeec1c7f0`
 
 ---
 
@@ -69,15 +73,28 @@ This file documents proposed improvements, refactors, and feature enhancements f
 
 ---
 
-## [S-006] Track external (standalone/Hivemind) skills in SkillManager
+## [S-006] Track external (standalone/Hivemind) skills in SkillManager [ARCHITECTURAL LIMITATION]
 
-**Problem/Opportunity**: Four TODOs in `skill_manager.py` note that `send_skill_list`, `deactivate_skill`, `deactivate_except`, and `activate_skill` only operate on `self.plugin_skills` and do not account for `OVOSAbstractApp` or Hivemind-connected skills.
+**Problem/Opportunity**: Four TODOs in `skill_manager.py` note that `send_skill_list`, `deactivate_skill`, `deactivate_except`, and `activate_skill` only operate on `self.plugin_skills` and do not account for skills running in external processes.
 
-**Proposed Solution**: Introduce a secondary registry (e.g., `self.external_skills: Dict[str, SkillState]`) populated by bus messages from standalone apps announcing their presence. Merge this registry in the skill list/activate/deactivate handlers.
+**Root Cause**: External skills (standalone skills, Hivemind satellites, OVOSAbstractApp instances) run in separate Python processes. ovos-core has **no Python object reference** to them — only messagebus connectivity. This is architectural, not a bug.
 
-**Estimated Impact**: Medium — required for full skill lifecycle visibility in multi-device/Hivemind setups.
+**Why No Registry Works**:
+- External skills are discovered/launched independently (not by ovos-core)
+- They connect to the messagebus and emit/listen to events
+- ovos-core cannot "activate" or "deactivate" them (they control their own lifecycle)
+- A registry would be false visibility — ovos-core would track state it doesn't control
 
-**Reference**: `ovos_core/skill_manager.py:539, 554, 568, 582`
+**Correct Pattern**: External skills should:
+1. Emit `ovos.skills.installed` on messagebus to announce themselves
+2. Listen to `{skill_id}.activate` / `{skill_id}.deactivate` messages and respond appropriately
+3. Emit bus events for lifecycle changes (ready, active, inactive, etc.)
+
+**Reference**: See `ovos-workshop` skill launcher pattern for external skill startup.
+
+**Status**: Won't fix — document the pattern instead. This is working as designed.
+
+**Reference**: `ovos_core/skill_manager.py:665, 680, 697, 710`
 
 ---
 

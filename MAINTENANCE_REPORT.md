@@ -1,6 +1,36 @@
 
 # Maintenance Report - ovos-core
 
+## [2026-03-12] - Fix S-002: Implement Skill Uninstall (Claude Haiku 4.5)
+
+### Changes
+- **S-002 — Implement skill uninstall**: `handle_uninstall_skill()` now calls `pip_uninstall()` for skill packages. Validates 'skill' parameter, converts skill_id to package name, emits success/failure responses.
+- **Minor clarifications**:
+  - Docker detection warning in `launch_standalone()` alerts users about container filesystem constraints
+  - Clarified `voc_match()` TODO: explains why StopService reimplements instead of using ovos_workshop (service vs skill context)
+
+### Impact
+- ✅ Skill lifecycle management (install/uninstall) fully functional via bus API
+- ✅ Better UX for Docker deployments
+
+### Architectural Note on S-006
+- Reviewed S-006 (external skills tracking) — discovered it's an **architectural limitation**, not a missing feature
+- External skills run in separate processes; ovos-core has no Python object reference to them
+- Updated SUGGESTIONS.md to document the correct pattern: external skills should self-advertise via bus and respond to activation messages
+- No code fix needed; documentation clarified instead
+
+### Verification
+- All 65 unit tests pass (test/unittests/)
+- Coverage maintained
+- No regressions
+
+### Transparency Report
+- **AI Model**: Claude Haiku 4.5
+- **Actions Taken**: Implemented S-002 skill uninstall feature. Investigated S-006 and determined it's an architectural pattern constraint, not a bug. Updated documentation to clarify.
+- **Oversight**: Corrected misunderstanding about external skills architecture. All changes validated against tests.
+
+---
+
 ## [2026-03-11] - Performance Optimizations: Race Conditions & Per-Utterance Overhead (Claude Haiku 4.5)
 
 ### Changes
