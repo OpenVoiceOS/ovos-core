@@ -100,3 +100,35 @@ Set `intents.multilingual_matching: true` in `mycroft.conf`. If the primary lang
 ### What are utterance transformers?
 Plugins under the `opm.utterance_transformer` entry point that pre-process utterances before intent matching. Configured under `utterance_transformers` in `mycroft.conf`. Loaded by `UtteranceTransformersService` in `ovos_core/transformers.py`.
 
+---
+
+## Performance
+
+### What performance optimizations are in place?
+`ovos-core` includes several built-in optimizations:
+
+- **Thread-safe skill loading** — `_plugin_skills_lock` prevents concurrent dict mutation during `_load_plugin_skill()` and `_unload_plugin_skill()` (skill_manager.py:585-603)
+- **Safe iteration snapshots** — `send_skill_list()`, `deactivate_skill()`, `activate_skill()`, and `deactivate_except()` snapshot the plugin_skills dict inside the lock before iterating to prevent RuntimeError during concurrent modifications
+- **Event-based fallback signaling** — `_collect_fallback_skills()` uses `threading.Event` instead of busy-wait (fallback_service.py:122-125), reducing CPU usage on utterances reaching fallback
+- **Reusable stop event** — `wait_for_intent_service()` reuses `self._stop_event` instead of creating temporary Event objects (skill_manager.py:462)
+- **Pipeline matcher caching** — `get_pipeline_matcher()` uses module-level constants for migration map and pre-compiled regex (service.py:39-63, 237-238)
+- **Deferred thread spawning** — `create_daemon()` for metrics upload is guarded by config check; threads only spawn if `open_data.intent_urls` is configured (service.py:322, 352)
+- **Transformer plugin caching** — `UtteranceTransformersService`, `MetadataTransformersService`, and `IntentTransformersService` cache sorted plugins; cache is invalidated on `load_plugins()` (transformers.py)
+- **Fast blacklist lookup** — `_logged_skill_warnings` is a set (O(1) lookup) instead of list (skill_manager.py:111)
+- **Single blacklist read** — blacklist is read once before the plugin scan loop, not per-skill (skill_manager.py:363)
+
+### How can I measure ovos-core performance?
+Use the `Stopwatch` utility from `ovos_utils.metrics` to profile hot paths. Example:
+```python
+from ovos_utils.metrics import Stopwatch
+with Stopwatch("intent_match") as s:
+    match = self.intent_plugins.transform(match)
+LOG.info(f"Intent transform took {s.total} seconds")
+```
+
+### Why does my IntentService seem slow on startup?
+Common causes:
+- **No internet** — pipeline plugins that require network (e.g., OpenWeatherMap) may timeout. Set their timeout or disable them.
+- **Many skills** — each skill loads sequentially by default. Enable deferred loading: `skills.use_deferred_loading: true`
+- **Slow utterance transformers** — check that plugins are not making network calls in the critical path. Consider disabling unused ones.
+

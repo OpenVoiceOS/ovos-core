@@ -79,3 +79,27 @@ This file documents proposed improvements, refactors, and feature enhancements f
 
 **Reference**: `ovos_core/skill_manager.py:539, 554, 568, 582`
 
+---
+
+## [S-007] Performance Optimizations [ADDRESSED 2026-03-11]
+
+**Status**: Fully addressed (2026-03-11) — All identified race conditions and per-utterance overhead sources have been optimized.
+
+**Optimizations Implemented**:
+1. **Race Condition Fixes** (Priority 1):
+   - Added `_plugin_skills_lock` guard to `_unload_plugin_skill()` (skill_manager.py:585-603)
+   - Snapshot `plugin_skills` dict in `send_skill_list()`, `deactivate_skill()`, `activate_skill()`, `deactivate_except()` to prevent RuntimeError during concurrent modification
+   - Replaced busy-wait loop with `threading.Event` in `_collect_fallback_skills()` (fallback_service.py:122-125)
+
+2. **Per-Utterance Overhead** (Priority 2):
+   - Reuse `self._stop_event` instead of creating throwaway Event objects in `wait_for_intent_service()` (skill_manager.py:462)
+   - Moved `migration_map` dict and regex pattern to module-level constants (service.py:39-63), eliminating rebuild on every pipeline stage
+   - Guard `create_daemon()` calls with config check to skip thread creation when metrics disabled (service.py:322, 352)
+
+3. **Minor Optimizations** (Priority 3):
+   - Changed `_logged_skill_warnings` from list to set for O(1) lookup (skill_manager.py:111)
+   - Cache sorted plugins in `UtteranceTransformersService`, `MetadataTransformersService`, `IntentTransformersService` (transformers.py)
+   - Read `blacklist` once before plugin scan loop (skill_manager.py:363)
+
+**Reference**: MAINTENANCE_REPORT.md, AUDIT.md (Race Conditions section), FAQ.md (Performance section), commit `4274a52a09`.
+
