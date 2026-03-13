@@ -1,6 +1,49 @@
 
 # Maintenance Report - ovos-core
 
+## [2026-03-13] - Add Ovoscope Bus Coverage Report to CI (Qwen Code)
+
+### AI Model
+Qwen Code (Qwen 3.5)
+
+### Actions Taken
+- **Created `.github/workflows/ovoscope.yml`**: New workflow for end-to-end skill testing using ovoscope framework with bus coverage tracking.
+  - Uses `OpenVoiceOS/gh-automations/.github/workflows/ovoscope.yml@dev` reusable workflow
+  - Installs ovos-core with `[mycroft,plugins,skills-essential,lgpl,test]` extras
+  - Runs tests from `test/end2end/` directory
+  - Enables bus coverage reporting (`bus_coverage: true`)
+  - Posts `🔌 Skill Tests (ovoscope)` and `🚌 Bus Coverage` sections to PR comments
+  - Requires Adapt and Padatious pipelines (`require_adapt: true`, `require_padatious: true`)
+  
+- **Updated `FAQ.md`**: Added new "CI / Testing" section with:
+  - Explanation of ovos-core end-to-end testing strategy
+  - Instructions for running tests locally
+  - Description of bus coverage concept and what the report shows
+  
+- **Updated `QUICK_FACTS.md`**: Added "Testing & CI" section documenting:
+  - Unit tests vs end-to-end tests separation
+  - All CI workflows and their purposes
+  - Workflow reference table
+
+### Rationale
+Bus coverage provides behavioural testing metrics that complement code coverage. It shows which bus message types are exercised during tests, helping identify gaps in test coverage for skill interactions, intent matching, and pipeline behaviour.
+
+The workflow is kept separate from `build_tests.yml` (which runs unit tests) to maintain clear separation of concerns and allow independent troubleshooting.
+
+### Oversight
+- Workflow follows gh-automations `ovoscope.yml@dev` reusable workflow pattern
+- Bus coverage configuration uses sensible defaults:
+  - `bus_coverage_include: ""` (include all skills)
+  - `bus_coverage_exclude: "^Thread-|^intents$|^skills$|^__core__$"` (exclude internal threads and core services)
+- No changes to existing test files or test infrastructure required
+
+### Next Steps
+- Monitor first CI run to verify workflow executes correctly
+- Review bus coverage report to identify any gaps in existing end-to-end tests
+- Consider expanding test coverage based on bus coverage metrics
+
+---
+
 ## [2026-03-12] - S-003 validate_skill GitHub API + test fixes (Claude Sonnet 4.6)
 
 ### AI Model

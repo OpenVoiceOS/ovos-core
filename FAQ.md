@@ -1,6 +1,47 @@
 
 # FAQ - ovos-core
 
+## CI / Testing
+
+### What end-to-end tests does ovos-core run?
+
+ovos-core uses **ovoscope** for end-to-end skill testing. Tests live in `test/end2end/` and run via the `ovoscope.yml` GitHub Actions workflow.
+
+The workflow:
+- Installs ovos-core with `[mycroft,plugins,skills-essential,lgpl,test]` extras
+- Runs all tests in `test/end2end/` using pytest
+- Tests Adapt, Padatious, fallback, converse, and stop pipeline behaviours
+- Posts a `🔌 Skill Tests (ovoscope)` section to PR comments
+- Generates a `🚌 Bus Coverage` report showing which bus messages were observed/asserted
+
+See [ovoscope documentation](https://github.com/TigreGotico/ovoscope) for framework details.
+
+### How do I run end-to-end tests locally?
+
+```bash
+# Install ovos-core with test extras
+uv pip install -e .[test]
+
+# Run end-to-end tests
+pytest test/end2end/ -v --timeout=60
+
+# With bus coverage tracking
+pytest test/end2end/ -v --ovoscope-bus-cov --ovoscope-bus-cov-verbose
+```
+
+### What is bus coverage?
+
+Bus coverage tracks which bus message types your tests observe and assert against. Unlike code coverage, it measures **behavioural coverage** — whether your tests exercise the full range of bus interactions a skill produces.
+
+The bus coverage report shows:
+- **Listeners**: Which message handlers were triggered (and how many times)
+- **Emitters**: Which messages were emitted during tests
+- **Assertions**: Which emitted messages were explicitly asserted in test expectations
+
+See `ovoscope/docs/ci-integration.md` for configuration details.
+
+---
+
 ## How does `validate_skill` prevent installing incompatible skills?
 
 `SkillsStore.validate_skill()` (`skill_installer.py:226`) performs lightweight GitHub API validation (no auth required for public repos):
