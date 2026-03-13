@@ -14,7 +14,7 @@ jobs:
     with:
       system_deps: 'python3-dev swig libssl-dev portaudio19-dev libpulse-dev libfann-dev'
       install_extras: '.[mycroft,plugins,skills-essential,lgpl,test]'
-      test_path: 'test/'
+      test_path: 'test/unittests'
       coverage_source: 'ovos_core'
       deploy_pages: true
       gh_pages_branch: 'gh-pages'

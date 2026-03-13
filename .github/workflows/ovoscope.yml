@@ -15,7 +15,7 @@ jobs:
       runner: "ubuntu-latest"
       python_version: "3.11"
       system_deps: "python3-dev swig libssl-dev portaudio19-dev libpulse-dev libfann-dev"
-      install_extras: ".[mycroft,plugins,skills-essential,lgpl,test]"
+      install_extras: ".[test]"
       test_path: "test/end2end/"
       require_adapt: true
       require_padatious: true

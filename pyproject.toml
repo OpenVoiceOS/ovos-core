@@ -38,6 +38,12 @@ test = [
     "pytest-randomly>=3.16.0",
     "cov-core>=1.15.0",
     "ovoscope>=0.7.2,<1.0.0",
+    "ovos-m2v-pipeline>=0.0.6,<1.0.0",
+    "ovos-adapt-parser>=1.0.6, <2.0.0",
+    "ovos_padatious>=1.4.2,<2.0.0",
+    "ovos-utterance-plugin-cancel>=0.2.3, <1.0.0",
+    "ovos-skill-count>=0.0.1",
+    "ovos-skill-hello-world>=0.1.10",
 ]
 mycroft = [
     "ovos_PHAL[extras]>=0.2.9,<1.0.0",
