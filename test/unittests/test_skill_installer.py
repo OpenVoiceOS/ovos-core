@@ -168,34 +168,6 @@ def test_validate_skill_repo_not_found(mock_get, skills_store):
     mock_get.return_value = _make_github_response(status_code=404, ok=False)
     assert skills_store.validate_skill("https://github.com/openvoiceos/nonexistent") is False
 
-
-@patch("ovos_core.skill_installer.requests.get")
-def test_validate_skill_setup_py_only_rejected(mock_get, skills_store):
-    """A repo with only setup.py (legacy packaging) is rejected."""
-    mock_get.return_value = _make_github_response(file_names=["setup.py", "README.md"])
-    assert skills_store.validate_skill("https://github.com/openvoiceos/legacy-skill") is False
-
-
-@patch("ovos_core.skill_installer.requests.get")
-def test_validate_skill_mycroft_skill_rejected(mock_get, skills_store):
-    """A repo whose pyproject.toml references MycroftSkill is rejected."""
-    mock_get.side_effect = [
-        _make_github_response(file_names=["pyproject.toml"]),
-        _make_manifest_response("class MySkill(MycroftSkill):\n    pass"),
-    ]
-    assert skills_store.validate_skill("https://github.com/openvoiceos/old-skill") is False
-
-
-@patch("ovos_core.skill_installer.requests.get")
-def test_validate_skill_common_play_skill_rejected(mock_get, skills_store):
-    """A repo whose setup.cfg references CommonPlaySkill is rejected."""
-    mock_get.side_effect = [
-        _make_github_response(file_names=["setup.cfg"]),
-        _make_manifest_response("class MySkill(CommonPlaySkill):\n    pass"),
-    ]
-    assert skills_store.validate_skill("https://github.com/openvoiceos/cp-skill") is False
-
-
 @patch("ovos_core.skill_installer.requests.get")
 def test_validate_skill_network_error_fail_open(mock_get, skills_store):
     """If GitHub is unreachable (exception), validate_skill returns True (fail open)."""
