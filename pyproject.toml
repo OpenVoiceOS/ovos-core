@@ -155,5 +155,10 @@ include-package-data = true
 [tool.setuptools.packages.find]
 include = ["ovos_core*"]
 
+[tool.setuptools.package-data]
+ovos_core = [
+    "intent_services/locale/*/*.voc",
+]
+
 [tool.setuptools.dynamic]
 version = {attr = "ovos_core.version.__version__"}
