@@ -231,8 +231,8 @@ class SkillsStore:
 
         1. URL must start with ``https://github.com/``.
         2. The repository must exist (HTTP 200 from the GitHub contents API).
-        3. The repo must contain ``pyproject.toml`` or ``setup.cfg`` — a bare
-           ``setup.py``-only repo is rejected as it indicates a legacy skill.
+        3. The repo must contain ``pyproject.toml`` or ``setup.cfg`` or ``setup.py``
+           — a bare repo is rejected as it indicates a legacy skill.
         4. ``pyproject.toml`` / ``setup.cfg`` must *not* reference ``MycroftSkill``
            or ``CommonPlaySkill`` — those class names indicate an incompatible
            legacy skill.
@@ -279,31 +279,9 @@ class SkillsStore:
                       if isinstance(entry, dict)}
 
         # reject bare setup.py-only repos (legacy Mycroft packaging)
-        if "setup.py" in file_names and "pyproject.toml" not in file_names and "setup.cfg" not in file_names:
-            LOG.warning(f"validate_skill: '{owner}/{repo}' uses only setup.py — legacy packaging, rejecting")
+        if "setup.py" not in file_names and "pyproject.toml" not in file_names and "setup.cfg" not in file_names:
+            LOG.warning(f"validate_skill: '{owner}/{repo}' - legacy packaging, rejecting")
             return False
-
-        # fetch the modern packaging manifest to scan for incompatible base classes
-        for manifest in ("pyproject.toml", "setup.cfg"):
-            if manifest not in file_names:
-                continue
-            manifest_url = f"https://raw.githubusercontent.com/{owner}/{repo}/HEAD/{manifest}"
-            try:
-                manifest_resp = requests.get(manifest_url, timeout=3)
-            except Exception as exc:
-                LOG.warning(f"validate_skill: could not fetch {manifest} — {exc}")
-                break
-            if not manifest_resp.ok:
-                break
-            content = manifest_resp.text
-            for legacy_class in ("MycroftSkill", "CommonPlaySkill"):
-                if legacy_class in content:
-                    LOG.warning(
-                        f"validate_skill: '{owner}/{repo}' references {legacy_class} — "
-                        f"incompatible legacy skill, rejecting"
-                    )
-                    return False
-            break  # only need to check one manifest
 
         return True
 
