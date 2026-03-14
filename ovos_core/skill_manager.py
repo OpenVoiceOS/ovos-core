@@ -15,6 +15,7 @@
 """Load, update and manage skills on this device."""
 import os
 import threading
+import time
 from threading import Thread, Event
 from typing import Callable, List, Optional
 
@@ -455,6 +456,7 @@ class SkillManager(Thread):
         """ensure IntentService reported ready to accept skill messages"""
         max_wait: int = self.config.get("skills", {}).get("intent_service_timeout", 300)
         elapsed: int = 0
+        start_time = time.monotonic()
         while not self._stop_event.is_set() and elapsed < max_wait:
             response = self.bus.wait_for_response(
                 Message('mycroft.intents.is_ready',
@@ -463,7 +465,7 @@ class SkillManager(Thread):
             if response and response.data.get('status'):
                 return
             self._stop_event.wait(1)
-            elapsed += 1
+            elapsed = int(time.monotonic() - start_time)
         if self._stop_event.is_set():
             raise RuntimeError("Skill manager stopped while waiting for intent service")
         raise RuntimeError(
@@ -597,20 +599,24 @@ class SkillManager(Thread):
         Args:
             skill_id (str): Identifier of the plugin skill to unload.
         """
+        # Get skill_loader while holding lock, then release lock before shutdown
+        # to prevent deadlocks if skill shutdown code tries to re-enter the lock
+        skill_loader = None
         with self._plugin_skills_lock:
             if skill_id in self.plugin_skills:
                 LOG.info('Unloading plugin skill: ' + skill_id)
-                skill_loader = self.plugin_skills[skill_id]
-                if skill_loader.instance is not None:
-                    try:
-                        skill_loader.instance.shutdown()
-                    except Exception:
-                        LOG.exception('Failed to run skill specific shutdown code: ' + skill_loader.skill_id)
-                    try:
-                        skill_loader.instance.default_shutdown()
-                    except Exception:
-                        LOG.exception('Failed to shutdown skill: ' + skill_loader.skill_id)
-                self.plugin_skills.pop(skill_id)
+                skill_loader = self.plugin_skills.pop(skill_id)
+
+        # Call shutdown methods outside the lock to prevent deadlocks
+        if skill_loader is not None and skill_loader.instance is not None:
+            try:
+                skill_loader.instance.shutdown()
+            except Exception:
+                LOG.exception('Failed to run skill specific shutdown code: ' + skill_loader.skill_id)
+            try:
+                skill_loader.instance.default_shutdown()
+            except Exception:
+                LOG.exception('Failed to shutdown skill: ' + skill_loader.skill_id)
 
     def is_alive(self, message: Optional[Message] = None) -> bool:
         """Respond to is_alive status request."""

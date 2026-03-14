@@ -333,13 +333,18 @@ class SkillsStore:
         # or accept directly as package name
         pkg_name = skill.replace(".", "-") if "." in skill else skill
 
-        if self.pip_uninstall([pkg_name]):
-            LOG.info(f"Successfully uninstalled skill: {skill}")
-            self.bus.emit(message.reply("ovos.skills.uninstall.complete"))
-        else:
-            LOG.error(f"Failed to uninstall skill: {skill}")
+        try:
+            if self.pip_uninstall([pkg_name]):
+                LOG.info(f"Successfully uninstalled skill: {skill}")
+                self.bus.emit(message.reply("ovos.skills.uninstall.complete"))
+            else:
+                LOG.error(f"Failed to uninstall skill: {skill}")
+                self.bus.emit(message.reply("ovos.skills.uninstall.failed",
+                                            {"error": InstallError.PIP_ERROR.value}))
+        except Exception as e:
+            LOG.exception(f"Error uninstalling skill {skill}: {e}")
             self.bus.emit(message.reply("ovos.skills.uninstall.failed",
-                                        {"error": InstallError.PIP_ERROR.value}))
+                                        {"error": str(e)}))
 
     def handle_install_python(self, message: Message) -> None:
         """Handle a request to install arbitrary Python packages via pip."""
