@@ -19,6 +19,9 @@ class TestStopNoSkills(TestCase):
                                 "common_query.openvoiceos.stop.response",
                                 "persona.openvoiceos.stop.response",
                                 "ovos-hivemind-pipeline-plugin.stop.response",
+                                # StopService now subclasses OVOSAbstractApplication,
+                                # so it also emits a stop.response when mycroft.stop is broadcast
+                                "stop.openvoiceos.stop.response",
                                 ]
 
     def tearDown(self):
@@ -122,6 +125,9 @@ class TestCountSkills(TestCase):
                                 "common_query.openvoiceos.stop.response",
                                 "persona.openvoiceos.stop.response",
                                 "ovos-hivemind-pipeline-plugin.stop.response",
+                                # StopService now subclasses OVOSAbstractApplication,
+                                # so it also emits a stop.response when mycroft.stop is broadcast
+                                "stop.openvoiceos.stop.response",
                                 ]
 
     def tearDown(self):

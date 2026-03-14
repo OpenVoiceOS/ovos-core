@@ -1,9 +1,30 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, patch, MagicMock
 
 import pytest
 
 from ovos_bus_client import Message
 from ovos_core.skill_installer import SkillsStore
+
+
+def _make_github_response(status_code: int = 200, file_names: list = None,
+                          ok: bool = True) -> MagicMock:
+    """Build a fake requests.Response for the GitHub contents API."""
+    resp = MagicMock()
+    resp.status_code = status_code
+    resp.ok = ok
+    if file_names is not None:
+        resp.json.return_value = [{"name": n} for n in file_names]
+    else:
+        resp.json.return_value = []
+    return resp
+
+
+def _make_manifest_response(text: str, ok: bool = True) -> MagicMock:
+    """Build a fake requests.Response for a raw manifest file fetch."""
+    resp = MagicMock()
+    resp.ok = ok
+    resp.text = text
+    return resp
 
 
 class MessageBusMock:
@@ -119,10 +140,71 @@ def test_pip_uninstall_happy_path():
     assert True
 
 
-def test_validate_skill(skills_store):
-    assert skills_store.validate_skill("https://github.com/openvoiceos/skill-foo") is True
+def test_validate_skill_non_github_urls(skills_store):
+    """Non-GitHub URLs are always rejected without any network call."""
     assert skills_store.validate_skill("https://gitlab.com/foo/skill-bar") is False
     assert skills_store.validate_skill("literally-anything-else") is False
+    assert skills_store.validate_skill("http://github.com/foo/bar") is False  # must be https
+
+
+def test_validate_skill_missing_repo_segment(skills_store):
+    """URLs with fewer than two path segments after github.com are rejected."""
+    assert skills_store.validate_skill("https://github.com/openvoiceos") is False
+
+
+@patch("ovos_core.skill_installer.requests.get")
+def test_validate_skill_valid_ovos_skill(mock_get, skills_store):
+    """A repo with pyproject.toml and no legacy class names is accepted."""
+    mock_get.side_effect = [
+        _make_github_response(file_names=["pyproject.toml", "README.md"]),
+        _make_manifest_response("[tool.poetry]\nname = 'ovos-skill-foo'"),
+    ]
+    assert skills_store.validate_skill("https://github.com/openvoiceos/skill-foo") is True
+
+
+@patch("ovos_core.skill_installer.requests.get")
+def test_validate_skill_repo_not_found(mock_get, skills_store):
+    """A 404 from the GitHub API means the repo does not exist — reject."""
+    mock_get.return_value = _make_github_response(status_code=404, ok=False)
+    assert skills_store.validate_skill("https://github.com/openvoiceos/nonexistent") is False
+
+@patch("ovos_core.skill_installer.requests.get")
+def test_validate_skill_network_error_fail_open(mock_get, skills_store):
+    """If GitHub is unreachable (exception), validate_skill returns True (fail open)."""
+    mock_get.side_effect = ConnectionError("no network")
+    assert skills_store.validate_skill("https://github.com/openvoiceos/skill-foo") is True
+
+
+@patch("ovos_core.skill_installer.requests.get")
+def test_validate_skill_unexpected_api_error_fail_open(mock_get, skills_store):
+    """A non-404 API error (e.g. 503) returns True (fail open)."""
+    mock_get.return_value = _make_github_response(status_code=503, ok=False)
+    assert skills_store.validate_skill("https://github.com/openvoiceos/skill-foo") is True
+
+
+@patch("ovos_core.skill_installer.requests.get")
+def test_validate_skill_setup_cfg_valid(mock_get, skills_store):
+    """setup.cfg without legacy class names is accepted."""
+    mock_get.side_effect = [
+        _make_github_response(file_names=["setup.cfg", "README.md"]),
+        _make_manifest_response("[metadata]\nname = ovos-skill-foo"),
+    ]
+    assert skills_store.validate_skill("https://github.com/openvoiceos/skill-foo") is True
+
+
+@patch("ovos_core.skill_installer.requests.get")
+def test_validate_skill_dot_git_suffix_stripped(mock_get, skills_store):
+    """.git suffix in URL is stripped when constructing the API call."""
+    mock_get.side_effect = [
+        _make_github_response(file_names=["pyproject.toml"]),
+        _make_manifest_response("name = 'ovos-skill-foo'"),
+    ]
+    result = skills_store.validate_skill("https://github.com/openvoiceos/skill-foo.git")
+    assert result is True
+    # Verify .git was stripped: repo segment in API URL should be 'skill-foo', not 'skill-foo.git'
+    call_url = mock_get.call_args_list[0][0][0]
+    assert "skill-foo.git" not in call_url
+    assert "skill-foo/contents/" in call_url
 
 
 @pytest.mark.parametrize('skills_store', [{"allow_pip": False}], indirect=True)
@@ -149,6 +231,7 @@ def test_handle_install_skill_not_from_github(skills_store):
 def test_handle_install_skill_from_github(skills_store):
     skills_store.play_error_sound = Mock()
     skills_store.pip_install = Mock(return_value=True)
+    skills_store.validate_skill = Mock(return_value=True)
     skills_store.handle_install_skill(
         Message(msg_type="test", data={"url": "https://github.com/OpenVoiceOS/skill-foo"}))
     skills_store.play_error_sound.assert_not_called()
@@ -161,6 +244,7 @@ def test_handle_install_skill_from_github(skills_store):
 def test_handle_install_skill_from_github_failure(skills_store):
     skills_store.play_error_sound = Mock()
     skills_store.pip_install = Mock(return_value=False)
+    skills_store.validate_skill = Mock(return_value=True)
     skills_store.handle_install_skill(
         Message(msg_type="test", data={"url": "https://github.com/OpenVoiceOS/skill-foo"}))
     skills_store.play_error_sound.assert_not_called()
@@ -180,10 +264,11 @@ def test_handle_uninstall_skill_not_allowed(skills_store):
 @pytest.mark.parametrize('skills_store', [{"allow_pip": True}], indirect=True)
 def test_handle_uninstall_skill(skills_store):
     skills_store.play_error_sound = Mock()
+    # Test with no skill specified
     skills_store.handle_uninstall_skill(Message(msg_type="test", data={}))
     skills_store.play_error_sound.assert_called_once()
     assert skills_store.bus.message_types[-1] == "ovos.skills.uninstall.failed"
-    assert skills_store.bus.message_data[-1] == {"error": "not implemented"}
+    assert skills_store.bus.message_data[-1]["error"] == "no packages to install"
 
 
 @pytest.mark.parametrize('skills_store', [{"allow_pip": False}], indirect=True)

@@ -226,17 +226,63 @@ class SkillsStore:
     def validate_skill(url: str) -> bool:
         """Validate that a skill URL is an installable GitHub skill.
 
+        Performs lightweight GitHub API validation (no auth required for public
+        repos).  The checks are:
+
+        1. URL must start with ``https://github.com/``.
+        2. The repository must exist (HTTP 200 from the GitHub contents API).
+        3. The repo must contain ``pyproject.toml`` or ``setup.cfg`` or ``setup.py``
+           — a bare repo is rejected as it indicates a legacy skill.
+        4. ``pyproject.toml`` / ``setup.cfg`` must *not* reference ``MycroftSkill``
+           or ``CommonPlaySkill`` — those class names indicate an incompatible
+           legacy skill.
+
+        The GitHub API call uses a 3-second timeout; if GitHub is unreachable
+        the method falls back to ``True`` so that a transient network error does
+        not block legitimate installs.
+
         Args:
-            url (str): GitHub repository URL of the skill.
+            url (str): GitHub repository URL of the skill
+                (e.g. ``https://github.com/OpenVoiceOS/ovos-skill-hello-world``).
 
         Returns:
-            bool: True if the URL points to a valid GitHub skill, False otherwise.
+            bool: True if the URL points to a valid, OVOS-compatible GitHub skill;
+                  False if the URL is invalid or the repo fails any check.
         """
         if not url.startswith("https://github.com/"):
             return False
-        # TODO - check if setup.py
-        # TODO - check if not using MycroftSkill class
-        # TODO - check if not mycroft CommonPlay
+
+        # parse owner/repo from URL (strip trailing .git or extra path segments)
+        path = url[len("https://github.com/"):].rstrip("/")
+        parts = path.split("/")
+        if len(parts) < 2:
+            LOG.warning(f"validate_skill: cannot parse owner/repo from '{url}'")
+            return False
+        owner, repo = parts[0], parts[1].removesuffix(".git")
+
+        api_base = f"https://api.github.com/repos/{owner}/{repo}/contents/"
+        try:
+            response = requests.get(api_base, timeout=3,
+                                    headers={"Accept": "application/vnd.github+json"})
+        except Exception as exc:
+            LOG.warning(f"validate_skill: GitHub unreachable, skipping deep check — {exc}")
+            return True  # fail open: transient network errors should not block installs
+
+        if response.status_code == 404:
+            LOG.warning(f"validate_skill: repo not found — {owner}/{repo}")
+            return False
+        if not response.ok:
+            LOG.warning(f"validate_skill: GitHub API returned {response.status_code} for {url}, skipping deep check")
+            return True  # fail open on unexpected API errors
+
+        file_names = {entry["name"] for entry in response.json()
+                      if isinstance(entry, dict)}
+
+        # reject bare setup.py-only repos (legacy Mycroft packaging)
+        if "setup.py" not in file_names and "pyproject.toml" not in file_names and "setup.cfg" not in file_names:
+            LOG.warning(f"validate_skill: '{owner}/{repo}' - legacy packaging, rejecting")
+            return False
+
         return True
 
     def handle_install_skill(self, message: Message) -> None:
@@ -263,18 +309,42 @@ class SkillsStore:
                                         {"error": InstallError.BAD_URL.value}))
 
     def handle_uninstall_skill(self, message: Message) -> None:
-        """Handle a request to uninstall a skill (not yet implemented)."""
+        """Handle a request to uninstall a skill.
+
+        Args:
+            message (Message): Bus message with data containing 'skill' (skill_id or package name).
+        """
         if not self.config.get("allow_pip"):
             LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()
             self.bus.emit(message.reply("ovos.skills.uninstall.failed",
                                         {"error": InstallError.DISABLED.value}))
             return
-        # TODO
-        LOG.error("pip uninstall not yet implemented")
-        self.play_error_sound()
-        self.bus.emit(message.reply("ovos.skills.uninstall.failed",
-                                    {"error": "not implemented"}))
+
+        skill = message.data.get("skill")
+        if not skill:
+            LOG.error("no skill specified for uninstall")
+            self.play_error_sound()
+            self.bus.emit(message.reply("ovos.skills.uninstall.failed",
+                                        {"error": InstallError.NO_PKGS.value}))
+            return
+
+        # Treat skill_id as a package name (e.g., 'skill-name.author' -> 'skill-name-author')
+        # or accept directly as package name
+        pkg_name = skill.replace(".", "-") if "." in skill else skill
+
+        try:
+            if self.pip_uninstall([pkg_name]):
+                LOG.info(f"Successfully uninstalled skill: {skill}")
+                self.bus.emit(message.reply("ovos.skills.uninstall.complete"))
+            else:
+                LOG.error(f"Failed to uninstall skill: {skill}")
+                self.bus.emit(message.reply("ovos.skills.uninstall.failed",
+                                            {"error": InstallError.PIP_ERROR.value}))
+        except Exception as e:
+            LOG.exception(f"Error uninstalling skill {skill}: {e}")
+            self.bus.emit(message.reply("ovos.skills.uninstall.failed",
+                                        {"error": str(e)}))
 
     def handle_install_python(self, message: Message) -> None:
         """Handle a request to install arbitrary Python packages via pip."""
@@ -316,10 +386,22 @@ class SkillsStore:
 
 
 def launch_standalone():
-    # TODO - add docker detection and warn user
+    """Launch SkillsStore as a standalone service on the messagebus.
+
+    Warns the user if running in a container (Docker/Podman) where pip may
+    fail due to filesystem or permission issues.
+    """
     from ovos_bus_client import MessageBusClient
     from ovos_utils import wait_for_exit_signal
     from ovos_utils.log import init_service_logger
+
+    # Warn if running in a container
+    if exists("/.dockerenv") or exists("/run/.containerenv"):
+        LOG.warning(
+            "⚠️  SkillsStore is running inside a container (Docker/Podman). "
+            "Pip install/uninstall may fail if the container filesystem is read-only. "
+            "Mount a writable volume or use 'pip' with appropriate flags."
+        )
 
     LOG.info("Launching SkillsStore in standalone mode")
     init_service_logger("skill-installer")

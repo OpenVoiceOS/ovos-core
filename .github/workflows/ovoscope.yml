@@ -1,0 +1,25 @@
+name: Ovoscope End-to-End Tests
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+jobs:
+  ovoscope:
+    uses: OpenVoiceOS/gh-automations/.github/workflows/ovoscope.yml@dev
+    secrets: inherit
+    with:
+      runner: "ubuntu-latest"
+      python_version: "3.11"
+      system_deps: "python3-dev swig libssl-dev portaudio19-dev libpulse-dev libfann-dev"
+      install_extras: "test"
+      test_path: "test/end2end/"
+      require_adapt: true
+      require_padatious: true
+      bus_coverage: true
+      bus_coverage_include: ""
+      bus_coverage_exclude: "^Thread-|^intents$|^skills$|^__core__$"
+      pr_comment: true

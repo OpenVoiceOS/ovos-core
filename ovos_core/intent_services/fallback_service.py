@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 import operator
+import threading
 import time
 from collections import namedtuple
 from typing import Optional, Dict, List, Union
@@ -39,6 +40,7 @@ class FallbackService(ConfidenceMatcherPipeline):
         config = config or Configuration().get("skills", {}).get("fallbacks", {})
         super().__init__(bus, config)
         self.registered_fallbacks = {}  # skill_id: priority
+        self._fallback_response_event = threading.Event()
         self.bus.on("ovos.skills.fallback.register", self.handle_register_fallback)
         self.bus.on("ovos.skills.fallback.deregister", self.handle_deregister_fallback)
 
@@ -110,6 +112,7 @@ class FallbackService(ConfidenceMatcherPipeline):
             else:
                 LOG.debug(f"{skill_id} does NOT WANT to try to handle fallback")
             skill_ids.append(skill_id)
+            self._fallback_response_event.set()
 
         if in_range:  # no need to search if no skills available
             self.bus.on("ovos.skills.fallback.pong", handle_ack)
@@ -122,7 +125,8 @@ class FallbackService(ConfidenceMatcherPipeline):
             start = time.time()
             while not all(s in skill_ids for s in self.registered_fallbacks) \
                     and time.time() - start <= 0.5:
-                time.sleep(0.02)
+                self._fallback_response_event.clear()
+                self._fallback_response_event.wait(0.02)
 
             self.bus.remove("ovos.skills.fallback.pong", handle_ack)
         return fallback_skills

@@ -21,15 +21,19 @@ This file documents proposed improvements, refactors, and feature enhancements f
 
 ---
 
-## [S-002] Implement skill uninstall via bus API
+## [S-002] Implement skill uninstall via bus API [ADDRESSED 2026-03-12]
 
-**Problem/Opportunity**: `handle_uninstall_skill()` in `skill_installer.py` always returns a "not implemented" error. The `ovos.skills.uninstall` bus event is wired up but non-functional.
+**Status**: Fully implemented — `handle_uninstall_skill()` now calls `pip_uninstall()` to remove skill packages.
 
-**Proposed Solution**: Implement `pip_uninstall([package])` call inside `handle_uninstall_skill`, using the existing `pip_uninstall` method. Optionally derive the package name from the skill's entry point metadata.
+**Solution Implemented**:
+- `handle_uninstall_skill()` validates 'skill' parameter in message data
+- Converts skill_id to package name (e.g., 'skill-name.author' → 'skill-name-author')
+- Calls `pip_uninstall([pkg_name])` with protected package constraints
+- Emits success (`ovos.skills.uninstall.complete`) or failure responses
 
-**Estimated Impact**: Medium — unblocks skill lifecycle management from remote clients and Hivemind.
+**Impact**: ✅ Unblocks remote skill lifecycle management (Hivemind, CLI clients).
 
-**Reference**: `ovos_core/skill_installer.py:223-234`
+**Reference**: `ovos_core/skill_installer.py:265-296`, commit `ffeec1c7f0`
 
 ---
 
@@ -69,13 +73,50 @@ This file documents proposed improvements, refactors, and feature enhancements f
 
 ---
 
-## [S-006] Track external (standalone/Hivemind) skills in SkillManager
+## [S-006] Track external (standalone/Hivemind) skills in SkillManager [ARCHITECTURAL LIMITATION]
 
-**Problem/Opportunity**: Four TODOs in `skill_manager.py` note that `send_skill_list`, `deactivate_skill`, `deactivate_except`, and `activate_skill` only operate on `self.plugin_skills` and do not account for `OVOSAbstractApp` or Hivemind-connected skills.
+**Problem/Opportunity**: Four TODOs in `skill_manager.py` note that `send_skill_list`, `deactivate_skill`, `deactivate_except`, and `activate_skill` only operate on `self.plugin_skills` and do not account for skills running in external processes.
 
-**Proposed Solution**: Introduce a secondary registry (e.g., `self.external_skills: Dict[str, SkillState]`) populated by bus messages from standalone apps announcing their presence. Merge this registry in the skill list/activate/deactivate handlers.
+**Root Cause**: External skills (standalone skills, Hivemind satellites, OVOSAbstractApp instances) run in separate Python processes. ovos-core has **no Python object reference** to them — only messagebus connectivity. This is architectural, not a bug.
 
-**Estimated Impact**: Medium — required for full skill lifecycle visibility in multi-device/Hivemind setups.
+**Why No Registry Works**:
+- External skills are discovered/launched independently (not by ovos-core)
+- They connect to the messagebus and emit/listen to events
+- ovos-core cannot "activate" or "deactivate" them (they control their own lifecycle)
+- A registry would be false visibility — ovos-core would track state it doesn't control
 
-**Reference**: `ovos_core/skill_manager.py:539, 554, 568, 582`
+**Correct Pattern**: External skills should:
+1. Emit `ovos.skills.installed` on messagebus to announce themselves
+2. Listen to `{skill_id}.activate` / `{skill_id}.deactivate` messages and respond appropriately
+3. Emit bus events for lifecycle changes (ready, active, inactive, etc.)
+
+**Reference**: See `ovos-workshop` skill launcher pattern for external skill startup.
+
+**Status**: Won't fix — document the pattern instead. This is working as designed.
+
+**Reference**: `ovos_core/skill_manager.py:665, 680, 697, 710`
+
+---
+
+## [S-007] Performance Optimizations [ADDRESSED 2026-03-11]
+
+**Status**: Fully addressed (2026-03-11) — All identified race conditions and per-utterance overhead sources have been optimized.
+
+**Optimizations Implemented**:
+1. **Race Condition Fixes** (Priority 1):
+   - Added `_plugin_skills_lock` guard to `_unload_plugin_skill()` (skill_manager.py:585-603)
+   - Snapshot `plugin_skills` dict in `send_skill_list()`, `deactivate_skill()`, `activate_skill()`, `deactivate_except()` to prevent RuntimeError during concurrent modification
+   - Replaced busy-wait loop with `threading.Event` in `_collect_fallback_skills()` (fallback_service.py:122-125)
+
+2. **Per-Utterance Overhead** (Priority 2):
+   - Reuse `self._stop_event` instead of creating throwaway Event objects in `wait_for_intent_service()` (skill_manager.py:462)
+   - Moved `migration_map` dict and regex pattern to module-level constants (service.py:39-63), eliminating rebuild on every pipeline stage
+   - Guard `create_daemon()` calls with config check to skip thread creation when metrics disabled (service.py:322, 352)
+
+3. **Minor Optimizations** (Priority 3):
+   - Changed `_logged_skill_warnings` from list to set for O(1) lookup (skill_manager.py:111)
+   - Cache sorted plugins in `UtteranceTransformersService`, `MetadataTransformersService`, `IntentTransformersService` (transformers.py)
+   - Read `blacklist` once before plugin scan loop (skill_manager.py:363)
+
+**Reference**: MAINTENANCE_REPORT.md, AUDIT.md (Race Conditions section), FAQ.md (Performance section), commit `4274a52a09`.
 

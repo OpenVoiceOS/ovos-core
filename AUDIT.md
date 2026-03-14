@@ -22,6 +22,11 @@
 - **Missing return type hints** across `skill_manager.py` (all 35 methods), `skill_installer.py`, `transformers.py` — all added.
 - **Missing docstrings** on `SkillsStore` methods — added.
 
+## Race Conditions (Fixed 2026-03-11)
+- **plugin_skills dict concurrent mutation** (skill_manager.py:585-603, 618-661) — `_unload_plugin_skill` and iteration methods were not guarded by `_plugin_skills_lock`, creating RuntimeError: dictionary changed size during iteration. FIXED: added lock guards and snapshot-before-iterate pattern.
+- **Busy-wait in fallback skill response collection** (fallback_service.py:122-125) — `_collect_fallback_skills` spun with `time.sleep(0.02)` on every utterance. FIXED: replaced with `threading.Event` signaling.
+- **Temporary Event object spam** (skill_manager.py:462) — `wait_for_intent_service` created one throwaway Event per 1-second retry. FIXED: reused `self._stop_event`.
+
 ## Known Open Issues (Tracked in SUGGESTIONS.md)
 - **S-001**: `_unload_on_network_disconnect/internet_disconnect/gui_disconnect` are stub methods — no implementation.
 - **S-002**: `handle_uninstall_skill` always returns "not implemented".

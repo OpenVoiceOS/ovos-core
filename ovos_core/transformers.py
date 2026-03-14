@@ -17,6 +17,7 @@ class UtteranceTransformersService:
         self.has_loaded = False
         self.bus = bus
         self.config = self.config_core.get("utterance_transformers") or {}
+        self._sorted_plugins = None
         self.load_plugins()
 
     @staticmethod
@@ -35,6 +36,7 @@ class UtteranceTransformersService:
                 except Exception as e:
                     LOG.error(e)
                     LOG.exception(f"Failed to load utterance transformer plugin: {plug_name}")
+        self._sorted_plugins = None
 
     @property
     def plugins(self):
@@ -46,8 +48,10 @@ class UtteranceTransformersService:
         A plugin of `priority` 1 will override any existing context keys and
         will be the last to modify utterances`
         """
-        return sorted(self.loaded_plugins.values(),
-                      key=lambda k: k.priority, reverse=True)
+        if self._sorted_plugins is None:
+            self._sorted_plugins = sorted(self.loaded_plugins.values(),
+                                          key=lambda k: k.priority, reverse=True)
+        return self._sorted_plugins
 
     def shutdown(self) -> None:
         for module in self.plugins:
@@ -78,6 +82,7 @@ class MetadataTransformersService:
         self.has_loaded = False
         self.bus = bus
         self.config = self.config_core.get("metadata_transformers") or {}
+        self._sorted_plugins = None
         self.load_plugins()
 
     @staticmethod
@@ -96,6 +101,7 @@ class MetadataTransformersService:
                 except Exception as e:
                     LOG.error(e)
                     LOG.exception(f"Failed to load metadata transformer plugin: {plug_name}")
+        self._sorted_plugins = None
 
     @property
     def plugins(self):
@@ -106,8 +112,10 @@ class MetadataTransformersService:
 
         A plugin of `priority` 1 will override any existing context keys
         """
-        return sorted(self.loaded_plugins.values(),
-                      key=lambda k: k.priority, reverse=True)
+        if self._sorted_plugins is None:
+            self._sorted_plugins = sorted(self.loaded_plugins.values(),
+                                          key=lambda k: k.priority, reverse=True)
+        return self._sorted_plugins
 
     def shutdown(self) -> None:
         for module in self.plugins:
@@ -154,6 +162,7 @@ class IntentTransformersService:
         self.has_loaded = False
         self.bus = bus
         self.config = self.config_core.get("intent_transformers") or {}
+        self._sorted_plugins = None
         self.load_plugins()
 
     @staticmethod
@@ -184,14 +193,17 @@ class IntentTransformersService:
                 except Exception as e:
                     LOG.error(e)
                     LOG.exception(f"Failed to load intent transformer plugin: {plug_name}")
+        self._sorted_plugins = None
 
     @property
     def plugins(self):
         """
         Returns the loaded intent transformer plugins sorted by priority.
         """
-        return sorted(self.loaded_plugins.values(),
-                      key=lambda k: k.priority, reverse=True)
+        if self._sorted_plugins is None:
+            self._sorted_plugins = sorted(self.loaded_plugins.values(),
+                                          key=lambda k: k.priority, reverse=True)
+        return self._sorted_plugins
 
     def shutdown(self) -> None:
         """
