@@ -8,7 +8,7 @@ from ovos_bus_client.session import SessionManager, UtteranceState, Session
 from ovos_config.config import Configuration
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
-from ovos_utils.lang import standardize_lang_tag
+from ovos_spec_tools import standardize_lang
 from ovos_utils.log import LOG
 
 from ovos_plugin_manager.templates.pipeline import PipelinePlugin, IntentHandlerMatch
@@ -293,7 +293,7 @@ class ConverseService(PipelinePlugin):
             - Checks for skill conversation timeouts
             - Attempts conversation with each eligible skill
         """
-        lang = standardize_lang_tag(lang)
+        lang = standardize_lang(lang)
         session = SessionManager.get(message)
 
         # we call flatten in case someone is sending the old style list of tuples

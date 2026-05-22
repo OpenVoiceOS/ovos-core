@@ -20,13 +20,12 @@ from collections import defaultdict
 from typing import Tuple, Callable, List
 
 import requests
-from langcodes import closest_match
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
-from ovos_utils.lang import standardize_lang_tag
+from ovos_spec_tools import closest_lang, standardize_lang
 from ovos_utils.log import LOG
 from ovos_utils.metrics import Stopwatch
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
@@ -180,19 +179,17 @@ class IntentService:
         """
         default_lang = get_message_lang(message)
         valid_langs = message.context.get("valid_langs") or get_valid_languages()
-        valid_langs = [standardize_lang_tag(l) for l in valid_langs]
+        valid_langs = [standardize_lang(l) for l in valid_langs]
         lang_keys = ["stt_lang",
                      "request_lang",
                      "detected_lang"]
         for k in lang_keys:
             if k in message.context:
-                try:
-                    v = standardize_lang_tag(message.context[k])
-                    best_lang, _ = closest_match(v, valid_langs, max_distance=10)
-                except Exception:
-                    v = message.context[k]
-                    best_lang = "und"
-                if best_lang == "und":
+                v = standardize_lang(message.context[k])
+                # closest_lang already applies the "distance below 10" threshold
+                # and returns None when no candidate is close enough
+                best_lang = closest_lang(v, valid_langs, max_distance=10)
+                if best_lang is None:
                     LOG.warning(f"ignoring {k}, {v} is not in enabled languages: {valid_langs}")
                     continue
                 LOG.info(f"replaced {default_lang} with {k}: {v}")
@@ -244,7 +241,7 @@ class IntentService:
     @staticmethod
     def _validate_session(message, lang):
         # get session
-        lang = standardize_lang_tag(lang)
+        lang = standardize_lang(lang)
         sess = SessionManager.get(message)
         if sess.session_id == "default":
             updated = False
