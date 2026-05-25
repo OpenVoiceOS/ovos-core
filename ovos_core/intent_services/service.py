@@ -22,9 +22,7 @@ from typing import Tuple, Callable, List
 import requests
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
-from ovos_bus_client.session import SessionManager as _SessionManager
-from ovos_bus_client.util import dig_for_message as _dig_for_message
-from ovos_config.locale import get_default_lang as _get_default_lang
+from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
 from ovos_spec_tools import closest_lang, standardize_lang
@@ -37,27 +35,6 @@ from ovos_core.transformers import MetadataTransformersService, UtteranceTransfo
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
 
-
-def get_message_lang(message=None):
-    """Return the BCP-47 language tag for *message*, always with region subtag.
-
-    Re-implements the :func:`ovos_bus_client.util.get_message_lang` look-up
-    using :func:`ovos_spec_tools.standardize_lang`, which preserves the
-    region subtag (e.g. ``'de-de'`` → ``'de-DE'``).
-    """
-    message = message or _dig_for_message()
-    if not message:
-        return None
-    # explicit lang attached to message data or context
-    raw = message.data.get("lang") or message.context.get("lang")
-    if raw:
-        return standardize_lang(raw)
-    # session-based lang
-    if "session_id" in message.context or "session" in message.context:
-        sess = _SessionManager.get(message)
-        return standardize_lang(sess.lang)
-    # fall back to the configured default language
-    return standardize_lang(_get_default_lang())
 
 # Module-level constants for pipeline matcher migration and optimization
 _PIPELINE_MIGRATION_MAP = {
