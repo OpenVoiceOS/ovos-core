@@ -19,7 +19,7 @@ from unittest import TestCase, mock
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import IntentContextManager as ContextManager
-from ovos_core.intent_services.service import get_message_lang
+from ovos_bus_client.util import get_message_lang
 from ovos_config import Configuration
 from ovos_config import LocalConf, DEFAULT_CONFIG
 from ovos_config.locale import setup_locale

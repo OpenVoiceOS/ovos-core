@@ -22,8 +22,7 @@ from typing import Tuple, Callable, List
 import requests
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
-from ovos_bus_client.version import VERSION_MAJOR as _BUS_CLIENT_MAJOR, \
-    VERSION_MINOR as _BUS_CLIENT_MINOR
+from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
 from ovos_spec_tools import closest_lang, standardize_lang
@@ -35,32 +34,6 @@ from ovos_utils.thread_utils import create_daemon
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService, IntentTransformersService
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
-
-
-# ovos_bus_client>=2.1.0a1 routes get_message_lang through spec-tools'
-# standardize_lang (region preserved). Earlier 1.x uses the deprecated
-# ovos_utils.lang.standardize_lang_tag which strips the region
-# (``it-it`` → ``it``). Bumping the floor breaks ovos-audio (still pinned
-# ``<2.0.0``), so probe the runtime and provide a local patch when needed.
-# This whole block can be deleted once every core dep allows bus-client 2.x.
-if (_BUS_CLIENT_MAJOR, _BUS_CLIENT_MINOR) >= (2, 1):
-    from ovos_bus_client.util import get_message_lang
-else:
-    from ovos_bus_client.util import dig_for_message as _dig_for_message
-    from ovos_config.locale import get_default_lang as _get_default_lang
-
-    def get_message_lang(message=None):
-        """Region-preserving replacement for ``ovos_bus_client<2.1.0a1``."""
-        message = message or _dig_for_message()
-        if not message:
-            return None
-        raw = message.data.get("lang") or message.context.get("lang")
-        if raw:
-            return standardize_lang(raw)
-        if "session_id" in message.context or "session" in message.context:
-            sess = SessionManager.get(message)
-            return standardize_lang(sess.lang)
-        return standardize_lang(_get_default_lang())
 
 
 # Module-level constants for pipeline matcher migration and optimization
