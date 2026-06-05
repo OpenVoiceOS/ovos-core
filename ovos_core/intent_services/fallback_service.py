@@ -25,7 +25,7 @@ from ovos_config import Configuration
 from ovos_plugin_manager.templates.pipeline import ConfidenceMatcherPipeline, IntentHandlerMatch
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
-from ovos_utils.lang import standardize_lang_tag
+from ovos_spec_tools import standardize_lang
 from ovos_utils.log import LOG
 from ovos_workshop.permissions import FallbackMode
 
@@ -145,7 +145,7 @@ class FallbackService(ConfidenceMatcherPipeline):
         Returns:
             PipelineMatch or None
         """
-        lang = standardize_lang_tag(lang)
+        lang = standardize_lang(lang)
         # we call flatten in case someone is sending the old style list of tuples
         utterances = flatten_list(utterances)
         message.data["utterances"] = utterances  # all transcripts
