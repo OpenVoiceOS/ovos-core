@@ -30,6 +30,21 @@ from typing import List, Optional
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
+from ovos_config.config import Configuration
+
+
+def use_spec_namespace():
+    """Switch ovos-core to the spec (``ovos.*``) bus namespace.
+
+    The conformance suites assert the spec topic names, so they flip the
+    deployment ``legacy_namespace`` config off. Call from ``setUpModule``.
+    """
+    Configuration()["legacy_namespace"] = False
+
+
+def reset_namespace():
+    """Restore the default legacy bus namespace. Call from ``tearDownModule``."""
+    Configuration()["legacy_namespace"] = True
 
 PADACIOSO_HIGH = "ovos-padacioso-pipeline-plugin-high"
 STOP_HIGH = "ovos-stop-pipeline-plugin-high"

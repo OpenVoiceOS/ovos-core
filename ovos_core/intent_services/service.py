@@ -17,7 +17,7 @@ import json
 import re
 import time
 from collections import defaultdict
-from typing import Tuple, Callable, List
+from typing import Tuple, Callable, List, Optional
 
 import requests
 from ovos_bus_client.message import Message
@@ -62,6 +62,17 @@ _PIPELINE_MIGRATION_MAP = {
 }
 
 _PIPELINE_RE = re.compile(r'-(high|medium|low)$')
+
+
+def _legacy_namespace() -> bool:
+    """Whether to emit the legacy ``mycroft.*`` bus topics (default) or the
+    OVOS spec ``ovos.*`` topics, during the bus-namespace transition.
+
+    Deployment-wide, controlled by the ``legacy_namespace`` config key
+    (default ``True``). Emitters pick exactly one namespace so subscribers —
+    which listen on both — never receive duplicate messages.
+    """
+    return Configuration().get("legacy_namespace", True)
 
 
 def on_started():
@@ -272,7 +283,8 @@ class IntentService:
         skill_id = message.data.get("skill_id")
         self._deactivations[sess.session_id].append(skill_id)
 
-    def _emit_match_message(self, match: IntentHandlerMatch, message: Message, lang: str):
+    def _emit_match_message(self, match: IntentHandlerMatch, message: Message, lang: str,
+                            pipeline_id: Optional[str] = None):
         """
         Emit a reply message for a matched intent, updating session and skill activation.
 
@@ -343,6 +355,23 @@ class IntentService:
 
             # update Session if modified by pipeline
             reply.context["session"] = sess.serialize()
+
+            if not _legacy_namespace():
+                # OVOS-PIPELINE-1 §7.1: stamp the matching plugin id on the dispatch.
+                if pipeline_id:
+                    reply.context["pipeline_id"] = pipeline_id
+                # OVOS-PIPELINE-1 §9.2: emit the match notification before dispatch.
+                intent_name = match.match_type
+                if intent_name and ":" in intent_name:
+                    intent_name = intent_name.split(":", 1)[-1]
+                self.bus.emit(reply.forward("ovos.intent.matched", {
+                    "skill_id": match.skill_id,
+                    "intent_name": intent_name,
+                    "lang": lang,
+                    "utterance": match.utterance,
+                    "slots": match.match_data,
+                    "pipeline_id": pipeline_id,
+                }))
 
             # finally emit reply message
             self.bus.emit(reply)
@@ -481,7 +510,7 @@ class IntentService:
                                 f"ignoring match, intent '{match.match_type}' blacklisted by Session '{sess.session_id}'")
                             continue
                         try:
-                            self._emit_match_message(match, message, intent_lang)
+                            self._emit_match_message(match, message, intent_lang, pipeline)
                             break
                         except Exception:
                             LOG.exception(f"{match_func} returned an invalid match")
@@ -513,7 +542,10 @@ class IntentService:
         sound = Configuration().get('sounds', {}).get('error', "snd/error.mp3")
         # NOTE: message.reply to ensure correct message destination
         self.bus.emit(message.reply('mycroft.audio.play_sound', {"uri": sound}))
-        self.bus.emit(message.reply('complete_intent_failure', message.data))
+        # OVOS-PIPELINE-1 §9.3 intent-layer no-match signal: legacy
+        # complete_intent_failure or spec ovos.intent.unmatched, per namespace.
+        nomatch = 'complete_intent_failure' if _legacy_namespace() else 'ovos.intent.unmatched'
+        self.bus.emit(message.reply(nomatch, message.data))
         self.bus.emit(message.reply("ovos.utterance.handled"))
 
     @staticmethod

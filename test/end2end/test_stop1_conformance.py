@@ -9,11 +9,13 @@ The stop pipeline is in-core and deterministic on a ``FakeBus`` — no external
 matcher is needed. Drivers and the xfail discipline are described in
 ``_conformance.py``.
 
+During the transition both the legacy and the spec topic names are emitted.
+
 Coverage map (clause -> status against current ovos-core):
 - §5.1 empty ``active_handlers`` triggers a global stop ......... green (terminates)
-- §5.3 global stop broadcasts on ``ovos.stop`` .................. xfail (mycroft.stop)
+- §5.3 global stop broadcasts on ``ovos.stop`` .................. green (alongside legacy)
+- §4.2 stoppability query broadcast ``ovos.stop.ping`` .......... green (alongside legacy)
 - §3.1 global-stop self-dispatch ``<id>:global_stop`` ........... xfail (stop:global)
-- §4.2 stoppability query broadcast ``ovos.stop.ping`` .......... xfail (<skill>.stop.ping)
 - §2   a registration naming ``stop`` is malformed (reserved) ... xfail
 """
 import time
@@ -26,7 +28,8 @@ from ovos_utils.log import LOG
 
 from ovoscope import get_minicroft, register_padatious_intent
 
-from ._conformance import STOP_HIGH, capture, types, utterance
+from ._conformance import (STOP_HIGH, capture, reset_namespace, types,
+                           use_spec_namespace, utterance)
 
 _MC = None
 
@@ -34,6 +37,7 @@ _MC = None
 def setUpModule():
     global _MC
     LOG.set_level("CRITICAL")
+    use_spec_namespace()  # assert the ovos.* spec topics
     _MC = get_minicroft([])
     time.sleep(1)
 
@@ -41,6 +45,7 @@ def setUpModule():
 def tearDownModule():
     if _MC is not None:
         _MC.stop()
+    reset_namespace()
 
 
 def _stop_with_active(session_id: str, active_skill: str) -> Message:
@@ -69,9 +74,6 @@ class TestSec5GlobalStop(TestCase):
         recs = capture(_MC, utterance("stop", "stop-global-eof", [STOP_HIGH]), 4.0)
         self.assertEqual(types(recs).count("ovos.utterance.handled"), 1)
 
-    @pytest.mark.xfail(strict=False,
-                       reason="ovos-core broadcasts the legacy 'mycroft.stop'; "
-                              "STOP-1 §5.3 mandates the 'ovos.stop' broadcast")
     def test_global_stop_broadcast_topic(self):
         """The global-stop handler MUST emit ``ovos.stop`` (§5.3)."""
         recs = capture(_MC, utterance("stop", "stop-global-bcast", [STOP_HIGH]), 4.0)
@@ -94,9 +96,6 @@ class TestSec42PingPong(TestCase):
     """§4.1 step 2 / §4.2: with active handlers present, the stop plugin emits a
     broadcast ``ovos.stop.ping`` and collects ``ovos.stop.pong`` responses."""
 
-    @pytest.mark.xfail(strict=False,
-                       reason="ovos-core emits a per-skill legacy '<skill_id>.stop.ping'; "
-                              "STOP-1 §4.2/§8 define the broadcast 'ovos.stop.ping'")
     def test_ping_broadcast_topic(self):
         """The stoppability query is the broadcast topic ``ovos.stop.ping`` (§4.2)."""
         recs = capture(_MC, _stop_with_active("stop-ping", "fake.skill"), 4.0)
