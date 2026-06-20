@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.1.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.6a1) (2026-06-20)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.5a1...2.1.6a1)
+
+**Closed issues:**
+
+- Research-collab proposal: URML primitive vocabulary as substrate-neutral intent target for OVOS skills [\#764](https://github.com/OpenVoiceOS/ovos-core/issues/764)
+- suggestion for starting up jarvis [\#757](https://github.com/OpenVoiceOS/ovos-core/issues/757)
+
+**Merged pull requests:**
+
+- fix: drop dead gitlocalize translations job from release workflow [\#768](https://github.com/OpenVoiceOS/ovos-core/pull/768) ([JarbasAl](https://github.com/JarbasAl))
+- fix: allow ovos-bus-client 2.x [\#767](https://github.com/OpenVoiceOS/ovos-core/pull/767) ([JarbasAl](https://github.com/JarbasAl))
+- fix\(deps\): allow ovos-bus-client 2.x \(widen cap to \<3.0.0\) [\#766](https://github.com/OpenVoiceOS/ovos-core/pull/766) ([JarbasAl](https://github.com/JarbasAl))
+- refactor: migrate language matching to ovos-spec-tools [\#763](https://github.com/OpenVoiceOS/ovos-core/pull/763) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.1.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.5a1) (2026-03-24)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.4a2...2.1.5a1)
