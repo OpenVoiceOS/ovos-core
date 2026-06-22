@@ -46,6 +46,9 @@ test = [
     "ovos-skill-hello-world>=0.2.5a2",
     "ovos-skill-parrot>=0.1.27a6",
     "ovos-skill-fallback-unknown>=0.1.10a2",
+    # data-over-sound install path: ggwave audio -> skill installer
+    "ovos-dinkum-listener>=0.8.2a1,<1.0.0",
+    "ovos-audio-transformer-plugin-ggwave>=1.0.0a1,<2.0.0",
 ]
 mycroft = [
     "ovos_PHAL[extras]>=0.2.16a1,<1.0.0",
