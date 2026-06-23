@@ -51,6 +51,14 @@ IGNORE_MESSAGES = [
     # StopService now subclasses OVOSAbstractApplication,
     # so it also emits a stop.response when mycroft.stop is broadcast
     "stop.openvoiceos.stop.response",
+    # handler-lifecycle events from a background skill whose handler completes
+    # when stopped are orthogonal to the stop-cascade sequence under test
+    # (PIPELINE-1 §8); they are non-deterministic and must not pollute counts.
+    "mycroft.skill.handler.start",
+    "mycroft.skill.handler.complete",
+    "ovos.intent.handler.start",
+    "ovos.intent.handler.complete",
+    "ovos.intent.handler.error",
 ]
 
 
