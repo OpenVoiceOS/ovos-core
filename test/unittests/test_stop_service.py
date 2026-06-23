@@ -100,8 +100,11 @@ class TestCollectStopSkills(unittest.TestCase):
             t.join(timeout=1)
 
         self.assertEqual(set(result_holder[0]), {"skill_a", "skill_b"})
-        # listener must be removed
-        svc.bus.remove.assert_called_once_with("skill.stop.pong", ack_handler)
+        # both pong listeners must be removed (OVOS-STOP-1 §4.2 dual namespace)
+        removed = {c[0][0] for c in svc.bus.remove.call_args_list}
+        self.assertEqual(removed, {"skill.stop.pong", "ovos.stop.pong"})
+        for c in svc.bus.remove.call_args_list:
+            self.assertEqual(c[0][1], ack_handler)
 
     def test_skills_that_decline_are_excluded(self):
         """Skills that respond with can_handle=False are not in want_stop,
@@ -161,10 +164,9 @@ class TestCollectStopSkills(unittest.TestCase):
 
             svc._collect_stop_skills(Message("test"))
 
-        # bus.remove must have been called regardless of timeout
-        svc.bus.remove.assert_called_once()
-        args = svc.bus.remove.call_args[0]
-        self.assertEqual(args[0], "skill.stop.pong")
+        # both pong listeners must be removed regardless of timeout
+        removed = {c[0][0] for c in svc.bus.remove.call_args_list}
+        self.assertEqual(removed, {"skill.stop.pong", "ovos.stop.pong"})
 
     def test_listener_removed_on_handler_exception(self):
         """Listener must be cleaned up even if handle_ack raises."""
@@ -205,8 +207,9 @@ class TestCollectStopSkills(unittest.TestCase):
                 ack_handler(Message("skill.stop.pong", {}))  # no skill_id → guard fires
             t.join(timeout=1)
 
-        # Listener must still have been removed
-        svc.bus.remove.assert_called_once()
+        # Listeners must still have been removed (both namespaces)
+        removed = {c[0][0] for c in svc.bus.remove.call_args_list}
+        self.assertEqual(removed, {"skill.stop.pong", "ovos.stop.pong"})
 
     def test_malformed_pong_skill_id_missing_is_ignored(self):
         """A pong with no skill_id should not crash and not pollute want_stop."""
