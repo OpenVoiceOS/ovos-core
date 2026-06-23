@@ -9,7 +9,7 @@ All events use the OVOS `Message` format: `{type, data, context}`.
 
 | Event | Direction | Description |
 |---|---|---|
-| `recognizer_loop:utterance` | listener → core | User utterance, triggers intent pipeline |
+| `recognizer_loop:utterance` | listener → core | User utterance, triggers intent pipeline (legacy; spec topic `ovos.utterance.handle` — see [spec-conformance.md](spec-conformance.md)) |
 | `add_context` | skill → core | Add a context entity to the session |
 | `remove_context` | skill → core | Remove a named context entity |
 | `clear_context` | skill → core | Clear all context entities |
