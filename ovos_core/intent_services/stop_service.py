@@ -15,6 +15,8 @@ from ovos_utils.log import LOG
 from ovos_utils.parse import match_one
 from ovos_workshop.app import OVOSAbstractApplication
 
+from ovos_core.intent_services.service import _legacy_namespace
+
 
 class StopService(ConfidenceMatcherPipeline, OVOSAbstractApplication):
     """Intent Service that handles stopping skills."""
@@ -35,7 +37,7 @@ class StopService(ConfidenceMatcherPipeline, OVOSAbstractApplication):
         """Broadcast a global stop and mark the utterance handled."""
         # OVOS-STOP-1 §5.3 universal stop broadcast: legacy 'mycroft.stop' or
         # spec 'ovos.stop', depending on the active namespace.
-        stop_topic = "mycroft.stop" if self._legacy_namespace() else "ovos.stop"
+        stop_topic = "mycroft.stop" if _legacy_namespace() else "ovos.stop"
         self.bus.emit(message.forward(stop_topic))
         # TODO - this needs a confirmation dialog if nothing was stopped
         self.bus.emit(message.forward("ovos.utterance.handled"))
@@ -128,7 +130,7 @@ class StopService(ConfidenceMatcherPipeline, OVOSAbstractApplication):
         self.bus.on("ovos.stop.pong", handle_ack)  # OVOS-STOP-1 §4.2
         try:
             # ask skills if they can stop (OVOS-STOP-1 §4.2)
-            if self._legacy_namespace():
+            if _legacy_namespace():
                 # legacy: one targeted ping per active skill
                 for skill_id in active_skills:
                     self.bus.emit(message.forward(f"{skill_id}.stop.ping",
