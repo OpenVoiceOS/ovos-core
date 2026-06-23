@@ -17,6 +17,11 @@ jobs:
       system_deps: "python3-dev swig libssl-dev portaudio19-dev libpulse-dev libfann-dev"
       install_extras: "test"
       test_path: "test/end2end/"
+      # Conformance suites assert against the current ecosystem dev: install
+      # ovoscope and the pipeline plugins from their GitHub dev branches so the
+      # latest e2e harness (e.g. register_padatious_intent, ovoscope >=0.15.0a1)
+      # is available before it reaches a stable release.
+      pre_release: true
       require_adapt: true
       require_padatious: true
       bus_coverage: true
