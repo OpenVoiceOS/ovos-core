@@ -123,19 +123,18 @@ class StopService(ConfidenceMatcherPipeline, OVOSAbstractApplication):
                 # all skills answered the ping!
                 event.set()
 
-        # Collect pongs on BOTH namespaces; only one ping namespace is emitted.
-        self.bus.on("skill.stop.pong", handle_ack)
-        self.bus.on("ovos.stop.pong", handle_ack)  # OVOS-STOP-1 §4.2
+        # ask skills if they can stop (OVOS-STOP-1 §4.2)
+        self.bus.on("skill.stop.pong", handle_ack) # legacy namespace - TODO: remove
+        self.bus.on("ovos.stop.pong", handle_ack)  
         try:
-            # ask skills if they can stop (OVOS-STOP-1 §4.2)
-            if Configuration().get("legacy_namespace", True):
-                # legacy: one targeted ping per active skill
-                for skill_id in active_skills:
-                    self.bus.emit(message.forward(f"{skill_id}.stop.ping",
-                                                  {"skill_id": skill_id}))
-            else:
-                # spec: a single broadcast stoppability query
-                self.bus.emit(message.forward("ovos.stop.ping"))
+            
+            # spec: a single broadcast stoppability query
+            self.bus.emit(message.forward("ovos.stop.ping"))
+            
+            # legacy: one targeted ping per active skill
+            for skill_id in active_skills:
+                self.bus.emit(message.forward(f"{skill_id}.stop.ping",  # legacy namespace - TODO: remove
+                                              {"skill_id": skill_id}))
 
             # wait for all skills to acknowledge they can stop
             event.wait(timeout=0.5)
