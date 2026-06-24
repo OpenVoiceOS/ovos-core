@@ -64,17 +64,6 @@ _PIPELINE_MIGRATION_MAP = {
 _PIPELINE_RE = re.compile(r'-(high|medium|low)$')
 
 
-def _legacy_namespace() -> bool:
-    """Whether to emit the legacy ``mycroft.*`` bus topics (default) or the
-    OVOS spec ``ovos.*`` topics, during the bus-namespace transition.
-
-    Deployment-wide, controlled by the ``legacy_namespace`` config key
-    (default ``True``). Emitters pick exactly one namespace so subscribers —
-    which listen on both — never receive duplicate messages.
-    """
-    return Configuration().get("legacy_namespace", True)
-
-
 def on_started():
     LOG.info('IntentService is starting up.')
 
