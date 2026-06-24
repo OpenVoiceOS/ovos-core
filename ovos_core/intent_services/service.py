@@ -356,24 +356,24 @@ class IntentService:
             # update Session if modified by pipeline
             reply.context["session"] = sess.serialize()
 
-            if not _legacy_namespace():
-                # OVOS-PIPELINE-1 §7.1: stamp the matching plugin id on the dispatch.
-                if pipeline_id:
-                    reply.context["pipeline_id"] = pipeline_id
-                # OVOS-PIPELINE-1 §9.2: emit the match notification before dispatch.
-                intent_name = match.match_type
-                if intent_name and ":" in intent_name:
-                    intent_name = intent_name.split(":", 1)[-1]
-                self.bus.emit(reply.forward("ovos.intent.matched", {
-                    "skill_id": match.skill_id,
-                    "intent_name": intent_name,
-                    "lang": lang,
-                    "utterance": match.utterance,
-                    "slots": match.match_data,
-                    "pipeline_id": pipeline_id,
-                }))
+            # OVOS-PIPELINE-1 §7.1: stamp the matching plugin id on the dispatch.
+            if pipeline_id:
+                reply.context["pipeline_id"] = pipeline_id
+                
+            # OVOS-PIPELINE-1 §9.2: emit the match notification before dispatch.
+            intent_name = match.match_type
+            if intent_name and ":" in intent_name:
+                intent_name = intent_name.split(":", 1)[-1]
+            self.bus.emit(reply.forward("ovos.intent.matched", {
+                "skill_id": match.skill_id,
+                "intent_name": intent_name,
+                "lang": lang,
+                "utterance": match.utterance,
+                "slots": match.match_data,
+                "pipeline_id": pipeline_id,
+            }))
 
-            # finally emit reply message
+            # finally emit reply message (intent dispatch)
             self.bus.emit(reply)
 
         else:  # upload intent metrics if enabled
@@ -542,10 +542,11 @@ class IntentService:
         sound = Configuration().get('sounds', {}).get('error', "snd/error.mp3")
         # NOTE: message.reply to ensure correct message destination
         self.bus.emit(message.reply('mycroft.audio.play_sound', {"uri": sound}))
-        # OVOS-PIPELINE-1 §9.3 intent-layer no-match signal: legacy
-        # complete_intent_failure or spec ovos.intent.unmatched, per namespace.
-        nomatch = 'complete_intent_failure' if _legacy_namespace() else 'ovos.intent.unmatched'
-        self.bus.emit(message.reply(nomatch, message.data))
+        
+        # OVOS-PIPELINE-1 §9.3 intent-layer no-match signal
+        self.bus.emit(message.reply('complete_intent_failure', message.data))  # legacy namespace - TODO remove
+        self.bus.emit(message.reply('ovos.intent.unmatched', message.data))
+        
         self.bus.emit(message.reply("ovos.utterance.handled"))
 
     @staticmethod
