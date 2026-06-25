@@ -575,7 +575,11 @@ class IntentService:
         lang = get_message_lang(message)
         sess = SessionManager.get(message)
         # optional: drop stages from the session pipeline for this probe
-        excluded = message.data.get("exclude_pipeline")
+        excluded = message.data.get("exclude_pipeline") or []
+        if isinstance(excluded, str):
+            excluded = [excluded]
+        else:
+            excluded = [x for x in excluded if isinstance(x, str) and x]
         match = None
         # Loop through the matching functions until a match is found.
         for pipeline, match_func in self.get_pipeline(session=sess):
