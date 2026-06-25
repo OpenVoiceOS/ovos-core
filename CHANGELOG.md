@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.2.0a1) (2026-06-25)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.6a1...2.2.0a1)
+
+**Merged pull requests:**
+
+- feat: intent.service.intent.get accepts exclude\_pipeline filter [\#773](https://github.com/OpenVoiceOS/ovos-core/pull/773) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.1.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.6a1) (2026-06-20)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.5a1...2.1.6a1)
