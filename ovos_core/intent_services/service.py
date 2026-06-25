@@ -23,6 +23,7 @@ import requests
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
+from ovos_bus_client.util.migration import TransitionalDeduplicator, utterance_key
 from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
 from ovos_spec_tools import closest_lang, standardize_lang
@@ -125,7 +126,15 @@ class IntentService:
         # this will sync default session across all components
         SessionManager.connect_to_bus(self.bus)
 
+        # During the namespace migration the utterance entry is consumed on
+        # BOTH the legacy recognizer_loop:utterance and the new
+        # ovos.utterance.handle (OVOS-PIPELINE-1 §9.1) topics so producers on
+        # either version are handled. Producers dual-emit during the migration;
+        # _utt_dedup drops the duplicate so the utterance is processed once.
+        # Drop the legacy listener (and the dedup) next major.
+        self._utt_dedup = TransitionalDeduplicator()
         self.bus.on('recognizer_loop:utterance', self.handle_utterance)
+        self.bus.on('ovos.utterance.handle', self.handle_utterance)
 
         # Context related handlers
         self.bus.on('add_context', self.handle_add_context)
@@ -439,6 +448,13 @@ class IntentService:
         Args:
             message (Message): The messagebus data
         """
+        # producers dual-emit on the legacy and new namespace during the
+        # migration; drop the content-duplicate so we process it once
+        if self._utt_dedup.is_duplicate(utterance_key(message.data.get('utterances'),
+                                                      message.data.get('lang'))):
+            LOG.debug("Ignoring duplicate utterance from the other namespace")
+            return
+
         # Get utterance utterance_plugins additional context
         message = self._handle_transformers(message)
 
@@ -607,6 +623,7 @@ class IntentService:
                     continue
 
         self.bus.remove('recognizer_loop:utterance', self.handle_utterance)
+        self.bus.remove('ovos.utterance.handle', self.handle_utterance)
         self.bus.remove('add_context', self.handle_add_context)
         self.bus.remove('remove_context', self.handle_remove_context)
         self.bus.remove('clear_context', self.handle_clear_context)
