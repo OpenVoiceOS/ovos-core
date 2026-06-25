@@ -562,13 +562,29 @@ class IntentService:
 
         Args:
             message (Message): message containing utterance
+
+        Optional message.data keys:
+            exclude_pipeline (list[str]): drop these stages from the session
+                pipeline before matching (substring match, e.g. ["converse"]).
+                `intent.service.intent.get` is a read-only probe (it never runs
+                a handler), so callers can use this to ask "what would match,
+                ignoring these stages?" - e.g. a conversing skill probing the
+                pipeline without re-entering the converse stage.
         """
         utterance = message.data["utterance"]
         lang = get_message_lang(message)
         sess = SessionManager.get(message)
+        # optional: drop stages from the session pipeline for this probe
+        excluded = message.data.get("exclude_pipeline") or []
+        if isinstance(excluded, str):
+            excluded = [excluded]
+        else:
+            excluded = [x for x in excluded if isinstance(x, str) and x]
         match = None
         # Loop through the matching functions until a match is found.
         for pipeline, match_func in self.get_pipeline(session=sess):
+            if excluded and any(x in pipeline for x in excluded):
+                continue
             s = time.monotonic()
             match = match_func([utterance], lang, message)
             LOG.debug(f"matching '{pipeline}' took: {time.monotonic() - s} seconds")
