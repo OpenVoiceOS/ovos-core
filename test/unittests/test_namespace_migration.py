@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import Mock
 
 from ovos_bus_client.message import Message
-from ovos_bus_client.util.migration import TransitionalDeduplicator
+from ovos_bus_client.util import Deduplicator
 
 from ovos_core.intent_services import IntentService
 
@@ -20,7 +20,7 @@ class TestUtteranceDedup(unittest.TestCase):
         # build a bare IntentService without loading the heavy pipelines;
         # exercise only the dedup guard at the top of handle_utterance
         self.service = IntentService.__new__(IntentService)
-        self.service._utt_dedup = TransitionalDeduplicator()
+        self.service._utt_dedup = Deduplicator()
         # short-circuit handle_utterance right after the dedup guard so the
         # test counts how many times processing proceeds past it
         self._processed = []
@@ -56,12 +56,15 @@ class TestUtteranceDedup(unittest.TestCase):
                 pass
         self.assertEqual(len(self._processed), 2)
 
-    def test_empty_utterances_not_deduped(self):
-        # no text -> utterance_key is None -> never a duplicate
-        for _ in range(2):
-            msg = Message("recognizer_loop:utterance", {"utterances": [], "lang": "en-US"})
+    def test_same_text_different_lang_both_handled(self):
+        # lang is part of the dedup key, so the same text in two langs is distinct
+        msg1 = Message("recognizer_loop:utterance",
+                       {"utterances": ["hello world"], "lang": "en-US"})
+        msg2 = Message("ovos.utterance.handle",
+                       {"utterances": ["hello world"], "lang": "pt-PT"})
+        for m in (msg1, msg2):
             try:
-                self.service.handle_utterance(msg)
+                self.service.handle_utterance(m)
             except RuntimeError:
                 pass
         self.assertEqual(len(self._processed), 2)

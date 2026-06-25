@@ -22,8 +22,7 @@ from typing import Tuple, Callable, List
 import requests
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
-from ovos_bus_client.util import get_message_lang
-from ovos_bus_client.util.migration import TransitionalDeduplicator, utterance_key
+from ovos_bus_client.util import get_message_lang, Deduplicator
 from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
 from ovos_spec_tools import closest_lang, standardize_lang
@@ -132,7 +131,7 @@ class IntentService:
         # either version are handled. Producers dual-emit during the migration;
         # _utt_dedup drops the duplicate so the utterance is processed once.
         # Drop the legacy listener (and the dedup) next major.
-        self._utt_dedup = TransitionalDeduplicator()
+        self._utt_dedup = Deduplicator()
         self.bus.on('recognizer_loop:utterance', self.handle_utterance)
         self.bus.on('ovos.utterance.handle', self.handle_utterance)
 
@@ -450,8 +449,9 @@ class IntentService:
         """
         # producers dual-emit on the legacy and new namespace during the
         # migration; drop the content-duplicate so we process it once
-        if self._utt_dedup.is_duplicate(utterance_key(message.data.get('utterances'),
-                                                      message.data.get('lang'))):
+        key = hash((tuple(message.data.get("utterances", [])),
+                    message.data.get("lang")))
+        if self._utt_dedup.is_duplicate(key):
             LOG.debug("Ignoring duplicate utterance from the other namespace")
             return
 
