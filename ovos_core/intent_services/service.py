@@ -17,7 +17,7 @@ import json
 import re
 import time
 from collections import defaultdict
-from typing import Tuple, Callable, List
+from typing import Tuple, Callable, List, Optional
 
 import requests
 from ovos_bus_client.message import Message
@@ -62,6 +62,33 @@ _PIPELINE_MIGRATION_MAP = {
 }
 
 _PIPELINE_RE = re.compile(r'-(high|medium|low)$')
+
+# OVOS-PIPELINE-1 §7.3 reserved intent_names. A Match produced by one of the
+# reserving pipeline-plugin roles below is a reserved-name dispatch: §7.1
+# requires the ``session.active_handlers`` push to be SUPPRESSED for it, because
+# a reserved name represents a continuation/termination of an already-active
+# skill's participation, not a fresh activation. Keyed off the producing
+# pipeline_id (the role that holds the namespace lease), with the confidence
+# suffix (``-high``/``-medium``/``-low``) stripped before lookup.
+#
+#   converse       -> ovos-converse-pipeline-plugin       (CONVERSE-1 §4/§5: converse, response)
+#   stop           -> ovos-stop-pipeline-plugin           (STOP-1 §4: stop)
+#   fallback       -> ovos-fallback-pipeline-plugin        (FALLBACK-1 §6.3: fallback)
+#   common_query   -> ovos-common-query-pipeline-plugin    (COMMON-QUERY-1 §3: common_query)
+_RESERVED_NAME_PIPELINES = {
+    "ovos-converse-pipeline-plugin",
+    "ovos-stop-pipeline-plugin",
+    "ovos-fallback-pipeline-plugin",
+    "ovos-common-query-pipeline-plugin",
+}
+
+
+def _produces_reserved_name(pipeline_id: Optional[str]) -> bool:
+    """OVOS-PIPELINE-1 §7.3: True when ``pipeline_id`` is a reserved-name role
+    whose dispatches must NOT stamp ``session.active_handlers`` (§7.1)."""
+    if not pipeline_id:
+        return False
+    return _PIPELINE_RE.sub("", pipeline_id) in _RESERVED_NAME_PIPELINES
 
 
 def on_started():
@@ -353,7 +380,23 @@ class IntentService:
                 # but we still want to update the timestamp
                 was_deactivated = match.skill_id in self._deactivations[sess.session_id]
                 if not was_deactivated:
-                    sess.activate_skill(match.skill_id)
+                    # OVOS-PIPELINE-1 §7.1: push the spec ``active_handlers``
+                    # record ``{skill_id, activated_at}`` onto the working
+                    # session, evicting any prior entry for the same skill_id and
+                    # promoting it head-first by recency. The helper is applied
+                    # AFTER ``Match.updated_session`` is committed (``sess`` above),
+                    # so a plugin that mutated ``active_handlers`` via its snapshot
+                    # (e.g. STOP-1's global-stop wipe) sees this stamp land on top.
+                    # With ovos-bus-client #234, ``active_skills`` is a back-compat
+                    # projection of ``active_handlers``, so we prefer the spec
+                    # helper over the legacy ``sess.activate_skill``.
+                    #
+                    # §7.1/§7.3: the push is SUPPRESSED for reserved intent_name
+                    # dispatches (converse/response/stop/fallback/common_query) —
+                    # a reserved name is a continuation/termination of an
+                    # already-active skill's participation, not a fresh activation.
+                    if not _produces_reserved_name(pipeline_id):
+                        sess.add_active_handler(match.skill_id)
                     # emit event for skills callback -> self.handle_activate
                     self.bus.emit(reply.forward(f"{match.skill_id}.activate"))
 

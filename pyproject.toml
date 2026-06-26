@@ -16,6 +16,9 @@ dependencies = [
     "watchdog>=2.1, <3.0",
     "combo-lock>=0.2.2, <0.4",
     "ovos-utils>=0.11.1a1,<1.0.0",
+    # TODO(OVOS-PIPELINE-1 §7.1): bump floor once ovos-bus-client #234
+    # (feat/session-spec-fields: Session.add_active_handler/active_handlers)
+    # publishes; the active_handlers push relies on it.
     "ovos_bus_client>=2.2.0a1,<3.0.0",
     "ovos-plugin-manager>=2.5.0a1,<3.0.0",
     "ovos-config>=0.0.13,<3.0.0",

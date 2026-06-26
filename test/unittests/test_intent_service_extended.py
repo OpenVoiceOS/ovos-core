@@ -463,6 +463,88 @@ class TestEmitMatchMessage(unittest.TestCase):
             svc._emit_match_message(match, msg, "en-US")
         svc.intent_plugins.transform.assert_called_once()
 
+    def test_active_handler_pushed_on_normal_dispatch(self):
+        """OVOS-PIPELINE-1 §7.1: a normal (non-reserved) dispatch pushes the
+        spec {skill_id, activated_at} record onto session.active_handlers."""
+        svc = _make_service()
+        svc.bus.emit = MagicMock()
+        sess = Session("s")
+        self.assertEqual(sess.active_handlers, [])
+        match = _make_match(session=sess)
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["hello"]},
+                      context={"session": sess.serialize()})
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess):
+            svc._emit_match_message(match, msg, "en-US",
+                                    pipeline_id="ovos-adapt-pipeline-plugin-high")
+        # spec record present and head-first, keyed by activated_at
+        self.assertEqual(len(sess.active_handlers), 1)
+        rec = sess.active_handlers[0]
+        self.assertEqual(rec["skill_id"], "test.skill")
+        self.assertIn("activated_at", rec)
+        # back-compat projection also reflects it
+        self.assertIn("test.skill", [s[0] for s in sess.active_skills])
+
+    def test_active_handler_evicts_prior_same_skill(self):
+        """§7.1: a repeat dispatch for the same skill_id evicts the prior entry
+        and promotes it head-first (no duplicate)."""
+        svc = _make_service()
+        svc.bus.emit = MagicMock()
+        sess = Session("s")
+        sess.add_active_handler("other.skill")
+        match = _make_match(session=sess)
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["hello"]},
+                      context={"session": sess.serialize()})
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess):
+            svc._emit_match_message(match, msg, "en-US",
+                                    pipeline_id="ovos-adapt-pipeline-plugin-high")
+            svc._emit_match_message(match, msg, "en-US",
+                                    pipeline_id="ovos-adapt-pipeline-plugin-high")
+        ids = [r["skill_id"] for r in sess.active_handlers]
+        self.assertEqual(ids.count("test.skill"), 1)
+        self.assertEqual(sess.active_handlers[0]["skill_id"], "test.skill")
+
+    def test_active_handler_suppressed_for_reserved_name(self):
+        """§7.1/§7.3: the active_handlers push is SUPPRESSED for dispatches
+        produced by a reserved-name pipeline role (converse/response/stop/
+        fallback/common_query)."""
+        for pid in ("ovos-converse-pipeline-plugin",
+                    "ovos-stop-pipeline-plugin-high",
+                    "ovos-fallback-pipeline-plugin-medium",
+                    "ovos-common-query-pipeline-plugin"):
+            with self.subTest(pipeline_id=pid):
+                svc = _make_service()
+                svc.bus.emit = MagicMock()
+                sess = Session("s")
+                match = _make_match(session=sess)
+                msg = Message("recognizer_loop:utterance",
+                              data={"utterances": ["hello"]},
+                              context={"session": sess.serialize()})
+                with patch("ovos_core.intent_services.service.SessionManager.get",
+                           return_value=sess):
+                    svc._emit_match_message(match, msg, "en-US", pipeline_id=pid)
+                self.assertEqual(sess.active_handlers, [],
+                                 f"reserved pipeline {pid} must not stamp active_handlers")
+
+    def test_active_handler_not_pushed_when_deactivated(self):
+        """§7.1: a skill that called self.deactivate this turn is not re-stamped."""
+        svc = _make_service()
+        svc.bus.emit = MagicMock()
+        sess = Session("s")
+        svc._deactivations[sess.session_id] = ["test.skill"]
+        match = _make_match(session=sess)
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["hello"]},
+                      context={"session": sess.serialize()})
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess):
+            svc._emit_match_message(match, msg, "en-US",
+                                    pipeline_id="ovos-adapt-pipeline-plugin-high")
+        self.assertEqual(sess.active_handlers, [])
+
 
 # ---------------------------------------------------------------------------
 # handle_utterance (basic wiring)
