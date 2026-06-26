@@ -14,6 +14,9 @@ jobs:
     with:
       system_deps: 'python3-dev swig libssl-dev portaudio19-dev libpulse-dev libfann-dev'
       install_extras: '.[mycroft,plugins,skills-essential,lgpl,test]'
+      # in-flight cross-deps not yet published: bus-client Session (PR #234) +
+      # spec-tools fallback_handlers (PR #45)
+      pre_install_pip: 'git+https://github.com/OpenVoiceOS/ovos-spec-tools@fix/session-fallback-handlers git+https://github.com/OpenVoiceOS/ovos-bus-client@feat/session-spec-fields'
       test_path: 'test/unittests'
       coverage_source: 'ovos_core'
       deploy_pages: true
