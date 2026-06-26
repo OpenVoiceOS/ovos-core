@@ -299,6 +299,53 @@ class IntentService:
         skill_id = message.data.get("skill_id")
         self._deactivations[sess.session_id].append(skill_id)
 
+    @staticmethod
+    def _missing_required_slots(match: IntentHandlerMatch) -> List[str]:
+        """OVOS-PIPELINE-1 §6.2 orchestrator backstop for ``required_slots``.
+
+        After a plugin returns a ``Match``, the orchestrator MUST verify that
+        the match's slot map contains every slot listed in the matched intent's
+        ``required_slots`` (OVOS-INTENT-3 §5.3, OVOS-INTENT-4 §6.1). If any
+        required slot is absent, the orchestrator MUST treat the match as if the
+        plugin had declined and continue iteration — no bus event is emitted;
+        the only observable effect is a non-match (§6.2).
+
+        The primary obligation to enforce ``required_slots`` still lies with the
+        engine during ``match()``; this is a second line of defense against
+        engine bugs or plugins that do not implement the rule.
+
+        Source of ``required_slots``: per §6.2 the orchestrator obtains this
+        "from the same registration data the plugin consumed — in-process, this
+        is available from the plugin's compiled state or from the orchestrator's
+        own manifest (INTENT-4 §10)". ovos-core does not yet maintain an
+        INTENT-4 §10 registration manifest (no ``ovos.intent.list`` /
+        ``ovos.intent.describe`` index is plumbed into the orchestrator), so the
+        only conformant, in-process channel a plugin has to surface the matched
+        intent's ``required_slots`` to the orchestrator is the ``Match`` itself.
+        We read it from ``match.match_data['__required_slots__']`` when present.
+        The captured slot map is ``match.match_data`` (OVOS-INTENT-3 §7;
+        ``Match.slots`` in PIPELINE-1 §4.3), keyed by slot/vocabulary name.
+
+        When a plugin does not surface ``required_slots`` (the common case
+        today), this returns an empty list and the backstop is a no-op, leaving
+        engine-side enforcement authoritative.
+
+        TODO: once an INTENT-4 §10 manifest is plumbed into the orchestrator,
+        source ``required_slots`` from it (keyed on skill_id/intent_name/lang)
+        so the backstop covers every plugin regardless of whether it echoes the
+        constraint back in ``match_data``.
+
+        Returns:
+            List[str]: required slot names absent from the match's slot map.
+                       Empty when the match is conformant or carries no
+                       ``required_slots``.
+        """
+        match_data = match.match_data or {}
+        required_slots = match_data.get("__required_slots__")
+        if not required_slots:
+            return []
+        return [slot for slot in required_slots if not match_data.get(slot)]
+
     def _emit_match_message(self, match: IntentHandlerMatch, message: Message, lang: str,
                             pipeline_id: str = None):
         """
@@ -554,6 +601,18 @@ class IntentService:
                         if isinstance(match, IntentHandlerMatch) and match.match_type in sess.blacklisted_intents:
                             LOG.debug(
                                 f"ignoring match, intent '{match.match_type}' blacklisted by Session '{sess.session_id}'")
+                            continue
+                        # OVOS-PIPELINE-1 §6.2: orchestrator backstop for
+                        # required_slots. Runs AFTER the §5.3/§5.4 denylist
+                        # checks and uses the same observable semantics — if any
+                        # required slot is absent, treat the match as if the
+                        # plugin had declined and continue iteration; no bus
+                        # event is emitted.
+                        missing = self._missing_required_slots(match)
+                        if missing:
+                            LOG.debug(
+                                f"ignoring match, intent '{match.match_type}' is missing "
+                                f"required_slots {missing} (OVOS-PIPELINE-1 §6.2)")
                             continue
                         try:
                             # OVOS-PIPELINE-1 §4.2: adopt the (possibly updated)

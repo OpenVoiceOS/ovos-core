@@ -547,6 +547,121 @@ class TestEmitMatchMessage(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# required_slots orchestrator backstop (OVOS-PIPELINE-1 §6.2)
+# ---------------------------------------------------------------------------
+
+class TestRequiredSlotsBackstop(unittest.TestCase):
+    """OVOS-PIPELINE-1 §6.2 orchestrator backstop for required_slots."""
+
+    @staticmethod
+    def _match_with_required(present_slots, required_slots):
+        data = {"skill_id": "music.skill"}
+        data.update(present_slots)
+        data["__required_slots__"] = required_slots
+        return IntentHandlerMatch(
+            match_type="music.skill:play_music",
+            match_data=data,
+            skill_id="music.skill",
+            utterance="play some jazz",
+        )
+
+    # --- _missing_required_slots unit ---------------------------------------
+
+    def test_no_required_slots_is_noop(self):
+        """A match that carries no required_slots is never filtered."""
+        match = _make_match()
+        self.assertEqual(IntentService._missing_required_slots(match), [])
+
+    def test_all_required_present_passes(self):
+        match = self._match_with_required({"query": "some jazz"}, ["query"])
+        self.assertEqual(IntentService._missing_required_slots(match), [])
+
+    def test_missing_required_slot_detected(self):
+        match = self._match_with_required({}, ["query"])
+        self.assertEqual(IntentService._missing_required_slots(match), ["query"])
+
+    def test_empty_value_counts_as_missing(self):
+        match = self._match_with_required({"query": ""}, ["query"])
+        self.assertEqual(IntentService._missing_required_slots(match), ["query"])
+
+    def test_partial_required_slots_reported(self):
+        match = self._match_with_required({"query": "jazz"},
+                                          ["query", "engine"])
+        self.assertEqual(IntentService._missing_required_slots(match),
+                         ["engine"])
+
+    def test_none_match_data_is_safe(self):
+        match = IntentHandlerMatch(match_type="x:y", match_data=None,
+                                   skill_id="x")
+        self.assertEqual(IntentService._missing_required_slots(match), [])
+
+    # --- end-to-end match-loop behaviour ------------------------------------
+
+    def _run_loop(self, first_match):
+        """Drive handle_utterance with a single pipeline stage returning
+        ``first_match``, then a second stage that always declines, and return
+        whether the first match was dispatched."""
+        svc = _make_service()
+        sess = Session("s")
+        emitted = []
+        svc.bus.emit = lambda m: emitted.append(m)
+        svc.send_complete_intent_failure = MagicMock()
+        # The §6.2 backstop runs strictly BEFORE _emit_match_message, so stub
+        # dispatch out: a match that survives the backstop reaches it, a filtered
+        # one never does. This also keeps the test independent of the
+        # ovos-bus-client §7.1 active_handlers floor (pyproject TODO #234).
+        emit_match = MagicMock(return_value=sess)
+        svc._emit_match_message = emit_match
+
+        def stage_one(utterances, lang, message):
+            return first_match
+
+        def stage_two(utterances, lang, message):
+            return None
+
+        stage_one.__name__ = "stage_one"
+        stage_two.__name__ = "stage_two"
+
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["play some jazz"]},
+                      context={"session": sess.serialize()})
+
+        with patch.object(svc, "get_pipeline",
+                          return_value=[("stage_one", stage_one),
+                                        ("stage_two", stage_two)]), \
+             patch.object(svc, "_handle_transformers", side_effect=lambda m: m), \
+             patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.sync"), \
+             patch("ovos_core.intent_services.service.get_message_lang",
+                   return_value="en-US"), \
+             patch("ovos_core.intent_services.service.get_valid_languages",
+                   return_value=["en-US"]), \
+             patch.object(svc, "_validate_session", return_value=sess), \
+             patch.object(svc, "disambiguate_lang", return_value="en-US"):
+            match, _, _ = svc.handle_utterance(msg)
+        return match, svc, emit_match
+
+    def test_match_missing_required_slot_is_skipped(self):
+        """A Match missing a required slot is treated as declined: it is not
+        dispatched and the loop falls through to intent failure (no §6.2 bus
+        event for the skip)."""
+        bad = self._match_with_required({}, ["query"])
+        match, svc, emit_match = self._run_loop(bad)
+        self.assertIsNone(match)
+        emit_match.assert_not_called()
+        svc.send_complete_intent_failure.assert_called_once()
+
+    def test_match_with_required_slot_dispatches(self):
+        """A Match with all required slots present dispatches normally."""
+        good = self._match_with_required({"query": "some jazz"}, ["query"])
+        match, svc, emit_match = self._run_loop(good)
+        self.assertIs(match, good)
+        emit_match.assert_called_once()
+        svc.send_complete_intent_failure.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # handle_utterance (basic wiring)
 # ---------------------------------------------------------------------------
 
