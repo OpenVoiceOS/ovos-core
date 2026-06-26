@@ -30,6 +30,11 @@ LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utte
 SPEC_SPEAK = SpecMessage.SPEAK.value                      # ovos.utterance.speak
 INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value     # ovos.intent.unmatched (§9.3)
 HANDLER_ERROR = SpecMessage.INTENT_HANDLER_ERROR.value
+# OVOS-STOP-1 spec topics — the producer emits these; the bus bridges the 1:1
+# legacy renames (mycroft.stop / skill.stop.pong) transparently per MIGRATION_MAP.
+STOP_BROADCAST = SpecMessage.STOP.value                   # ovos.stop  (was mycroft.stop)
+STOP_PING = SpecMessage.STOP_PING.value                   # ovos.stop.ping (broadcast)
+STOP_PONG = SpecMessage.STOP_PONG.value                   # ovos.stop.pong (was skill.stop.pong)
 
 
 def _wait_for_active_skill(session_id, skill_id, timeout=10, interval=0.1):
@@ -44,7 +49,6 @@ def _wait_for_active_skill(session_id, skill_id, timeout=10, interval=0.1):
         f"Skill {skill_id} did not activate in session {session_id} "
         f"within {timeout}s"
     )
-
 
 # The two namespace paths every scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
@@ -172,7 +176,7 @@ class TestStopNoSkills(TestCase):
                     # StopService wraps the global-stop handler in HandlerLifecycle
                     Message("mycroft.skill.handler.start",
                             {"name": "StopService.handle_global_stop"}),
-                    Message("mycroft.stop", {}),
+                    Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast (bridged to mycroft.stop)
                     Message("mycroft.skill.handler.complete",
                             {"name": "StopService.handle_global_stop"}),
 
@@ -253,7 +257,7 @@ class TestStopNoSkills(TestCase):
                     # StopService wraps the global-stop handler in HandlerLifecycle
                     Message("mycroft.skill.handler.start",
                             {"name": "StopService.handle_global_stop"}),
-                    Message("mycroft.stop", {}),
+                    Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast (bridged to mycroft.stop)
                     Message("mycroft.skill.handler.complete",
                             {"name": "StopService.handle_global_stop"}),
 
@@ -416,7 +420,7 @@ class TestCountSkills(TestCase):
                 Message("mycroft.skill.handler.start",
                         {"name": "StopService.handle_global_stop"},
                         {"skill_id": "stop.openvoiceos"}),
-                Message("mycroft.stop", {},
+                Message(STOP_BROADCAST, {},
                         {"skill_id": "stop.openvoiceos"}),
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_global_stop"},

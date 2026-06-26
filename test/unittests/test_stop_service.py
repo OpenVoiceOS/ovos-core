@@ -69,7 +69,7 @@ class TestCollectStopSkills(unittest.TestCase):
 
         def capture_on(event, handler):
             nonlocal ack_handler
-            if event == "skill.stop.pong":
+            if event == "ovos.stop.pong":  # OVOS-STOP-1 §4.2 spec pong topic
                 ack_handler = handler
 
         svc.bus.on = capture_on
@@ -93,15 +93,15 @@ class TestCollectStopSkills(unittest.TestCase):
             import time
             time.sleep(0.05)  # let the thread register the handler
             if ack_handler:
-                ack_handler(Message("skill.stop.pong",
+                ack_handler(Message("ovos.stop.pong",
                                     {"skill_id": "skill_a", "can_handle": True}))
-                ack_handler(Message("skill.stop.pong",
+                ack_handler(Message("ovos.stop.pong",
                                     {"skill_id": "skill_b", "can_handle": True}))
             t.join(timeout=1)
 
         self.assertEqual(set(result_holder[0]), {"skill_a", "skill_b"})
         # listener must be removed
-        svc.bus.remove.assert_called_once_with("skill.stop.pong", ack_handler)
+        svc.bus.remove.assert_called_once_with("ovos.stop.pong", ack_handler)
 
     def test_skills_that_decline_are_excluded(self):
         """Skills that respond with can_handle=False are not in want_stop,
@@ -113,7 +113,7 @@ class TestCollectStopSkills(unittest.TestCase):
 
         def capture_on(event, handler):
             nonlocal ack_handler
-            if event == "skill.stop.pong":
+            if event == "ovos.stop.pong":  # OVOS-STOP-1 §4.2 spec pong topic
                 ack_handler = handler
 
         svc.bus.on = capture_on
@@ -136,7 +136,7 @@ class TestCollectStopSkills(unittest.TestCase):
             import time
             time.sleep(0.05)
             if ack_handler:
-                ack_handler(Message("skill.stop.pong",
+                ack_handler(Message("ovos.stop.pong",
                                     {"skill_id": "skill_a", "can_handle": False}))
             t.join(timeout=1)
 
@@ -164,7 +164,7 @@ class TestCollectStopSkills(unittest.TestCase):
         # bus.remove must have been called regardless of timeout
         svc.bus.remove.assert_called_once()
         args = svc.bus.remove.call_args[0]
-        self.assertEqual(args[0], "skill.stop.pong")
+        self.assertEqual(args[0], "ovos.stop.pong")
 
     def test_listener_removed_on_handler_exception(self):
         """Listener must be cleaned up even if handle_ack raises."""
@@ -177,7 +177,7 @@ class TestCollectStopSkills(unittest.TestCase):
 
         def capture_on(event, handler):
             nonlocal ack_handler
-            if event == "skill.stop.pong":
+            if event == "ovos.stop.pong":  # OVOS-STOP-1 §4.2 spec pong topic
                 ack_handler = handler
 
         svc.bus.on = capture_on
@@ -202,7 +202,7 @@ class TestCollectStopSkills(unittest.TestCase):
             time.sleep(0.05)
             # Send a malformed message that triggers the guard (skill_id missing)
             if ack_handler:
-                ack_handler(Message("skill.stop.pong", {}))  # no skill_id → guard fires
+                ack_handler(Message("ovos.stop.pong", {}))  # no skill_id → guard fires
             t.join(timeout=1)
 
         # Listener must still have been removed
@@ -219,7 +219,7 @@ class TestCollectStopSkills(unittest.TestCase):
 
         def capture_on(event, handler):
             nonlocal ack_handler
-            if event == "skill.stop.pong":
+            if event == "ovos.stop.pong":  # OVOS-STOP-1 §4.2 spec pong topic
                 ack_handler = handler
 
         svc.bus.on = capture_on
@@ -238,8 +238,8 @@ class TestCollectStopSkills(unittest.TestCase):
             t.start()
             time.sleep(0.05)
             if ack_handler:
-                ack_handler(Message("skill.stop.pong", {}))          # bad — no skill_id
-                ack_handler(Message("skill.stop.pong",
+                ack_handler(Message("ovos.stop.pong", {}))          # bad — no skill_id
+                ack_handler(Message("ovos.stop.pong",
                                     {"skill_id": "real_skill", "can_handle": True}))  # good
             t.join(timeout=1)
 
@@ -266,10 +266,35 @@ class TestCollectStopSkills(unittest.TestCase):
 
             svc._collect_stop_skills(Message("test"))
 
-        # only ok_skill should have received a ping (check msg_type of emitted messages)
+        # only ok_skill should have received a per-skill ping (check msg_type)
         emitted_types = [c[0][0].msg_type for c in svc.bus.emit.call_args_list]
         self.assertTrue(any("ok_skill" in t for t in emitted_types))
         self.assertFalse(any("bad_skill" in t for t in emitted_types))
+
+    def test_spec_broadcast_ping_emitted(self):
+        """OVOS-STOP-1 §4.1/§4.2: a single ``ovos.stop.ping`` broadcast is emitted,
+        and the spec ``ovos.stop.pong`` topic is the one subscribed."""
+        svc = _make_service()
+        sess = self._session_with_skills(["skill_a"])
+        svc.bus.emit = MagicMock()
+        svc.bus.remove = MagicMock()
+        svc.bus.on = MagicMock()
+
+        with patch.object(StopService, "get_active_skills", return_value=["skill_a"]), \
+             patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.stop_service.Event") as MockEvent:
+            mock_evt = MagicMock()
+            mock_evt.wait = MagicMock()
+            MockEvent.return_value = mock_evt
+
+            svc._collect_stop_skills(Message("test"))
+
+        emitted_types = [c[0][0].msg_type for c in svc.bus.emit.call_args_list]
+        # spec broadcast emitted exactly once
+        self.assertEqual(emitted_types.count("ovos.stop.ping"), 1)
+        # spec pong topic is the one subscribed (back-compat per-skill ping kept)
+        self.assertEqual(svc.bus.on.call_args[0][0], "ovos.stop.pong")
 
 
 class TestHandleStopConfirmation(unittest.TestCase):
@@ -521,7 +546,10 @@ class TestGetActiveSkills(unittest.TestCase):
 
 class TestBusHandlers(unittest.TestCase):
 
-    def test_handle_global_stop_emits_mycroft_stop(self):
+    def test_handle_global_stop_emits_ovos_stop(self):
+        # OVOS-STOP-1 §5.3: global-stop handler emits the spec topic ``ovos.stop``.
+        # The bus bridges it to legacy ``mycroft.stop`` (MIGRATION_MAP); this test
+        # mocks emit so it asserts the spec topic the handler actually produces.
         svc = _make_service()
         emitted = []
         svc.bus.emit = lambda m: emitted.append(m)
@@ -529,7 +557,7 @@ class TestBusHandlers(unittest.TestCase):
         svc.handle_global_stop(msg)
         types = [m.msg_type for m in emitted]
         self.assertIn("mycroft.skill.handler.start", types)
-        self.assertIn("mycroft.stop", types)
+        self.assertIn("ovos.stop", types)
         self.assertIn("mycroft.skill.handler.complete", types)
 
     def test_handle_skill_stop_forwards_to_skill(self):

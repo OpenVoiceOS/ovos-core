@@ -42,6 +42,11 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value              # ovos.utterance.handl
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utterance
 SPEC_SPEAK = SpecMessage.SPEAK.value                      # ovos.utterance.speak
 HANDLER_ERROR = SpecMessage.INTENT_HANDLER_ERROR.value
+# OVOS-STOP-1 spec topics — the producer emits these; the bus bridges the 1:1
+# legacy renames (mycroft.stop / skill.stop.pong) transparently per MIGRATION_MAP.
+STOP_BROADCAST = SpecMessage.STOP.value                   # ovos.stop  (was mycroft.stop)
+STOP_PING = SpecMessage.STOP_PING.value                   # ovos.stop.ping (broadcast)
+STOP_PONG = SpecMessage.STOP_PONG.value                   # ovos.stop.pong (was skill.stop.pong)
 
 # The two namespace paths every scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
@@ -124,7 +129,7 @@ class TestGlobalStopVocabulary(TestCase):
                 # StopService wraps the global-stop handler in HandlerLifecycle
                 Message("mycroft.skill.handler.start",
                         {"name": "StopService.handle_global_stop"}),
-                Message("mycroft.stop", {}),
+                Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 (bridged to mycroft.stop)
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_global_stop"}),
                 Message(SpecMessage.UTTERANCE_HANDLED, {}),
@@ -168,7 +173,7 @@ class TestGlobalStopVocabulary(TestCase):
                 # StopService wraps the global-stop handler in HandlerLifecycle
                 Message("mycroft.skill.handler.start",
                         {"name": "StopService.handle_global_stop"}),
-                Message("mycroft.stop", {}),
+                Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 (bridged to mycroft.stop)
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_global_stop"}),
                 Message(SpecMessage.UTTERANCE_HANDLED, {}),
@@ -232,7 +237,7 @@ class TestGlobalStopVocWithActiveSkill(TestCase):
                 # StopService wraps the global-stop handler in HandlerLifecycle
                 Message("mycroft.skill.handler.start",
                         {"name": "StopService.handle_global_stop"}),
-                Message("mycroft.stop", {}),
+                Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 (bridged to mycroft.stop)
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_global_stop"}),
                 Message(SpecMessage.UTTERANCE_HANDLED, {}),
@@ -359,6 +364,13 @@ class TestStopServiceNotASkill(TestCase):
     regression guard for dropping the OVOSAbstractApplication base class.
     """
 
+    # emit_legacy=True on both paths so the spec broadcast reaches the un-migrated
+    # StopService skill via the legacy-topic mirror.
+    NAMESPACE_PATHS = {
+        "spec": (False, True, SPEC_UTTERANCE),
+        "legacy": (True, True, LEGACY_UTTERANCE),
+    }
+
     def setUp(self):
         LOG.set_level("DEBUG")
 
@@ -368,7 +380,7 @@ class TestStopServiceNotASkill(TestCase):
     def _run_stop_service_is_not_a_skill(self, namespace):
         """A global stop with no skills loaded emits the stop dispatch lifecycle
         and NO stop.openvoiceos.stop.response (StopService does not self-respond)."""
-        modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
+        modernize, emit_legacy, utt_topic = self.NAMESPACE_PATHS[namespace]
         minicroft = get_minicroft([], modernize=modernize, emit_legacy=emit_legacy)
 
         session = Session("123")
@@ -396,7 +408,7 @@ class TestStopServiceNotASkill(TestCase):
                 # StopService wraps the global-stop handler in HandlerLifecycle
                 Message("mycroft.skill.handler.start",
                         {"name": "StopService.handle_global_stop"}),
-                Message("mycroft.stop", {}),
+                Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 (bridged to mycroft.stop)
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_global_stop"}),
                 Message(SpecMessage.UTTERANCE_HANDLED, {}),
@@ -406,6 +418,6 @@ class TestStopServiceNotASkill(TestCase):
         minicroft.stop()
 
     def test_stop_service_is_not_a_skill(self):
-        for namespace in NAMESPACE_PATHS:
+        for namespace in self.NAMESPACE_PATHS:
             with self.subTest(namespace=namespace):
                 self._run_stop_service_is_not_a_skill(namespace)

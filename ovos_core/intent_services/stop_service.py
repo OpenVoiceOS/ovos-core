@@ -10,6 +10,7 @@ from ovos_bus_client.session import SessionManager, UtteranceState
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import ConfidenceMatcherPipeline, IntentHandlerMatch
 from ovos_spec_tools import LocaleResources
+from ovos_spec_tools.messages import SpecMessage
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
@@ -25,16 +26,31 @@ class StopService(ConfidenceMatcherPipeline):
         bus = bus or FakeBus()
         ConfidenceMatcherPipeline.__init__(self, config=config, bus=bus)
         self._locale = LocaleResources(skill_locale=join(dirname(__file__), "locale"))
+        # NOTE (OVOS-STOP-1 §2/§3.1 — intent_name rename DEFERRED): the spec
+        # reserves intent_name exactly ``"stop"``/``"global_stop"``. In the current
+        # IntentHandlerMatch contract ``match_type`` is BOTH the reserved
+        # intent_name AND the dispatch bus topic — IntentService dispatches via
+        # ``message.reply(match.match_type)`` and keys ``session.blacklisted_intents``
+        # on it (service.py). The orchestrator routes these two ``stop:*`` topics to
+        # the handlers below. Renaming match_type to the bare spec names without
+        # losing that dispatch route needs a PIPELINE-1 dispatch-layer change
+        # (separating intent_name from the dispatch topic), so it is deferred.
         self.bus.on("stop:global", self.handle_global_stop)
         self.bus.on("stop:skill", self.handle_skill_stop)
 
     def handle_global_stop(self, message: Message) -> None:
-        """Emit a global mycroft.stop; the §9.5 end-marker is the orchestrator's
-        responsibility (``IntentDispatcher._notify_terminal``)."""
+        """Emit the global stop broadcast.
+
+        OVOS-STOP-1 §5.3: the global-stop handler MUST emit ``ovos.stop``
+        (``SpecMessage.STOP``). It is a 1:1 rename in the spec MIGRATION_MAP, so
+        the bus bridge transparently re-delivers it on the legacy ``mycroft.stop``
+        topic for subscribers still on that namespace — we emit ONLY the spec
+        topic and never hand-roll a dual-emit (§3.1: exactly one broadcast).
+        """
         with HandlerLifecycle(self.bus, message,
                               skill_id="stop.openvoiceos",
                               data={"name": "StopService.handle_global_stop"}):
-            self.bus.emit(message.forward("mycroft.stop"))
+            self.bus.emit(message.forward(SpecMessage.STOP))
 
     def handle_skill_stop(self, message: Message) -> None:
         """Forward a stop request to the specific skill."""
@@ -122,9 +138,22 @@ class StopService(ConfidenceMatcherPipeline):
                 # all skills answered the ping!
                 event.set()
 
-        self.bus.on("skill.stop.pong", handle_ack)
+        # OVOS-STOP-1 §4.2: subscribe the spec pong topic ``ovos.stop.pong``
+        # (SpecMessage.STOP_PONG). It is a 1:1 rename in MIGRATION_MAP, so the bus
+        # bridge ALSO delivers un-migrated skills' legacy ``skill.stop.pong`` here
+        # — one subscription receives both namespaces.
+        self.bus.on(SpecMessage.STOP_PONG, handle_ack)
         try:
-            # ask skills if they can stop
+            # OVOS-STOP-1 §4.1/§4.2: emit the stoppability query as a single
+            # broadcast ``ovos.stop.ping`` (SpecMessage.STOP_PING). The skill_id is
+            # not part of a broadcast payload; responders self-identify in the pong.
+            self.bus.emit(message.forward(SpecMessage.STOP_PING))
+
+            # Back-compat: the per-skill ``{skill_id}.stop.ping`` is a structural
+            # placeholder the broadcast replaces and which CANNOT be statically
+            # bus-bridged (it has no fixed counterpart topic). Un-migrated skills
+            # still listen only on their per-skill ping, so we keep emitting it
+            # until the skill side (ovos-workshop) has migrated to the broadcast.
             for skill_id in active_skills:
                 self.bus.emit(message.forward(f"{skill_id}.stop.ping",
                                               {"skill_id": skill_id}))
@@ -132,7 +161,7 @@ class StopService(ConfidenceMatcherPipeline):
             # wait for all skills to acknowledge they can stop
             event.wait(timeout=0.5)
         finally:
-            self.bus.remove("skill.stop.pong", handle_ack)
+            self.bus.remove(SpecMessage.STOP_PONG, handle_ack)
         return want_stop or active_skills
 
     def handle_stop_confirmation(self, message: Message) -> None:
@@ -206,6 +235,11 @@ class StopService(ConfidenceMatcherPipeline):
             # check if any skill can stop
             for skill_id in self._collect_stop_skills(message):
                 LOG.debug(f"Telling skill to stop: {skill_id}")
+                # OVOS-STOP-1 §6.1: clear the dispatch target's response_mode via
+                # the committed updated_session. (§6.2 structured draining of
+                # ``active_handlers``/``converse_handlers`` is DEFERRED — those
+                # SESSION-1/CONVERSE-1 fields do not yet exist on the bus-client
+                # Session; the current recency input is ``session.active_skills``.)
                 sess.disable_response_mode(skill_id)
                 self.bus.once(f"{skill_id}.stop.response", self.handle_stop_confirmation)
                 return IntentHandlerMatch(
