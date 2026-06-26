@@ -1,10 +1,37 @@
+"""End-to-end padatious intent tests, exercised on BOTH bus namespaces.
+
+- **spec**: ``modernize=False, emit_legacy=False`` — the utterance is injected on
+  the spec topic ``ovos.utterance.handle`` and core handles it natively; no
+  cross-namespace bridging occurs.
+- **legacy**: ``modernize=True, emit_legacy=False`` — the utterance is injected on
+  the legacy topic ``recognizer_loop:utterance``; the FakeBus modernize-bridge
+  re-dispatches it as ``ovos.utterance.handle`` so the (spec-only) intent listener
+  still handles it.
+
+The captured sequence is identical on both paths except message[0]'s topic (the
+injected utterance topic). The hello-world skill speaks on the spec topic
+``ovos.utterance.speak`` (no legacy ``speak`` mirror because emit_legacy=False).
+"""
 from unittest import TestCase
 from copy import deepcopy
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
+from ovos_spec_tools import SpecMessage, migration_counterpart
 from ovos_utils.log import LOG
 
 from ovoscope import End2EndTest, get_minicroft
+
+# key -> (modernize, emit_legacy, utterance_topic)
+# Topics from the ovos-spec-tools SpecMessage enum; legacy derived, not hardcoded.
+SPEC_UTTERANCE = SpecMessage.UTTERANCE.value
+LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)
+SPEC_SPEAK = SpecMessage.SPEAK.value
+UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
+
+NAMESPACE_PATHS = {
+    "spec": (False, False, SPEC_UTTERANCE),
+    "legacy": (True, False, LEGACY_UTTERANCE),
+}
 
 
 class TestPadatiousIntent(TestCase):
@@ -12,18 +39,19 @@ class TestPadatiousIntent(TestCase):
     def setUp(self):
         LOG.set_level("DEBUG")
         self.skill_id = "ovos-skill-hello-world.openvoiceos"
-        self.minicroft = get_minicroft([self.skill_id])
 
     def tearDown(self):
-        if self.minicroft:
-            self.minicroft.stop()
         LOG.set_level("CRITICAL")
 
-    def test_padatious_match(self):
+    def _run_padatious_match(self, namespace):
+        modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
+        minicroft = get_minicroft([self.skill_id], modernize=modernize,
+                                  emit_legacy=emit_legacy)
+
         session = Session("123")
         session.lang = "en-US"
         session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
-        message = Message("recognizer_loop:utterance",
+        message = Message(utt_topic,
                           {"utterances": ["good morning"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
@@ -31,12 +59,13 @@ class TestPadatiousIntent(TestCase):
         final_session.active_skills = [(self.skill_id, 0.0)]
 
         test = End2EndTest(
-            minicroft=self.minicroft,
+            minicroft=minicroft,
             skill_ids=[self.skill_id],
+            flip_points=[utt_topic],
+            entry_points=[utt_topic],
             source_message=message,
             final_session=final_session,
             activation_points=[f"{self.skill_id}:Greetings.intent"],
-            # keep_original_src=[f"{self.skill_id}.activate"], # TODO
             expected_messages=[
                 message,
                 Message(f"{self.skill_id}.activate",
@@ -48,9 +77,8 @@ class TestPadatiousIntent(TestCase):
                 Message("mycroft.skill.handler.start",
                         data={"name": "HelloWorldSkill.handle_greetings"},
                         context={"skill_id": self.skill_id}),
-                Message("speak",
-                        data={"lang": session.lang,
-                              "expect_response": False,
+                Message(SPEC_SPEAK,
+                        data={"expect_response": False,
                               "meta": {
                                   "dialog": "hello",
                                   "data": {},
@@ -60,81 +88,123 @@ class TestPadatiousIntent(TestCase):
                 Message("mycroft.skill.handler.complete",
                         data={"name": "HelloWorldSkill.handle_greetings"},
                         context={"skill_id": self.skill_id}),
-                Message("ovos.utterance.handled",
+                Message(UTTERANCE_HANDLED,
                         data={},
                         context={"skill_id": self.skill_id}),
             ]
         )
 
         test.execute(timeout=10)
+        minicroft.stop()
 
-    def test_skill_blacklist(self):
+    def test_padatious_match(self):
+        for namespace in NAMESPACE_PATHS:
+            with self.subTest(namespace=namespace):
+                self._run_padatious_match(namespace)
+
+    def _run_skill_blacklist(self, namespace):
+        modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
+        minicroft = get_minicroft([self.skill_id], modernize=modernize,
+                                  emit_legacy=emit_legacy)
+
         session = Session("123")
         session.lang = "en-US"
         session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
         session.blacklisted_skills = [self.skill_id]
-        message = Message("recognizer_loop:utterance",
+        message = Message(utt_topic,
                           {"utterances": ["good morning"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
         test = End2EndTest(
-            minicroft=self.minicroft,
+            minicroft=minicroft,
             skill_ids=[self.skill_id],
+            flip_points=[utt_topic],
+            entry_points=[utt_topic],
             source_message=message,
             final_session=session,
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
                 Message("complete_intent_failure", {}),
-                Message("ovos.utterance.handled", {})
+                Message(UTTERANCE_HANDLED, {})
             ]
         )
 
         test.execute(timeout=10)
+        minicroft.stop()
 
-    def test_intent_blacklist(self):
+    def test_skill_blacklist(self):
+        for namespace in NAMESPACE_PATHS:
+            with self.subTest(namespace=namespace):
+                self._run_skill_blacklist(namespace)
+
+    def _run_intent_blacklist(self, namespace):
+        modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
+        minicroft = get_minicroft([self.skill_id], modernize=modernize,
+                                  emit_legacy=emit_legacy)
+
         session = Session("123")
         session.lang = "en-US"
         session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
         session.blacklisted_intents = [f"{self.skill_id}:Greetings.intent"]
-        message = Message("recognizer_loop:utterance",
+        message = Message(utt_topic,
                           {"utterances": ["good morning"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
         test = End2EndTest(
-            minicroft=self.minicroft,
+            minicroft=minicroft,
             skill_ids=[self.skill_id],
+            flip_points=[utt_topic],
+            entry_points=[utt_topic],
             source_message=message,
             final_session=session,
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
                 Message("complete_intent_failure", {}),
-                Message("ovos.utterance.handled", {})
+                Message(UTTERANCE_HANDLED, {})
             ]
         )
 
         test.execute(timeout=10)
+        minicroft.stop()
 
-    def test_adapt_no_match(self):
+    def test_intent_blacklist(self):
+        for namespace in NAMESPACE_PATHS:
+            with self.subTest(namespace=namespace):
+                self._run_intent_blacklist(namespace)
+
+    def _run_adapt_no_match(self, namespace):
+        modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
+        minicroft = get_minicroft([self.skill_id], modernize=modernize,
+                                  emit_legacy=emit_legacy)
+
         session = Session("123")
         session.lang = "en-US"
         session.pipeline = ['ovos-adapt-pipeline-plugin-high']
-        message = Message("recognizer_loop:utterance",
+        message = Message(utt_topic,
                           {"utterances": ["good morning"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
         test = End2EndTest(
-            minicroft=self.minicroft,
+            minicroft=minicroft,
             skill_ids=[self.skill_id],
+            flip_points=[utt_topic],
+            entry_points=[utt_topic],
             source_message=message,
             final_session=session,
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
                 Message("complete_intent_failure", {}),
-                Message("ovos.utterance.handled", {})
+                Message(UTTERANCE_HANDLED, {})
             ]
         )
 
         test.execute(timeout=10)
+        minicroft.stop()
+
+    def test_adapt_no_match(self):
+        for namespace in NAMESPACE_PATHS:
+            with self.subTest(namespace=namespace):
+                self._run_adapt_no_match(namespace)
