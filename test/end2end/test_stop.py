@@ -34,7 +34,9 @@ HANDLER_ERROR = SpecMessage.INTENT_HANDLER_ERROR.value
 # legacy renames (mycroft.stop / skill.stop.pong) transparently per MIGRATION_MAP.
 STOP_BROADCAST = SpecMessage.STOP.value                   # ovos.stop  (was mycroft.stop)
 STOP_PING = SpecMessage.STOP_PING.value                   # ovos.stop.ping (broadcast)
-STOP_PONG = SpecMessage.STOP_PONG.value                   # ovos.stop.pong (was skill.stop.pong)
+STOP_PONG = SpecMessage.STOP_PONG.value                   # ovos.stop.pong — spec pong the
+# pipeline subscribes; the producer (ovos-workshop) still emits legacy skill.stop.pong,
+# which the MIGRATION_MAP bridge delivers here (so captured sequences carry the legacy topic).
 
 
 def _wait_for_active_skill(session_id, skill_id, timeout=10, interval=0.1):
@@ -176,7 +178,10 @@ class TestStopNoSkills(TestCase):
                     # StopService wraps the global-stop handler in HandlerLifecycle
                     Message("mycroft.skill.handler.start",
                             {"name": "StopService.handle_global_stop"}),
-                    Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast (bridged to mycroft.stop)
+                    Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast
+                    # back-compat: handle_global_stop also emits the legacy
+                    # mycroft.stop directly for un-migrated skills
+                    Message("mycroft.stop", {}),
                     Message("mycroft.skill.handler.complete",
                             {"name": "StopService.handle_global_stop"}),
 
@@ -257,7 +262,10 @@ class TestStopNoSkills(TestCase):
                     # StopService wraps the global-stop handler in HandlerLifecycle
                     Message("mycroft.skill.handler.start",
                             {"name": "StopService.handle_global_stop"}),
-                    Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast (bridged to mycroft.stop)
+                    Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast
+                    # back-compat: handle_global_stop also emits the legacy
+                    # mycroft.stop directly for un-migrated skills
+                    Message("mycroft.stop", {}),
                     Message("mycroft.skill.handler.complete",
                             {"name": "StopService.handle_global_stop"}),
 
@@ -421,6 +429,10 @@ class TestCountSkills(TestCase):
                         {"name": "StopService.handle_global_stop"},
                         {"skill_id": "stop.openvoiceos"}),
                 Message(STOP_BROADCAST, {},
+                        {"skill_id": "stop.openvoiceos"}),
+                # back-compat: handle_global_stop also emits the legacy mycroft.stop
+                # directly — the un-migrated count skill listens there and stops
+                Message("mycroft.stop", {},
                         {"skill_id": "stop.openvoiceos"}),
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_global_stop"},

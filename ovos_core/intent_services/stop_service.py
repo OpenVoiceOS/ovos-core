@@ -41,16 +41,25 @@ class StopService(ConfidenceMatcherPipeline):
     def handle_global_stop(self, message: Message) -> None:
         """Emit the global stop broadcast.
 
-        OVOS-STOP-1 §5.3: the global-stop handler MUST emit ``ovos.stop``
-        (``SpecMessage.STOP``). It is a 1:1 rename in the spec MIGRATION_MAP, so
-        the bus bridge transparently re-delivers it on the legacy ``mycroft.stop``
-        topic for subscribers still on that namespace — we emit ONLY the spec
-        topic and never hand-roll a dual-emit (§3.1: exactly one broadcast).
+        OVOS-STOP-1 §5.3: the global-stop handler emits the spec broadcast
+        ``ovos.stop`` (``SpecMessage.STOP``).
+
+        Back-compat: the MIGRATION_MAP bus bridge only re-delivers ``ovos.stop``
+        on the legacy ``mycroft.stop`` topic when the bridge's legacy direction is
+        enabled, which is NOT guaranteed (it is an opt-in on MessageBusClient and
+        off in the pure-spec path). Skills have NOT migrated their stop handler —
+        ovos-workshop still subscribes ONLY ``mycroft.stop`` — so a spec-only
+        broadcast would silently fail to stop them. We therefore also emit the
+        legacy ``mycroft.stop`` directly until the skill side migrates, mirroring
+        the back-compat per-skill ``{skill_id}.stop.ping`` kept in
+        ``_collect_stop_skills``. The two topics target disjoint subscriber sets
+        (spec vs un-migrated), so this is not a double broadcast to any one skill.
         """
         with HandlerLifecycle(self.bus, message,
                               skill_id="stop.openvoiceos",
                               data={"name": "StopService.handle_global_stop"}):
             self.bus.emit(message.forward(SpecMessage.STOP))
+            self.bus.emit(message.forward("mycroft.stop"))
 
     def handle_skill_stop(self, message: Message) -> None:
         """Forward a stop request to the specific skill."""
