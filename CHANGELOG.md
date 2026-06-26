@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.0a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.2.0a2) (2026-06-26)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.2.0a1...2.2.0a2)
+
+**Merged pull requests:**
+
+- deps: adopt bus-client 2.x + workshop 8.x; single-source pyproject [\#775](https://github.com/OpenVoiceOS/ovos-core/pull/775) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.2.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.2.0a1) (2026-06-25)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.6a1...2.2.0a1)
