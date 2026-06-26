@@ -1,42 +1,69 @@
+"""End-to-end converse test, exercised on BOTH bus namespaces.
+
+- **spec**: ``modernize=False, emit_legacy=False`` — utterances injected on the spec
+  topic ``ovos.utterance.handle``; core handles them natively, no bridging.
+- **legacy**: ``modernize=True, emit_legacy=False`` — utterances injected on the
+  legacy topic ``recognizer_loop:utterance``; the FakeBus modernize-bridge
+  re-dispatches each as ``ovos.utterance.handle`` so the spec listener handles it.
+
+The parrot skill speaks on the spec topic ``ovos.utterance.speak``. The start/stop
+dialog utterances are randomized variants, so only their stable ``meta.dialog`` is
+asserted; the deterministic echo reply asserts its full utterance.
+"""
 from copy import deepcopy
 from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
+from ovos_spec_tools import SpecMessage, migration_counterpart
 from ovos_utils.log import LOG
 
 from ovoscope import End2EndTest, get_minicroft
 
+# Topics from the ovos-spec-tools SpecMessage enum; legacy derived, not hardcoded.
+SPEC_UTTERANCE = SpecMessage.UTTERANCE.value
+LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)
+SPEC_SPEAK = SpecMessage.SPEAK.value
+UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
+
+# key -> (modernize, emit_legacy, utterance_topic)
+NAMESPACE_PATHS = {
+    "spec": (False, False, SPEC_UTTERANCE),
+    "legacy": (True, False, LEGACY_UTTERANCE),
+}
+
 
 class TestConverse(TestCase):
 
+    skill_id = "ovos-skill-parrot.openvoiceos"
+
     def setUp(self):
         LOG.set_level("DEBUG")
-        self.skill_id = "ovos-skill-parrot.openvoiceos"
-        self.minicroft = get_minicroft([self.skill_id])  # reuse for speed, but beware if skills keeping internal state
 
     def tearDown(self):
-        if self.minicroft:
-            self.minicroft.stop()
         LOG.set_level("CRITICAL")
 
-    def test_parrot_mode(self):
+    def _run_parrot_mode(self, namespace: str) -> None:
+        modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
+        minicroft = get_minicroft([self.skill_id], modernize=modernize,
+                                  emit_legacy=emit_legacy)
+
         session = Session("123")
         session.lang = "en-US"
         session.pipeline = ["ovos-converse-pipeline-plugin", "ovos-padatious-pipeline-plugin-high"]
 
-        message1 = Message("recognizer_loop:utterance",
+        message1 = Message(utt_topic,
                            {"utterances": ["start parrot mode"], "lang": session.lang},
                            {"session": session.serialize(), "source": "A", "destination": "B"})
         # NOTE: we dont pass session after first message
         # End2EndTest will inject/update the session from message1
-        message2 = Message("recognizer_loop:utterance",
+        message2 = Message(utt_topic,
                            {"utterances": ["echo test"], "lang": session.lang},
                            {"source": "A", "destination": "B"})
-        message3 = Message("recognizer_loop:utterance",
+        message3 = Message(utt_topic,
                            {"utterances": ["stop parrot"], "lang": session.lang},
                            {"source": "A", "destination": "B"})
-        message4 = Message("recognizer_loop:utterance",
+        message4 = Message(utt_topic,
                            {"utterances": ["echo test"], "lang": session.lang},
                            {"source": "A", "destination": "B"})
 
@@ -51,7 +78,7 @@ class TestConverse(TestCase):
             Message("mycroft.skill.handler.start",
                     data={"name": "ParrotSkill.handle_start_parrot_intent"},
                     context={"skill_id": self.skill_id}),
-            Message("speak",
+            Message(SPEC_SPEAK,
                     data={"expect_response": False,
                           "meta": {
                               "dialog": "parrot_start",
@@ -62,7 +89,7 @@ class TestConverse(TestCase):
             Message("mycroft.skill.handler.complete",
                     data={"name": "ParrotSkill.handle_start_parrot_intent"},
                     context={"skill_id": self.skill_id}),
-            Message("ovos.utterance.handled",
+            Message(UTTERANCE_HANDLED,
                     data={},
                     context={"skill_id": self.skill_id}),
         ]
@@ -83,7 +110,7 @@ class TestConverse(TestCase):
             Message(f"{self.skill_id}.converse.request",
                     data={"utterances": ["echo test"], "lang": session.lang},
                     context={"skill_id": self.skill_id}),
-            Message("speak",
+            Message(SPEC_SPEAK,
                     data={"utterance": "echo test",
                           "expect_response": False,
                           "lang": session.lang,
@@ -94,7 +121,7 @@ class TestConverse(TestCase):
             Message("skill.converse.response",
                     data={"skill_id": self.skill_id},
                     context={"skill_id": self.skill_id}),
-            Message("ovos.utterance.handled",
+            Message(UTTERANCE_HANDLED,
                     data={},
                     context={"skill_id": self.skill_id})
         ]
@@ -117,7 +144,7 @@ class TestConverse(TestCase):
                     data={"utterances": ["stop parrot"], "lang": session.lang},
                     context={"skill_id": self.skill_id}),
 
-            Message("speak",
+            Message(SPEC_SPEAK,
                     data={"expect_response": False,
                           "lang": session.lang,
                           "meta": {
@@ -129,7 +156,7 @@ class TestConverse(TestCase):
             Message("skill.converse.response",
                     data={"skill_id": self.skill_id},
                     context={"skill_id": self.skill_id}),
-            Message("ovos.utterance.handled",
+            Message(UTTERANCE_HANDLED,
                     data={},
                     context={"skill_id": self.skill_id})
         ]
@@ -143,17 +170,18 @@ class TestConverse(TestCase):
                     context={"skill_id": self.skill_id}),
             Message("mycroft.audio.play_sound", data={"uri": "snd/error.mp3"}),
             Message("complete_intent_failure"),
-            Message("ovos.utterance.handled")
+            Message(UTTERANCE_HANDLED)
         ]
 
         final_session = deepcopy(session)
         final_session.active_skills = [(self.skill_id, 0.0)]
 
         test = End2EndTest(
-            minicroft=self.minicroft,
+            minicroft=minicroft,
             skill_ids=[self.skill_id],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
+            eof_msgs=[UTTERANCE_HANDLED],
+            flip_points=[utt_topic],
+            entry_points=[utt_topic],
             final_session=final_session,
             source_message=[message1, message2, message3, message4],
             expected_messages=expected1 + expected2 + expected3 + expected4,
@@ -165,3 +193,9 @@ class TestConverse(TestCase):
                                ]
         )
         test.execute(timeout=10)
+        minicroft.stop()
+
+    def test_parrot_mode(self):
+        for namespace in NAMESPACE_PATHS:
+            with self.subTest(namespace=namespace):
+                self._run_parrot_mode(namespace)

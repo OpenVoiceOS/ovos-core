@@ -21,65 +21,117 @@ Covers:
   stages (no ``complete_intent_failure`` emitted).
 - An utterance NOT matched by the configured pipeline produces
   ``complete_intent_failure`` and the error sound.
+
+Each scenario is exercised on BOTH bus namespaces (see ``namespace_e2e`` helpers):
+
+- **spec**: ``modernize=False, emit_legacy=False`` — the utterance is injected on
+  the spec topic ``ovos.utterance.handle`` and core handles it natively. No
+  cross-namespace bridging occurs; assertions use the spec topics
+  (``ovos.utterance.speak``, ``ovos.utterance.handled``).
+- **legacy**: ``modernize=True, emit_legacy=False`` — the utterance is injected on
+  the legacy topic ``recognizer_loop:utterance``; the FakeBus modernize-bridge
+  re-dispatches it as ``ovos.utterance.handle`` so the (spec-only) intent listener
+  still handles it. This proves legacy back-compat reaches the spec listener.
 """
 from copy import deepcopy
 from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
+from ovos_spec_tools import SpecMessage, migration_counterpart
 from ovos_utils.log import LOG
 
 from ovoscope import End2EndTest, get_minicroft
 
+# Topics come from the ovos-spec-tools SpecMessage enum (spec namespace); the
+# legacy counterpart is derived via migration_counterpart, never hardcoded.
+SPEC_UTTERANCE = SpecMessage.UTTERANCE.value          # ovos.utterance.handle
+LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utterance
+SPEC_SPEAK = SpecMessage.SPEAK.value                  # ovos.utterance.speak
+UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
+
+# The two namespace paths every scenario is run on.
+#   key       -> (modernize, emit_legacy, utterance_topic)
+NAMESPACE_PATHS = {
+    # pure spec: inject on ovos.* and assert no bridging
+    "spec": (False, False, SPEC_UTTERANCE),
+    # legacy producer bridged to the spec listener via modernize
+    "legacy": (True, False, LEGACY_UTTERANCE),
+}
+
+
+def utterance_topic(namespace: str) -> str:
+    """Topic the utterance is injected on for a given namespace path."""
+    return NAMESPACE_PATHS[namespace][2]
+
 
 class TestIntentPipelineRouting(TestCase):
-    """Verify that pipeline stage ordering controls which handler fires."""
+    """Verify that pipeline stage ordering controls which handler fires.
+
+    Every scenario runs on both the spec and legacy namespace paths via
+    ``self.subTest(namespace=...)``; a fresh MiniCroft is built per path so the
+    ``modernize``/``emit_legacy`` flags can differ.
+    """
+
+    skill_id = "ovos-skill-count.openvoiceos"
+    # Filter noisy bus messages that are not relevant to pipeline routing. The
+    # count skill speaks on the spec topic ``ovos.utterance.speak`` (no legacy
+    # mirror because emit_legacy=False on both paths).
+    ignore_messages = [
+        SPEC_SPEAK,
+        "ovos.common_play.stop.response",
+        "common_query.openvoiceos.stop.response",
+        "persona.openvoiceos.stop.response",
+        "ovos-hivemind-pipeline-plugin.stop.response",
+        "stop.openvoiceos.stop.response",
+    ]
 
     def setUp(self) -> None:
-        """Set up a shared MiniCroft instance with the count skill loaded."""
         LOG.set_level("DEBUG")
-        self.skill_id = "ovos-skill-count.openvoiceos"
-        self.minicroft = get_minicroft([self.skill_id])
-        # Filter noisy bus messages that are not relevant to pipeline routing.
-        self.ignore_messages = [
-            "speak",
-            "ovos.common_play.stop.response",
-            "common_query.openvoiceos.stop.response",
-            "persona.openvoiceos.stop.response",
-            "ovos-hivemind-pipeline-plugin.stop.response",
-            "stop.openvoiceos.stop.response",
-        ]
 
     def tearDown(self) -> None:
-        """Stop MiniCroft and restore log level."""
-        if self.minicroft:
-            self.minicroft.stop()
         LOG.set_level("CRITICAL")
+
+    # ------------------------------------------------------------------
+    # helpers
+    # ------------------------------------------------------------------
+    def _make_minicroft(self, namespace: str) -> "MiniCroft":
+        modernize, emit_legacy, _ = NAMESPACE_PATHS[namespace]
+        return get_minicroft([self.skill_id], modernize=modernize,
+                             emit_legacy=emit_legacy)
+
+    def _source_message(self, namespace: str, utterance: str, pipeline,
+                        session_id: str, blacklisted=None) -> Message:
+        session = Session(session_id)
+        session.lang = "en-US"
+        session.pipeline = list(pipeline)
+        if blacklisted is not None:
+            session.blacklisted_skills = list(blacklisted)
+        return Message(
+            utterance_topic(namespace),
+            {"utterances": [utterance], "lang": session.lang},
+            {"session": session.serialize(), "source": "A", "destination": "B"},
+        ), session
 
     # ------------------------------------------------------------------
     # Scenario 1: Padatious intent matched end-to-end
     # ------------------------------------------------------------------
-
-    def test_padatious_intent_matched(self) -> None:
+    def _run_padatious_intent_matched(self, namespace: str) -> None:
         """A padatious intent for 'count to 3' is matched and the handler fires."""
-        session = Session("pipeline-test-1")
-        session.lang = "en-US"
-        session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
-
-        message = Message(
-            "recognizer_loop:utterance",
-            {"utterances": ["count to 3"], "lang": session.lang},
-            {"session": session.serialize(), "source": "A", "destination": "B"},
-        )
+        utt_topic = utterance_topic(namespace)
+        message, session = self._source_message(
+            namespace, "count to 3",
+            ["ovos-padatious-pipeline-plugin-high"], "pipeline-test-1")
 
         final_session = deepcopy(session)
         final_session.active_skills = [(self.skill_id, 0.0)]
 
         test = End2EndTest(
-            minicroft=self.minicroft,
+            minicroft=self._make_minicroft(namespace),
             skill_ids=[self.skill_id],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
+            eof_msgs=[UTTERANCE_HANDLED],
+            flip_points=[utt_topic],
+            entry_points=[utt_topic],
             ignore_messages=self.ignore_messages,
             source_message=message,
             final_session=final_session,
@@ -107,44 +159,40 @@ class TestIntentPipelineRouting(TestCase):
                     context={"skill_id": self.skill_id},
                 ),
                 Message(
-                    "ovos.utterance.handled",
+                    UTTERANCE_HANDLED,
                     data={},
                     context={"skill_id": self.skill_id},
                 ),
             ],
         )
-
         test.execute(timeout=15)
+
+    def test_padatious_intent_matched(self) -> None:
+        for namespace in NAMESPACE_PATHS:
+            with self.subTest(namespace=namespace):
+                self._run_padatious_intent_matched(namespace)
 
     # ------------------------------------------------------------------
     # Scenario 2: Pipeline ordering — high stage fires, low stage skipped
     # ------------------------------------------------------------------
-
-    def test_high_priority_stage_handles_before_low(self) -> None:
+    def _run_high_priority_stage_handles_before_low(self, namespace: str) -> None:
         """When padatious-high is listed first it matches; stop-high is listed after
         and must NOT fire (no ``stop:global`` / ``mycroft.stop`` messages)."""
-        session = Session("pipeline-test-2")
-        session.lang = "en-US"
-        # padatious-high before stop-high: count should be handled by padatious
-        session.pipeline = [
-            "ovos-padatious-pipeline-plugin-high",
-            "ovos-stop-pipeline-plugin-high",
-        ]
-
-        message = Message(
-            "recognizer_loop:utterance",
-            {"utterances": ["count to 3"], "lang": session.lang},
-            {"session": session.serialize(), "source": "A", "destination": "B"},
-        )
+        utt_topic = utterance_topic(namespace)
+        message, session = self._source_message(
+            namespace, "count to 3",
+            ["ovos-padatious-pipeline-plugin-high",
+             "ovos-stop-pipeline-plugin-high"], "pipeline-test-2")
 
         final_session = deepcopy(session)
         final_session.active_skills = [(self.skill_id, 0.0)]
 
         test = End2EndTest(
-            minicroft=self.minicroft,
+            minicroft=self._make_minicroft(namespace),
             skill_ids=[self.skill_id],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
+            eof_msgs=[UTTERANCE_HANDLED],
+            flip_points=[utt_topic],
+            entry_points=[utt_topic],
             ignore_messages=self.ignore_messages,
             source_message=message,
             final_session=final_session,
@@ -172,38 +220,36 @@ class TestIntentPipelineRouting(TestCase):
                     context={"skill_id": self.skill_id},
                 ),
                 Message(
-                    "ovos.utterance.handled",
+                    UTTERANCE_HANDLED,
                     data={},
                     context={"skill_id": self.skill_id},
                 ),
             ],
         )
-
         test.execute(timeout=15)
+
+    def test_high_priority_stage_handles_before_low(self) -> None:
+        for namespace in NAMESPACE_PATHS:
+            with self.subTest(namespace=namespace):
+                self._run_high_priority_stage_handles_before_low(namespace)
 
     # ------------------------------------------------------------------
     # Scenario 3: No pipeline stage matches → complete_intent_failure
     # ------------------------------------------------------------------
-
-    def test_no_match_produces_intent_failure(self) -> None:
+    def _run_no_match_produces_intent_failure(self, namespace: str) -> None:
         """An utterance that no configured pipeline stage can handle produces
         ``complete_intent_failure`` and the error sound, not a skill activation."""
-        session = Session("pipeline-test-3")
-        session.lang = "en-US"
-        # Only stop-high is configured; "blah blah blah" won't match stop
-        session.pipeline = ["ovos-stop-pipeline-plugin-high"]
-
-        message = Message(
-            "recognizer_loop:utterance",
-            {"utterances": ["blah blah blah"], "lang": session.lang},
-            {"session": session.serialize(), "source": "A", "destination": "B"},
-        )
+        utt_topic = utterance_topic(namespace)
+        message, session = self._source_message(
+            namespace, "blah blah blah",
+            ["ovos-stop-pipeline-plugin-high"], "pipeline-test-3")
 
         test = End2EndTest(
-            minicroft=self.minicroft,
+            minicroft=self._make_minicroft(namespace),
             skill_ids=[self.skill_id],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
+            eof_msgs=[UTTERANCE_HANDLED],
+            flip_points=[utt_topic],
+            entry_points=[utt_topic],
             ignore_messages=self.ignore_messages,
             source_message=message,
             final_session=session,
@@ -211,35 +257,34 @@ class TestIntentPipelineRouting(TestCase):
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
                 Message("complete_intent_failure", {}),
-                Message("ovos.utterance.handled", {}),
+                Message(UTTERANCE_HANDLED, {}),
             ],
         )
-
         test.execute(timeout=15)
+
+    def test_no_match_produces_intent_failure(self) -> None:
+        for namespace in NAMESPACE_PATHS:
+            with self.subTest(namespace=namespace):
+                self._run_no_match_produces_intent_failure(namespace)
 
     # ------------------------------------------------------------------
     # Scenario 4: Blacklisted skill causes intent failure even when padatious matches
     # ------------------------------------------------------------------
-
-    def test_blacklisted_skill_falls_through_to_failure(self) -> None:
+    def _run_blacklisted_skill_falls_through_to_failure(self, namespace: str) -> None:
         """When the matching skill is blacklisted in the session, the utterance
         falls through all pipeline stages and produces ``complete_intent_failure``."""
-        session = Session("pipeline-test-4")
-        session.lang = "en-US"
-        session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
-        session.blacklisted_skills = [self.skill_id]
-
-        message = Message(
-            "recognizer_loop:utterance",
-            {"utterances": ["count to 3"], "lang": session.lang},
-            {"session": session.serialize(), "source": "A", "destination": "B"},
-        )
+        utt_topic = utterance_topic(namespace)
+        message, session = self._source_message(
+            namespace, "count to 3",
+            ["ovos-padatious-pipeline-plugin-high"], "pipeline-test-4",
+            blacklisted=[self.skill_id])
 
         test = End2EndTest(
-            minicroft=self.minicroft,
+            minicroft=self._make_minicroft(namespace),
             skill_ids=[self.skill_id],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
+            eof_msgs=[UTTERANCE_HANDLED],
+            flip_points=[utt_topic],
+            entry_points=[utt_topic],
             ignore_messages=self.ignore_messages,
             source_message=message,
             final_session=session,
@@ -247,8 +292,12 @@ class TestIntentPipelineRouting(TestCase):
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
                 Message("complete_intent_failure", {}),
-                Message("ovos.utterance.handled", {}),
+                Message(UTTERANCE_HANDLED, {}),
             ],
         )
-
         test.execute(timeout=15)
+
+    def test_blacklisted_skill_falls_through_to_failure(self) -> None:
+        for namespace in NAMESPACE_PATHS:
+            with self.subTest(namespace=namespace):
+                self._run_blacklisted_skill_falls_through_to_failure(namespace)

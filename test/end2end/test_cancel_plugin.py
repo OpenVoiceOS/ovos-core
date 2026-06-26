@@ -7,8 +7,26 @@ from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
 from ovos_config.config import Configuration
 from ovos_config.models import LocalConf
+from ovos_spec_tools import SpecMessage, migration_counterpart
 from ovos_utils.log import LOG
 from ovoscope import End2EndTest, get_minicroft
+
+
+# Topics come from the ovos-spec-tools SpecMessage enum (spec namespace); the
+# legacy counterpart is derived via migration_counterpart, never hardcoded.
+SPEC_UTTERANCE = SpecMessage.UTTERANCE.value              # ovos.utterance.handle
+LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utterance
+UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value      # ovos.utterance.handled
+UTTERANCE_CANCELLED = SpecMessage.UTTERANCE_CANCELLED.value  # ovos.utterance.cancelled
+
+# The two namespace paths the scenario is run on.
+#   key       -> (modernize, emit_legacy, utterance_topic)
+NAMESPACE_PATHS = {
+    # pure spec: inject on ovos.* and assert no bridging
+    "spec": (False, False, SPEC_UTTERANCE),
+    # legacy producer bridged to the spec listener via modernize
+    "legacy": (True, False, LEGACY_UTTERANCE),
+}
 
 
 # Entry-point name of the cancel transformer as it ships in
@@ -26,10 +44,10 @@ class TestCancelIntentMidSentence(TestCase):
     def setUp(self):
         LOG.set_level("DEBUG")
         # Write a temp xdg-conf enabling the cancel transformer under
-        # its current entry-point name, prepend it to
-        # ``Configuration.xdg_configs``, and boot MiniCroft with
-        # ``isolate_config=False`` so the boot-time
-        # ``Configuration.reload()`` does not wipe the override.
+        # its current entry-point name and prepend it to
+        # ``Configuration.xdg_configs``. MiniCroft is booted in the
+        # per-namespace helper with ``isolate_config=False`` so the
+        # boot-time ``Configuration.reload()`` does not wipe the override.
         cfg_data = {"utterance_transformers": {PLUGIN_NAME: {"active": True}}}
         fd, self._tmp_conf = tempfile.mkstemp(
             prefix="ovos-core-cancel-test-", suffix=".json")
@@ -41,57 +59,69 @@ class TestCancelIntentMidSentence(TestCase):
         Configuration.reload()
 
         self.skill_id = "ovos-skill-hello-world.openvoiceos"
-        self.minicroft = get_minicroft(
-            [self.skill_id], isolate_config=False)
 
     def tearDown(self):
-        if self.minicroft:
-            self.minicroft.stop()
         Configuration.xdg_configs = self._orig_xdg
         Configuration.reload()
         os.unlink(self._tmp_conf)
         LOG.set_level("CRITICAL")
 
+    def _run_cancel_match(self, namespace):
+        modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
+        minicroft = get_minicroft(
+            [self.skill_id], isolate_config=False,
+            modernize=modernize, emit_legacy=emit_legacy)
+        try:
+            session = Session("123")
+            session.lang = "en-US"
+            message = Message(utt_topic,
+                              {"utterances": ["can you tell me the...ummm...oh, nevermind that"], "lang": session.lang},
+                              {"session": session.serialize(), "source": "A", "destination": "B"})
+
+            # utterance cancelled -> no complete_intent_failure
+            test = End2EndTest(
+                minicroft=minicroft,
+                skill_ids=[self.skill_id],
+                flip_points=[utt_topic],
+                entry_points=[utt_topic],
+                source_message=message,
+                final_session=session,
+                expected_messages=[
+                    message,
+                    Message("mycroft.audio.play_sound", {"uri": "snd/cancel.mp3"}),
+                    Message(UTTERANCE_CANCELLED, {}),
+                    Message(UTTERANCE_HANDLED, {}),
+
+                ]
+            )
+
+            test.execute(timeout=10)
+
+            # ensure hello world doesnt match either
+            message = Message(utt_topic,
+                              {"utterances": ["hello world cancel command"], "lang": "en-US"},
+                              {"session": session.serialize(), "source": "A", "destination": "B"})
+
+            test = End2EndTest(
+                minicroft=minicroft,
+                skill_ids=[self.skill_id],
+                flip_points=[utt_topic],
+                entry_points=[utt_topic],
+                source_message=message,
+                expected_messages=[
+                    message,
+                    Message("mycroft.audio.play_sound", {"uri": "snd/cancel.mp3"}),
+                    Message(UTTERANCE_CANCELLED, {}),
+                    Message(UTTERANCE_HANDLED, {}),
+
+                ]
+            )
+
+            test.execute(timeout=10)
+        finally:
+            minicroft.stop()
+
     def test_cancel_match(self):
-        session = Session("123")
-        session.lang = "en-US"
-        message = Message("recognizer_loop:utterance",
-                          {"utterances": ["can you tell me the...ummm...oh, nevermind that"], "lang": session.lang},
-                          {"session": session.serialize(), "source": "A", "destination": "B"})
-
-        # utterance cancelled -> no complete_intent_failure
-        test = End2EndTest(
-            minicroft=self.minicroft,
-            skill_ids=[self.skill_id],
-            source_message=message,
-            final_session=session,
-            expected_messages=[
-                message,
-                Message("mycroft.audio.play_sound", {"uri": "snd/cancel.mp3"}),
-                Message("ovos.utterance.cancelled", {}),
-                Message("ovos.utterance.handled", {}),
-
-            ]
-        )
-
-        test.execute(timeout=10)
-
-        # ensure hello world doesnt match either
-        message = Message("recognizer_loop:utterance",
-                          {"utterances": ["hello world cancel command"], "lang": "en-US"},
-                          {"session": session.serialize(), "source": "A", "destination": "B"})
-
-        test = End2EndTest(
-            minicroft=self.minicroft,
-            skill_ids=[self.skill_id],
-            source_message=message,
-            expected_messages=[
-                message,
-                Message("mycroft.audio.play_sound", {"uri": "snd/cancel.mp3"}),
-                Message("ovos.utterance.cancelled", {}),
-                Message("ovos.utterance.handled", {}),
-
-            ]
-        )
-
-        test.execute(timeout=10)
+        for namespace in NAMESPACE_PATHS:
+            with self.subTest(namespace=namespace):
+                self._run_cancel_match(namespace)
