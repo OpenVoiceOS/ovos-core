@@ -548,8 +548,9 @@ class TestBusHandlers(unittest.TestCase):
 
     def test_handle_global_stop_emits_ovos_stop(self):
         # OVOS-STOP-1 §5.3: global-stop handler emits the spec topic ``ovos.stop``.
-        # The bus bridges it to legacy ``mycroft.stop`` (MIGRATION_MAP); this test
-        # mocks emit so it asserts the spec topic the handler actually produces.
+        # Back-compat: it ALSO emits the legacy ``mycroft.stop`` directly, because the
+        # spec->legacy bus bridge is not guaranteed (opt-in / off on the pure-spec
+        # path) and skills have not migrated their stop handler off ``mycroft.stop``.
         svc = _make_service()
         emitted = []
         svc.bus.emit = lambda m: emitted.append(m)
@@ -557,7 +558,10 @@ class TestBusHandlers(unittest.TestCase):
         svc.handle_global_stop(msg)
         types = [m.msg_type for m in emitted]
         self.assertIn("ovos.stop", types)
+        self.assertIn("mycroft.stop", types)
         self.assertIn("ovos.utterance.handled", types)
+        # the spec broadcast is emitted before the legacy back-compat one
+        self.assertLess(types.index("ovos.stop"), types.index("mycroft.stop"))
 
     def test_handle_skill_stop_forwards_to_skill(self):
         svc = _make_service()
