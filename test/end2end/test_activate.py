@@ -13,6 +13,7 @@ from ovoscope import End2EndTest, get_minicroft
 SPEC_UTTERANCE = SpecMessage.UTTERANCE.value              # ovos.utterance.handle
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utterance
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value   # ovos.utterance.handled
+INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value         # ovos.intent.matched
 
 # The two namespace paths the utterance-injecting scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
@@ -198,6 +199,10 @@ class TestDeactivate(TestCase):
                         context={"skill_id": self.skill_id}),
                 Message(f"{self.skill_id}.activate",
                         data={},
+                        context={"skill_id": self.skill_id}),
+                # OVOS-PIPELINE-1 §9.2: matched broadcast precedes the dispatch
+                Message(INTENT_MATCHED,
+                        data={"skill_id": self.skill_id, "intent_name": "converse:skill"},
                         context={"skill_id": self.skill_id}),
                 Message("converse:skill",
                         data={"utterances": ["deactivate skill from within converse"], "lang": session.lang,

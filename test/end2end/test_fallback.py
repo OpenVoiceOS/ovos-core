@@ -17,12 +17,14 @@ from ovos_spec_tools import SpecMessage, migration_counterpart
 from ovos_utils.log import LOG
 
 from ovoscope import End2EndTest, get_minicroft
+from ovoscope import DEFAULT_IGNORED
 
 # Topics from the ovos-spec-tools SpecMessage enum; legacy derived, not hardcoded.
 SPEC_UTTERANCE = SpecMessage.UTTERANCE.value
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)
 SPEC_SPEAK = SpecMessage.SPEAK.value
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
+INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value  # ovos.intent.matched (§9.2)
 
 # key -> (modernize, emit_legacy, utterance_topic)
 NAMESPACE_PATHS = {
@@ -62,6 +64,11 @@ class TestFallback(TestCase):
             flip_points=[utt_topic],
             entry_points=[utt_topic],
             final_session=final_session,
+            # OVOS-PIPELINE-1 §9.2: matched broadcast precedes the dispatch; this
+            # test asserts the fallback request/response flow, not the matched
+            # notification, so it is filtered as noise (the default-ignored set is
+            # preserved alongside it).
+            ignore_messages=DEFAULT_IGNORED + [INTENT_MATCHED],
             keep_original_src=[
                 "ovos.skills.fallback.ping",
                 # "ovos.skills.fallback.pong", # TODO

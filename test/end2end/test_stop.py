@@ -29,6 +29,8 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value              # ovos.utterance.handl
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utterance
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value   # ovos.utterance.handled
 SPEC_SPEAK = SpecMessage.SPEAK.value                      # ovos.utterance.speak
+INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value         # ovos.intent.matched (§9.2)
+INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value     # ovos.intent.unmatched (§9.3)
 
 # The two namespace paths every scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
@@ -44,6 +46,9 @@ NAMESPACE_PATHS = {
 # on the spec topic ovos.utterance.speak (no legacy mirror, emit_legacy=False).
 IGNORE_MESSAGES = [
     SPEC_SPEAK,
+    # ovos.intent.matched (§9.2) precedes every dispatch; these scenarios assert
+    # stop routing/activation, not the matched broadcast, so it is filtered here.
+    INTENT_MATCHED,
     "ovos.common_play.stop.response",
     "common_query.openvoiceos.stop.response",
     "persona.openvoiceos.stop.response",
@@ -124,7 +129,7 @@ class TestStopNoSkills(TestCase):
                 expected_messages=[
                     message,
                     Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                    Message("complete_intent_failure", {}),
+                    Message(INTENT_UNMATCHED, {}),
                     Message(UTTERANCE_HANDLED, {}),
                 ]
             )

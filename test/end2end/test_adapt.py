@@ -27,6 +27,8 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)
 SPEC_SPEAK = SpecMessage.SPEAK.value
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
+INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value      # ovos.intent.matched (§9.2)
+INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value  # ovos.intent.unmatched (§9.3)
 
 NAMESPACE_PATHS = {
     "spec": (False, False, SPEC_UTTERANCE),
@@ -70,6 +72,12 @@ class TestAdaptIntent(TestCase):
                 message,
                 Message(f"{self.skill_id}.activate",
                         data={},
+                        context={"skill_id": self.skill_id}),
+                # OVOS-PIPELINE-1 §9.2: matched broadcast precedes the dispatch
+                Message(INTENT_MATCHED,
+                        data={"skill_id": self.skill_id,
+                              "intent_name": f"{self.skill_id}:HelloWorldIntent",
+                              "utterance": "hello world", "lang": session.lang},
                         context={"skill_id": self.skill_id}),
                 Message(f"{self.skill_id}:HelloWorldIntent",
                         data={"utterance": "hello world", "lang": session.lang},
@@ -126,7 +134,7 @@ class TestAdaptIntent(TestCase):
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {}),
+                Message(INTENT_UNMATCHED, {}),
                 Message(UTTERANCE_HANDLED, {})
             ]
         )
@@ -162,7 +170,7 @@ class TestAdaptIntent(TestCase):
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {}),
+                Message(INTENT_UNMATCHED, {}),
                 Message(UTTERANCE_HANDLED, {})
             ]
         )
@@ -197,7 +205,7 @@ class TestAdaptIntent(TestCase):
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {}),
+                Message(INTENT_UNMATCHED, {}),
                 Message(UTTERANCE_HANDLED, {})
             ]
         )

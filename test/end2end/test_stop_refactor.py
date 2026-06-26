@@ -41,6 +41,7 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value              # ovos.utterance.handl
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utterance
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value   # ovos.utterance.handled
 SPEC_SPEAK = SpecMessage.SPEAK.value                      # ovos.utterance.speak
+INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value         # ovos.intent.matched (§9.2)
 
 # The two namespace paths every scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
@@ -57,6 +58,9 @@ NAMESPACE_PATHS = {
 # emit_legacy=False on both paths).
 _STOP_RESPONSES = [
     SPEC_SPEAK,
+    # ovos.intent.matched (§9.2) precedes every dispatch; these scenarios assert
+    # stop routing/activation, not the matched broadcast, so it is filtered here.
+    INTENT_MATCHED,
     "ovos.common_play.stop.response",
     "common_query.openvoiceos.stop.response",
     "persona.openvoiceos.stop.response",

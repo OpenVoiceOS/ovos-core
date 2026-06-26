@@ -317,7 +317,15 @@ class TestSendCompleteIntentFailure(unittest.TestCase):
     """Tests for IntentService.send_complete_intent_failure."""
 
     def test_emits_three_messages(self):
-        """Three messages should be emitted: play_sound, complete_intent_failure, handled."""
+        """Three messages should be emitted: play_sound, ovos.intent.unmatched, handled.
+
+        OVOS-PIPELINE-1 §9.3: the orchestrator emits the spec topic
+        ``ovos.intent.unmatched``; the bus bridge re-delivers the legacy
+        ``complete_intent_failure`` (ovos-spec-tools MIGRATION_MAP) to
+        un-migrated consumers, so the orchestrator never hand-rolls the legacy
+        emit. This test patches ``bus.emit`` to a plain collector (no bridge),
+        so only the spec topic is observed here.
+        """
         svc = _make_service()
         emitted = []
         svc.bus.emit = lambda m: emitted.append(m)
@@ -325,9 +333,9 @@ class TestSendCompleteIntentFailure(unittest.TestCase):
         with patch("ovos_core.intent_services.service.Configuration",
                    return_value={"sounds": {"error": "snd/error.mp3"}}):
             svc.send_complete_intent_failure(msg)
-        types = [m.msg_type for m in emitted]
+        types = [str(m.msg_type) for m in emitted]
         self.assertIn("mycroft.audio.play_sound", types)
-        self.assertIn("complete_intent_failure", types)
+        self.assertIn("ovos.intent.unmatched", types)
         self.assertIn("ovos.utterance.handled", types)
 
     def test_error_sound_from_config_used(self):
