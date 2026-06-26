@@ -576,6 +576,170 @@ class TestBusHandlers(unittest.TestCase):
         self.assertIn("mycroft.skill.handler.complete", types)
 
 
+class TestStop1Draining(unittest.TestCase):
+    """OVOS-STOP-1 §4.1 step 4 / §5.2 / §6.2 — recency selection + session draining."""
+
+    def setUp(self):
+        self.svc = _make_service()
+
+    # ---- §4.1 step 4: single-target recency selection ----------------------
+
+    def test_select_stop_target_picks_highest_activated_at(self):
+        """Multi-pong: select the handler with the highest activated_at,
+        not the legacy active_skills list order."""
+        sess = Session("s")
+        # stamp out of recency order: skill_b is most recently activated
+        sess.active_handlers = [
+            {"skill_id": "skill_a", "activated_at": 100.0},
+            {"skill_id": "skill_b", "activated_at": 200.0},
+            {"skill_id": "skill_c", "activated_at": 150.0},
+        ]
+        with patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=sess):
+            target = StopService._select_stop_target(
+                ["skill_a", "skill_b", "skill_c"], Message("test"))
+        self.assertEqual(target, "skill_b")
+
+    def test_select_stop_target_tie_breaks_on_head(self):
+        """On an activated_at tie, the head (most recently stamped) wins."""
+        sess = Session("s")
+        sess.active_handlers = [
+            {"skill_id": "skill_head", "activated_at": 200.0},
+            {"skill_id": "skill_tail", "activated_at": 200.0},
+        ]
+        with patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=sess):
+            target = StopService._select_stop_target(
+                ["skill_head", "skill_tail"], Message("test"))
+        self.assertEqual(target, "skill_head")
+
+    def test_select_stop_target_only_considers_candidates(self):
+        """A more-recent handler that is NOT a positive responder is ignored."""
+        sess = Session("s")
+        sess.active_handlers = [
+            {"skill_id": "not_pong", "activated_at": 300.0},
+            {"skill_id": "pong_skill", "activated_at": 100.0},
+        ]
+        with patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=sess):
+            target = StopService._select_stop_target(["pong_skill"], Message("test"))
+        self.assertEqual(target, "pong_skill")
+
+    def test_select_stop_target_empty_candidates_returns_none(self):
+        sess = Session("s")
+        with patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=sess):
+            self.assertIsNone(StopService._select_stop_target([], Message("test")))
+
+    def test_match_high_multi_pong_selects_most_recent(self):
+        """Integration: match_high dispatches the single highest-activated_at target."""
+        sess = Session("s")
+        sess.active_handlers = [
+            {"skill_id": "old_skill", "activated_at": 100.0},
+            {"skill_id": "new_skill", "activated_at": 500.0},
+        ]
+        self.svc.bus.once = MagicMock()
+        with patch.object(self.svc, "voc_match",
+                          side_effect=lambda utt, voc, lang, exact: voc == "stop"), \
+             patch.object(StopService, "get_active_skills",
+                          return_value=["new_skill", "old_skill"]), \
+             patch.object(self.svc, "_collect_stop_skills",
+                          return_value=["old_skill", "new_skill"]), \
+             patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=sess):
+            result = self.svc.match_high(["stop"], "en-US", Message("test"))
+
+        self.assertEqual(result.match_type, "stop:skill")
+        self.assertEqual(result.match_data["skill_id"], "new_skill")
+
+    # ---- §6.2: targeted stop removes only the target -----------------------
+
+    def test_targeted_stop_removes_only_target_from_active_handlers(self):
+        """A targeted stop drains ONLY the dispatch target from active_handlers."""
+        sess = Session("s")
+        sess.active_handlers = [
+            {"skill_id": "keep_skill", "activated_at": 100.0},
+            {"skill_id": "target_skill", "activated_at": 500.0},
+        ]
+        self.svc.bus.once = MagicMock()
+        with patch.object(self.svc, "voc_match",
+                          side_effect=lambda utt, voc, lang, exact: voc == "stop"), \
+             patch.object(StopService, "get_active_skills",
+                          return_value=["target_skill", "keep_skill"]), \
+             patch.object(self.svc, "_collect_stop_skills",
+                          return_value=["target_skill", "keep_skill"]), \
+             patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=sess):
+            result = self.svc.match_high(["stop"], "en-US", Message("test"))
+
+        remaining = [h["skill_id"] for h in result.updated_session.active_handlers]
+        self.assertEqual(remaining, ["keep_skill"])
+        self.assertNotIn("target_skill", remaining)
+
+    def test_targeted_stop_clears_target_response_mode_only(self):
+        """§6.1: only the dispatch target's response_mode entry is cleared."""
+        sess = Session("s")
+        sess.active_handlers = [{"skill_id": "target_skill", "activated_at": 500.0}]
+        sess.set_response_mode("target_skill", 9999999999.0)
+        self.svc.bus.once = MagicMock()
+        with patch.object(self.svc, "voc_match",
+                          side_effect=lambda utt, voc, lang, exact: voc == "stop"), \
+             patch.object(StopService, "get_active_skills",
+                          return_value=["target_skill"]), \
+             patch.object(self.svc, "_collect_stop_skills",
+                          return_value=["target_skill"]), \
+             patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=sess):
+            result = self.svc.match_high(["stop"], "en-US", Message("test"))
+
+        self.assertIsNone(result.updated_session.response_mode)
+
+    # ---- §5.2: global_stop drains both lists + clears response_mode --------
+
+    def test_global_stop_drains_both_lists_and_response_mode(self):
+        """§5.2: global_stop updated_session sets active_handlers=[],
+        converse_handlers=[], and removes response_mode."""
+        sess = Session("s")
+        sess.active_handlers = [{"skill_id": "a", "activated_at": 1.0}]
+        sess.converse_handlers = [{"skill_id": "b", "activated_at": 1.0}]
+        sess.set_response_mode("c", 9999999999.0)
+
+        with patch.object(self.svc, "voc_match",
+                          side_effect=lambda utt, voc, lang, exact: voc == "global_stop"), \
+             patch.object(StopService, "get_active_skills", return_value=["a"]), \
+             patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=sess):
+            result = self.svc.match_high(["stop everything"], "en-US", Message("test"))
+
+        self.assertEqual(result.match_type, "stop:global")
+        self.assertEqual(result.updated_session.active_handlers, [])
+        self.assertEqual(result.updated_session.converse_handlers, [])
+        self.assertIsNone(result.updated_session.response_mode)
+
+    def test_global_stop_no_positive_pong_drains_session(self):
+        """§4.1 step 5 → §5.2: stop with active skills but no positive pong
+        escalates to global_stop and drains the session."""
+        sess = Session("s")
+        sess.active_handlers = [{"skill_id": "a", "activated_at": 1.0}]
+        sess.converse_handlers = [{"skill_id": "a", "activated_at": 1.0}]
+        sess.set_response_mode("a", 9999999999.0)
+
+        self.svc.config = {"min_conf": 0.5}
+        with patch.object(self.svc, "voc_list", return_value=["stop"]), \
+             patch("ovos_core.intent_services.stop_service.match_one",
+                   return_value=("stop", 0.9)), \
+             patch.object(StopService, "get_active_skills", return_value=["a"]), \
+             patch.object(self.svc, "_collect_stop_skills", return_value=[]), \
+             patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=sess):
+            result = self.svc.match_low(["stop"], "en-US", Message("test"))
+
+        self.assertEqual(result.match_type, "stop:global")
+        self.assertEqual(result.updated_session.active_handlers, [])
+        self.assertEqual(result.updated_session.converse_handlers, [])
+        self.assertIsNone(result.updated_session.response_mode)
+
+
 class TestShutdown(unittest.TestCase):
 
     def test_shutdown_removes_listeners(self):
