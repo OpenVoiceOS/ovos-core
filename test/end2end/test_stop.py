@@ -29,6 +29,11 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value              # ovos.utterance.handl
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utterance
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value   # ovos.utterance.handled
 SPEC_SPEAK = SpecMessage.SPEAK.value                      # ovos.utterance.speak
+# OVOS-STOP-1 spec topics — the producer emits these; the bus bridges the 1:1
+# legacy renames (mycroft.stop / skill.stop.pong) transparently per MIGRATION_MAP.
+STOP_BROADCAST = SpecMessage.STOP.value                   # ovos.stop  (was mycroft.stop)
+STOP_PING = SpecMessage.STOP_PING.value                   # ovos.stop.ping (broadcast)
+STOP_PONG = SpecMessage.STOP_PONG.value                   # ovos.stop.pong (was skill.stop.pong)
 
 # The two namespace paths every scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
@@ -87,7 +92,7 @@ class TestStopNoSkills(TestCase):
                     Message("stop.openvoiceos.activate", {}),  # stop pipeline counts as active_skill
 
                     Message("stop:global", {}),  # global stop, no active skill
-                    Message("mycroft.stop", {}),
+                    Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast (bridged to mycroft.stop)
 
                     Message(UTTERANCE_HANDLED, {})
                 ]
@@ -163,7 +168,7 @@ class TestStopNoSkills(TestCase):
                     Message("stop.openvoiceos.activate", {}),  # stop pipeline counts as active_skill
 
                     Message("stop:global", {}),  # global stop, no active skill
-                    Message("mycroft.stop", {}),
+                    Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast (bridged to mycroft.stop)
 
                     Message(UTTERANCE_HANDLED, {})
                 ]
@@ -266,9 +271,10 @@ class TestCountSkills(TestCase):
 
             stop_skill_active = [
                 message,
+                Message(STOP_PING, {}),  # OVOS-STOP-1 §4.1 broadcast stoppability query
                 Message(f"{self.skill_id}.stop.ping",
-                        {"skill_id": self.skill_id}),
-                Message("skill.stop.pong",
+                        {"skill_id": self.skill_id}),  # back-compat per-skill ping
+                Message(STOP_PONG,  # OVOS-STOP-1 §4.2 spec pong (bridged from skill.stop.pong)
                         {"skill_id": self.skill_id, "can_handle": True},
                         {"skill_id": self.skill_id}),
 
@@ -369,7 +375,7 @@ class TestCountSkills(TestCase):
                 Message("stop.openvoiceos.activate", {}),  # stop pipeline counts as active_skill
 
                 Message("stop:global", {}),  # global stop, no active skill
-                Message("mycroft.stop", {}),
+                Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast (bridged to mycroft.stop)
 
                 Message(f"{self.skill_id}.stop.response",
                         {"skill_id": self.skill_id, "result": True}),
@@ -424,9 +430,10 @@ class TestCountSkills(TestCase):
 
             stop_skill_active = [
                 message,
+                Message(STOP_PING, {}),  # OVOS-STOP-1 §4.1 broadcast stoppability query
                 Message(f"{self.skill_id}.stop.ping",
-                        {"skill_id": self.skill_id}),
-                Message("skill.stop.pong",
+                        {"skill_id": self.skill_id}),  # back-compat per-skill ping
+                Message(STOP_PONG,  # OVOS-STOP-1 §4.2 spec pong (bridged from skill.stop.pong)
                         {"skill_id": self.skill_id, "can_handle": True},
                         {"skill_id": self.skill_id}),
 
