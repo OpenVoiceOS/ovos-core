@@ -1,3 +1,0 @@
-# skills providing portuguese specific functionality
-# NOTE: we do not set upper range on purpose, it is up to release channel being used to do that
-ovos-skill-word-of-the-day

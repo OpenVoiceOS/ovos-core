@@ -23,6 +23,7 @@ from ovos_plugin_manager.templates.pipeline import (
     ConfidenceMatcherPipeline,
 )
 from ovos_utils.fakebus import FakeBus
+from ovos_spec_tools import SpecMessage
 
 from ovos_core.intent_services.service import IntentService
 
@@ -562,7 +563,7 @@ class TestShutdown(unittest.TestCase):
         svc.bus.remove = MagicMock()
         svc.shutdown()
         removed = {c[0][0] for c in svc.bus.remove.call_args_list}
-        self.assertIn("recognizer_loop:utterance", removed)
+        self.assertIn(SpecMessage.UTTERANCE, removed)
         self.assertIn("add_context", removed)
         self.assertIn("remove_context", removed)
         self.assertIn("clear_context", removed)

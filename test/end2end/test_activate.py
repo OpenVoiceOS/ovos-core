@@ -2,10 +2,26 @@ from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
+from ovos_spec_tools import SpecMessage, migration_counterpart
 from ovos_utils.log import LOG
 
 from ovos_workshop.skills.converse import ConversationalSkill
 from ovoscope import End2EndTest, get_minicroft
+
+# Topics come from the ovos-spec-tools SpecMessage enum (spec namespace); the
+# legacy counterpart is derived via migration_counterpart, never hardcoded.
+SPEC_UTTERANCE = SpecMessage.UTTERANCE.value              # ovos.utterance.handle
+LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utterance
+UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value   # ovos.utterance.handled
+
+# The two namespace paths the utterance-injecting scenario is run on.
+#   key       -> (modernize, emit_legacy, utterance_topic)
+NAMESPACE_PATHS = {
+    # pure spec: inject on ovos.* and assert no bridging
+    "spec": (False, False, SPEC_UTTERANCE),
+    # legacy producer bridged to the spec listener via modernize
+    "legacy": (True, False, LEGACY_UTTERANCE),
+}
 
 
 class TestSkill(ConversationalSkill):
@@ -126,25 +142,43 @@ class TestDeactivate(TestCase):
 
         test.execute(timeout=10)
 
-    def test_deactivate_inside_converse(self):
+    def _run_deactivate_inside_converse(self, namespace):
+        """A converse handler that deactivates its own skill mid-utterance.
+
+        The utterance is injected on ``recognizer_loop:utterance`` (a migrated
+        topic), so this scenario runs on both namespace paths: pure spec
+        (inject on ``ovos.utterance.handle``) and legacy bridged to the spec
+        listener via ``modernize``. The captured sequence is identical on both
+        paths except message[0]'s topic.
+        """
+        modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
+        minicroft = get_minicroft([self.skill_id],
+                                  extra_skills={self.skill_id: TestSkill},
+                                  modernize=modernize, emit_legacy=emit_legacy)
+
         session = Session("123")
         session.lang = "en-US"
         session.activate_skill(self.skill_id) # start with skill active
 
-        message = Message("recognizer_loop:utterance",
+        message = Message(utt_topic,
                           {"utterances": ["deactivate skill from within converse"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
+        # the skill deactivates itself inside converse, but the converse
+        # pipeline re-activates it after handling the converse response, so it
+        # ends the utterance active again (identical on both namespace paths).
         final_session = Session("123")
         final_session.lang = "en-US"
-        final_session.active_skills = []
+        final_session.active_skills = [(self.skill_id, 0.0)]
 
         test = End2EndTest(
-            minicroft=self.minicroft,
+            minicroft=minicroft,
             skill_ids=[self.skill_id],
             source_message=message,
             final_session=final_session,
             activation_points=[message.msg_type], # starts activated
+            flip_points=[utt_topic],
+            entry_points=[utt_topic],
             deactivation_points=["intent.service.skills.deactivated"],
             # messages internal to ovos-core, i.e. would not be sent to clients such as hivemind
             keep_original_src=[
@@ -186,11 +220,19 @@ class TestDeactivate(TestCase):
                 Message("skill.converse.response",
                         data={"skill_id": self.skill_id},
                         context={"skill_id": self.skill_id}),
-                Message("ovos.utterance.handled",
+                Message(UTTERANCE_HANDLED,
                         data={},
                         context={"skill_id": self.skill_id})
 
             ]
         )
 
-        test.execute(timeout=10)
+        try:
+            test.execute(timeout=10)
+        finally:
+            minicroft.stop()
+
+    def test_deactivate_inside_converse(self):
+        for namespace in NAMESPACE_PATHS:
+            with self.subTest(namespace=namespace):
+                self._run_deactivate_inside_converse(namespace)

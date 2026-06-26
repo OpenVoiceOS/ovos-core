@@ -1,9 +1,0 @@
-# skills that require internet connectivity, should not be installed in offline devices
-# NOTE: we do not set upper range on purpose, it is up to release channel being used to do that
-ovos-skill-weather>=1.0.3
-ovos-skill-ddg>=0.3.5
-ovos-skill-wolfie>=0.5.8
-ovos-skill-wikipedia>=0.8.13
-ovos-skill-wikihow>=0.3.3
-ovos-skill-speedtest>=0.3.6
-ovos-skill-ip>=0.2.5

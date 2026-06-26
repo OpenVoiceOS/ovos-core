@@ -9,6 +9,19 @@ refactored to subclass OVOSAbstractApplication:
    tried via the active-skills fallback.
 4. StopService (as OVOSSkill) emits stop.openvoiceos.stop.response when
    mycroft.stop is broadcast — verified via ignore_messages pattern.
+
+Every scenario that injects an utterance is run on BOTH bus namespace paths via
+``self.subTest(namespace=...)``:
+
+- **spec**: ``modernize=False, emit_legacy=False`` — the utterance is injected
+  on the spec topic ``ovos.utterance.handle`` and no bridging occurs.
+- **legacy**: ``modernize=True, emit_legacy=False`` — the utterance is injected
+  on the legacy topic ``recognizer_loop:utterance`` and modernized to the spec
+  listener.
+
+The captured sequence is identical on both paths except message[0]'s topic
+(the injected utterance topic); a fresh MiniCroft is built per path so the
+``modernize``/``emit_legacy`` flags can differ.
 """
 
 import time
@@ -16,15 +29,34 @@ from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
+from ovos_spec_tools import SpecMessage, migration_counterpart
 from ovos_utils import create_daemon
 from ovos_utils.log import LOG
 
 from ovoscope import End2EndTest, get_minicroft
 
+# Topics come from the ovos-spec-tools SpecMessage enum (spec namespace); the
+# legacy counterpart is derived via migration_counterpart, never hardcoded.
+SPEC_UTTERANCE = SpecMessage.UTTERANCE.value              # ovos.utterance.handle
+LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utterance
+UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value   # ovos.utterance.handled
+SPEC_SPEAK = SpecMessage.SPEAK.value                      # ovos.utterance.speak
+
+# The two namespace paths every scenario is run on.
+#   key       -> (modernize, emit_legacy, utterance_topic)
+NAMESPACE_PATHS = {
+    # pure spec: inject on ovos.* and assert no bridging
+    "spec": (False, False, SPEC_UTTERANCE),
+    # legacy producer bridged to the spec listener via modernize
+    "legacy": (True, False, LEGACY_UTTERANCE),
+}
+
 # Messages produced by other pipeline-plugin skills in response to mycroft.stop;
-# always ignored so they don't pollute assertion counts.
+# always ignored so they don't pollute assertion counts. The stop pipeline
+# speaks on the spec topic ovos.utterance.speak (no legacy mirror because
+# emit_legacy=False on both paths).
 _STOP_RESPONSES = [
-    "speak",
+    SPEC_SPEAK,
     "ovos.common_play.stop.response",
     "common_query.openvoiceos.stop.response",
     "persona.openvoiceos.stop.response",
@@ -47,28 +79,28 @@ class TestGlobalStopVocabulary(TestCase):
 
     def setUp(self):
         LOG.set_level("DEBUG")
-        # No skills needed — vocabulary tests only exercise the StopService itself
-        self.minicroft = get_minicroft([])
 
     def tearDown(self):
-        if self.minicroft:
-            self.minicroft.stop()
         LOG.set_level("CRITICAL")
 
-    def test_global_stop_voc_no_active_skills(self):
+    def _run_global_stop_voc_no_active_skills(self, namespace):
         """'stop everything' matches global_stop.voc and emits stop:global."""
+        modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
+        minicroft = get_minicroft([], modernize=modernize, emit_legacy=emit_legacy)
+
         session = Session("123")
         session.lang = "en-US"
         session.pipeline = ["ovos-stop-pipeline-plugin-high"]
-        message = Message("recognizer_loop:utterance",
+        message = Message(utt_topic,
                           {"utterances": ["stop everything"], "lang": session.lang},
                           {"session": session.serialize()})
 
         test = End2EndTest(
-            minicroft=self.minicroft,
+            minicroft=minicroft,
             skill_ids=[],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
+            eof_msgs=[UTTERANCE_HANDLED],
+            flip_points=[utt_topic],
+            entry_points=[utt_topic],
             ignore_messages=_STOP_RESPONSES,
             source_message=message,
             expected_messages=[
@@ -76,28 +108,38 @@ class TestGlobalStopVocabulary(TestCase):
                 Message("stop.openvoiceos.activate", {}),
                 Message("stop:global", {}),
                 Message("mycroft.stop", {}),
-                Message("ovos.utterance.handled", {}),
+                Message(UTTERANCE_HANDLED, {}),
             ]
         )
         test.execute()
+        minicroft.stop()
 
-    def test_stop_voc_exact_still_works(self):
+    def test_global_stop_voc_no_active_skills(self):
+        for namespace in NAMESPACE_PATHS:
+            with self.subTest(namespace=namespace):
+                self._run_global_stop_voc_no_active_skills(namespace)
+
+    def _run_stop_voc_exact_still_works(self, namespace):
         """Bare 'stop' without active skills still matches stop.voc and emits stop:global.
 
         Regression: confirms the .voc rename did not break the stop vocabulary.
         """
+        modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
+        minicroft = get_minicroft([], modernize=modernize, emit_legacy=emit_legacy)
+
         session = Session("123")
         session.lang = "en-US"
         session.pipeline = ["ovos-stop-pipeline-plugin-high"]
-        message = Message("recognizer_loop:utterance",
+        message = Message(utt_topic,
                           {"utterances": ["stop"], "lang": session.lang},
                           {"session": session.serialize()})
 
         test = End2EndTest(
-            minicroft=self.minicroft,
+            minicroft=minicroft,
             skill_ids=[],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
+            eof_msgs=[UTTERANCE_HANDLED],
+            flip_points=[utt_topic],
+            entry_points=[utt_topic],
             ignore_messages=_STOP_RESPONSES,
             source_message=message,
             expected_messages=[
@@ -105,10 +147,16 @@ class TestGlobalStopVocabulary(TestCase):
                 Message("stop.openvoiceos.activate", {}),
                 Message("stop:global", {}),
                 Message("mycroft.stop", {}),
-                Message("ovos.utterance.handled", {}),
+                Message(UTTERANCE_HANDLED, {}),
             ]
         )
         test.execute()
+        minicroft.stop()
+
+    def test_stop_voc_exact_still_works(self):
+        for namespace in NAMESPACE_PATHS:
+            with self.subTest(namespace=namespace):
+                self._run_stop_voc_exact_still_works(namespace)
 
 
 class TestGlobalStopVocWithActiveSkill(TestCase):
@@ -121,15 +169,16 @@ class TestGlobalStopVocWithActiveSkill(TestCase):
     def setUp(self):
         LOG.set_level("DEBUG")
         self.skill_id = "ovos-skill-count.openvoiceos"
-        self.minicroft = get_minicroft([self.skill_id])
 
     def tearDown(self):
-        if self.minicroft:
-            self.minicroft.stop()
         LOG.set_level("CRITICAL")
 
-    def test_global_stop_voc_with_active_skill(self):
+    def _run_global_stop_voc_with_active_skill(self, namespace):
         """'stop everything now' emits stop:global regardless of active skills."""
+        modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
+        minicroft = get_minicroft([self.skill_id], modernize=modernize,
+                                  emit_legacy=emit_legacy)
+
         session = Session("123")
         session.lang = "en-US"
         session.pipeline = ["ovos-stop-pipeline-plugin-high",
@@ -137,7 +186,7 @@ class TestGlobalStopVocWithActiveSkill(TestCase):
         # Activate the count skill so it is in the active-skills list
         session.activate_skill(self.skill_id)
 
-        message = Message("recognizer_loop:utterance",
+        message = Message(utt_topic,
                           {"utterances": ["stop everything now"], "lang": session.lang},
                           {"session": session.serialize()})
 
@@ -145,10 +194,11 @@ class TestGlobalStopVocWithActiveSkill(TestCase):
         ignore = _STOP_RESPONSES + [f"{self.skill_id}.stop.response"]
 
         test = End2EndTest(
-            minicroft=self.minicroft,
+            minicroft=minicroft,
             skill_ids=[],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
+            eof_msgs=[UTTERANCE_HANDLED],
+            flip_points=[utt_topic],
+            entry_points=[utt_topic],
             ignore_messages=ignore,
             source_message=message,
             expected_messages=[
@@ -156,10 +206,16 @@ class TestGlobalStopVocWithActiveSkill(TestCase):
                 Message("stop.openvoiceos.activate", {}),
                 Message("stop:global", {}),
                 Message("mycroft.stop", {}),
-                Message("ovos.utterance.handled", {}),
+                Message(UTTERANCE_HANDLED, {}),
             ]
         )
         test.execute()
+        minicroft.stop()
+
+    def test_global_stop_voc_with_active_skill(self):
+        for namespace in NAMESPACE_PATHS:
+            with self.subTest(namespace=namespace):
+                self._run_global_stop_voc_with_active_skill(namespace)
 
 
 class TestStopSkillCanHandleFalse(TestCase):
@@ -174,20 +230,21 @@ class TestStopSkillCanHandleFalse(TestCase):
     def setUp(self):
         LOG.set_level("DEBUG")
         self.skill_id = "ovos-skill-count.openvoiceos"
-        self.minicroft = get_minicroft([self.skill_id])
 
     def tearDown(self):
-        if self.minicroft:
-            self.minicroft.stop()
         LOG.set_level("CRITICAL")
 
-    def test_stop_with_active_skill_ping_pong(self):
+    def _run_stop_with_active_skill_ping_pong(self, namespace):
         """Stop a running skill via the ping-pong mechanism.
 
         Asserts the full message sequence:
           stop.ping → skill.stop.pong (can_handle=True) → stop:skill →
           {skill_id}.stop → {skill_id}.stop.response
         """
+        modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
+        minicroft = get_minicroft([self.skill_id], modernize=modernize,
+                                  emit_legacy=emit_legacy)
+
         session = Session("123")
         session.lang = "en-US"
         session.pipeline = ["ovos-stop-pipeline-plugin-high",
@@ -195,16 +252,16 @@ class TestStopSkillCanHandleFalse(TestCase):
 
         def make_it_count():
             nonlocal session
-            msg = Message("recognizer_loop:utterance",
+            msg = Message(utt_topic,
                           {"utterances": ["count to infinity"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
             session.activate_skill(self.skill_id)
-            self.minicroft.bus.emit(msg)
+            minicroft.bus.emit(msg)
 
         create_daemon(make_it_count)
         time.sleep(2)
 
-        message = Message("recognizer_loop:utterance",
+        message = Message(utt_topic,
                           {"utterances": ["stop"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
@@ -223,16 +280,17 @@ class TestStopSkillCanHandleFalse(TestCase):
             Message("mycroft.skill.handler.complete",
                     {"name": "CountSkill.handle_how_are_you_intent"},
                     {"skill_id": self.skill_id}),
-            Message("ovos.utterance.handled",
+            Message(UTTERANCE_HANDLED,
                     {"name": "CountSkill.handle_how_are_you_intent"},
                     {"skill_id": self.skill_id}),
         ]
 
         test = End2EndTest(
-            minicroft=self.minicroft,
+            minicroft=minicroft,
             skill_ids=[],
             eof_msgs=[],
-            flip_points=["recognizer_loop:utterance"],
+            flip_points=[utt_topic],
+            entry_points=[utt_topic],
             keep_original_src=[
                 f"{self.skill_id}.stop.ping",
                 f"{self.skill_id}.stop",
@@ -245,6 +303,12 @@ class TestStopSkillCanHandleFalse(TestCase):
             expected_messages=expected,
         )
         test.execute()
+        minicroft.stop()
+
+    def test_stop_with_active_skill_ping_pong(self):
+        for namespace in NAMESPACE_PATHS:
+            with self.subTest(namespace=namespace):
+                self._run_stop_with_active_skill_ping_pong(namespace)
 
 
 class TestStopServiceAsSkill(TestCase):
@@ -261,20 +325,20 @@ class TestStopServiceAsSkill(TestCase):
 
     def setUp(self):
         LOG.set_level("DEBUG")
-        self.minicroft = get_minicroft([])
 
     def tearDown(self):
-        if self.minicroft:
-            self.minicroft.stop()
         LOG.set_level("CRITICAL")
 
-    def test_stop_service_emits_activate_and_stop_response(self):
+    def _run_stop_service_emits_activate_and_stop_response(self, namespace):
         """After a global stop, stop.openvoiceos.activate and stop.openvoiceos.stop.response
         are both emitted — confirming the service participates in skill lifecycle."""
+        modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
+        minicroft = get_minicroft([], modernize=modernize, emit_legacy=emit_legacy)
+
         session = Session("123")
         session.lang = "en-US"
         session.pipeline = ["ovos-stop-pipeline-plugin-high"]
-        message = Message("recognizer_loop:utterance",
+        message = Message(utt_topic,
                           {"utterances": ["stop"], "lang": session.lang},
                           {"session": session.serialize()})
 
@@ -282,10 +346,11 @@ class TestStopServiceAsSkill(TestCase):
         ignore = [m for m in _STOP_RESPONSES if m != "stop.openvoiceos.stop.response"]
 
         test = End2EndTest(
-            minicroft=self.minicroft,
+            minicroft=minicroft,
             skill_ids=[],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
+            eof_msgs=[UTTERANCE_HANDLED],
+            flip_points=[utt_topic],
+            entry_points=[utt_topic],
             ignore_messages=ignore,
             source_message=message,
             expected_messages=[
@@ -296,7 +361,13 @@ class TestStopServiceAsSkill(TestCase):
                 # StopService as OVOSSkill handles mycroft.stop and replies
                 Message("stop.openvoiceos.stop.response",
                         {"result": False, "skill_id": "stop.openvoiceos"}),
-                Message("ovos.utterance.handled", {}),
+                Message(UTTERANCE_HANDLED, {}),
             ]
         )
         test.execute()
+        minicroft.stop()
+
+    def test_stop_service_emits_activate_and_stop_response(self):
+        for namespace in NAMESPACE_PATHS:
+            with self.subTest(namespace=namespace):
+                self._run_stop_service_emits_activate_and_stop_response(namespace)
