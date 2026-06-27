@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.2.1a1) (2026-06-27)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.2.0a2...2.2.1a1)
+
+**Merged pull requests:**
+
+- fix: guard optional None blacklisted\_skills/intents \(SESSION-1 §3\) [\#780](https://github.com/OpenVoiceOS/ovos-core/pull/780) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.2.0a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.2.0a2) (2026-06-26)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.2.0a1...2.2.0a2)
