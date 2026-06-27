@@ -9,7 +9,7 @@ on:
 
 jobs:
   ovoscope:
-    uses: OpenVoiceOS/gh-automations/.github/workflows/ovoscope.yml@dev
+    uses: OpenVoiceOS/gh-automations/.github/workflows/ovoscope.yml@feat/ovoscope-post-install
     secrets: inherit
     with:
       runner: "ubuntu-latest"
@@ -31,6 +31,19 @@ jobs:
         --force-reinstall
         git+https://github.com/OpenVoiceOS/ovos-bus-client@feat/session-spec-fields
         git+https://github.com/OpenVoiceOS/ovos-workshop@feat/intent-4-producer
+        git+https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin@fix/allow-ovos-workshop-9
+        git+https://github.com/OpenVoiceOS/ovos-padatious-pipeline-plugin@fix/allow-ovos-workshop-9
+        git+https://github.com/OpenVoiceOS/ovos-skill-parrot@fix/allow-ovos-workshop-10
+        git+https://github.com/OpenVoiceOS/ovos-skill-fallback-unknown@fix/allow-ovos-workshop-10
+        git+https://github.com/OpenVoiceOS/ovos-skill-count@fix/allow-ovos-workshop-10
+        git+https://github.com/OpenVoiceOS/ovos-skill-hello-world@fix/allow-ovos-workshop-10
+      # Re-pin the integrated stack AFTER .[test] (installed with --no-deps) so
+      # the resolver cannot downgrade ovos-workshop back to a <9 published wheel
+      # pulled in by the fixture skills / transitive ovos-core. Without this the
+      # 9.x INTENT-4 producer is uninstalled and its bus topics never emit.
+      post_install_pip: >-
+        git+https://github.com/OpenVoiceOS/ovos-workshop@feat/intent-4-producer
+        git+https://github.com/OpenVoiceOS/ovos-bus-client@feat/session-spec-fields
         git+https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin@fix/allow-ovos-workshop-9
         git+https://github.com/OpenVoiceOS/ovos-padatious-pipeline-plugin@fix/allow-ovos-workshop-9
         git+https://github.com/OpenVoiceOS/ovos-skill-parrot@fix/allow-ovos-workshop-10
