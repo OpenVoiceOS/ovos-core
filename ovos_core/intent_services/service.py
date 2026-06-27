@@ -520,7 +520,15 @@ class IntentService:
         # NOTE: message.reply to ensure correct message destination
         self.bus.emit(message.reply('mycroft.audio.play_sound', {"uri": sound}))
         # OVOS-PIPELINE-1 §6.4 cancellation terminal path: cancelled -> handled
-        self.bus.emit(message.reply(SpecMessage.UTTERANCE_CANCELLED))
+        # OVOS-TRANSFORM-1 §8.2: ovos.utterance.cancelled carries the
+        # cancel_reason and the orchestrator-stamped cancel_by from the §8.1
+        # signal that triggered the cancellation.
+        cancel_data = {}
+        if message.context.get("cancel_reason") is not None:
+            cancel_data["cancel_reason"] = message.context["cancel_reason"]
+        if message.context.get("cancel_by") is not None:
+            cancel_data["cancel_by"] = message.context["cancel_by"]
+        self.bus.emit(message.reply(SpecMessage.UTTERANCE_CANCELLED, cancel_data))
         self.bus.emit(message.reply(SpecMessage.UTTERANCE_HANDLED))
 
     def handle_utterance(self, message: Message):
