@@ -11,38 +11,43 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""OVOS-CONTEXT-1 conformance tests for the core-resident subsystem.
+"""OVOS-CONTEXT-1 conformance tests for the core-resident helpers.
 
-Covers the orchestrator MUST clauses this implementation flips:
+The §5.3 ``ovos.session.sync`` entry-by-entry merge is owned by the
+``SessionManager`` singleton (bus-client #239) and is covered there; core
+does **not** re-implement it. This module covers the stateless helpers the
+orchestrator applies to a session's ``intent_context`` map:
 
-- §2 the flat entry shape + liveness predicate;
-- §4 prune-then-decrement decay across turns;
-- §5.3 ``ovos.session.sync`` entry-by-entry merge (set + null-delete);
+- §2 the flat entry shape + liveness predicate + cap eviction;
+- §4 / §4.1 prune-then-decrement decay across turns;
 - §3.1 scope resolution, §6 / §6.1 gating predicates;
 - §7 context-supplied slot fill.
 
-Plus a live FakeBus integration check exercising the orchestrator wiring
-in ``IntentService``.
+Plus a live FakeBus integration check that drives ``ovos.session.sync``
+through the **real** ``SessionManager`` and asserts the orchestrator sees
+the merged-then-decayed context on the session.
 """
 import time
 import unittest
 from collections import defaultdict
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import Session
+from ovos_bus_client.session import Session, SessionManager
 from ovos_utils.fakebus import FakeBus
 
 from ovos_core.intent_services.intent_context import (
-    IntentContextStore,
     is_live,
     resolve_key,
     normalize_declaration,
     gate_satisfied,
     context_supplied_slots,
+    prune,
+    decrement,
+    enforce_cap,
     INTENT_CONTEXT_FIELD,
 )
-from ovos_core.intent_services.service import IntentService, SESSION_SYNC
+from ovos_core.intent_services.service import IntentService
 
 
 def _make_service(config=None) -> IntentService:
@@ -53,7 +58,6 @@ def _make_service(config=None) -> IntentService:
     svc.config = config or {}
     svc.pipeline_plugins = {}
     svc._deactivations = defaultdict(list)
-    svc.intent_context = IntentContextStore()
 
     ut = MagicMock()
     ut.transform.side_effect = lambda utt, ctx: (utt, ctx)
@@ -205,144 +209,189 @@ class TestSlotFill(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# §4 — decay lifecycle on the store
+# §4 — decay lifecycle (stateless helpers over a passed-in map)
 # ---------------------------------------------------------------------------
 
 class TestDecay(unittest.TestCase):
     def test_prune_removes_dead(self):
-        store = IntentContextStore()
-        store.set("s", {"live": {"value": "a", "turns_remaining": 1},
-                        "dead": {"value": "b", "turns_remaining": 0}})
-        store.prune("s")
-        self.assertIn("live", store.get("s"))
-        self.assertNotIn("dead", store.get("s"))
+        ctx = {"live": {"value": "a", "turns_remaining": 1},
+               "dead": {"value": "b", "turns_remaining": 0}}
+        prune(ctx)
+        self.assertIn("live", ctx)
+        self.assertNotIn("dead", ctx)
+
+    def test_prune_is_in_place_and_returns_map(self):
+        ctx = {"dead": {"value": "b", "turns_remaining": 0}}
+        out = prune(ctx)
+        self.assertIs(out, ctx)
+        self.assertEqual(ctx, {})
 
     def test_decrement_counts_down(self):
-        store = IntentContextStore()
-        store.set("s", {"k": {"value": None, "turns_remaining": 2}})
-        store.decrement("s")
-        self.assertEqual(store.get("s")["k"]["turns_remaining"], 1)
+        ctx = {"k": {"value": None, "turns_remaining": 2}}
+        decrement(ctx)
+        self.assertEqual(ctx["k"]["turns_remaining"], 1)
 
     def test_turns_one_lives_exactly_next_round(self):
         # §4: turns_remaining 1 is live for the next match round, gone after
-        store = IntentContextStore()
-        store.set("s", {"k": {"value": None, "turns_remaining": 1}})
+        ctx = {"k": {"value": None, "turns_remaining": 1}}
         # round 1: prune keeps it (live), then decrement -> 0
-        store.prune("s")
-        self.assertIn("k", store.get("s"))
-        store.decrement("s")
+        prune(ctx)
+        self.assertIn("k", ctx)
+        decrement(ctx)
         # round 2: prune removes it (turns 0 is dead)
-        store.prune("s")
-        self.assertNotIn("k", store.get("s"))
+        prune(ctx)
+        self.assertNotIn("k", ctx)
 
     def test_decrement_decrements_unmatched_turn(self):
         # §4: decrement runs whether or not an intent matched
-        store = IntentContextStore()
-        store.set("s", {"k": {"value": None, "turns_remaining": 1}})
-        store.decrement("s")
-        self.assertEqual(store.get("s")["k"]["turns_remaining"], 0)
+        ctx = {"k": {"value": None, "turns_remaining": 1}}
+        decrement(ctx)
+        self.assertEqual(ctx["k"]["turns_remaining"], 0)
 
     def test_decrement_only_keys_skips_midispatch(self):
         # §4.1: an entry synced mid-dispatch is not decremented this turn
-        store = IntentContextStore()
-        store.set("s", {"old": {"value": None, "turns_remaining": 1}})
-        pre = set(store.get("s").keys())
+        ctx = {"old": {"value": None, "turns_remaining": 1}}
+        pre = set(ctx.keys())
         # mid-dispatch sync writes a fresh entry
-        store.merge_sync("s", {"new": {"value": None, "turns_remaining": 1}})
-        store.decrement("s", only_keys=pre)
-        self.assertEqual(store.get("s")["old"]["turns_remaining"], 0)
-        self.assertEqual(store.get("s")["new"]["turns_remaining"], 1)
+        ctx["new"] = {"value": None, "turns_remaining": 1}
+        decrement(ctx, only_keys=pre)
+        self.assertEqual(ctx["old"]["turns_remaining"], 0)
+        self.assertEqual(ctx["new"]["turns_remaining"], 1)
+
+    def test_decrement_leaves_untimed_entries(self):
+        ctx = {"perm": {"value": "x"}}
+        decrement(ctx)
+        self.assertNotIn("turns_remaining", ctx["perm"])
 
 
 # ---------------------------------------------------------------------------
-# §5.3 — ovos.session.sync entry-by-entry merge
+# §2 — live-entry cap eviction
 # ---------------------------------------------------------------------------
 
-class TestSyncMerge(unittest.TestCase):
-    def test_set_and_replace(self):
-        store = IntentContextStore()
-        store.merge_sync("s", {"k": {"value": "a"}})
-        self.assertEqual(store.get("s")["k"]["value"], "a")
-        store.merge_sync("s", {"k": {"value": "b"}})
-        self.assertEqual(store.get("s")["k"]["value"], "b")
-
-    def test_null_deletes(self):
-        store = IntentContextStore()
-        store.merge_sync("s", {"k": {"value": "a"}, "j": {"value": "b"}})
-        store.merge_sync("s", {"k": None})
-        self.assertNotIn("k", store.get("s"))
-        self.assertIn("j", store.get("s"))  # disjoint key untouched
-
-    def test_disjoint_keys_do_not_overwrite(self):
-        store = IntentContextStore()
-        store.merge_sync("s", {"a.skill:x": {"value": "1"}})
-        store.merge_sync("s", {"b.skill:y": {"value": "2"}})
-        self.assertEqual(set(store.get("s").keys()),
-                         {"a.skill:x", "b.skill:y"})
-
-    def test_cap_eviction(self):
-        store = IntentContextStore(max_entries=2)
-        store.merge_sync("s", {"near": {"value": "x", "turns_remaining": 1},
-                               "far": {"value": "y", "turns_remaining": 99},
-                               "perm": {"value": "z"}})
-        ctx = store.get("s")
+class TestCapEviction(unittest.TestCase):
+    def test_cap_evicts_entry_closest_to_expiry(self):
+        ctx = {"near": {"value": "x", "turns_remaining": 1},
+               "far": {"value": "y", "turns_remaining": 99},
+               "perm": {"value": "z"}}
+        enforce_cap(ctx, max_entries=2)
         self.assertEqual(len(ctx), 2)
         # the entry closest to expiry (smallest turns_remaining) is evicted
         self.assertNotIn("near", ctx)
 
+    def test_cap_noop_under_limit(self):
+        ctx = {"a": {"value": "1"}, "b": {"value": "2"}}
+        enforce_cap(ctx, max_entries=10)
+        self.assertEqual(set(ctx.keys()), {"a", "b"})
+
 
 # ---------------------------------------------------------------------------
-# live FakeBus integration through IntentService
+# live FakeBus integration through the REAL SessionManager
 # ---------------------------------------------------------------------------
 
-class TestSessionSyncHandler(unittest.TestCase):
-    def test_sync_handler_merges_set_and_delete(self):
-        svc = _make_service()
+class TestLiveSessionManagerSync(unittest.TestCase):
+    """Drive ``ovos.session.sync`` through the real SessionManager (which
+    owns the §5.3 merge, bus-client #239) and assert the orchestrator sees
+    the merged-then-decayed context on the session."""
+
+    def setUp(self):
+        # isolate the singleton between tests
+        SessionManager.sessions = {"default": Session("default")}
+        SessionManager.default_session = SessionManager.sessions["default"]
+        SessionManager.bus = None
+
+    def tearDown(self):
+        SessionManager.sessions = {"default": Session("default")}
+        SessionManager.default_session = SessionManager.sessions["default"]
+        SessionManager.bus = None
+
+    def test_real_sessionmanager_merges_sync(self):
+        # the merge itself lives in SessionManager (bus-client #239); here
+        # we drive the *real* handler to confirm core consumes a managed
+        # session whose intent_context the singleton has merged. The full
+        # set + null-delete matrix is covered by bus-client's own suite —
+        # we assert the additive set + delete is visible on the session.
         sess = Session("live-sess")
-        # seed an existing entry directly
-        svc.intent_context.set(sess.session_id, {"keep": {"value": "k"}})
+        sess.intent_context = {"keep": {"value": "k"}}
+        SessionManager.update(sess)
 
-        payload = {INTENT_CONTEXT_FIELD: {
+        # a skill emits ovos.session.sync with an updated session snapshot
+        snap = sess.serialize()
+        snap[INTENT_CONTEXT_FIELD] = {
             "tea.skill:confirming_milk": {"value": None, "turns_remaining": 1},
             "keep": None,  # delete
-        }}
-        msg = Message(SESSION_SYNC, data={"session": payload},
-                      context={"session": sess.serialize()})
-        with patch("ovos_core.intent_services.service.SessionManager.get",
-                   return_value=sess):
-            svc.handle_session_sync(msg)
+        }
+        SessionManager.handle_session_sync(
+            Message("ovos.session.sync", context={"session": snap}))
 
-        ctx = svc.intent_context.get(sess.session_id)
-        self.assertIn("tea.skill:confirming_milk", ctx)
-        self.assertNotIn("keep", ctx)
+        merged = SessionManager.sessions["live-sess"].intent_context
+        self.assertIn("tea.skill:confirming_milk", merged)
+        self.assertNotIn("keep", merged)
 
-    def test_decay_over_turns_via_handle_utterance(self):
+    def test_orchestrator_decays_managed_session(self):
+        bus = FakeBus()
+        SessionManager.connect_to_bus(bus)
         svc = _make_service()
+        svc.bus = bus
+
         sess = Session("turn-sess")
-        svc.intent_context.set(sess.session_id,
-                               {"tea.skill:flag": {"value": None,
-                                                   "turns_remaining": 1}})
+        sess.intent_context = {"tea.skill:flag": {"value": None,
+                                                  "turns_remaining": 1}}
+        SessionManager.update(sess)
 
         def _drive():
             msg = Message("recognizer_loop:utterance",
                           data={"utterances": ["hello"]},
-                          context={"session": sess.serialize()})
-            with patch.object(svc, "get_pipeline", return_value=[]), \
-                 patch("ovos_core.intent_services.service.SessionManager.get",
-                       return_value=sess), \
-                 patch.object(svc, "_validate_session", return_value=sess), \
-                 patch("ovos_core.intent_services.service.SessionManager.sync"):
-                svc.handle_utterance(msg)
+                          context={"session":
+                                   SessionManager.sessions["turn-sess"].serialize()})
+            # no pipelines loaded -> no match, decay still runs
+            svc.handle_utterance(msg)
 
         # turn 1: flag is live during the round, decremented to 0 after
         _drive()
         self.assertEqual(
-            svc.intent_context.get(sess.session_id)["tea.skill:flag"]["turns_remaining"],
+            SessionManager.sessions["turn-sess"].intent_context["tea.skill:flag"]["turns_remaining"],
             0)
         # turn 2: pre-match prune removes the now-dead flag
         _drive()
-        self.assertNotIn("tea.skill:flag",
-                         svc.intent_context.get(sess.session_id))
+        self.assertNotIn(
+            "tea.skill:flag",
+            SessionManager.sessions["turn-sess"].intent_context or {})
+
+    def test_midispatch_sync_survives_decay(self):
+        # §4.1: an entry merged onto the managed session mid-dispatch (via
+        # the real SessionManager handler) is NOT decremented by the
+        # dispatch it arrived in — it lands alive for exactly the next match
+        # round. Exercises core's post-match decrement (only_keys) against a
+        # session the real singleton has merged into.
+        sess = Session("mid-sess")
+        sess.intent_context = {"old.skill:flag": {"value": None,
+                                                  "turns_remaining": 1}}
+        SessionManager.update(sess)
+
+        # pre-match snapshot, as core captures it before the match round
+        pre_match_keys = set(sess.intent_context.keys())
+
+        # mid-dispatch: a skill emits ovos.session.sync; the REAL handler
+        # merges the disjoint new key onto the managed session.
+        snap = sess.serialize()
+        snap[INTENT_CONTEXT_FIELD] = {
+            "new.skill:flag": {"value": None, "turns_remaining": 1}}
+        SessionManager.handle_session_sync(
+            Message("ovos.session.sync", context={"session": snap}))
+
+        # core's post-match decrement: re-read authoritative session, skip
+        # mid-dispatch keys (only_keys) so they are not decremented.
+        managed = SessionManager.sessions["mid-sess"]
+        post_ctx = dict(managed.intent_context or {})
+        decrement(post_ctx, only_keys=pre_match_keys)
+        managed.intent_context = post_ctx or None
+        SessionManager.update(managed)
+
+        ctx = SessionManager.sessions["mid-sess"].intent_context
+        # the pre-existing entry was decremented (present at match time)
+        self.assertEqual(ctx["old.skill:flag"]["turns_remaining"], 0)
+        # the mid-dispatch entry was NOT decremented (arrived after prune)
+        self.assertEqual(ctx["new.skill:flag"]["turns_remaining"], 1)
 
 
 if __name__ == "__main__":
