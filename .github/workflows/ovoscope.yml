@@ -9,7 +9,7 @@ on:
 
 jobs:
   ovoscope:
-    uses: OpenVoiceOS/gh-automations/.github/workflows/ovoscope.yml@fix/ovoscope-local-source-wins
+    uses: OpenVoiceOS/gh-automations/.github/workflows/ovoscope.yml@dev
     secrets: inherit
     with:
       runner: "ubuntu-latest"
@@ -19,13 +19,6 @@ jobs:
       test_path: "test/end2end/"
       require_adapt: true
       require_padatious: true
-      # Temporary migration measure: reinstall the workshop-decoupled pipeline
-      # plugins from their fix branches over the stale PyPI ones (which pin
-      # ovos-workshop<8.0.0, conflicting with workshop 8.3.0a1 and leaving the
-      # real opm.pipeline entry points absent). Runs after the plugin-install
-      # step and before verification, so it overrides the CI fallback installs.
-      # Drop once adapt#45 + padatious#73 merge to dev; then use pre_release: true.
-      pre_install_pip: "--force-reinstall git+https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin@fix/allow-ovos-workshop-9 git+https://github.com/OpenVoiceOS/ovos-padatious-pipeline-plugin@fix/allow-ovos-workshop-9"
       bus_coverage: true
       bus_coverage_include: ""
       bus_coverage_exclude: "^Thread-|^intents$|^skills$|^__core__$"
