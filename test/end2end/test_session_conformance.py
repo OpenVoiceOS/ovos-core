@@ -161,15 +161,25 @@ class TestResponseMode(TestCase):
 
     def test_get_response_enable_sets_response_state(self):
         """Enabling get-response marks the skill RESPONSE in the session, so the
-        converse stage routes the next utterance to it (§2.2)."""
+        converse stage routes the next utterance to it; disabling clears it back
+        to the default INTENT state (§2.2).
+
+        ``utterance_states`` carries the ``UtteranceState`` *value* (string), and
+        under the spec ``response_mode`` model INTENT is the absence of a response
+        window — a disabled skill is simply not present in the mapping. The
+        assertion accepts either the enum or its value and treats a missing key as
+        INTENT so it holds across the legacy dict and the spec projection."""
         sess = Session("se-respmode")
         sess.lang = "en-US"
+
         sess.enable_response_mode(PARROT_ID)
-        self.assertEqual(sess.utterance_states.get(PARROT_ID),
-                         UtteranceState.RESPONSE)
+        self.assertIn(sess.utterance_states.get(PARROT_ID),
+                      (UtteranceState.RESPONSE, UtteranceState.RESPONSE.value))
+
         sess.disable_response_mode(PARROT_ID)
-        self.assertEqual(sess.utterance_states.get(PARROT_ID),
-                         UtteranceState.INTENT)
+        # INTENT is the default: either stamped explicitly or implied by absence.
+        self.assertIn(sess.utterance_states.get(PARROT_ID),
+                      (None, UtteranceState.INTENT, UtteranceState.INTENT.value))
 
     @_skip_without("response_mode")
     def test_response_mode_spec_field(self):

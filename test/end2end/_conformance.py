@@ -31,6 +31,14 @@ from typing import List, Optional
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
 from ovos_config.config import Configuration
+from ovos_spec_tools import SpecMessage
+
+# The spec-namespace entry topic the IntentService subscribes to
+# (``IntentService.bus.on(SpecMessage.UTTERANCE, ...)``). The conformance
+# suites run with ``legacy_namespace=False`` (see :func:`use_spec_namespace`),
+# so core handles the utterance natively on this topic — injecting on the
+# legacy ``recognizer_loop:utterance`` would never reach the handler.
+ENTRY_TOPIC = SpecMessage.UTTERANCE.value  # "ovos.utterance.handle"
 
 
 def use_spec_namespace():
@@ -58,7 +66,7 @@ def utterance(text: str, session_id: str, pipeline: List[str],
     sess.pipeline = pipeline
     for key, value in session_fields.items():
         setattr(sess, key, value)
-    return Message("recognizer_loop:utterance",
+    return Message(ENTRY_TOPIC,
                    {"utterances": [text], "lang": lang},
                    {"session": sess.serialize(), "source": "A", "destination": "B"})
 

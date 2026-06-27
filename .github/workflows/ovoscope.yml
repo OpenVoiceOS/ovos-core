@@ -42,6 +42,7 @@ jobs:
       # pulled in by the fixture skills / transitive ovos-core. Without this the
       # 9.x INTENT-4 producer is uninstalled and its bus topics never emit.
       post_install_pip: >-
+        git+https://github.com/TigreGotico/ovoscope@fix/none-iter-guard
         git+https://github.com/OpenVoiceOS/ovos-workshop@feat/intent-4-producer
         git+https://github.com/OpenVoiceOS/ovos-bus-client@feat/session-spec-fields
         git+https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin@fix/allow-ovos-workshop-9

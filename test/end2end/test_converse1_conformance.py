@@ -32,6 +32,7 @@ from ovos_utils.log import LOG
 from ovoscope import get_minicroft
 
 from ._conformance import (
+    ENTRY_TOPIC,
     PADACIOSO_HIGH,
     capture,
     reset_namespace,
@@ -91,7 +92,7 @@ def _activate_parrot(session_id: str) -> Session:
 
 
 def _followup(sess: Session, text: str) -> Message:
-    return Message("recognizer_loop:utterance",
+    return Message(ENTRY_TOPIC,
                    {"utterances": [text], "lang": "en-US"},
                    {"session": sess.serialize(), "source": "A", "destination": "B"})
 

@@ -31,8 +31,8 @@ from ovos_utils.log import LOG
 
 from ovoscope import get_minicroft, register_padatious_intent
 
-from ._conformance import (STOP_HIGH, capture, reset_namespace, types,
-                           use_spec_namespace, utterance)
+from ._conformance import (ENTRY_TOPIC, STOP_HIGH, capture, reset_namespace,
+                           types, use_spec_namespace, utterance)
 
 _MC = None
 
@@ -57,7 +57,7 @@ def _stop_with_active(session_id: str, active_skill: str) -> Message:
     sess.lang = "en-US"
     sess.pipeline = [STOP_HIGH]
     sess.activate_skill(active_skill)
-    return Message("recognizer_loop:utterance",
+    return Message(ENTRY_TOPIC,
                    {"utterances": ["stop"], "lang": "en-US"},
                    {"session": sess.serialize(), "source": "A", "destination": "B"})
 
