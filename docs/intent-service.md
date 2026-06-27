@@ -65,9 +65,38 @@ intent.service.intent.get  {utterance: "...", lang: "..."}
 
 | Event | Effect |
 |---|---|
-| `add_context` | Inject entity into session context |
-| `remove_context` | Remove named context entity |
-| `clear_context` | Clear all context entities |
+| `add_context` | Inject entity into legacy frame-based session context |
+| `remove_context` | Remove named context entity (legacy frames) |
+| `clear_context` | Clear all context entities (legacy frames) |
+| `ovos.session.sync` | OVOS-CONTEXT-1 §5.3 — merge `session.intent_context` entry-by-entry |
+
+### OVOS-CONTEXT-1 intent context
+
+The orchestrator implements the **OVOS-CONTEXT-1** flat, decaying
+`session.intent_context` key/value store alongside the legacy
+frame-based `IntentContextManager`. The core-resident subsystem
+(`ovos_core.intent_services.intent_context`) owns:
+
+- the entry shape and *liveness* predicate (§2);
+- the prune-then-decrement decay lifecycle, once per utterance dispatch
+  (§4 / §4.1);
+- the `ovos.session.sync` entry-by-entry merge — present entry objects
+  set/replace, `null` entries delete, absent keys unchanged (§5.3);
+- the §3.1 scope-resolution helper, the §6 / §6.1 gating predicates, and
+  the §7 context-supplied slot fill, as pure functions any in-process
+  engine can apply.
+
+The orchestrator holds the authoritative map keyed by `session_id`,
+prunes/decrements it each turn, and stamps it onto every serialized
+session it emits, since the legacy `Session` object does not yet carry
+`intent_context` as a first-class field.
+
+> **Engine-side gating is out of scope here.** The §6 / §6.1
+> `requires_context` / `excludes_context` enforcement *inside a matcher*
+> (e.g. Adapt dropping a candidate whose required context is unsatisfied)
+> lives in each pipeline plugin, not in core. Core provides the shared
+> `gate_satisfied` / `context_supplied_slots` vocabulary those plugins
+> consult.
 
 ## Open Data / Metrics Upload
 
@@ -81,6 +110,7 @@ If `open_data.intent_urls` is configured, intent match results (utterance, inten
 | `add_context` | `handle_add_context` |
 | `remove_context` | `handle_remove_context` |
 | `clear_context` | `handle_clear_context` |
+| `ovos.session.sync` | `handle_session_sync` |
 | `intent.service.intent.get` | `handle_get_intent` |
 | `intent.service.skills.deactivate` | `_handle_deactivate` |
 | `intent.service.pipelines.reload` | `handle_reload_pipelines` |

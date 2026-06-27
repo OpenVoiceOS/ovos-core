@@ -40,6 +40,9 @@ def _make_service(config=None) -> IntentService:
     svc._deactivations = defaultdict(list)
     # PIPELINE-1 §7/§8 dispatcher; timer disabled so unit tests stay deterministic
     svc.intent_dispatcher = IntentDispatcher(bus, timeout=0)
+    # OVOS-CONTEXT-1 — orchestrator-resident intent_context store
+    from ovos_core.intent_services.intent_context import IntentContextStore
+    svc.intent_context = IntentContextStore()
 
     # Minimal stub objects for transformer services
     ut = MagicMock()
