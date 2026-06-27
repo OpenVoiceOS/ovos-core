@@ -22,6 +22,21 @@ jobs:
       # latest e2e harness (e.g. register_padatious_intent, ovoscope >=0.15.0a1)
       # is available before it reaches a stable release.
       pre_release: true
+      # Integrated-stack pins for the spec-conformance suites. These force the
+      # producer/session/plugin/fixture branches that EMIT the spec topics and
+      # session fields the suites assert (ovos-spec-tools is published 0.16.1a2,
+      # so it is not pinned here). --force-reinstall overrides the PyPI versions
+      # the package/extra pull in.
+      pre_install_pip: >-
+        --force-reinstall
+        git+https://github.com/OpenVoiceOS/ovos-bus-client@feat/session-spec-fields
+        git+https://github.com/OpenVoiceOS/ovos-workshop@feat/intent-4-producer
+        git+https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin@fix/allow-ovos-workshop-9
+        git+https://github.com/OpenVoiceOS/ovos-padatious-pipeline-plugin@fix/allow-ovos-workshop-9
+        git+https://github.com/OpenVoiceOS/ovos-skill-parrot@fix/allow-ovos-workshop-10
+        git+https://github.com/OpenVoiceOS/ovos-skill-fallback-unknown@fix/allow-ovos-workshop-10
+        git+https://github.com/OpenVoiceOS/ovos-skill-count@fix/allow-ovos-workshop-10
+        git+https://github.com/OpenVoiceOS/ovos-skill-hello-world@fix/allow-ovos-workshop-10
       require_adapt: true
       require_padatious: true
       bus_coverage: true
