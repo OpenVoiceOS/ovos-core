@@ -15,10 +15,12 @@ Coverage map (clause -> status against current ovos-core):
 - §5.1 effective-pipeline ordering / unknown-id skip ............ green
 - §5.3 blacklisted_skills orchestrator backstop ................. green
 - §6.4 every utterance terminates with the end-marker .......... green
+- §6.4 cancelled utterance emits ``ovos.utterance.cancelled`` .. green
 - §7   dispatch on ``<skill_id>:<intent_name>`` ................ green
 - §7.1 ``context.skill_id`` stamped on dispatch ................ green
 - §7.1 ``context.pipeline_id`` stamped on dispatch ............. green
 - §8   handler-lifecycle trio ``ovos.intent.handler.*`` ........ green (alongside legacy)
+- §8.1 raising handler emits ``ovos.intent.handler.error`` ..... green (workshop)
 - §9.1 entry topic ``ovos.utterance.handle`` ................... green (alongside legacy)
 - §9.2 ``ovos.intent.matched`` notification .................... green
 - §9.3 ``ovos.intent.unmatched`` on no-match ................... green (alongside legacy)
@@ -62,16 +64,32 @@ GREET_SKILL_ID, GREET_NAME = GREET_INTENT.split(":")
 GREET_SAMPLES = ["hello", "hi", "hey", "greetings", "good morning"]
 
 
+BOOM_INTENT = "conformance.skill:boom"
+BOOM_SKILL_ID, BOOM_NAME = BOOM_INTENT.split(":")
+BOOM_SAMPLES = ["detonate the test", "make it explode", "boom now please"]
+
+
 class _EchoSkill(OVOSSkill):
     """Intent-style handler: registered with the handler-lifecycle prefix so the
-    §8 trio fires, and speaking so the §9.6 response topic fires."""
+    §8 trio fires, and speaking so the §9.6 response topic fires.
+
+    Also registers a handler on the pipeline dispatch topic ``BOOM_INTENT`` that
+    raises, so the §8.1 error path (``ovos.intent.handler.error``) can be driven
+    through a real utterance that reaches the orchestrator's end-marker.
+    """
 
     def initialize(self):
         self.add_event("conformance.echo", self.handle_echo,
                        handler_info="mycroft.skill.handler", is_intent=True)
+        # dispatch topic for a padatious-matched, raising handler
+        self.add_event(BOOM_INTENT, self.handle_boom,
+                       handler_info="mycroft.skill.handler", is_intent=True)
 
     def handle_echo(self, message: Message):
         self.speak(message.data.get("text", "echo"))
+
+    def handle_boom(self, message: Message):
+        raise RuntimeError("conformance: deliberate handler failure (§8.1)")
 
 
 _MC = None
@@ -83,6 +101,7 @@ def setUpModule():
     use_spec_namespace()  # assert the ovos.* spec topics
     _MC = get_minicroft([SKILL_ID], extra_skills={SKILL_ID: _EchoSkill})
     register_padatious_intent(_MC.bus, GREET_INTENT, GREET_SAMPLES)
+    register_padatious_intent(_MC.bus, BOOM_INTENT, BOOM_SAMPLES)
     time.sleep(2)
 
 
@@ -251,3 +270,66 @@ class TestSec96Speak(TestCase):
         """A speaking handler emits on ``ovos.utterance.speak`` (§9.6)."""
         recs = capture(_MC, Message("conformance.echo", {"text": "hello there"}), 3.0)
         self.assertIn("ovos.utterance.speak", types(recs))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §6.4 — Cancelled utterance terminal path
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestSec64Cancelled(TestCase):
+    """§6.4: an utterance flagged ``context['canceled']`` (e.g. by a cancel-word
+    utterance transformer) is a terminal path — the orchestrator emits
+    ``ovos.utterance.cancelled`` and exactly one end-marker, with no dispatch."""
+
+    def _cancelled_entry(self, session_id: str) -> Message:
+        msg = utterance("hello", session_id, [PADACIOSO_HIGH])
+        msg.context["canceled"] = True
+        msg.context["cancel_word"] = "nevermind"
+        return msg
+
+    def test_cancelled_topic_emitted(self):
+        """A cancelled utterance emits ``ovos.utterance.cancelled`` (§6.4)."""
+        recs = capture(_MC, self._cancelled_entry("p1-cancel"), 3.0)
+        self.assertIn("ovos.utterance.cancelled", types(recs))
+
+    def test_cancelled_terminates_once(self):
+        """The cancelled path terminates with exactly one end-marker (§6.4, §9.5)."""
+        recs = capture(_MC, self._cancelled_entry("p1-cancel-eof"), 3.0)
+        self.assertEqual(types(recs).count("ovos.utterance.handled"), 1)
+
+    def test_cancelled_does_not_dispatch(self):
+        """A cancelled utterance never reaches the matcher — no dispatch fires (§6.4)."""
+        recs = capture(_MC, self._cancelled_entry("p1-cancel-nodisp"), 3.0)
+        self.assertNotIn(GREET_INTENT, types(recs))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §8.1 — Handler error path
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestSec81HandlerError(TestCase):
+    """§8.1: when an accepted handler raises, the orchestrator/handler wrapper
+    emits ``ovos.intent.handler.error`` (the terminal of the lifecycle trio) and
+    the utterance still terminates with exactly one ``ovos.utterance.handled``."""
+
+    @_requires_spec_workshop
+    def test_error_topic_emitted(self):
+        """A raising handler emits ``ovos.intent.handler.error`` (§8.1)."""
+        recs = capture(
+            _MC,
+            utterance("make it explode", "p1-err-topic", [PADACIOSO_HIGH]),
+            4.0,
+        )
+        seq = types(recs)
+        self.assertIn(BOOM_INTENT, seq)  # the raising handler was dispatched
+        self.assertIn("ovos.intent.handler.error", seq)
+
+    def test_error_still_terminates_once(self):
+        """Despite the handler raising, the utterance terminates with exactly one
+        end-marker — the error does not abort the lifecycle (§8.1, §9.5)."""
+        recs = capture(
+            _MC,
+            utterance("make it explode", "p1-err-eof", [PADACIOSO_HIGH]),
+            4.0,
+        )
+        self.assertEqual(types(recs).count("ovos.utterance.handled"), 1)
