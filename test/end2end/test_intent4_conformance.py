@@ -16,10 +16,14 @@ once the contract lands. The xfail discipline is described in ``_conformance.py`
 
 Coverage map (clause -> status against current ovos-core):
 - §2   registrations are fire-and-forget (no ack / no .response) .. green
+- §5   ``ovos.intent.register.keyword`` makes an intent matchable . xfail
 - §6   ``ovos.intent.register.template`` makes an intent matchable . xfail
 - §7   ``ovos.entity.register`` value-set hint ................... xfail
 - §8.2 ``ovos.intent.deregister`` removes an intent .............. xfail
+- §8.3 ``ovos.entity.deregister`` removes an entity .............. xfail
+- §8.4 ``ovos.skill.deregister`` removes a whole skill ........... xfail
 - §8.5 ``ovos.intent.disable`` suppresses an intent .............. xfail
+- §8.5 ``ovos.intent.enable`` re-arms a disabled intent .......... xfail
 - §10.1 ``ovos.intent.list`` introspection responds ............. xfail
 - §10.2 ``ovos.intent.describe`` introspection responds ......... xfail
 """
@@ -30,9 +34,20 @@ import pytest
 from ovos_bus_client.message import Message
 from ovos_utils.log import LOG
 
-from ovoscope import get_minicroft, register_padatious_intent
+from ovoscope import (
+    get_minicroft,
+    register_padatious_entity,
+    register_padatious_intent,
+)
 
 from ._conformance import PADACIOSO_HIGH, capture, types, utterance
+
+KEYWORD_INTENT = "intent4.skill:lights_off"
+KEYWORD_SKILL, KEYWORD_NAME = KEYWORD_INTENT.split(":")
+KEYWORD_SAMPLES = ["turn off the lights", "switch off the lights", "lights off please"]
+
+ENTITY_NAME = "intent4.skill:color"
+ENTITY_SAMPLES = ["red", "green", "blue"]
 
 _MC = None
 
@@ -158,6 +173,137 @@ class TestSec85Disable(TestCase):
             3.0,
         )
         self.assertNotIn(TEMPLATE_INTENT, types(recs))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §5 — Keyword-intent registration
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestSec5KeywordRegistration(TestCase):
+    """§5: a keyword intent registered on ``ovos.intent.register.keyword``
+    becomes matchable; a match dispatches ``<skill_id>:<intent_name>``."""
+
+    @pytest.mark.xfail(strict=False,
+                       reason="ovos-core consumes keyword registration via the legacy "
+                              "'padatious:register_intent'/'register_intent'; INTENT-4 "
+                              "§5 defines 'ovos.intent.register.keyword'")
+    def test_spec_keyword_registration_is_matchable(self):
+        """Registering via the spec keyword topic makes the intent matchable (§5)."""
+        _MC.bus.emit(Message("ovos.intent.register.keyword", {
+            "skill_id": KEYWORD_SKILL,
+            "intent_name": KEYWORD_NAME,
+            "lang": "en-US",
+            "samples": KEYWORD_SAMPLES,
+        }, {"skill_id": KEYWORD_SKILL}))
+        time.sleep(1.5)
+        recs = capture(
+            _MC,
+            utterance("turn off the lights", "i4-kw", [PADACIOSO_HIGH]),
+            3.0,
+        )
+        self.assertIn(KEYWORD_INTENT, types(recs))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §7 — Entity (value-set) registration
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestSec7EntityRegistration(TestCase):
+    """§7: ``ovos.entity.register`` registers a value-set hint that the matcher
+    can resolve as a named slot. Registration is fire-and-forget (§2)."""
+
+    @pytest.mark.xfail(strict=False,
+                       reason="ovos-core consumes entity registration via the legacy "
+                              "'padatious:register_entity'/'register_vocab'; INTENT-4 "
+                              "§7 defines 'ovos.entity.register'")
+    def test_spec_entity_registration_no_ack(self):
+        """Emitting an entity registration on the spec topic produces no ack and is
+        accepted by an INTENT-4 consumer (§7, §2)."""
+        recs = capture(_MC, Message("ovos.entity.register", {
+            "skill_id": ENTITY_NAME.split(":")[0],
+            "name": ENTITY_NAME,
+            "lang": "en-US",
+            "samples": ENTITY_SAMPLES,
+        }, {"skill_id": ENTITY_NAME.split(":")[0]}), 2.0)
+        acks = [t for t in types(recs) if t.endswith(".response")]
+        self.assertEqual(acks, [], f"unexpected acknowledgement(s): {acks}")
+        # an INTENT-4 consumer must not reject a well-formed entity payload
+        self.assertNotIn("ovos.entity.register.error", types(recs))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §8.3 / §8.4 — Entity and whole-skill deregistration
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestSec83EntityDeregister(TestCase):
+    """§8.3: ``ovos.entity.deregister`` removes one entity value-set hint."""
+
+    @pytest.mark.xfail(strict=False,
+                       reason="ovos-core does not consume 'ovos.entity.deregister'; "
+                              "INTENT-4 §8.3")
+    def test_spec_entity_deregister_no_error(self):
+        """A spec-topic entity deregister is consumed without an error event (§8.3)."""
+        register_padatious_entity(_MC.bus, ENTITY_NAME, ENTITY_SAMPLES)
+        time.sleep(1.0)
+        recs = capture(_MC, Message("ovos.entity.deregister", {
+            "skill_id": ENTITY_NAME.split(":")[0],
+            "name": ENTITY_NAME, "lang": "en-US",
+        }, {"skill_id": ENTITY_NAME.split(":")[0]}), 2.0)
+        self.assertNotIn("ovos.entity.deregister.error", types(recs))
+
+
+class TestSec84SkillDeregister(TestCase):
+    """§8.4: ``ovos.skill.deregister`` removes every intent and entity registered
+    under one ``skill_id`` in a single broadcast."""
+
+    @pytest.mark.xfail(strict=False,
+                       reason="ovos-core removes a skill's registrations via the legacy "
+                              "'detach_skill'; INTENT-4 §8.4 defines 'ovos.skill.deregister'")
+    def test_spec_skill_deregister_removes_all_intents(self):
+        """After a spec-topic skill deregister, none of the skill's intents match (§8.4)."""
+        register_padatious_intent(_MC.bus, KEYWORD_INTENT, KEYWORD_SAMPLES)
+        time.sleep(1.5)
+        _MC.bus.emit(Message("ovos.skill.deregister", {
+            "skill_id": KEYWORD_SKILL,
+        }, {"skill_id": KEYWORD_SKILL}))
+        time.sleep(1.5)
+        recs = capture(
+            _MC,
+            utterance("turn off the lights", "i4-skilldereg", [PADACIOSO_HIGH]),
+            3.0,
+        )
+        self.assertNotIn(KEYWORD_INTENT, types(recs))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §8.5 — Enable re-arms a disabled intent
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestSec85Enable(TestCase):
+    """§8.5: ``ovos.intent.enable`` re-arms an intent previously suppressed by
+    ``ovos.intent.disable``, restoring its match candidacy."""
+
+    @pytest.mark.xfail(strict=False,
+                       reason="ovos-core does not consume 'ovos.intent.disable'/"
+                              "'ovos.intent.enable'; INTENT-4 §8.5")
+    def test_spec_enable_rearms_intent(self):
+        """A disabled-then-enabled intent matches again (§8.5)."""
+        register_padatious_intent(_MC.bus, KEYWORD_INTENT, KEYWORD_SAMPLES)
+        time.sleep(1.5)
+        _MC.bus.emit(Message("ovos.intent.disable", {
+            "skill_id": KEYWORD_SKILL, "intent_name": KEYWORD_NAME, "lang": "en-US",
+        }, {"skill_id": KEYWORD_SKILL}))
+        time.sleep(1.0)
+        _MC.bus.emit(Message("ovos.intent.enable", {
+            "skill_id": KEYWORD_SKILL, "intent_name": KEYWORD_NAME, "lang": "en-US",
+        }, {"skill_id": KEYWORD_SKILL}))
+        time.sleep(1.0)
+        recs = capture(
+            _MC,
+            utterance("turn off the lights", "i4-enable", [PADACIOSO_HIGH]),
+            3.0,
+        )
+        self.assertIn(KEYWORD_INTENT, types(recs))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
