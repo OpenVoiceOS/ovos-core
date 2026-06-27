@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.2.3a1) (2026-06-27)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.2.2a1...2.2.3a1)
+
+**Merged pull requests:**
+
+- fix\(deps\): allow ovos-workshop 9.x \(widen \<9.0.0 -\> \<10.0.0\) [\#779](https://github.com/OpenVoiceOS/ovos-core/pull/779) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.2.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.2.2a1) (2026-06-27)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.2.1a1...2.2.2a1)
