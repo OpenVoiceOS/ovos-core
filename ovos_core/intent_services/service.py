@@ -472,11 +472,11 @@ class IntentService:
                     match = match_func(utterances, intent_lang, message)
                     if match:
                         LOG.info(f"{pipeline} match ({intent_lang}): {match}")
-                        if match.skill_id and match.skill_id in sess.blacklisted_skills:
+                        if match.skill_id and match.skill_id in (sess.blacklisted_skills or []):
                             LOG.debug(
                                 f"ignoring match, skill_id '{match.skill_id}' blacklisted by Session '{sess.session_id}'")
                             continue
-                        if isinstance(match, IntentHandlerMatch) and match.match_type in sess.blacklisted_intents:
+                        if isinstance(match, IntentHandlerMatch) and match.match_type in (sess.blacklisted_intents or []):
                             LOG.debug(
                                 f"ignoring match, intent '{match.match_type}' blacklisted by Session '{sess.session_id}'")
                             continue
