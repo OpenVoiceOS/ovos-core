@@ -305,7 +305,7 @@ class ConverseService(PipelinePlugin):
 
         # check if any skill wants to capture utterance for self.get_response method
         for skill_id in gr_skills:
-            if skill_id in session.blacklisted_skills:
+            if skill_id in (session.blacklisted_skills or []):
                 LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{session.session_id}'")
                 continue
             LOG.debug(f"utterance captured by skill.get_response method: {skill_id}")
@@ -322,7 +322,7 @@ class ConverseService(PipelinePlugin):
 
         # check if any skill wants to converse
         for skill_id in self._collect_converse_skills(message):
-            if skill_id in session.blacklisted_skills:
+            if skill_id in (session.blacklisted_skills or []):
                 LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{session.session_id}'")
                 continue
             LOG.debug(f"Attempting to converse with skill: {skill_id}")
