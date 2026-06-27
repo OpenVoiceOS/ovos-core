@@ -36,9 +36,9 @@ def _make_service(config=None) -> IntentService:
     svc.config = config or {}
     svc.pipeline_plugins = {}
     svc._deactivations = defaultdict(list)
-    # OVOS-CONTEXT-1 — orchestrator-resident intent_context store
-    from ovos_core.intent_services.intent_context import IntentContextStore
-    svc.intent_context = IntentContextStore()
+    # OVOS-CONTEXT-1 — the session.intent_context map is owned by the
+    # SessionManager singleton (bus-client #239); the orchestrator holds
+    # no store, so nothing to seed here.
 
     # Minimal stub objects for transformer services
     ut = MagicMock()
