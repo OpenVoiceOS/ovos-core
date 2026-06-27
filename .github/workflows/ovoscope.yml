@@ -30,7 +30,6 @@ jobs:
       pre_install_pip: >-
         --force-reinstall
         git+https://github.com/JarbasAl/padacioso@fix/allow-ovos-bus-client-2x
-        git+https://github.com/OpenVoiceOS/ovos-bus-client@feat/session-spec-fields
         git+https://github.com/OpenVoiceOS/ovos-workshop@feat/intent-4-producer
         git+https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin@fix/allow-ovos-workshop-9
         git+https://github.com/OpenVoiceOS/ovos-padatious-pipeline-plugin@fix/allow-ovos-workshop-9
@@ -46,7 +45,6 @@ jobs:
         git+https://github.com/OpenVoiceOS/ovoscope@dev
         git+https://github.com/JarbasAl/padacioso@fix/allow-ovos-bus-client-2x
         git+https://github.com/OpenVoiceOS/ovos-workshop@feat/intent-4-producer
-        git+https://github.com/OpenVoiceOS/ovos-bus-client@feat/session-spec-fields
         git+https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin@fix/allow-ovos-workshop-9
         git+https://github.com/OpenVoiceOS/ovos-padatious-pipeline-plugin@fix/allow-ovos-workshop-9
         git+https://github.com/OpenVoiceOS/ovos-skill-parrot@fix/allow-ovos-workshop-10
