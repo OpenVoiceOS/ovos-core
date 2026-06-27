@@ -34,7 +34,6 @@ from ovoscope import get_minicroft
 from ._conformance import (
     PADACIOSO_HIGH,
     capture,
-    first,
     reset_namespace,
     types,
     use_spec_namespace,
@@ -78,7 +77,6 @@ def _activate_parrot(session_id: str) -> Session:
     recs = capture(_MC, utterance("start parrot mode", session_id,
                                   CONVERSE_PIPELINE), 4.0)
     # the activation reply carries the updated session
-    reply = first(recs, f"{PARROT_ID}.activate") or first(recs, "ovos.utterance.handled")
     sess = None
     for m in reversed(recs):
         if m.context.get("session"):
