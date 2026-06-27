@@ -9,7 +9,9 @@ on:
 
 jobs:
   ovoscope:
-    uses: OpenVoiceOS/gh-automations/.github/workflows/ovoscope.yml@fix/ovoscope-local-source-wins
+    # gh-automations #57 (local-source-wins fix) merged to dev 2026-06-27;
+    # its fix/ovoscope-local-source-wins branch was deleted, so pin @dev.
+    uses: OpenVoiceOS/gh-automations/.github/workflows/ovoscope.yml@dev
     secrets: inherit
     with:
       runner: "ubuntu-latest"
