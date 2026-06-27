@@ -42,6 +42,13 @@ LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utte
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value   # ovos.utterance.handled
 SPEC_SPEAK = SpecMessage.SPEAK.value                      # ovos.utterance.speak
 INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value         # ovos.intent.matched (§9.2)
+# OVOS-STOP-1 spec topics — the producer emits these; the bus bridges the 1:1
+# legacy renames (mycroft.stop / skill.stop.pong) transparently per MIGRATION_MAP.
+STOP_BROADCAST = SpecMessage.STOP.value                   # ovos.stop  (was mycroft.stop)
+STOP_PING = SpecMessage.STOP_PING.value                   # ovos.stop.ping (broadcast)
+STOP_PONG = SpecMessage.STOP_PONG.value                   # ovos.stop.pong — spec pong the
+# pipeline subscribes; the producer (ovos-workshop) still emits legacy skill.stop.pong,
+# which the MIGRATION_MAP bridge delivers here (so captured sequences carry the legacy topic).
 
 # The two namespace paths every scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
@@ -111,6 +118,9 @@ class TestGlobalStopVocabulary(TestCase):
                 message,
                 Message("stop.openvoiceos.activate", {}),
                 Message("stop:global", {}),
+                Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast
+                # back-compat: handle_global_stop also emits the legacy mycroft.stop
+                # directly for un-migrated skills (no spec->legacy bridge guaranteed)
                 Message("mycroft.stop", {}),
                 Message(UTTERANCE_HANDLED, {}),
             ]
@@ -150,6 +160,9 @@ class TestGlobalStopVocabulary(TestCase):
                 message,
                 Message("stop.openvoiceos.activate", {}),
                 Message("stop:global", {}),
+                Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast
+                # back-compat: handle_global_stop also emits the legacy mycroft.stop
+                # directly for un-migrated skills (no spec->legacy bridge guaranteed)
                 Message("mycroft.stop", {}),
                 Message(UTTERANCE_HANDLED, {}),
             ]
@@ -209,6 +222,9 @@ class TestGlobalStopVocWithActiveSkill(TestCase):
                 message,
                 Message("stop.openvoiceos.activate", {}),
                 Message("stop:global", {}),
+                Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast
+                # back-compat: handle_global_stop also emits the legacy mycroft.stop
+                # directly for un-migrated skills (no spec->legacy bridge guaranteed)
                 Message("mycroft.stop", {}),
                 Message(UTTERANCE_HANDLED, {}),
             ]
@@ -271,7 +287,13 @@ class TestStopSkillCanHandleFalse(TestCase):
 
         expected = [
             message,
-            Message(f"{self.skill_id}.stop.ping", {"skill_id": self.skill_id}),
+            Message(STOP_PING, {}),  # OVOS-STOP-1 §4.1 broadcast stoppability query
+            Message(f"{self.skill_id}.stop.ping", {"skill_id": self.skill_id}),  # back-compat per-skill ping
+            # OVOS-STOP-1 §4.2: the producer (ovos-workshop) still answers on the
+            # legacy ``skill.stop.pong`` (its migration to ``ovos.stop.pong`` is
+            # deferred), so that is the topic the captured bus carries. The
+            # MIGRATION_MAP bridge still delivers it to the pipeline's
+            # ``ovos.stop.pong`` subscription.
             Message("skill.stop.pong",
                     {"skill_id": self.skill_id, "can_handle": True},
                     {"skill_id": self.skill_id}),
@@ -296,6 +318,9 @@ class TestStopSkillCanHandleFalse(TestCase):
             flip_points=[utt_topic],
             entry_points=[utt_topic],
             keep_original_src=[
+                STOP_PING,  # OVOS-STOP-1 §4.1 broadcast ping is forwarded from the source
+                            # utterance, keeping its original source (directed at skills,
+                            # like the per-skill ping below)
                 f"{self.skill_id}.stop.ping",
                 f"{self.skill_id}.stop",
                 "mycroft.skills.abort_question",
@@ -320,12 +345,24 @@ class TestStopServiceAsSkill(TestCase):
 
     Since StopService now subclasses OVOSAbstractApplication it is registered
     as a skill under skill_id='stop.openvoiceos'.  It therefore:
-      - responds to mycroft.stop with stop.openvoiceos.stop.response
+      - responds to the global stop broadcast with stop.openvoiceos.stop.response
       - emits stop.openvoiceos.activate when the stop pipeline matches
 
-    These messages are already filtered via ignore_messages in other tests;
-    here we explicitly verify their presence.
+    The stop handler now emits the OVOS-STOP-1 §5.3 spec broadcast ``ovos.stop``.
+    The bundled StopService OVOSSkill still subscribes the legacy ``mycroft.stop``
+    (un-migrated; ovos-workshop migrates that to ``ovos.stop`` separately), so this
+    scenario runs with ``emit_legacy=True`` — the bus mirrors the spec broadcast
+    onto the legacy topic the skill listens on, and it replies. Under a pure-spec
+    deployment (``emit_legacy=False``) an un-migrated skill would not hear the
+    broadcast; that is expected migration-window behaviour.
     """
+
+    # emit_legacy=True on both paths so the spec broadcast reaches the un-migrated
+    # StopService skill via the legacy-topic mirror.
+    NAMESPACE_PATHS = {
+        "spec": (False, True, SPEC_UTTERANCE),
+        "legacy": (True, True, LEGACY_UTTERANCE),
+    }
 
     def setUp(self):
         LOG.set_level("DEBUG")
@@ -336,7 +373,7 @@ class TestStopServiceAsSkill(TestCase):
     def _run_stop_service_emits_activate_and_stop_response(self, namespace):
         """After a global stop, stop.openvoiceos.activate and stop.openvoiceos.stop.response
         are both emitted — confirming the service participates in skill lifecycle."""
-        modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
+        modernize, emit_legacy, utt_topic = self.NAMESPACE_PATHS[namespace]
         minicroft = get_minicroft([], modernize=modernize, emit_legacy=emit_legacy)
 
         session = Session("123")
@@ -361,8 +398,14 @@ class TestStopServiceAsSkill(TestCase):
                 message,
                 Message("stop.openvoiceos.activate", {}),
                 Message("stop:global", {}),
+                Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast
+                # StopService as OVOSSkill subscribes the spec stop and replies
+                Message("stop.openvoiceos.stop.response",
+                        {"result": False, "skill_id": "stop.openvoiceos"}),
+                # back-compat: handle_global_stop also emits the legacy mycroft.stop
+                # for un-migrated skills; StopService also still listens there and
+                # replies a second time (idempotent, result False)
                 Message("mycroft.stop", {}),
-                # StopService as OVOSSkill handles mycroft.stop and replies
                 Message("stop.openvoiceos.stop.response",
                         {"result": False, "skill_id": "stop.openvoiceos"}),
                 Message(UTTERANCE_HANDLED, {}),
@@ -372,6 +415,6 @@ class TestStopServiceAsSkill(TestCase):
         minicroft.stop()
 
     def test_stop_service_emits_activate_and_stop_response(self):
-        for namespace in NAMESPACE_PATHS:
+        for namespace in self.NAMESPACE_PATHS:
             with self.subTest(namespace=namespace):
                 self._run_stop_service_emits_activate_and_stop_response(namespace)

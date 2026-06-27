@@ -5,10 +5,11 @@ from typing import Optional, Dict, List, Union
 
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import SessionManager, UtteranceState
+from ovos_bus_client.session import Session, SessionManager, UtteranceState
 
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import ConfidenceMatcherPipeline, IntentHandlerMatch
+from ovos_spec_tools.messages import SpecMessage
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
@@ -28,14 +29,93 @@ class StopService(ConfidenceMatcherPipeline, OVOSAbstractApplication):
                                          resources_dir=f"{dirname(__file__)}")
         config = config or Configuration().get("skills", {}).get("stop") or {}
         ConfidenceMatcherPipeline.__init__(self, config=config, bus=bus)
+        # NOTE (OVOS-STOP-1 §2/§3.1 — intent_name rename DEFERRED): the spec
+        # reserves intent_name exactly ``"stop"``/``"global_stop"``. In the current
+        # IntentHandlerMatch contract ``match_type`` is BOTH the reserved
+        # intent_name AND the dispatch bus topic — IntentService dispatches via
+        # ``message.reply(match.match_type)`` and keys ``session.blacklisted_intents``
+        # on it (service.py). The orchestrator routes these two ``stop:*`` topics to
+        # the handlers below. Renaming match_type to the bare spec names without
+        # losing that dispatch route needs a PIPELINE-1 dispatch-layer change
+        # (separating intent_name from the dispatch topic), so it is deferred.
         self.bus.on("stop:global", self.handle_global_stop)
         self.bus.on("stop:skill", self.handle_skill_stop)
 
+    @staticmethod
+    def _select_stop_target(candidates: List[str],
+                            message: Optional[Message] = None) -> Optional[str]:
+        """OVOS-STOP-1 §4.1 step 4 — single-target recency selection.
+
+        From the positive pong responders in ``candidates``, select the one
+        whose ``active_handlers`` entry has the highest ``activated_at``
+        (OVOS-PIPELINE-1 §7.1 recency record). Selection is driven by the
+        spec ``activated_at`` field, NOT the legacy ``active_skills`` list
+        order. On an ``activated_at`` tie, the entry appearing first in the
+        head-first ``active_handlers`` list (the most recently stamped one)
+        wins.
+
+        Returns the selected ``skill_id``, or ``None`` if no candidate is
+        present in ``active_handlers``.
+        """
+        if not candidates:
+            return None
+        session = SessionManager.get(message)
+        # active_handlers is head-first (index 0 == most recently stamped);
+        # enumerate so a lower index breaks an activated_at tie.
+        best = None  # (activated_at, -index, skill_id)
+        for idx, handler in enumerate(session.active_handlers):
+            skill_id = handler.get("skill_id")
+            if skill_id not in candidates:
+                continue
+            key = (handler.get("activated_at", 0.0), -idx)
+            if best is None or key > best[0]:
+                best = (key, skill_id)
+        if best is not None:
+            return best[1]
+        # Defensive: a candidate that is not represented in active_handlers
+        # (should not happen — §4.1 step 3 filters pongs to active_handlers).
+        return candidates[0]
+
     def handle_global_stop(self, message: Message) -> None:
-        """Emit a global mycroft.stop and mark the utterance handled."""
+        """Emit the global stop broadcast and mark the utterance handled.
+
+        OVOS-STOP-1 §5.3: the global-stop handler emits the spec broadcast
+        ``ovos.stop`` (``SpecMessage.STOP``).
+
+        Back-compat: the MIGRATION_MAP bus bridge only re-delivers ``ovos.stop``
+        on the legacy ``mycroft.stop`` topic when the bridge's legacy direction is
+        enabled, which is NOT guaranteed (it is an opt-in on MessageBusClient and
+        off in the pure-spec path). Skills have NOT migrated their stop handler —
+        ovos-workshop still subscribes ONLY ``mycroft.stop`` — so a spec-only
+        broadcast would silently fail to stop them. We therefore also emit the
+        legacy ``mycroft.stop`` directly until the skill side migrates, mirroring
+        the back-compat per-skill ``{skill_id}.stop.ping`` kept in
+        ``_collect_stop_skills``. The two topics target disjoint subscriber sets
+        (spec vs un-migrated), so this is not a double broadcast to any one skill.
+        """
+        self.bus.emit(message.forward(SpecMessage.STOP))
         self.bus.emit(message.forward("mycroft.stop"))
         # TODO - this needs a confirmation dialog if nothing was stopped
         self.bus.emit(message.forward("ovos.utterance.handled"))
+
+    @staticmethod
+    def _drain_global_stop_session(session) -> "Session":
+        """OVOS-STOP-1 §5.2 — build the fully-cleaned ``updated_session`` for a
+        ``global_stop`` Match.
+
+        The global_stop Match MUST carry a session with:
+
+        - ``active_handlers``  → ``[]``  (§5.2 / §6.2)
+        - ``converse_handlers`` → ``[]`` (§5.2 / §6.2, OVOS-CONVERSE-1 §2.1)
+        - ``response_mode``    → absent  (§5.2 / §6.1)
+
+        All three are cleared atomically at match time so the drained state is
+        committed before dispatch (PIPELINE-1 §4.2).
+        """
+        session.active_handlers = []
+        session.converse_handlers = []
+        session.clear_response_mode()
+        return session
 
     def handle_skill_stop(self, message: Message) -> None:
         """Forward a stop request to the specific skill."""
@@ -120,9 +200,22 @@ class StopService(ConfidenceMatcherPipeline, OVOSAbstractApplication):
                 # all skills answered the ping!
                 event.set()
 
-        self.bus.on("skill.stop.pong", handle_ack)
+        # OVOS-STOP-1 §4.2: subscribe the spec pong topic ``ovos.stop.pong``
+        # (SpecMessage.STOP_PONG). It is a 1:1 rename in MIGRATION_MAP, so the bus
+        # bridge ALSO delivers un-migrated skills' legacy ``skill.stop.pong`` here
+        # — one subscription receives both namespaces.
+        self.bus.on(SpecMessage.STOP_PONG, handle_ack)
         try:
-            # ask skills if they can stop
+            # OVOS-STOP-1 §4.1/§4.2: emit the stoppability query as a single
+            # broadcast ``ovos.stop.ping`` (SpecMessage.STOP_PING). The skill_id is
+            # not part of a broadcast payload; responders self-identify in the pong.
+            self.bus.emit(message.forward(SpecMessage.STOP_PING))
+
+            # Back-compat: the per-skill ``{skill_id}.stop.ping`` is a structural
+            # placeholder the broadcast replaces and which CANNOT be statically
+            # bus-bridged (it has no fixed counterpart topic). Un-migrated skills
+            # still listen only on their per-skill ping, so we keep emitting it
+            # until the skill side (ovos-workshop) has migrated to the broadcast.
             for skill_id in active_skills:
                 self.bus.emit(message.forward(f"{skill_id}.stop.ping",
                                               {"skill_id": skill_id}))
@@ -130,7 +223,7 @@ class StopService(ConfidenceMatcherPipeline, OVOSAbstractApplication):
             # wait for all skills to acknowledge they can stop
             event.wait(timeout=0.5)
         finally:
-            self.bus.remove("skill.stop.pong", handle_ack)
+            self.bus.remove(SpecMessage.STOP_PONG, handle_ack)
         return want_stop or active_skills
 
     def handle_stop_confirmation(self, message: Message) -> None:
@@ -191,20 +284,30 @@ class StopService(ConfidenceMatcherPipeline, OVOSAbstractApplication):
 
         if is_global_stop:
             LOG.info(f"Emitting global stop, {len(self.get_active_skills(message))} active skills")
-            # emit a global stop, full stop anything OVOS is doing
+            # emit a global stop, full stop anything OVOS is doing.
+            # OVOS-STOP-1 §5.2: drain active_handlers + converse_handlers and
+            # clear response_mode in the committed updated_session.
             return IntentHandlerMatch(
                 match_type="stop:global",
                 match_data={"conf": conf},
-                updated_session=sess,
+                updated_session=self._drain_global_stop_session(sess),
                 utterance=utterance,
                 skill_id="stop.openvoiceos"
             )
 
         if is_stop:
-            # check if any skill can stop
-            for skill_id in self._collect_stop_skills(message):
+            # OVOS-STOP-1 §4.1 step 4: from the positive pong responders select
+            # the single most-recently-activated target (highest activated_at in
+            # session.active_handlers), not the legacy active_skills order.
+            skill_id = self._select_stop_target(self._collect_stop_skills(message),
+                                                 message)
+            if skill_id:
                 LOG.debug(f"Telling skill to stop: {skill_id}")
+                # OVOS-STOP-1 §6.1: clear the dispatch target's response_mode and
+                # §6.2: remove only that target from active_handlers, via the
+                # committed updated_session.
                 sess.disable_response_mode(skill_id)
+                sess.remove_active_handler(skill_id)
                 self.bus.once(f"{skill_id}.stop.response", self.handle_stop_confirmation)
                 return IntentHandlerMatch(
                     match_type="stop:skill",
@@ -286,10 +389,16 @@ class StopService(ConfidenceMatcherPipeline, OVOSAbstractApplication):
         if conf < self.config.get("min_conf", 0.5):
             return None
 
-        # check if any skill can stop
-        for skill_id in self._collect_stop_skills(message):
+        # OVOS-STOP-1 §4.1 step 4: select the single most-recently-activated
+        # positive pong responder as the stop target.
+        skill_id = self._select_stop_target(self._collect_stop_skills(message),
+                                            message)
+        if skill_id:
             LOG.debug(f"Telling skill to stop: {skill_id}")
+            # OVOS-STOP-1 §6.1 (clear target response_mode) + §6.2 (remove only
+            # the target from active_handlers) via the committed updated_session.
             sess.disable_response_mode(skill_id)
+            sess.remove_active_handler(skill_id)
             self.bus.once(f"{skill_id}.stop.response", self.handle_stop_confirmation)
             return IntentHandlerMatch(
                 match_type="stop:skill",
@@ -299,12 +408,14 @@ class StopService(ConfidenceMatcherPipeline, OVOSAbstractApplication):
                 skill_id="stop.openvoiceos"
             )
 
-        # emit a global stop, full stop anything OVOS is doing
+        # emit a global stop, full stop anything OVOS is doing.
+        # OVOS-STOP-1 §5.2: drain active_handlers + converse_handlers and clear
+        # response_mode in the committed updated_session.
         LOG.debug(f"Emitting global stop signal, {len(self.get_active_skills(message))} active skills")
         return IntentHandlerMatch(
             match_type="stop:global",
             match_data={"conf": conf},
-            updated_session=sess,
+            updated_session=self._drain_global_stop_session(sess),
             utterance=utterance,
             skill_id="stop.openvoiceos"
         )
