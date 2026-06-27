@@ -98,7 +98,7 @@ class FallbackService(ConfidenceMatcherPipeline):
         # filter skills outside the fallback_range
         in_range = [s for s, p in self.registered_fallbacks.items()
                     if fb_range.start < p <= fb_range.stop
-                    and s not in sess.blacklisted_skills]
+                    and s not in (sess.blacklisted_skills or [])]
         skill_ids += [s for s in self.registered_fallbacks if s not in in_range]
 
         def handle_ack(msg):
@@ -159,7 +159,7 @@ class FallbackService(ConfidenceMatcherPipeline):
         sorted_handlers = sorted(fallbacks, key=operator.itemgetter(1))
 
         for skill_id, prio in sorted_handlers:
-            if skill_id in sess.blacklisted_skills:
+            if skill_id in (sess.blacklisted_skills or []):
                 LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{sess.session_id}'")
                 continue
 

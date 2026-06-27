@@ -85,7 +85,7 @@ class StopService(ConfidenceMatcherPipeline, OVOSAbstractApplication):
         skill_ids = []
 
         active_skills = [s for s in self.get_active_skills(message)
-                         if s not in sess.blacklisted_skills]
+                         if s not in (sess.blacklisted_skills or [])]
 
         if not active_skills:
             return want_stop
