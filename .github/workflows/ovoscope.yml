@@ -9,7 +9,7 @@ on:
 
 jobs:
   ovoscope:
-    uses: OpenVoiceOS/gh-automations/.github/workflows/ovoscope.yml@dev
+    uses: OpenVoiceOS/gh-automations/.github/workflows/ovoscope.yml@fix/ovoscope-local-source-wins
     secrets: inherit
     with:
       runner: "ubuntu-latest"
