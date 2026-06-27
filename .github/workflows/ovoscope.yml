@@ -26,7 +26,10 @@ jobs:
       #   - ovos-bus-client #234   (Session spec fields)
       #   - ovos-workshop  #431    (INTENT-4 registration producer, 9.x)
       #   - adapt / padatious      (workshop-decoupled pipeline plugins, workshop<10)
-      pre_install_pip: "--force-reinstall git+https://github.com/OpenVoiceOS/ovos-bus-client@feat/session-spec-fields git+https://github.com/OpenVoiceOS/ovos-workshop@feat/intent-4-producer git+https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin@fix/allow-ovos-workshop-9 git+https://github.com/OpenVoiceOS/ovos-padatious-pipeline-plugin@fix/allow-ovos-workshop-9"
+      # ovos-spec-tools@dev (0.16.0a1) adds Session.fallback_handlers (OVOS-FALLBACK-1
+      # §4) which bus-client #234 forwards to super().__init__; published 0.14.0a1
+      # lacks it and crashes at import (TypeError: unexpected kwarg 'fallback_handlers').
+      pre_install_pip: "--force-reinstall git+https://github.com/OpenVoiceOS/ovos-spec-tools@dev#egg=ovos-spec-tools[langcodes] git+https://github.com/OpenVoiceOS/ovos-bus-client@feat/session-spec-fields git+https://github.com/OpenVoiceOS/ovos-workshop@feat/intent-4-producer git+https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin@fix/allow-ovos-workshop-9 git+https://github.com/OpenVoiceOS/ovos-padatious-pipeline-plugin@fix/allow-ovos-workshop-9"
       bus_coverage: true
       bus_coverage_include: ""
       bus_coverage_exclude: "^Thread-|^intents$|^skills$|^__core__$"
