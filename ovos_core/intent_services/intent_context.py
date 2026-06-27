@@ -11,22 +11,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Core-resident implementation of OVOS-CONTEXT-1 — intent context.
+"""Core-resident helpers for OVOS-CONTEXT-1 — intent context.
 
 OVOS-CONTEXT-1 replaces the legacy frame-based ``IntentContextManager``
 (``ovos_bus_client.session.IntentContextManager``) with a **flat,
 decaying key/value map** stored at ``session.intent_context`` (§2).
 
-This module is the orchestrator-resident half of the spec. It owns:
+The authoritative owner of that map is the ``SessionManager`` singleton
+(``ovos_bus_client.session.SessionManager``): it carries
+``intent_context`` as a first-class, round-tripping field on every
+``Session`` and applies the §5.3 ``ovos.session.sync`` entry-by-entry
+merge (set + null-delete) itself — see ``SessionManager.handle_session_sync``
+/ ``SessionManager.merge_intent_context`` (bus-client #239). The
+orchestrator does **not** subscribe to ``ovos.session.sync`` and does
+**not** hold a parallel store.
 
-- the entry shape and the *liveness* predicate (§2);
-- the prune-then-decrement decay lifecycle (§4);
-- the ``ovos.session.sync`` entry-by-entry merge (§5.3);
+This module is therefore a set of **stateless helpers** the orchestrator
+(and any in-process engine) applies to a session's ``intent_context``
+map. It owns no state; every function takes the map (or an entry) as an
+argument and returns a value or mutates the passed-in dict in place:
+
+- the entry-shape *liveness* predicate (§2);
+- the prune-then-decrement decay lifecycle (§4 / §4.1);
+- the §2 live-entry cap eviction;
 - the §3.1 scope-resolution helper that maps a gating declaration to a
   stored key, the §6 / §6.1 gating predicates, and the §7
-  context-supplied slot fill — provided here as pure functions so any
-  in-process engine (and core's own match post-processing) can apply
-  them identically.
+  context-supplied slot fill.
 
 The *engine-side* enforcement of §6 / §6.1 gating inside a matcher (e.g.
 the Adapt matcher dropping a candidate whose ``requires_context`` is
@@ -34,23 +44,15 @@ unsatisfied) is **out of scope for this module** — it belongs to each
 pipeline plugin and is tracked as a follow-up. What lives here is the
 shared, engine-agnostic vocabulary those plugins (and the orchestrator)
 consult.
-
-Storage note: ``session.intent_context`` is a plain JSON object carried
-inside the OVOS-SESSION-1 carrier (``Message.context.session``). The
-legacy ``ovos_bus_client.session.Session`` object does not yet expose it
-as a first-class attribute and drops it on round-trip, so the
-orchestrator maintains the working map keyed by ``session_id`` and
-stamps it back onto the serialized session it emits. See
-``IntentContextStore`` and the wiring in ``service.py``.
 """
 import time
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
 from ovos_utils.log import LOG
 
-#: OVOS-CONTEXT-1 §2 — the JSON path, inside the session carrier, that
-#: holds the flat intent-context map. Stamped onto / read from the
-#: serialized session dict (``message.context["session"][_FIELD]``).
+#: OVOS-CONTEXT-1 §2 — the JSON field, inside the session carrier, that
+#: holds the flat intent-context map. First-class on ``Session`` in
+#: bus-client (round-trips through serialize/deserialize).
 INTENT_CONTEXT_FIELD = "intent_context"
 
 #: OVOS-CONTEXT-1 §2 / OVOS-MSG-1 §2.1.1 — the single load-bearing
@@ -232,147 +234,89 @@ def context_supplied_slots(intent_context: Dict[str, Any],
     return supplied
 
 
-class IntentContextStore:
-    """Orchestrator-resident store of ``session.intent_context`` maps.
+# ---------------------------------------------------------------------------
+# §4 — decay lifecycle (stateless; operates on a passed-in intent_context map)
+# ---------------------------------------------------------------------------
 
-    Holds the authoritative flat context map for each session, applies
-    the §4 decay lifecycle (prune before a match round, decrement after),
-    and the §5.3 ``ovos.session.sync`` entry-by-entry merge.
+def prune(intent_context: Dict[str, Any],
+          now: Optional[float] = None) -> Dict[str, Any]:
+    """OVOS-CONTEXT-1 §4 (pre-match) — remove every non-live entry from
+    the given map, in place.
 
-    The legacy ``ovos_bus_client.session.Session`` object does not carry
-    ``intent_context`` and drops it on (de)serialization, so the
-    orchestrator is the source of truth: it reads the inbound snapshot
-    off the wire, reconciles it with what it already holds, and stamps
-    the working map back onto the serialized session it emits.
+    This is the gating snapshot every matcher sees during the upcoming
+    match round.
+
+    @param intent_context: the session's flat ``intent_context`` map
+        (mutated in place).
+    @param now: current Unix time; defaults to ``time.time()``.
+    @return: the same (pruned) map.
     """
+    if not intent_context:
+        return intent_context
+    now = time.time() if now is None else now
+    dead = [k for k, e in intent_context.items() if not is_live(e, now)]
+    for k in dead:
+        intent_context.pop(k, None)
+    return intent_context
 
-    def __init__(self, max_entries: int = DEFAULT_MAX_ENTRIES):
-        # session_id -> {key: entry}
-        self._maps: Dict[str, Dict[str, Any]] = {}
-        self.max_entries = max_entries
 
-    def get(self, session_id: str) -> Dict[str, Any]:
-        """Return the (mutable) working map for a session, creating it
-        empty if absent."""
-        return self._maps.setdefault(session_id, {})
+def decrement(intent_context: Dict[str, Any],
+              only_keys: Optional[Set[str]] = None) -> Dict[str, Any]:
+    """OVOS-CONTEXT-1 §4 (post-match) — decrement ``turns_remaining`` on
+    every remaining entry that sets it, whether or not any intent
+    matched.
 
-    def set(self, session_id: str, intent_context: Dict[str, Any]) -> None:
-        """Replace the working map for a session wholesale.
+    Per §4.1, an entry written by an ``ovos.session.sync`` emitted
+    **mid-dispatch** must not be decremented by the dispatch it was
+    written in. The orchestrator captures the key set present at the
+    pre-match prune and passes it as ``only_keys`` so freshly-synced keys
+    are skipped, landing alive for exactly the next match round.
 
-        Used when adopting an inbound snapshot for an unseen session
-        (the carrier is replayable, OVOS-CONTEXT-1 §9).
-        """
-        self._maps[session_id] = dict(intent_context or {})
+    @param intent_context: the session's flat ``intent_context`` map
+        (mutated in place).
+    @param only_keys: if given, decrement only entries whose key is in
+        this set (the snapshot present before the match round).
+    @return: the same map.
+    """
+    if not intent_context:
+        return intent_context
+    for key, entry in intent_context.items():
+        if only_keys is not None and key not in only_keys:
+            continue  # §4.1 — mid-dispatch sync entry, not decremented
+        if not isinstance(entry, dict):
+            continue
+        turns = entry.get("turns_remaining")
+        if turns is not None:
+            entry["turns_remaining"] = turns - 1
+    return intent_context
 
-    def adopt_inbound(self, session_id: str,
-                      inbound: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        """Reconcile a wire-carried ``intent_context`` snapshot for a
-        session the orchestrator has not seen before.
 
-        On ordinary Messages ``session.intent_context`` is **read-only**
-        (§8): the orchestrator keeps its own working copy. But sessions
-        are replayable carriers (§9) — when an utterance arrives for a
-        session id we hold no map for, the inbound snapshot is the only
-        state available, so we adopt it. For a session we already track,
-        the inbound snapshot is ignored (the §5 pathways are the only
-        writers).
+def enforce_cap(intent_context: Dict[str, Any],
+                max_entries: int = DEFAULT_MAX_ENTRIES,
+                now: Optional[float] = None) -> Dict[str, Any]:
+    """OVOS-CONTEXT-1 §2 — bound the live entry count of the given map,
+    evicting the entry closest to natural expiry when exceeded (smallest
+    ``turns_remaining``, then earliest ``expires_at``, then arbitrary).
 
-        @return: the working map for the session.
-        """
-        if session_id not in self._maps:
-            self._maps[session_id] = dict(inbound or {})
-        return self._maps[session_id]
+    @param intent_context: the session's flat ``intent_context`` map
+        (mutated in place).
+    @param max_entries: the recommended live-entry ceiling.
+    @param now: current Unix time; defaults to ``time.time()`` (unused for
+        ranking but accepted for call-site symmetry).
+    @return: the same map.
+    """
+    if not intent_context or len(intent_context) <= max_entries:
+        return intent_context
 
-    def prune(self, session_id: str, now: Optional[float] = None) -> Dict[str, Any]:
-        """OVOS-CONTEXT-1 §4 (pre-match) — remove every non-live entry.
+    def _expiry_rank(item):
+        _, entry = item
+        turns = entry.get("turns_remaining") if isinstance(entry, dict) else None
+        expires = entry.get("expires_at") if isinstance(entry, dict) else None
+        # entries with neither sort last (least eligible for eviction)
+        return (turns if turns is not None else float("inf"),
+                expires if expires is not None else float("inf"))
 
-        This is the gating snapshot every matcher sees during the
-        upcoming match round.
-
-        @return: the pruned working map.
-        """
-        now = time.time() if now is None else now
-        ctx = self.get(session_id)
-        dead = [k for k, e in ctx.items() if not is_live(e, now)]
-        for k in dead:
-            ctx.pop(k, None)
-        return ctx
-
-    def decrement(self, session_id: str,
-                  only_keys: Optional[set] = None) -> Dict[str, Any]:
-        """OVOS-CONTEXT-1 §4 (post-match) — decrement ``turns_remaining``
-        on every remaining entry that sets it, whether or not any intent
-        matched.
-
-        Per §4.1, an entry written by an ``ovos.session.sync`` emitted
-        **mid-dispatch** must not be decremented by the dispatch it was
-        written in. The orchestrator captures the key set present at the
-        pre-match prune and passes it as ``only_keys`` so freshly-synced
-        keys are skipped, landing alive for exactly the next match round.
-
-        @param only_keys: if given, decrement only entries whose key is in
-            this set (the snapshot present before the match round).
-        @return: the working map.
-        """
-        ctx = self.get(session_id)
-        for key, entry in ctx.items():
-            if only_keys is not None and key not in only_keys:
-                continue  # §4.1 — mid-dispatch sync entry, not decremented
-            turns = entry.get("turns_remaining")
-            if turns is not None:
-                entry["turns_remaining"] = turns - 1
-        return ctx
-
-    def merge_sync(self, session_id: str,
-                   payload: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        """OVOS-CONTEXT-1 §5.3 — apply an ``ovos.session.sync``
-        ``intent_context`` payload **entry-by-entry**:
-
-        - a key mapping to an entry object **sets or replaces** that key;
-        - a key mapping to JSON ``null`` **removes** that key;
-        - keys absent from the payload are left unchanged.
-
-        Concurrent handlers writing disjoint keys therefore do not
-        overwrite each other.
-
-        @return: the merged working map.
-        """
-        ctx = self.get(session_id)
-        if not payload:
-            return ctx
-        for key, entry in payload.items():
-            if entry is None:
-                ctx.pop(key, None)
-            elif isinstance(entry, dict):
-                ctx[key] = entry
-            else:
-                LOG.warning(f"ignoring malformed intent_context entry "
-                            f"for key '{key}': {entry!r}")
-        self._enforce_cap(session_id)
-        return ctx
-
-    def _enforce_cap(self, session_id: str, now: Optional[float] = None) -> None:
-        """OVOS-CONTEXT-1 §2 — bound the live entry count, evicting the
-        entry closest to natural expiry when exceeded (smallest
-        ``turns_remaining``, then earliest ``expires_at``, then
-        arbitrary)."""
-        ctx = self.get(session_id)
-        if len(ctx) <= self.max_entries:
-            return
-        now = time.time() if now is None else now
-
-        def _expiry_rank(item):
-            _, entry = item
-            turns = entry.get("turns_remaining")
-            expires = entry.get("expires_at")
-            # entries with neither sort last (least eligible for eviction)
-            return (turns if turns is not None else float("inf"),
-                    expires if expires is not None else float("inf"))
-
-        while len(ctx) > self.max_entries:
-            victim = min(ctx.items(), key=_expiry_rank)[0]
-            ctx.pop(victim, None)
-
-    def discard(self, session_id: str) -> None:
-        """Drop the working map for a session (e.g. on reset)."""
-        self._maps.pop(session_id, None)
+    while len(intent_context) > max_entries:
+        victim = min(intent_context.items(), key=_expiry_rank)[0]
+        intent_context.pop(victim, None)
+    return intent_context

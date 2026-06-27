@@ -37,15 +37,11 @@ from ovos_plugin_manager.pipeline import OVOSPipelineFactory
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
 
 from ovos_core.intent_services.intent_context import (
-    IntentContextStore,
-    INTENT_CONTEXT_FIELD,
+    context_supplied_slots,
+    prune as prune_intent_context,
+    decrement as decrement_intent_context,
+    enforce_cap as enforce_intent_context_cap,
 )
-
-#: OVOS-SESSION-2 §2.7 / OVOS-CONTEXT-1 §5.3 — the bus topic skills emit
-#: to add, update, or remove ``session.intent_context`` entries. Defined
-#: as a literal here (its registration as a ``SpecMessage`` member is an
-#: OVOS-SESSION-2 / ovos-spec-tools follow-up, not a CONTEXT-1 concern).
-SESSION_SYNC = "ovos.session.sync"
 
 
 # Module-level constants for pipeline matcher migration and optimization
@@ -143,20 +139,19 @@ class IntentService:
 
         self.bus.on(SpecMessage.UTTERANCE, self.handle_utterance)
 
-        # OVOS-CONTEXT-1 — orchestrator-resident store of the flat
-        # decaying ``session.intent_context`` map (§2). The orchestrator
-        # owns this state: it prunes/decrements it each turn (§4), merges
-        # ``ovos.session.sync`` payloads into it (§5.3), and stamps it
-        # onto the serialized session it emits. Lazily-backed via the
-        # ``intent_context`` property so partial constructions stay safe.
-        self._intent_context = IntentContextStore()
+        # OVOS-CONTEXT-1 — the flat, decaying ``session.intent_context``
+        # map (§2) is owned by the ``SessionManager`` singleton: it carries
+        # the field first-class on every Session and applies the §5.3
+        # ``ovos.session.sync`` entry-by-entry merge itself (bus-client
+        # #239, ``SessionManager.handle_session_sync``). The orchestrator
+        # does NOT subscribe to ``ovos.session.sync`` and holds no parallel
+        # store — it only applies the §4 decay lifecycle around each match
+        # round on the session's own map (see ``handle_utterance``).
 
         # Context related handlers
         self.bus.on('add_context', self.handle_add_context)
         self.bus.on('remove_context', self.handle_remove_context)
         self.bus.on('clear_context', self.handle_clear_context)
-        # OVOS-CONTEXT-1 §5.3 — entry-by-entry intent_context merge
-        self.bus.on(SESSION_SYNC, self.handle_session_sync)
 
         # Intents API
         self.bus.on('intent.service.intent.get', self.handle_get_intent)
@@ -169,20 +164,6 @@ class IntentService:
         self.status.set_alive()
         if preload_pipelines:
             self.bus.emit(Message('intent.service.pipelines.reload'))
-
-    @property
-    def intent_context(self) -> IntentContextStore:
-        """OVOS-CONTEXT-1 — the orchestrator's intent_context store,
-        lazily created so partial constructions (e.g. ``__new__`` in
-        tests, or subclasses skipping ``__init__``) remain safe."""
-        store = getattr(self, "_intent_context", None)
-        if store is None:
-            store = self._intent_context = IntentContextStore()
-        return store
-
-    @intent_context.setter
-    def intent_context(self, value: IntentContextStore) -> None:
-        self._intent_context = value
 
     def handle_reload_pipelines(self, message: Message):
         pipeline_plugins = OVOSPipelineFactory.get_installed_pipeline_ids()
@@ -385,11 +366,17 @@ class IntentService:
 
             # OVOS-CONTEXT-1 §5.1 — a pipeline plugin MAY promote captures
             # to context by returning an updated intent_context map on its
-            # Match. We apply it before the dispatch is emitted so it is
-            # live as a gate for the very next utterance.
+            # Match. We merge it (entry-by-entry, §5.3 semantics) onto the
+            # session's own map via the SessionManager singleton, before
+            # the dispatch is emitted, so it is live as a gate for the very
+            # next utterance.
             promoted = getattr(match, "intent_context", None)
             if promoted:
-                self.intent_context.merge_sync(sess.session_id, promoted)
+                merged = SessionManager.merge_intent_context(
+                    dict(sess.intent_context or {}), promoted)
+                enforce_intent_context_cap(merged)
+                sess.intent_context = merged or None
+                SessionManager.update(sess)
 
             # OVOS-CONTEXT-1 §7 — context-supplied slot fill. When the
             # matched intent declares a requires_context key that also
@@ -397,9 +384,9 @@ class IntentService:
             # live entry's value (utterance-produced values always win).
             self._apply_context_slots(match, sess, reply)
 
-            # update Session if modified by pipeline; stamp the working
-            # intent_context so the post-decay snapshot rides forward
-            reply.context["session"] = self._stamp_intent_context(sess)
+            # update Session if modified by pipeline; the intent_context
+            # map round-trips on the Session itself (bus-client #239)
+            reply.context["session"] = sess.serialize()
 
             # stamp the matching plugin's identity on the dispatch (§3.1, §7.1)
             if pipeline_id:
@@ -531,17 +518,19 @@ class IntentService:
         # get session
         sess = self._validate_session(message, lang)
 
-        # OVOS-CONTEXT-1 §4 (pre-match) — adopt any wire-carried snapshot
-        # for a session we don't yet track (replayable carriers, §9),
-        # then prune every dead entry so every matcher in this round sees
-        # the same post-decay gating snapshot.
-        inbound_ctx = (message.context.get("session") or {}).get(INTENT_CONTEXT_FIELD)
-        self.intent_context.adopt_inbound(sess.session_id, inbound_ctx)
-        pre_match_ctx = self.intent_context.prune(sess.session_id)
+        # OVOS-CONTEXT-1 §4 (pre-match) — the session carries its own flat
+        # ``intent_context`` map (owned by SessionManager, bus-client #239).
+        # Prune every dead entry so every matcher in this round sees the
+        # same post-decay gating snapshot, then write the pruned map back
+        # via the singleton so it stays authoritative.
+        intent_ctx = dict(sess.intent_context or {})
+        prune_intent_context(intent_ctx)
         # snapshot of keys present before the match round; entries synced
         # in mid-dispatch (§4.1) are excluded from the post-match decrement
-        pre_match_keys = set(pre_match_ctx.keys())
-        message.context["session"] = self._stamp_intent_context(sess)
+        pre_match_keys = set(intent_ctx.keys())
+        sess.intent_context = intent_ctx or None
+        SessionManager.update(sess)
+        message.context["session"] = sess.serialize()
 
         # match
         match = None
@@ -598,9 +587,15 @@ class IntentService:
         # every surviving entry, whether or not any intent matched. This
         # runs over the entries present at match time; entries written by
         # an ``ovos.session.sync`` emitted mid-dispatch (§4.1) are merged
-        # into the store by handle_session_sync and are *not* decremented
-        # here, landing alive for exactly the next match round.
-        self.intent_context.decrement(sess.session_id, only_keys=pre_match_keys)
+        # onto the managed session by ``SessionManager.handle_session_sync``
+        # and are *not* decremented here (``only_keys`` skips them), landing
+        # alive for exactly the next match round. We re-read the authoritative
+        # session so any such mid-dispatch merge is reflected.
+        sess = SessionManager.sessions.get(sess.session_id, sess)
+        post_ctx = dict(sess.intent_context or {})
+        decrement_intent_context(post_ctx, only_keys=pre_match_keys)
+        sess.intent_context = post_ctx or None
+        SessionManager.update(sess)
 
         # sync any changes made to the default session, eg by ConverseService
         if sess.session_id == "default":
@@ -653,10 +648,8 @@ class IntentService:
         slot_names = getattr(match, "slot_names", None)
         if not requires or not slot_names:
             return
-        from ovos_core.intent_services.intent_context import context_supplied_slots
-        ctx = self.intent_context.get(sess.session_id)
         supplied = context_supplied_slots(
-            intent_context=ctx,
+            intent_context=sess.intent_context or {},
             requires=requires,
             slot_names=slot_names,
             owner_id=match.skill_id,
@@ -666,40 +659,6 @@ class IntentService:
             reply.data[key] = value
         if supplied:
             LOG.debug(f"context-supplied slots (§7): {supplied}")
-
-    def _stamp_intent_context(self, sess) -> dict:
-        """Serialize a session and stamp the orchestrator's working
-        ``intent_context`` map onto it (OVOS-CONTEXT-1 §2 / §8).
-
-        The legacy ``Session`` object does not carry ``intent_context``,
-        so the orchestrator — the field's authority — writes its working
-        copy onto every serialized session it emits, ensuring the
-        post-decay snapshot rides forward on the wire to each matcher.
-
-        @param sess: the bus-client Session being emitted.
-        @return: the serialized session dict including ``intent_context``.
-        """
-        data = sess.serialize()
-        ctx = self.intent_context.get(sess.session_id)
-        if ctx:
-            data[INTENT_CONTEXT_FIELD] = ctx
-        return data
-
-    def handle_session_sync(self, message: Message):
-        """OVOS-CONTEXT-1 §5.3 — apply an ``ovos.session.sync`` payload's
-        ``intent_context`` entry-by-entry into the working map.
-
-        Present entry objects set or replace the keyed entry; ``null``
-        entries delete the key; absent keys are unchanged. This is the
-        only mutation pathway available to skill handlers (§5.3 / §8).
-        """
-        sess = SessionManager.get(message)
-        payload = (message.data.get("session") or {}).get(INTENT_CONTEXT_FIELD)
-        if payload is None:
-            return
-        self.intent_context.merge_sync(sess.session_id, payload)
-        LOG.debug(f"merged intent_context sync for session "
-                  f"'{sess.session_id}': {list(payload.keys())}")
 
     @staticmethod
     def handle_add_context(message: Message):
@@ -812,7 +771,6 @@ class IntentService:
         self.bus.remove('add_context', self.handle_add_context)
         self.bus.remove('remove_context', self.handle_remove_context)
         self.bus.remove('clear_context', self.handle_clear_context)
-        self.bus.remove(SESSION_SYNC, self.handle_session_sync)
         self.bus.remove('intent.service.intent.get', self.handle_get_intent)
 
         self.status.set_stopping()
