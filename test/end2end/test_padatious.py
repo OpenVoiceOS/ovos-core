@@ -27,6 +27,9 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)
 SPEC_SPEAK = SpecMessage.SPEAK.value
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
+# PIPELINE-1 §8 handler-lifecycle trio, emitted by the orchestrator (core).
+HANDLER_START = SpecMessage.INTENT_HANDLER_START.value
+HANDLER_COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value
 
 NAMESPACE_PATHS = {
     "spec": (False, False, SPEC_UTTERANCE),
@@ -71,6 +74,11 @@ class TestPadatiousIntent(TestCase):
                 Message(f"{self.skill_id}.activate",
                         data={},
                         context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §8.1: orchestrator start before dispatch
+                Message(HANDLER_START,
+                        data={"skill_id": self.skill_id,
+                              "intent_name": "Greetings.intent"},
+                        context={"skill_id": self.skill_id}),
                 Message(f"{self.skill_id}:Greetings.intent",
                         data={"utterance": "good morning", "lang": session.lang},
                         context={"skill_id": self.skill_id}),
@@ -87,6 +95,11 @@ class TestPadatiousIntent(TestCase):
                         context={"skill_id": self.skill_id}),
                 Message("mycroft.skill.handler.complete",
                         data={"name": "HelloWorldSkill.handle_greetings"},
+                        context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §8.1: orchestrator complete before the end-marker
+                Message(HANDLER_COMPLETE,
+                        data={"skill_id": self.skill_id,
+                              "intent_name": "Greetings.intent"},
                         context={"skill_id": self.skill_id}),
                 Message(UTTERANCE_HANDLED,
                         data={},

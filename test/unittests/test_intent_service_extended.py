@@ -26,6 +26,7 @@ from ovos_utils.fakebus import FakeBus
 from ovos_spec_tools import SpecMessage
 
 from ovos_core.intent_services.service import IntentService
+from ovos_core.intent_services.dispatcher import IntentDispatcher
 
 
 def _make_service(config=None) -> IntentService:
@@ -36,6 +37,8 @@ def _make_service(config=None) -> IntentService:
     svc.config = config or {}
     svc.pipeline_plugins = {}
     svc._deactivations = defaultdict(list)
+    # PIPELINE-1 §7/§8 dispatcher; timer disabled so unit tests stay deterministic
+    svc.intent_dispatcher = IntentDispatcher(bus, timeout=0)
 
     # Minimal stub objects for transformer services
     ut = MagicMock()

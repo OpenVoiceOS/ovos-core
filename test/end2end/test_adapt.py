@@ -27,6 +27,11 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)
 SPEC_SPEAK = SpecMessage.SPEAK.value
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
+# PIPELINE-1 §8 handler-lifecycle trio, emitted by the orchestrator (core)
+# wrapping the dispatch: start before, complete on the framework done-signal. The
+# skill's own ovos.utterance.handled (§9.5) is untouched by this change.
+HANDLER_START = SpecMessage.INTENT_HANDLER_START.value
+HANDLER_COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value
 
 NAMESPACE_PATHS = {
     "spec": (False, False, SPEC_UTTERANCE),
@@ -71,6 +76,11 @@ class TestAdaptIntent(TestCase):
                 Message(f"{self.skill_id}.activate",
                         data={},
                         context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §8.1: orchestrator emits start immediately before dispatch
+                Message(HANDLER_START,
+                        data={"skill_id": self.skill_id,
+                              "intent_name": "HelloWorldIntent"},
+                        context={"skill_id": self.skill_id}),
                 Message(f"{self.skill_id}:HelloWorldIntent",
                         data={"utterance": "hello world", "lang": session.lang},
                         context={"skill_id": self.skill_id}),
@@ -88,6 +98,12 @@ class TestAdaptIntent(TestCase):
                         context={"skill_id": self.skill_id}),
                 Message("mycroft.skill.handler.complete",
                         data={"name": "HelloWorldSkill.handle_hello_world_intent"},
+                        context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §8.1: orchestrator emits complete on the handler's
+                # completion, before the end-marker (spec ordering §6.1).
+                Message(HANDLER_COMPLETE,
+                        data={"skill_id": self.skill_id,
+                              "intent_name": "HelloWorldIntent"},
                         context={"skill_id": self.skill_id}),
                 Message(UTTERANCE_HANDLED,
                         data={},

@@ -41,6 +41,8 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value              # ovos.utterance.handl
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utterance
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value   # ovos.utterance.handled
 SPEC_SPEAK = SpecMessage.SPEAK.value                      # ovos.utterance.speak
+# PIPELINE-1 §8 handler-lifecycle trio, emitted by the orchestrator (core).
+HANDLER_COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value
 
 # The two namespace paths every scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
@@ -279,6 +281,14 @@ class TestStopSkillCanHandleFalse(TestCase):
                     {"skill_id": self.skill_id}),
             Message("mycroft.skill.handler.complete",
                     {"name": "CountSkill.handle_how_are_you_intent"},
+                    {"skill_id": self.skill_id}),
+            # PIPELINE-1 §8.1: orchestrator completes the (pre-capture) count
+            # dispatch when it observes the count handler's completion (the
+            # in-flight count_to_N.intent dispatch resolves here). The matching
+            # start fired before capture began.
+            Message(HANDLER_COMPLETE,
+                    {"skill_id": self.skill_id,
+                     "intent_name": "count_to_N.intent"},
                     {"skill_id": self.skill_id}),
             Message(UTTERANCE_HANDLED,
                     {"name": "CountSkill.handle_how_are_you_intent"},

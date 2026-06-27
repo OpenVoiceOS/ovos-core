@@ -29,6 +29,9 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value              # ovos.utterance.handl
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utterance
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value   # ovos.utterance.handled
 SPEC_SPEAK = SpecMessage.SPEAK.value                      # ovos.utterance.speak
+# PIPELINE-1 §8 handler-lifecycle trio, emitted by the orchestrator (core).
+HANDLER_START = SpecMessage.INTENT_HANDLER_START.value
+HANDLER_COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value
 
 # The two namespace paths every scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
@@ -205,6 +208,10 @@ class TestCountSkills(TestCase):
             activate_skill = [
                 message,
                 Message(f"{self.skill_id}.activate", {}),  # skill is activated
+                # PIPELINE-1 §8.1: orchestrator start before dispatch
+                Message(HANDLER_START,
+                        {"skill_id": self.skill_id,
+                         "intent_name": "count_to_N.intent"}),
                 Message(f"{self.skill_id}:count_to_N.intent", {}),  # intent triggers
 
                 Message("mycroft.skill.handler.start", {
@@ -214,6 +221,10 @@ class TestCountSkills(TestCase):
                 Message("mycroft.skill.handler.complete", {
                     "name": "CountSkill.handle_how_are_you_intent"
                 }),
+                # PIPELINE-1 §8.1: orchestrator complete before the end-marker
+                Message(HANDLER_COMPLETE,
+                        {"skill_id": self.skill_id,
+                         "intent_name": "count_to_N.intent"}),
 
                 Message(UTTERANCE_HANDLED, {})
             ]

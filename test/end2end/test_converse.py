@@ -25,6 +25,9 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)
 SPEC_SPEAK = SpecMessage.SPEAK.value
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
+# PIPELINE-1 §8 handler-lifecycle trio, emitted by the orchestrator (core).
+HANDLER_START = SpecMessage.INTENT_HANDLER_START.value
+HANDLER_COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value
 
 # key -> (modernize, emit_legacy, utterance_topic)
 NAMESPACE_PATHS = {
@@ -72,6 +75,11 @@ class TestConverse(TestCase):
             Message(f"{self.skill_id}.activate",
                     data={},
                     context={"skill_id": self.skill_id}),
+            # PIPELINE-1 §8.1: orchestrator start before dispatch
+            Message(HANDLER_START,
+                    data={"skill_id": self.skill_id,
+                          "intent_name": "start_parrot.intent"},
+                    context={"skill_id": self.skill_id}),
             Message(f"{self.skill_id}:start_parrot.intent",
                     data={"utterance": "start parrot mode", "lang": session.lang},
                     context={"skill_id": self.skill_id}),
@@ -89,6 +97,11 @@ class TestConverse(TestCase):
             Message("mycroft.skill.handler.complete",
                     data={"name": "ParrotSkill.handle_start_parrot_intent"},
                     context={"skill_id": self.skill_id}),
+            # PIPELINE-1 §8.1: orchestrator complete before the end-marker
+            Message(HANDLER_COMPLETE,
+                    data={"skill_id": self.skill_id,
+                          "intent_name": "start_parrot.intent"},
+                    context={"skill_id": self.skill_id}),
             Message(UTTERANCE_HANDLED,
                     data={},
                     context={"skill_id": self.skill_id}),
@@ -103,6 +116,11 @@ class TestConverse(TestCase):
                     context={"skill_id": self.skill_id}),
             Message(f"{self.skill_id}.activate",
                     data={},
+                    context={"skill_id": self.skill_id}),
+            # PIPELINE-1 §7.0/§8.1: a converse dispatch is a dispatch -> orchestrator
+            # emits start before it (intent_name is the reserved name "skill").
+            Message(HANDLER_START,
+                    data={"skill_id": self.skill_id, "intent_name": "skill"},
                     context={"skill_id": self.skill_id}),
             Message("converse:skill",
                     data={"utterances": ["echo test"], "lang": session.lang, "skill_id": self.skill_id},
@@ -137,6 +155,10 @@ class TestConverse(TestCase):
                     data={},
                     context={"skill_id": self.skill_id}),
 
+            # PIPELINE-1 §7.0/§8.1: orchestrator start before the converse dispatch
+            Message(HANDLER_START,
+                    data={"skill_id": self.skill_id, "intent_name": "skill"},
+                    context={"skill_id": self.skill_id}),
             Message("converse:skill",
                     data={"utterances": ["stop parrot"], "lang": session.lang, "skill_id": self.skill_id},
                     context={"skill_id": self.skill_id}),

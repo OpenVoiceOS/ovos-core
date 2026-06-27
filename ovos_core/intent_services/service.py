@@ -32,6 +32,7 @@ from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
 from ovos_utils.thread_utils import create_daemon
 
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService, IntentTransformersService
+from ovos_core.intent_services.dispatcher import IntentDispatcher, DEFAULT_HANDLER_TIMEOUT
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
 
@@ -120,6 +121,14 @@ class IntentService:
         self.utterance_plugins = UtteranceTransformersService(bus)
         self.metadata_plugins = MetadataTransformersService(bus)
         self.intent_plugins = IntentTransformersService(bus)
+
+        # OVOS-PIPELINE-1 §6.1: the orchestrator owns the post-match terminal
+        # sequence — ovos.intent.matched (§9.2), dispatch (§7) and the §8
+        # handler-lifecycle trio. ``handler_timeout`` (seconds, §8.3) bounds
+        # handler execution so exactly one terminal is guaranteed even if a
+        # handler never reports; 0/None disables the timer.
+        handler_timeout = self.config.get("handler_timeout", DEFAULT_HANDLER_TIMEOUT)
+        self.intent_dispatcher = IntentDispatcher(bus, timeout=handler_timeout)
 
         # connection SessionManager to the bus,
         # this will sync default session across all components
@@ -272,7 +281,8 @@ class IntentService:
         skill_id = message.data.get("skill_id")
         self._deactivations[sess.session_id].append(skill_id)
 
-    def _emit_match_message(self, match: IntentHandlerMatch, message: Message, lang: str):
+    def _emit_match_message(self, match: IntentHandlerMatch, message: Message, lang: str,
+                            pipeline_id: str = None):
         """
         Emit a reply message for a matched intent, updating session and skill activation.
 
@@ -344,8 +354,18 @@ class IntentService:
             # update Session if modified by pipeline
             reply.context["session"] = sess.serialize()
 
-            # finally emit reply message
-            self.bus.emit(reply)
+            # stamp the matching plugin's identity on the dispatch (§3.1, §7.1)
+            if pipeline_id:
+                reply.context["pipeline_id"] = pipeline_id
+
+            # OVOS-PIPELINE-1 §7 dispatch + §8 handler-lifecycle trio: hand the
+            # dispatch Message to the IntentDispatcher, which emits
+            # ovos.intent.handler.start (§8.1) before the dispatch and the matching
+            # terminal (complete/error/timeout) after. skill_id / intent_name come
+            # from the orchestrator's own Match, not the skill.
+            skill_id = match.skill_id or reply.msg_type.split(":", 1)[0]
+            intent_name = reply.msg_type.split(":", 1)[-1]
+            self.intent_dispatcher.dispatch(reply, skill_id, intent_name)
 
         else:  # upload intent metrics if enabled
             if self.config.get("open_data", {}).get("intent_urls"):
@@ -481,7 +501,8 @@ class IntentService:
                                 f"ignoring match, intent '{match.match_type}' blacklisted by Session '{sess.session_id}'")
                             continue
                         try:
-                            self._emit_match_message(match, message, intent_lang)
+                            self._emit_match_message(match, message, intent_lang,
+                                                     pipeline_id=pipeline)
                             break
                         except Exception:
                             LOG.exception(f"{match_func} returned an invalid match")
@@ -606,6 +627,7 @@ class IntentService:
                                     {"intent": None, "utterance": utterance}))
 
     def shutdown(self):
+        self.intent_dispatcher.shutdown()
         self.utterance_plugins.shutdown()
         self.metadata_plugins.shutdown()
         for pipeline in self.pipeline_plugins.values():
