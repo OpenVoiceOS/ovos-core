@@ -9,7 +9,7 @@ on:
 
 jobs:
   ovoscope:
-    uses: OpenVoiceOS/gh-automations/.github/workflows/ovoscope.yml@dev
+    uses: OpenVoiceOS/gh-automations/.github/workflows/ovoscope.yml@fix/ovoscope-local-source-wins
     secrets: inherit
     with:
       runner: "ubuntu-latest"
@@ -19,6 +19,12 @@ jobs:
       test_path: "test/end2end/"
       require_adapt: true
       require_padatious: true
+      # THROWAWAY spec-stack integration proof: reinstall every in-flight spec
+      # PR over the published deps so ovoscope sees the full integrated stack.
+      #   - ovos-bus-client #234   (Session spec fields)
+      #   - ovos-workshop  #431    (INTENT-4 registration producer, 9.x)
+      #   - adapt / padatious      (workshop-decoupled pipeline plugins, workshop<10)
+      pre_install_pip: "--force-reinstall git+https://github.com/OpenVoiceOS/ovos-bus-client@feat/session-spec-fields git+https://github.com/OpenVoiceOS/ovos-workshop@feat/intent-4-producer git+https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin@fix/allow-ovos-workshop-9 git+https://github.com/OpenVoiceOS/ovos-padatious-pipeline-plugin@fix/allow-ovos-workshop-9"
       bus_coverage: true
       bus_coverage_include: ""
       bus_coverage_exclude: "^Thread-|^intents$|^skills$|^__core__$"
