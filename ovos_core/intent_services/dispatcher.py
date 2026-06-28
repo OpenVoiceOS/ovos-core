@@ -86,16 +86,7 @@ DEFAULT_HANDLER_TIMEOUT = 5 * 60
 
 
 class _InFlightDispatch:
-    """A dispatch awaiting its §8 terminal.
-
-    Doubles as a context manager: ``with dispatcher.dispatch(...):`` blocks on exit
-    until the handler reaches its §8 terminal, so the orchestrator can then emit the
-    §9.5 ``ovos.utterance.handled`` end-marker without any explicit event juggling::
-
-        with self.intent_dispatcher.dispatch(reply, skill_id, intent_name):
-            pass  # handler runs; the context blocks here until it is done
-        self.bus.emit(reply.forward(SpecMessage.UTTERANCE_HANDLED, {}))
-    """
+    """A dispatch awaiting its §8 terminal."""
 
     __slots__ = ("skill_id", "intent_name", "dispatch_msg", "timer", "resolved",
                  "done")
@@ -111,15 +102,6 @@ class _InFlightDispatch:
         #: §9.5 ``ovos.utterance.handled`` end-marker (which it, not the dispatcher,
         #: owns — uniformly with the no-match and cancel paths).
         self.done = threading.Event()
-
-    def __enter__(self) -> "_InFlightDispatch":
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> bool:
-        # block until the §8 terminal; the §8.3 timeout guarantees it eventually
-        # fires even if the handler never reports
-        self.done.wait()
-        return False
 
 
 class IntentDispatcher:
@@ -171,11 +153,10 @@ class IntentDispatcher:
         topic; the orchestrator passes them explicitly from its own ``Match`` so
         they never come from the skill.
 
-        Returns the in-flight entry. The dispatch goes out asynchronously — this
-        call does NOT block. The entry is a context manager: ``with dispatch(...):``
-        blocks on exit until the §8 terminal, so the orchestrator can emit its §9.5
-        ``ovos.utterance.handled`` end-marker right after. (Callers that don't want
-        to block can wait on ``entry.done`` directly instead.)
+        Returns the in-flight entry; its ``done`` event is set when the §8
+        terminal fires, so the orchestrator can block on it until the handler is
+        done (then emit its §9.5 ``ovos.utterance.handled`` end-marker). This call
+        itself does NOT block — the dispatch goes out asynchronously.
         """
         topic = dispatch_msg.msg_type
         if skill_id is None:
