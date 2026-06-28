@@ -244,10 +244,10 @@ class TestDispatchFromMatch(unittest.TestCase):
         it = MagicMock(); it.transform.side_effect = lambda i: i
         svc.intent_plugins = it
         svc.status = MagicMock()
-        svc.intent_dispatcher = IntentDispatcher(bus, timeout=0)  # timer off
-        # mirror IntentService.__init__: react to the §8 terminal to emit §9.5
-        bus.on(COMPLETE, svc._emit_utterance_handled)
-        bus.on(ERROR, svc._emit_utterance_handled)
+        # mirror IntentService.__init__: the dispatcher notifies the orchestrator on
+        # each §8 terminal, which emits the §9.5 end-marker
+        svc.intent_dispatcher = IntentDispatcher(
+            bus, timeout=0, on_terminal=svc._emit_utterance_handled)
         return svc, bus
 
     @staticmethod
