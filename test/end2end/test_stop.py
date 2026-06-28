@@ -179,9 +179,6 @@ class TestStopNoSkills(TestCase):
                     Message("mycroft.skill.handler.start",
                             {"name": "StopService.handle_global_stop"}),
                     Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast
-                    # back-compat: handle_global_stop also emits the legacy
-                    # mycroft.stop directly for un-migrated skills
-                    Message("mycroft.stop", {}),
                     Message("mycroft.skill.handler.complete",
                             {"name": "StopService.handle_global_stop"}),
 
@@ -263,9 +260,6 @@ class TestStopNoSkills(TestCase):
                     Message("mycroft.skill.handler.start",
                             {"name": "StopService.handle_global_stop"}),
                     Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast
-                    # back-compat: handle_global_stop also emits the legacy
-                    # mycroft.stop directly for un-migrated skills
-                    Message("mycroft.stop", {}),
                     Message("mycroft.skill.handler.complete",
                             {"name": "StopService.handle_global_stop"}),
 
@@ -429,10 +423,6 @@ class TestCountSkills(TestCase):
                         {"name": "StopService.handle_global_stop"},
                         {"skill_id": "stop.openvoiceos"}),
                 Message(STOP_BROADCAST, {},
-                        {"skill_id": "stop.openvoiceos"}),
-                # back-compat: handle_global_stop also emits the legacy mycroft.stop
-                # directly — the un-migrated count skill listens there and stops
-                Message("mycroft.stop", {},
                         {"skill_id": "stop.openvoiceos"}),
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_global_stop"},

@@ -79,22 +79,19 @@ class StopService(ConfidenceMatcherPipeline):
         OVOS-STOP-1 §5.3: the global-stop handler emits the spec broadcast
         ``ovos.stop`` (``SpecMessage.STOP``).
 
-        Back-compat: the MIGRATION_MAP bus bridge only re-delivers ``ovos.stop``
-        on the legacy ``mycroft.stop`` topic when the bridge's legacy direction is
-        enabled, which is NOT guaranteed (it is an opt-in on MessageBusClient and
-        off in the pure-spec path). Skills have NOT migrated their stop handler —
-        ovos-workshop still subscribes ONLY ``mycroft.stop`` — so a spec-only
-        broadcast would silently fail to stop them. We therefore also emit the
-        legacy ``mycroft.stop`` directly until the skill side migrates, mirroring
-        the back-compat per-skill ``{skill_id}.stop.ping`` kept in
-        ``_collect_stop_skills``. The two topics target disjoint subscriber sets
-        (spec vs un-migrated), so this is not a double broadcast to any one skill.
+        Back-compat: ``mycroft.stop ↔ ovos.stop`` is a payload-compatible rename
+        in the spec-tools MIGRATION_MAP, and the bus bridge re-delivers a spec
+        emit on its legacy counterpart by default (``emit_legacy`` defaults ON
+        during the migration window). So emitting ``ovos.stop`` ALSO reaches
+        un-migrated skills still listening on ``mycroft.stop`` — without us
+        hand-rolling a second emit. A manual ``mycroft.stop`` here would
+        double-deliver to anyone subscribed on both topics, so we rely on the
+        bridge (same fix as ovos-audio #171).
         """
         with HandlerLifecycle(self.bus, message,
                               skill_id="stop.openvoiceos",
                               data={"name": "StopService.handle_global_stop"}):
             self.bus.emit(message.forward(SpecMessage.STOP))
-            self.bus.emit(message.forward("mycroft.stop"))
 
     @staticmethod
     def _drain_global_stop_session(session) -> "Session":
@@ -105,13 +102,17 @@ class StopService(ConfidenceMatcherPipeline):
 
         - ``active_handlers``  → ``[]``  (§5.2 / §6.2)
         - ``converse_handlers`` → ``[]`` (§5.2 / §6.2, OVOS-CONVERSE-1 §2.1)
+        - ``active_skills``    → ``[]``  (legacy recency list read by
+          ``get_active_skills`` → stop-target routing; left stale it could
+          route a later targeted stop to a skill this global_stop drained)
         - ``response_mode``    → absent  (§5.2 / §6.1)
 
-        All three are cleared atomically at match time so the drained state is
+        All four are cleared atomically at match time so the drained state is
         committed before dispatch (PIPELINE-1 §4.2).
         """
         session.active_handlers = []
         session.converse_handlers = []
+        session.active_skills = []
         session.clear_response_mode()
         return session
 

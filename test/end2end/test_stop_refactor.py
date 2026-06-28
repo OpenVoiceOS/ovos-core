@@ -128,13 +128,11 @@ class TestGlobalStopVocabulary(TestCase):
                 message,
                 Message("stop.openvoiceos.activate", {}),
                 Message("stop:global", {}),
-                # StopService wraps the global-stop handler in HandlerLifecycle
+                # OVOS-STOP-1 §5.3: global-stop handler emits spec broadcast only.
+                # Legacy compatibility is provided by the bus bridge (MIGRATION_MAP).
                 Message("mycroft.skill.handler.start",
                         {"name": "StopService.handle_global_stop"}),
-                Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast
-                # back-compat: handle_global_stop also emits the legacy mycroft.stop
-                # directly for un-migrated skills (no spec->legacy bridge guaranteed)
-                Message("mycroft.stop", {}),
+                Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast (bridged to legacy mycroft.stop)
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_global_stop"}),
                 Message(SpecMessage.UTTERANCE_HANDLED, {}),
@@ -175,13 +173,11 @@ class TestGlobalStopVocabulary(TestCase):
                 message,
                 Message("stop.openvoiceos.activate", {}),
                 Message("stop:global", {}),
-                # StopService wraps the global-stop handler in HandlerLifecycle
+                # OVOS-STOP-1 §5.3: global-stop handler emits spec broadcast only.
+                # Legacy compatibility is provided by the bus bridge (MIGRATION_MAP).
                 Message("mycroft.skill.handler.start",
                         {"name": "StopService.handle_global_stop"}),
-                Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast
-                # back-compat: handle_global_stop also emits the legacy mycroft.stop
-                # directly for un-migrated skills (no spec->legacy bridge guaranteed)
-                Message("mycroft.stop", {}),
+                Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast (bridged to legacy mycroft.stop)
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_global_stop"}),
                 Message(SpecMessage.UTTERANCE_HANDLED, {}),
@@ -242,13 +238,11 @@ class TestGlobalStopVocWithActiveSkill(TestCase):
                 message,
                 Message("stop.openvoiceos.activate", {}),
                 Message("stop:global", {}),
-                # StopService wraps the global-stop handler in HandlerLifecycle
+                # OVOS-STOP-1 §5.3: global-stop handler emits spec broadcast only.
+                # Legacy compatibility is provided by the bus bridge (MIGRATION_MAP).
                 Message("mycroft.skill.handler.start",
                         {"name": "StopService.handle_global_stop"}),
-                Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast
-                # back-compat: handle_global_stop also emits the legacy mycroft.stop
-                # directly for un-migrated skills (no spec->legacy bridge guaranteed)
-                Message("mycroft.stop", {}),
+                Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast (bridged to legacy mycroft.stop)
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_global_stop"}),
                 Message(SpecMessage.UTTERANCE_HANDLED, {}),
@@ -416,13 +410,11 @@ class TestStopServiceNotASkill(TestCase):
                 message,
                 Message("stop.openvoiceos.activate", {}),
                 Message("stop:global", {}),
-                # StopService wraps the global-stop handler in HandlerLifecycle
+                # OVOS-STOP-1 §5.3: global-stop handler emits spec broadcast only.
+                # Legacy compatibility is provided by the bus bridge (MIGRATION_MAP).
                 Message("mycroft.skill.handler.start",
                         {"name": "StopService.handle_global_stop"}),
-                Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast
-                # back-compat: handle_global_stop also emits the legacy mycroft.stop
-                # directly for un-migrated skills (no spec->legacy bridge guaranteed)
-                Message("mycroft.stop", {}),
+                Message(STOP_BROADCAST, {}),  # OVOS-STOP-1 §5.3 spec broadcast (bridged to legacy mycroft.stop)
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_global_stop"}),
                 Message(SpecMessage.UTTERANCE_HANDLED, {}),

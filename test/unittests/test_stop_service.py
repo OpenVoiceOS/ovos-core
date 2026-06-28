@@ -18,6 +18,7 @@ from threading import Event
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session, SessionManager, UtteranceState
+from ovos_spec_tools.messages import SpecMessage
 from ovos_utils.fakebus import FakeBus
 
 from ovos_core.intent_services.stop_service import StopService
@@ -548,9 +549,10 @@ class TestBusHandlers(unittest.TestCase):
 
     def test_handle_global_stop_emits_ovos_stop(self):
         # OVOS-STOP-1 §5.3: global-stop handler emits the spec topic ``ovos.stop``.
-        # Back-compat: it ALSO emits the legacy ``mycroft.stop`` directly, because the
-        # spec->legacy bus bridge is not guaranteed (opt-in / off on the pure-spec
-        # path) and skills have not migrated their stop handler off ``mycroft.stop``.
+        # Back-compat to un-migrated ``mycroft.stop`` listeners is provided by the
+        # bus MIGRATION_MAP bridge (emit_legacy ON by default), NOT a manual
+        # second emit — hand-rolling ``mycroft.stop`` here would double-deliver to
+        # anyone on both topics (cf. ovos-audio #171).
         svc = _make_service()
         emitted = []
         svc.bus.emit = lambda m: emitted.append(m)
@@ -559,10 +561,9 @@ class TestBusHandlers(unittest.TestCase):
         types = [m.msg_type for m in emitted]
         self.assertIn("mycroft.skill.handler.start", types)
         self.assertIn("ovos.stop", types)
-        self.assertIn("mycroft.stop", types)
         self.assertIn("mycroft.skill.handler.complete", types)
-        # the spec broadcast is emitted before the legacy back-compat one
-        self.assertLess(types.index("ovos.stop"), types.index("mycroft.stop"))
+        # the handler does NOT hand-roll a legacy emit; the bridge mirrors it
+        self.assertNotIn("mycroft.stop", types)
 
     def test_handle_skill_stop_forwards_to_skill(self):
         svc = _make_service()
@@ -698,10 +699,11 @@ class TestStop1Draining(unittest.TestCase):
 
     def test_global_stop_drains_both_lists_and_response_mode(self):
         """§5.2: global_stop updated_session sets active_handlers=[],
-        converse_handlers=[], and removes response_mode."""
+        converse_handlers=[], active_skills=[], and removes response_mode."""
         sess = Session("s")
         sess.active_handlers = [{"skill_id": "a", "activated_at": 1.0}]
         sess.converse_handlers = [{"skill_id": "b", "activated_at": 1.0}]
+        sess.active_skills = [["a", 1.0]]
         sess.set_response_mode("c", 9999999999.0)
 
         with patch.object(self.svc, "voc_match",
@@ -714,6 +716,9 @@ class TestStop1Draining(unittest.TestCase):
         self.assertEqual(result.match_type, "stop:global")
         self.assertEqual(result.updated_session.active_handlers, [])
         self.assertEqual(result.updated_session.converse_handlers, [])
+        # §5.2: the legacy recency list is drained too, so a later targeted stop
+        # cannot route to a skill this global_stop already cleared
+        self.assertEqual(result.updated_session.active_skills, [])
         self.assertIsNone(result.updated_session.response_mode)
 
     def test_global_stop_no_positive_pong_drains_session(self):
