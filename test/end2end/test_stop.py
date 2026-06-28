@@ -319,7 +319,7 @@ class TestCountSkills(TestCase):
                         {"name": "CountSkill.handle_how_are_you_intent"},
                         {"skill_id": self.skill_id}),
                 Message(UTTERANCE_HANDLED,
-                        {"name": "CountSkill.handle_how_are_you_intent"},
+                        {},
                         {"skill_id": self.skill_id})
             ]
             test = End2EndTest(
@@ -477,7 +477,7 @@ class TestCountSkills(TestCase):
                         {"name": "CountSkill.handle_how_are_you_intent"},
                         {"skill_id": self.skill_id}),
                 Message(UTTERANCE_HANDLED,
-                        {"name": "CountSkill.handle_how_are_you_intent"},
+                        {},
                         {"skill_id": self.skill_id})
             ]
             test = End2EndTest(
