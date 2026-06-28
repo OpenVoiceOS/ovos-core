@@ -204,12 +204,19 @@ class IntentDispatcher:
             return None
 
     def _on_skill_complete(self, message: Message):
-        """Framework done-signal -> ``complete`` (§8.1)."""
+        """Framework done-signal -> ``complete`` (§8.1), then the §9.5 end-marker
+        ``ovos.utterance.handled``. The orchestrator owns the universal end-marker
+        on EVERY terminal path (matched included); core emits exactly one per
+        dispatch — the LIFO ``_pop`` guard fires one terminal per in-flight entry.
+        (A workshop build may still emit its own matched-path handled during the
+        migration window; that transient duplicate is expected and removed later
+        workshop-side.)"""
         entry = self._pop(self._session_id(message), message.context.get("skill_id"))
         if entry is None:
             return
         self._emit(SpecMessage.INTENT_HANDLER_COMPLETE, entry.dispatch_msg,
                    {"skill_id": entry.skill_id, "intent_name": entry.intent_name})
+        self._emit(SpecMessage.UTTERANCE_HANDLED, entry.dispatch_msg, {})
 
     def _on_skill_error(self, message: Message):
         """Framework done-signal -> ``error`` with the exception (§8.2)."""
@@ -223,6 +230,7 @@ class IntentDispatcher:
                    {"skill_id": entry.skill_id,
                     "intent_name": entry.intent_name,
                     "exception": str(exception)})
+        self._emit(SpecMessage.UTTERANCE_HANDLED, entry.dispatch_msg, {})
 
     def _on_timeout(self, sid: str, entry: _InFlightDispatch):
         """§8.3 — bound handler execution; on timeout emit ``error`` (timeout)

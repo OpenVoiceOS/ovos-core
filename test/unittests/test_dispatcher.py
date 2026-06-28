@@ -134,6 +134,8 @@ class TestIntentDispatcher(unittest.TestCase):
         self.assertEqual(comps[0].data,
                          {"skill_id": "test.skill", "intent_name": "do"})
         self.assertEqual(self.rec.by_topic(ERROR), [])
+        # §9.5: core owns the end-marker on the matched path too -> exactly one
+        self.assertEqual(len(self.rec.by_topic(HANDLED)), 1)
 
     def test_exactly_one_terminal_on_repeated_done_signal(self):
         msg = _dispatch_msg()
@@ -141,6 +143,7 @@ class TestIntentDispatcher(unittest.TestCase):
         self.bus.emit(_skill_complete(msg))
         self.bus.emit(_skill_complete(msg))  # duplicate / nested signal
         self.assertEqual(len(self.rec.by_topic(COMPLETE)), 1)
+        self.assertEqual(len(self.rec.by_topic(HANDLED)), 1)  # exactly one end-marker
 
     def test_no_echo_loop_from_bridged_spec_complete(self):
         # if the bus bridges the orchestrator's spec complete back to the legacy
