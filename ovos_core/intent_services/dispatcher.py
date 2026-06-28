@@ -137,6 +137,9 @@ class IntentDispatcher:
                 for entry in stack:
                     if entry.timer is not None:
                         entry.timer.cancel()
+                    # release any orchestrator blocked on entry.done so shutdown
+                    # never leaves a _dispatch_match waiter hung forever
+                    entry.done.set()
             self._in_flight.clear()
 
     # -- public API ------------------------------------------------------
@@ -225,9 +228,13 @@ class IntentDispatcher:
         entry = self._pop(self._session_id(message), message.context.get("skill_id"))
         if entry is None:
             return
-        self._emit(SpecMessage.INTENT_HANDLER_COMPLETE, entry.dispatch_msg,
-                   {"skill_id": entry.skill_id, "intent_name": entry.intent_name})
-        entry.done.set()
+        try:
+            self._emit(SpecMessage.INTENT_HANDLER_COMPLETE, entry.dispatch_msg,
+                       {"skill_id": entry.skill_id, "intent_name": entry.intent_name})
+        finally:
+            # release the waiting orchestrator even if the terminal emission raises;
+            # _pop already cancelled the §8.3 timer, so nothing else would set done.
+            entry.done.set()
 
     def _on_skill_error(self, message: Message):
         """Framework done-signal -> ``error`` with the exception (§8.2), then
@@ -238,11 +245,13 @@ class IntentDispatcher:
         exception = (message.data.get("exception")
                      or message.data.get("error")
                      or "handler raised an exception")
-        self._emit(SpecMessage.INTENT_HANDLER_ERROR, entry.dispatch_msg,
-                   {"skill_id": entry.skill_id,
-                    "intent_name": entry.intent_name,
-                    "exception": str(exception)})
-        entry.done.set()
+        try:
+            self._emit(SpecMessage.INTENT_HANDLER_ERROR, entry.dispatch_msg,
+                       {"skill_id": entry.skill_id,
+                        "intent_name": entry.intent_name,
+                        "exception": str(exception)})
+        finally:
+            entry.done.set()
 
     def _on_timeout(self, sid: str, entry: _InFlightDispatch):
         """§8.3 — bound handler execution; on timeout emit ``error`` (timeout) and
@@ -260,8 +269,10 @@ class IntentDispatcher:
                     self._in_flight.pop(sid, None)
         LOG.warning(f"handler timeout for {entry.skill_id}:{entry.intent_name} "
                     f"after {self.timeout}s; emitting ovos.intent.handler.error")
-        self._emit(SpecMessage.INTENT_HANDLER_ERROR, entry.dispatch_msg,
-                   {"skill_id": entry.skill_id,
-                    "intent_name": entry.intent_name,
-                    "exception": f"handler timed out after {self.timeout} seconds"})
-        entry.done.set()
+        try:
+            self._emit(SpecMessage.INTENT_HANDLER_ERROR, entry.dispatch_msg,
+                       {"skill_id": entry.skill_id,
+                        "intent_name": entry.intent_name,
+                        "exception": f"handler timed out after {self.timeout} seconds"})
+        finally:
+            entry.done.set()

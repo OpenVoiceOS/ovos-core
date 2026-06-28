@@ -204,7 +204,8 @@ class TestIntentDispatcher(unittest.TestCase):
         disp = IntentDispatcher(self.bus, timeout=0.2)
         try:
             entry = disp.dispatch(_dispatch_msg(), "test.skill", "do")
-            time.sleep(0.5)
+            # deterministic: wait on the §8.3 terminal rather than a fixed sleep
+            self.assertTrue(entry.done.wait(timeout=5))
             errs = self.rec.by_topic(ERROR)
             self.assertEqual(len(errs), 1)
             self.assertIn("timed out", errs[0].data["exception"])
@@ -276,10 +277,13 @@ class TestDispatchFromMatch(unittest.TestCase):
 
     def test_orchestrator_emits_handled_after_terminal(self):
         # §9.5: the orchestrator (not the dispatcher) owns ovos.utterance.handled;
-        # it blocks on the §8 terminal, then emits exactly one end-marker.
+        # it blocks on the §8 terminal, then emits exactly one end-marker AFTER the
+        # handler-complete terminal it waited on.
         svc, bus = self._make_service()
+        order = []
         handled = []
-        bus.on(HANDLED, lambda m: handled.append(m))
+        bus.on(COMPLETE, lambda m: order.append(COMPLETE))
+        bus.on(HANDLED, lambda m: (order.append(HANDLED), handled.append(m)))
         self._report_complete(bus)
 
         match = IntentHandlerMatch(match_type="test.skill:do",
@@ -291,6 +295,9 @@ class TestDispatchFromMatch(unittest.TestCase):
         svc._dispatch_match(match, msg, "en-US", pipeline_id="p1")
         self.assertEqual(len(handled), 1)
         self.assertEqual(handled[0].data, {})
+        # ordering contract: §8 handler.complete is observed before the §9.5 marker
+        self.assertIn(COMPLETE, order)
+        self.assertLess(order.index(COMPLETE), order.index(HANDLED))
         svc.intent_dispatcher.shutdown()
 
 
