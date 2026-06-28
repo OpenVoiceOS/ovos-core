@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.2.4a3](https://github.com/OpenVoiceOS/ovos-core/tree/2.2.4a3) (2026-06-28)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.2.4a1...2.2.4a3)
+
+**Merged pull requests:**
+
+- test\(e2e\): fix transient test\_fallback\_match meta mismatch on dev [\#792](https://github.com/OpenVoiceOS/ovos-core/pull/792) ([JarbasAl](https://github.com/JarbasAl))
+- ci: wire shared opm-check workflow \(opm.pipeline entry-points\) [\#787](https://github.com/OpenVoiceOS/ovos-core/pull/787) ([JarbasAl](https://github.com/JarbasAl))
+
+## [2.2.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.2.4a1) (2026-06-28)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.2.3a1...2.2.4a1)
+
+**Merged pull requests:**
+
+- fix: lift ovos-spec-tools upper bound \(spec-tools 1.x\) [\#790](https://github.com/OpenVoiceOS/ovos-core/pull/790) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.2.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.2.3a1) (2026-06-27)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.2.2a1...2.2.3a1)

@@ -86,6 +86,8 @@ class TestFallback(TestCase):
                         data={"lang": session.lang,
                               "expect_response": False,
                               "meta": {
+                                  "dialog": "unknown",
+                                  "data": {},
                                   "skill": self.skill_id
                               }},
                         context={"skill_id": self.skill_id}),
