@@ -63,9 +63,10 @@ even if no done-signal ever arrives.
 
 The end-marker ``ovos.utterance.handled`` (§9.5) is NOT this class's concern: it is
 the orchestrator's universal terminal, emitted uniformly across the no-match, cancel
-and matched paths by ``IntentService``. The dispatcher only signals *when* a matched
-handler is done — each in-flight entry's ``done`` event is set on its §8 terminal, so
-the orchestrator blocks on it and then emits the single §9.5 end-marker itself.
+and matched paths by ``IntentService``. On the matched path the orchestrator reacts
+to this dispatcher's §8 terminal (``ovos.intent.handler.complete``/``.error``) and
+emits the single §9.5 end-marker — listening rather than blocking, so a bus handler
+is never stalled waiting on a downstream done-signal.
 
 Correlation uses ``session.session_id`` (§6.5: "the session is the correlation key
 ... no additional correlation field is defined") plus the dispatched ``skill_id``.
@@ -88,8 +89,7 @@ DEFAULT_HANDLER_TIMEOUT = 5 * 60
 class _InFlightDispatch:
     """A dispatch awaiting its §8 terminal."""
 
-    __slots__ = ("skill_id", "intent_name", "dispatch_msg", "timer", "resolved",
-                 "done")
+    __slots__ = ("skill_id", "intent_name", "dispatch_msg", "timer", "resolved")
 
     def __init__(self, skill_id: str, intent_name: str, dispatch_msg: Message):
         self.skill_id = skill_id
@@ -97,11 +97,6 @@ class _InFlightDispatch:
         self.dispatch_msg = dispatch_msg
         self.timer: Optional[threading.Timer] = None
         self.resolved = False
-        #: set once the §8 terminal (complete/error/timeout) has fired, so the
-        #: orchestrator can block until the handler is done before emitting the
-        #: §9.5 ``ovos.utterance.handled`` end-marker (which it, not the dispatcher,
-        #: owns — uniformly with the no-match and cancel paths).
-        self.done = threading.Event()
 
 
 class IntentDispatcher:
@@ -137,29 +132,23 @@ class IntentDispatcher:
                 for entry in stack:
                     if entry.timer is not None:
                         entry.timer.cancel()
-                    # release any orchestrator blocked on entry.done so shutdown
-                    # never leaves a _dispatch_match waiter hung forever
-                    entry.done.set()
             self._in_flight.clear()
 
     # -- public API ------------------------------------------------------
     def dispatch(self, dispatch_msg: Message,
                  skill_id: Optional[str] = None,
-                 intent_name: Optional[str] = None) -> "_InFlightDispatch":
+                 intent_name: Optional[str] = None):
         """Dispatch a matched intent and own its §8 handler-lifecycle trio.
 
         Emits ``ovos.intent.handler.start`` (§8.1), the dispatch on
         ``<skill_id>:<intent_name>`` (§7), then exactly one terminal
-        (``complete``/``error``/timeout) once the handler reports.
+        (``complete``/``error``/timeout) once the handler reports. The dispatch goes
+        out asynchronously — this call does NOT block. The orchestrator reacts to the
+        §8 terminal to emit its §9.5 ``ovos.utterance.handled`` end-marker.
 
         ``skill_id``/``intent_name`` default to the two halves of the dispatch
         topic; the orchestrator passes them explicitly from its own ``Match`` so
         they never come from the skill.
-
-        Returns the in-flight entry; its ``done`` event is set when the §8
-        terminal fires, so the orchestrator can block on it until the handler is
-        done (then emit its §9.5 ``ovos.utterance.handled`` end-marker). This call
-        itself does NOT block — the dispatch goes out asynchronously.
         """
         topic = dispatch_msg.msg_type
         if skill_id is None:
@@ -182,7 +171,6 @@ class IntentDispatcher:
                    {"skill_id": skill_id, "intent_name": intent_name})
         # §7: the dispatch itself
         self.bus.emit(dispatch_msg)
-        return entry
 
     # -- emission helpers ------------------------------------------------
     @staticmethod
@@ -219,44 +207,34 @@ class IntentDispatcher:
             return None
 
     def _on_skill_complete(self, message: Message):
-        """Framework done-signal -> ``complete`` (§8.1), then release the waiting
-        orchestrator. Exactly one terminal fires per dispatch — the LIFO ``_pop``
-        guard claims one in-flight entry. The §9.5 ``ovos.utterance.handled``
-        end-marker is NOT emitted here: it belongs to the orchestrator, which
-        blocks on ``entry.done`` and emits it uniformly with the no-match / cancel
+        """Framework done-signal -> ``complete`` (§8.1). Exactly one terminal fires
+        per dispatch — the LIFO ``_pop`` guard claims one in-flight entry. The §9.5
+        ``ovos.utterance.handled`` end-marker is NOT emitted here: the orchestrator
+        owns it and reacts to this terminal, uniformly with the no-match / cancel
         paths."""
         entry = self._pop(self._session_id(message), message.context.get("skill_id"))
         if entry is None:
             return
-        try:
-            self._emit(SpecMessage.INTENT_HANDLER_COMPLETE, entry.dispatch_msg,
-                       {"skill_id": entry.skill_id, "intent_name": entry.intent_name})
-        finally:
-            # release the waiting orchestrator even if the terminal emission raises;
-            # _pop already cancelled the §8.3 timer, so nothing else would set done.
-            entry.done.set()
+        self._emit(SpecMessage.INTENT_HANDLER_COMPLETE, entry.dispatch_msg,
+                   {"skill_id": entry.skill_id, "intent_name": entry.intent_name})
 
     def _on_skill_error(self, message: Message):
-        """Framework done-signal -> ``error`` with the exception (§8.2), then
-        release the waiting orchestrator (``entry.done``)."""
+        """Framework done-signal -> ``error`` with the exception (§8.2)."""
         entry = self._pop(self._session_id(message), message.context.get("skill_id"))
         if entry is None:
             return
         exception = (message.data.get("exception")
                      or message.data.get("error")
                      or "handler raised an exception")
-        try:
-            self._emit(SpecMessage.INTENT_HANDLER_ERROR, entry.dispatch_msg,
-                       {"skill_id": entry.skill_id,
-                        "intent_name": entry.intent_name,
-                        "exception": str(exception)})
-        finally:
-            entry.done.set()
+        self._emit(SpecMessage.INTENT_HANDLER_ERROR, entry.dispatch_msg,
+                   {"skill_id": entry.skill_id,
+                    "intent_name": entry.intent_name,
+                    "exception": str(exception)})
 
     def _on_timeout(self, sid: str, entry: _InFlightDispatch):
-        """§8.3 — bound handler execution; on timeout emit ``error`` (timeout) and
-        release the waiting orchestrator (``entry.done``) so it stops blocking and
-        emits the §9.5 end-marker. MUST NOT re-dispatch."""
+        """§8.3 — bound handler execution; on timeout emit ``error`` (timeout) so the
+        orchestrator still gets exactly one terminal (and emits its §9.5 end-marker).
+        MUST NOT re-dispatch."""
         with self._lock:
             if entry.resolved:
                 return
@@ -269,10 +247,7 @@ class IntentDispatcher:
                     self._in_flight.pop(sid, None)
         LOG.warning(f"handler timeout for {entry.skill_id}:{entry.intent_name} "
                     f"after {self.timeout}s; emitting ovos.intent.handler.error")
-        try:
-            self._emit(SpecMessage.INTENT_HANDLER_ERROR, entry.dispatch_msg,
-                       {"skill_id": entry.skill_id,
-                        "intent_name": entry.intent_name,
-                        "exception": f"handler timed out after {self.timeout} seconds"})
-        finally:
-            entry.done.set()
+        self._emit(SpecMessage.INTENT_HANDLER_ERROR, entry.dispatch_msg,
+                   {"skill_id": entry.skill_id,
+                    "intent_name": entry.intent_name,
+                    "exception": f"handler timed out after {self.timeout} seconds"})

@@ -132,25 +132,23 @@ class TestIntentDispatcher(unittest.TestCase):
 
     def test_complete_on_done_signal(self):
         msg = _dispatch_msg()
-        entry = self.disp.dispatch(msg, "test.skill", "do")
+        self.disp.dispatch(msg, "test.skill", "do")
         self.bus.emit(_skill_complete(msg))
         comps = self.rec.by_topic(COMPLETE)
         self.assertEqual(len(comps), 1)
         self.assertEqual(comps[0].data,
                          {"skill_id": "test.skill", "intent_name": "do"})
         self.assertEqual(self.rec.by_topic(ERROR), [])
-        # the §8 terminal releases the orchestrator (done set); the dispatcher does
-        # NOT emit ovos.utterance.handled -- the §9.5 end-marker is the orchestrator's.
-        self.assertTrue(entry.done.is_set())
+        # the dispatcher does NOT emit ovos.utterance.handled -- the §9.5 end-marker
+        # is the orchestrator's (emitted in reaction to this terminal).
         self.assertEqual(self.rec.by_topic(HANDLED), [])
 
     def test_exactly_one_terminal_on_repeated_done_signal(self):
         msg = _dispatch_msg()
-        entry = self.disp.dispatch(msg, "test.skill", "do")
+        self.disp.dispatch(msg, "test.skill", "do")
         self.bus.emit(_skill_complete(msg))
         self.bus.emit(_skill_complete(msg))  # duplicate / nested signal
         self.assertEqual(len(self.rec.by_topic(COMPLETE)), 1)  # exactly one terminal
-        self.assertTrue(entry.done.is_set())
         self.assertEqual(self.rec.by_topic(HANDLED), [])  # dispatcher emits no end-marker
 
     def test_no_echo_loop_from_bridged_spec_complete(self):
@@ -200,18 +198,18 @@ class TestIntentDispatcher(unittest.TestCase):
         comps = [m.data["intent_name"] for m in self.rec.by_topic(COMPLETE)]
         self.assertEqual(comps, ["inner", "outer"])
 
-    def test_timeout_emits_error_and_releases(self):
+    def test_timeout_emits_error(self):
         disp = IntentDispatcher(self.bus, timeout=0.2)
         try:
-            entry = disp.dispatch(_dispatch_msg(), "test.skill", "do")
-            # deterministic: wait on the §8.3 terminal rather than a fixed sleep
-            self.assertTrue(entry.done.wait(timeout=5))
+            disp.dispatch(_dispatch_msg(), "test.skill", "do")
+            # deterministic: poll for the §8.3 terminal rather than a fixed sleep
+            deadline = time.time() + 5
+            while not self.rec.by_topic(ERROR) and time.time() < deadline:
+                time.sleep(0.02)
             errs = self.rec.by_topic(ERROR)
             self.assertEqual(len(errs), 1)
             self.assertIn("timed out", errs[0].data["exception"])
-            # §8.3: the timeout releases the waiting orchestrator (done set); the
-            # dispatcher itself emits no §9.5 ovos.utterance.handled end-marker.
-            self.assertTrue(entry.done.is_set())
+            # the dispatcher itself emits no §9.5 ovos.utterance.handled end-marker
             self.assertEqual(self.rec.by_topic(HANDLED), [])
         finally:
             disp.shutdown()
@@ -246,15 +244,17 @@ class TestDispatchFromMatch(unittest.TestCase):
         it = MagicMock(); it.transform.side_effect = lambda i: i
         svc.intent_plugins = it
         svc.status = MagicMock()
-        # small §8.3 timeout backstop so _dispatch_match never blocks forever if a
-        # test's dispatched handler does not report completion
-        svc.intent_dispatcher = IntentDispatcher(bus, timeout=2)
+        svc.intent_dispatcher = IntentDispatcher(bus, timeout=0)  # timer off
+        # mirror IntentService.__init__: react to the §8 terminal to emit §9.5
+        bus.on(COMPLETE, svc._emit_utterance_handled)
+        bus.on(ERROR, svc._emit_utterance_handled)
         return svc, bus
 
     @staticmethod
     def _report_complete(bus):
         """Make the dispatched handler report its framework done-signal so the
-        orchestrator's §8 wait is released synchronously (FakeBus is in-thread)."""
+        dispatcher emits its §8 terminal (which drives the orchestrator's §9.5
+        end-marker). FakeBus is in-thread, so this all resolves synchronously."""
         bus.on("test.skill:do",
                lambda m: bus.emit(m.forward(SKILL_COMPLETE, {"name": "h"})))
 
@@ -275,15 +275,12 @@ class TestDispatchFromMatch(unittest.TestCase):
         self.assertEqual(order[:2], ["start", "dispatch"])
         svc.intent_dispatcher.shutdown()
 
-    def test_orchestrator_emits_handled_after_terminal(self):
+    def test_orchestrator_emits_handled_on_terminal(self):
         # §9.5: the orchestrator (not the dispatcher) owns ovos.utterance.handled;
-        # it blocks on the §8 terminal, then emits exactly one end-marker AFTER the
-        # handler-complete terminal it waited on.
+        # it reacts to the §8 handler-complete terminal and emits exactly one marker.
         svc, bus = self._make_service()
-        order = []
         handled = []
-        bus.on(COMPLETE, lambda m: order.append(COMPLETE))
-        bus.on(HANDLED, lambda m: (order.append(HANDLED), handled.append(m)))
+        bus.on(HANDLED, lambda m: handled.append(m))
         self._report_complete(bus)
 
         match = IntentHandlerMatch(match_type="test.skill:do",
@@ -295,9 +292,6 @@ class TestDispatchFromMatch(unittest.TestCase):
         svc._dispatch_match(match, msg, "en-US", pipeline_id="p1")
         self.assertEqual(len(handled), 1)
         self.assertEqual(handled[0].data, {})
-        # ordering contract: §8 handler.complete is observed before the §9.5 marker
-        self.assertIn(COMPLETE, order)
-        self.assertLess(order.index(COMPLETE), order.index(HANDLED))
         svc.intent_dispatcher.shutdown()
 
 
