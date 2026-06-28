@@ -371,7 +371,15 @@ class IntentService:
             # from the orchestrator's own Match, not the skill.
             skill_id = match.skill_id or reply.msg_type.split(":", 1)[0]
             intent_name = reply.msg_type.split(":", 1)[-1]
-            self.intent_dispatcher.dispatch(reply, skill_id, intent_name)
+            entry = self.intent_dispatcher.dispatch(reply, skill_id, intent_name)
+
+            # OVOS-PIPELINE-1 §9.5: the orchestrator owns the universal end-marker.
+            # Block until the handler reports its §8 terminal — the dispatcher sets
+            # entry.done on complete/error, and the §8.3 timeout guarantees it fires
+            # even if the handler never reports — then emit ovos.utterance.handled
+            # exactly once, the same way the no-match and cancel paths do.
+            entry.done.wait()
+            self.bus.emit(reply.forward(SpecMessage.UTTERANCE_HANDLED, {}))
 
         else:  # upload intent metrics if enabled
             if self.config.get("open_data", {}).get("intent_urls"):

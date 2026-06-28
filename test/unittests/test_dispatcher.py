@@ -21,8 +21,13 @@ path:
   the framework error signal or on the §8.3 timeout;
 - the ``exception`` field is populated on the error path (§8.2);
 - ``context`` (incl. ``session``) preserved unchanged via ``forward``;
-- the §8.3 timeout terminal + (timeout-path) ``ovos.utterance.handled``;
+- the §8.3 timeout terminal (error) releases the waiting orchestrator;
 - reserved-name dispatches (§7.0/§7.3) get the trio identically.
+
+The dispatcher does NOT emit the §9.5 ``ovos.utterance.handled`` end-marker — it
+only sets each in-flight entry's ``done`` event on its §8 terminal. The orchestrator
+(``IntentService``) blocks on that and emits the single end-marker itself, uniformly
+with the no-match and cancel paths (see ``TestDispatchFromMatch``).
 """
 import time
 import unittest
@@ -127,23 +132,26 @@ class TestIntentDispatcher(unittest.TestCase):
 
     def test_complete_on_done_signal(self):
         msg = _dispatch_msg()
-        self.disp.dispatch(msg, "test.skill", "do")
+        entry = self.disp.dispatch(msg, "test.skill", "do")
         self.bus.emit(_skill_complete(msg))
         comps = self.rec.by_topic(COMPLETE)
         self.assertEqual(len(comps), 1)
         self.assertEqual(comps[0].data,
                          {"skill_id": "test.skill", "intent_name": "do"})
         self.assertEqual(self.rec.by_topic(ERROR), [])
-        # §9.5: core owns the end-marker on the matched path too -> exactly one
-        self.assertEqual(len(self.rec.by_topic(HANDLED)), 1)
+        # the §8 terminal releases the orchestrator (done set); the dispatcher does
+        # NOT emit ovos.utterance.handled -- the §9.5 end-marker is the orchestrator's.
+        self.assertTrue(entry.done.is_set())
+        self.assertEqual(self.rec.by_topic(HANDLED), [])
 
     def test_exactly_one_terminal_on_repeated_done_signal(self):
         msg = _dispatch_msg()
-        self.disp.dispatch(msg, "test.skill", "do")
+        entry = self.disp.dispatch(msg, "test.skill", "do")
         self.bus.emit(_skill_complete(msg))
         self.bus.emit(_skill_complete(msg))  # duplicate / nested signal
-        self.assertEqual(len(self.rec.by_topic(COMPLETE)), 1)
-        self.assertEqual(len(self.rec.by_topic(HANDLED)), 1)  # exactly one end-marker
+        self.assertEqual(len(self.rec.by_topic(COMPLETE)), 1)  # exactly one terminal
+        self.assertTrue(entry.done.is_set())
+        self.assertEqual(self.rec.by_topic(HANDLED), [])  # dispatcher emits no end-marker
 
     def test_no_echo_loop_from_bridged_spec_complete(self):
         # if the bus bridges the orchestrator's spec complete back to the legacy
@@ -192,16 +200,18 @@ class TestIntentDispatcher(unittest.TestCase):
         comps = [m.data["intent_name"] for m in self.rec.by_topic(COMPLETE)]
         self.assertEqual(comps, ["inner", "outer"])
 
-    def test_timeout_emits_error_and_handled(self):
+    def test_timeout_emits_error_and_releases(self):
         disp = IntentDispatcher(self.bus, timeout=0.2)
         try:
-            disp.dispatch(_dispatch_msg(), "test.skill", "do")
+            entry = disp.dispatch(_dispatch_msg(), "test.skill", "do")
             time.sleep(0.5)
             errs = self.rec.by_topic(ERROR)
             self.assertEqual(len(errs), 1)
             self.assertIn("timed out", errs[0].data["exception"])
-            # §8.3 / §9.5: on the timeout path the orchestrator owns the end-marker
-            self.assertEqual(len(self.rec.by_topic(HANDLED)), 1)
+            # §8.3: the timeout releases the waiting orchestrator (done set); the
+            # dispatcher itself emits no §9.5 ovos.utterance.handled end-marker.
+            self.assertTrue(entry.done.is_set())
+            self.assertEqual(self.rec.by_topic(HANDLED), [])
         finally:
             disp.shutdown()
 
@@ -235,14 +245,24 @@ class TestDispatchFromMatch(unittest.TestCase):
         it = MagicMock(); it.transform.side_effect = lambda i: i
         svc.intent_plugins = it
         svc.status = MagicMock()
-        svc.intent_dispatcher = IntentDispatcher(bus, timeout=0)
+        # small §8.3 timeout backstop so _dispatch_match never blocks forever if a
+        # test's dispatched handler does not report completion
+        svc.intent_dispatcher = IntentDispatcher(bus, timeout=2)
         return svc, bus
+
+    @staticmethod
+    def _report_complete(bus):
+        """Make the dispatched handler report its framework done-signal so the
+        orchestrator's §8 wait is released synchronously (FakeBus is in-thread)."""
+        bus.on("test.skill:do",
+               lambda m: bus.emit(m.forward(SKILL_COMPLETE, {"name": "h"})))
 
     def test_start_before_dispatch(self):
         svc, bus = self._make_service()
         order = []
         bus.on(START, lambda m: order.append("start"))
         bus.on("test.skill:do", lambda m: order.append("dispatch"))
+        self._report_complete(bus)
 
         match = IntentHandlerMatch(match_type="test.skill:do",
                                    match_data={}, skill_id="test.skill",
@@ -252,6 +272,25 @@ class TestDispatchFromMatch(unittest.TestCase):
                       {"session": Session("s1").serialize()})
         svc._dispatch_match(match, msg, "en-US", pipeline_id="p1")
         self.assertEqual(order[:2], ["start", "dispatch"])
+        svc.intent_dispatcher.shutdown()
+
+    def test_orchestrator_emits_handled_after_terminal(self):
+        # §9.5: the orchestrator (not the dispatcher) owns ovos.utterance.handled;
+        # it blocks on the §8 terminal, then emits exactly one end-marker.
+        svc, bus = self._make_service()
+        handled = []
+        bus.on(HANDLED, lambda m: handled.append(m))
+        self._report_complete(bus)
+
+        match = IntentHandlerMatch(match_type="test.skill:do",
+                                   match_data={}, skill_id="test.skill",
+                                   utterance="hello")
+        msg = Message("ovos.utterance.handle",
+                      {"utterances": ["hello"]},
+                      {"session": Session("s1").serialize()})
+        svc._dispatch_match(match, msg, "en-US", pipeline_id="p1")
+        self.assertEqual(len(handled), 1)
+        self.assertEqual(handled[0].data, {})
         svc.intent_dispatcher.shutdown()
 
 
