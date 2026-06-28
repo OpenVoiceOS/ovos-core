@@ -1,8 +1,9 @@
 import time
-from threading import Event
+from threading import Event, Timer
 from typing import Optional, Dict, List, Union
 
 from ovos_bus_client.client import MessageBusClient
+from ovos_bus_client.handler import HandlerLifecycle
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, UtteranceState, Session
 from ovos_config.config import Configuration
@@ -13,6 +14,14 @@ from ovos_utils.log import LOG
 
 from ovos_plugin_manager.templates.pipeline import PipelinePlugin, IntentHandlerMatch
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
+
+#: upper bound, seconds, on how long core waits for a skill's
+#: ``skill.converse.response`` before the dispatch lifecycle is declared a
+#: timeout (``mycroft.skill.handler.error``). Generous: converse handlers may
+#: legitimately run a while, but this must eventually backstop a silent skill so
+#: an orchestrator observing the done-signal never hangs on the in-flight
+#: dispatch.
+CONVERSE_HANDLER_TIMEOUT = 5 * 60
 
 
 class ConverseService(PipelinePlugin):
@@ -31,7 +40,55 @@ class ConverseService(PipelinePlugin):
         self.bus.on("converse:skill", self.handle_converse)
 
     def handle_converse(self, message: Message):
+        """Dispatch the utterance to a skill's ``converse`` method.
+
+        This is the orchestrator's converse dispatch hop: core forwards the
+        utterance on ``<skill_id>.converse.request`` and the targeted skill
+        replies (asynchronously) on ``skill.converse.response``. The
+        dispatch->outcome span is reported to the orchestrator as the framework
+        done-signal (``mycroft.skill.handler.{start,complete,error}``) so a
+        dispatcher observing it (OVOS-PIPELINE-1 §8) can resolve the lifecycle
+        instead of falling back to its handler timeout. The done-signal is
+        stamped with the *targeted* ``skill_id`` so it correlates to the
+        in-flight converse dispatch.
+        """
         skill_id = message.data["skill_id"]
+
+        lifecycle = HandlerLifecycle(self.bus, message, skill_id=skill_id,
+                                     handler_name=f"{skill_id}.converse")
+
+        # the skill answers asynchronously on skill.converse.response; resolve
+        # the lifecycle when that ack arrives (complete) or when it never does
+        # (error/timeout). exactly one terminal is emitted.
+        resolved = Event()
+
+        def _resolve_complete(msg: Message) -> None:
+            if msg.data.get("skill_id") and msg.data.get("skill_id") != skill_id:
+                return  # ack from a different skill, ignore
+            if resolved.is_set():
+                return
+            resolved.set()
+            timer.cancel()
+            self.bus.remove("skill.converse.response", _resolve_complete)
+            lifecycle.complete()
+
+        def _resolve_timeout() -> None:
+            if resolved.is_set():
+                return
+            resolved.set()
+            self.bus.remove("skill.converse.response", _resolve_complete)
+            LOG.warning(f"converse dispatch to {skill_id} timed out after "
+                        f"{CONVERSE_HANDLER_TIMEOUT}s; emitting handler error")
+            lifecycle.error(TimeoutError(
+                f"converse handler timed out after {CONVERSE_HANDLER_TIMEOUT} seconds"))
+
+        timer = Timer(CONVERSE_HANDLER_TIMEOUT, _resolve_timeout)
+        timer.daemon = True
+
+        self.bus.on("skill.converse.response", _resolve_complete)
+        timer.start()
+        # mycroft.skill.handler.start, then the dispatch itself
+        lifecycle.start()
         self.bus.emit(message.reply(f"{skill_id}.converse.request", message.data))
 
     @property
