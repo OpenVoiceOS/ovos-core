@@ -13,6 +13,13 @@ from ovoscope import End2EndTest, get_minicroft
 SPEC_UTTERANCE = SpecMessage.UTTERANCE.value              # ovos.utterance.handle
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utterance
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value   # ovos.utterance.handled
+# PIPELINE-1 orchestrator-emitted matched-path messages: §9.2 ovos.intent.matched
+# (before dispatch) and §8.1 ovos.intent.handler.start. The converse:skill
+# dispatch is a reserved-name dispatch with no mycroft.skill.handler.* done-signal,
+# so its §8 terminal resolves via the §8.3 timeout (after the end-marker, not
+# captured here).
+INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value         # ovos.intent.matched (§9.2)
+HANDLER_START = SpecMessage.INTENT_HANDLER_START.value    # ovos.intent.handler.start (§8.1)
 
 # The two namespace paths the utterance-injecting scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
@@ -198,6 +205,16 @@ class TestDeactivate(TestCase):
                         context={"skill_id": self.skill_id}),
                 Message(f"{self.skill_id}.activate",
                         data={},
+                        context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §9.2: matched notification precedes the dispatch
+                Message(INTENT_MATCHED,
+                        data={"skill_id": self.skill_id,
+                              "intent_name": "converse:skill"},
+                        context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §8.1: orchestrator start immediately before the dispatch
+                Message(HANDLER_START,
+                        data={"skill_id": self.skill_id,
+                              "intent_name": "skill"},
                         context={"skill_id": self.skill_id}),
                 Message("converse:skill",
                         data={"utterances": ["deactivate skill from within converse"], "lang": session.lang,
