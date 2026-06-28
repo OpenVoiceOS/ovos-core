@@ -247,7 +247,7 @@ class TestDispatchFromMatch(unittest.TestCase):
         msg = Message("ovos.utterance.handle",
                       {"utterances": ["hello"]},
                       {"session": Session("s1").serialize()})
-        svc._emit_match_message(match, msg, "en-US", pipeline_id="p1")
+        svc._dispatch_match(match, msg, "en-US", pipeline_id="p1")
         self.assertEqual(order[:2], ["start", "dispatch"])
         svc.intent_dispatcher.shutdown()
 

@@ -47,12 +47,16 @@ spec-consistent. The framework keeps emitting its long-standing legacy signals:
 - ``mycroft.skill.handler.error`` (carrying a human-readable error) → the
   orchestrator emits ``error`` with the reported ``exception`` (§8.2).
 
-These are **legacy-namespace** topics and, with the OVOS-MSG-1 trio bridge
-removed from ovos-spec-tools, they do **not** bridge to the spec trio — so the
-orchestrator's own spec emissions never echo back as a done-signal and no
-echo-guard is needed. The framework done-signal and the spec trio live in
-separate namespaces: workshop owns the legacy one, the orchestrator owns the
-spec one.
+These are **legacy-namespace** topics. **Hard dependency:** the ovos-spec-tools
+MIGRATION_MAP trio bridge (``mycroft.skill.handler.* ↔ ovos.intent.handler.*``)
+MUST be removed so the orchestrator's own spec emissions do not bridge back to a
+legacy done-signal. Until that lands the bridge is still active, but the
+resolved-guard in :meth:`_pop` keeps the terminal count at exactly one even if a
+bridged echo arrives (it claims an already-resolved entry and returns ``None``);
+the ``"message"``-aggregate consumers (the ovoscope harness) also never see the
+bridged counterpart. Once the bridge is removed, the framework done-signal and the
+spec trio live cleanly in separate namespaces: workshop owns the legacy one, the
+orchestrator owns the spec one.
 
 The §8.3 timeout backstops every dispatch so exactly one terminal is guaranteed
 even if no done-signal ever arrives.
@@ -95,11 +99,15 @@ class _InFlightDispatch:
 
 
 class IntentDispatcher:
-    """Owns the PIPELINE-1 §6.1 matched-path sequence (§9.2 notification, §7
-    dispatch, §8 handler-lifecycle trio).
+    """Owns the PIPELINE-1 §7 dispatch + §8 handler-lifecycle trio.
 
-    Owned by ``IntentService``; wires its own bus observers for the framework
-    done-signals. The orchestrator hands it a dispatch Message via :meth:`dispatch`.
+    Emits ``ovos.intent.handler.start`` before the ``<skill_id>:<intent_name>``
+    dispatch and exactly one terminal (``complete``/``error``/timeout) after. The
+    surrounding §6.1 orchestration — the §9.2 ``ovos.intent.matched`` notification,
+    skill activation, session update — lives in
+    ``IntentService._dispatch_match``, which hands a built dispatch Message to
+    :meth:`dispatch`. This class wires its own bus observers for the framework
+    done-signals (``mycroft.skill.handler.complete``/``.error``).
     """
 
     def __init__(self, bus, timeout: Optional[float] = DEFAULT_HANDLER_TIMEOUT):

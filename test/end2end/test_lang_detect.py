@@ -24,6 +24,10 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)
 SPEC_SPEAK = SpecMessage.SPEAK.value
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
+# OVOS-PIPELINE-1 §9.3: the no-match terminal is ovos.intent.unmatched. The
+# orchestrator emits the spec topic; complete_intent_failure is the legacy
+# counterpart re-delivered only by the emit_legacy bridge.
+INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value
 
 NAMESPACE_PATHS = {
     "spec": (False, False, SPEC_UTTERANCE),
@@ -65,7 +69,7 @@ class TestLangDisambiguation(TestCase):
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {"lang": lang_keys["stt_lang"]}),
+                Message(INTENT_UNMATCHED, {"lang": lang_keys["stt_lang"]}),
                 Message(UTTERANCE_HANDLED, {}),
             ]
         )
@@ -102,7 +106,7 @@ class TestLangDisambiguation(TestCase):
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {"lang": lang_keys["detected_lang"]}),
+                Message(INTENT_UNMATCHED, {"lang": lang_keys["detected_lang"]}),
                 Message(UTTERANCE_HANDLED, {}),
             ]
         )
@@ -140,7 +144,7 @@ class TestLangDisambiguation(TestCase):
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {"lang": lang_keys["request_lang"]}),
+                Message(INTENT_UNMATCHED, {"lang": lang_keys["request_lang"]}),
                 Message(UTTERANCE_HANDLED, {}),
             ]
         )
@@ -177,7 +181,7 @@ class TestLangDisambiguation(TestCase):
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {"lang": session.lang}),
+                Message(INTENT_UNMATCHED, {"lang": session.lang}),
                 Message(UTTERANCE_HANDLED, {}),
             ]
         )

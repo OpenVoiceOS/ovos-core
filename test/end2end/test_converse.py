@@ -25,9 +25,15 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)
 SPEC_SPEAK = SpecMessage.SPEAK.value
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
-# PIPELINE-1 §8 handler-lifecycle trio, emitted by the orchestrator (core).
-HANDLER_START = SpecMessage.INTENT_HANDLER_START.value
-HANDLER_COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value
+INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value      # ovos.intent.matched (§9.2)
+# §8 handler-lifecycle trio wraps every dispatch; this suite asserts converse
+# routing, not the trio (covered by the adapt/padatious suites), so it is
+# filtered via ignore_messages below.
+HANDLER_TRIO = [SpecMessage.INTENT_HANDLER_START.value,
+                SpecMessage.INTENT_HANDLER_COMPLETE.value,
+                SpecMessage.INTENT_HANDLER_ERROR.value,
+                "ovos.skills.settings_changed"]  # keep ovoscope's default ignore
+INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value  # ovos.intent.unmatched (§9.3)
 
 # key -> (modernize, emit_legacy, utterance_topic)
 NAMESPACE_PATHS = {
@@ -75,10 +81,9 @@ class TestConverse(TestCase):
             Message(f"{self.skill_id}.activate",
                     data={},
                     context={"skill_id": self.skill_id}),
-            # PIPELINE-1 §8.1: orchestrator start before dispatch
-            Message(HANDLER_START,
+            Message(INTENT_MATCHED,
                     data={"skill_id": self.skill_id,
-                          "intent_name": "start_parrot.intent"},
+                          "intent_name": f"{self.skill_id}:start_parrot.intent"},
                     context={"skill_id": self.skill_id}),
             Message(f"{self.skill_id}:start_parrot.intent",
                     data={"utterance": "start parrot mode", "lang": session.lang},
@@ -97,11 +102,6 @@ class TestConverse(TestCase):
             Message("mycroft.skill.handler.complete",
                     data={"name": "ParrotSkill.handle_start_parrot_intent"},
                     context={"skill_id": self.skill_id}),
-            # PIPELINE-1 §8.1: orchestrator complete before the end-marker
-            Message(HANDLER_COMPLETE,
-                    data={"skill_id": self.skill_id,
-                          "intent_name": "start_parrot.intent"},
-                    context={"skill_id": self.skill_id}),
             Message(UTTERANCE_HANDLED,
                     data={},
                     context={"skill_id": self.skill_id}),
@@ -117,10 +117,8 @@ class TestConverse(TestCase):
             Message(f"{self.skill_id}.activate",
                     data={},
                     context={"skill_id": self.skill_id}),
-            # PIPELINE-1 §7.0/§8.1: a converse dispatch is a dispatch -> orchestrator
-            # emits start before it (intent_name is the reserved name "skill").
-            Message(HANDLER_START,
-                    data={"skill_id": self.skill_id, "intent_name": "skill"},
+            Message(INTENT_MATCHED,
+                    data={"skill_id": self.skill_id, "intent_name": "converse:skill"},
                     context={"skill_id": self.skill_id}),
             Message("converse:skill",
                     data={"utterances": ["echo test"], "lang": session.lang, "skill_id": self.skill_id},
@@ -155,9 +153,8 @@ class TestConverse(TestCase):
                     data={},
                     context={"skill_id": self.skill_id}),
 
-            # PIPELINE-1 §7.0/§8.1: orchestrator start before the converse dispatch
-            Message(HANDLER_START,
-                    data={"skill_id": self.skill_id, "intent_name": "skill"},
+            Message(INTENT_MATCHED,
+                    data={"skill_id": self.skill_id, "intent_name": "converse:skill"},
                     context={"skill_id": self.skill_id}),
             Message("converse:skill",
                     data={"utterances": ["stop parrot"], "lang": session.lang, "skill_id": self.skill_id},
@@ -191,7 +188,7 @@ class TestConverse(TestCase):
                     data={"can_handle": False, "skill_id": self.skill_id},
                     context={"skill_id": self.skill_id}),
             Message("mycroft.audio.play_sound", data={"uri": "snd/error.mp3"}),
-            Message("complete_intent_failure"),
+            Message(INTENT_UNMATCHED),
             Message(UTTERANCE_HANDLED)
         ]
 
@@ -207,6 +204,7 @@ class TestConverse(TestCase):
             final_session=final_session,
             source_message=[message1, message2, message3, message4],
             expected_messages=expected1 + expected2 + expected3 + expected4,
+            ignore_messages=HANDLER_TRIO,
             activation_points=[f"{self.skill_id}:start_parrot.intent"],
             # messages internal to ovos-core, i.e. would not be sent to clients such as hivemind
             keep_original_src=[f"{self.skill_id}.converse.ping",

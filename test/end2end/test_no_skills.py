@@ -24,6 +24,9 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)
 SPEC_SPEAK = SpecMessage.SPEAK.value
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
+# OVOS-PIPELINE-1 §9.3: no-match terminal is ovos.intent.unmatched; the legacy
+# complete_intent_failure is only re-delivered by the emit_legacy bridge.
+INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value
 
 NAMESPACE_PATHS = {
     "spec": (False, False, SPEC_UTTERANCE),
@@ -56,7 +59,7 @@ class TestNoSkills(TestCase):
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {}),
+                Message(INTENT_UNMATCHED, {}),
                 Message(UTTERANCE_HANDLED, {}),
             ]
         )
@@ -89,7 +92,7 @@ class TestNoSkills(TestCase):
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {}),
+                Message(INTENT_UNMATCHED, {}),
                 Message(UTTERANCE_HANDLED, {}),
             ]
         )

@@ -29,9 +29,11 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value              # ovos.utterance.handl
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utterance
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value   # ovos.utterance.handled
 SPEC_SPEAK = SpecMessage.SPEAK.value                      # ovos.utterance.speak
-# PIPELINE-1 §8 handler-lifecycle trio, emitted by the orchestrator (core).
-HANDLER_START = SpecMessage.INTENT_HANDLER_START.value
+INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value         # ovos.intent.matched (§9.2)
+INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value     # ovos.intent.unmatched (§9.3)
+HANDLER_START = SpecMessage.INTENT_HANDLER_START.value    # §8.1
 HANDLER_COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value
+HANDLER_ERROR = SpecMessage.INTENT_HANDLER_ERROR.value
 
 # The two namespace paths every scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
@@ -47,6 +49,15 @@ NAMESPACE_PATHS = {
 # on the spec topic ovos.utterance.speak (no legacy mirror, emit_legacy=False).
 IGNORE_MESSAGES = [
     SPEC_SPEAK,
+    # ovos.intent.matched (§9.2) precedes every dispatch; these scenarios assert
+    # stop routing/activation, not the matched broadcast, so it is filtered here.
+    INTENT_MATCHED,
+    # the §8 handler-lifecycle trio also wraps every dispatch; these scenarios
+    # assert stop routing, not the trio (it is covered by the adapt/padatious
+    # suites), so it is filtered here too.
+    HANDLER_START,
+    HANDLER_COMPLETE,
+    HANDLER_ERROR,
     "ovos.common_play.stop.response",
     "common_query.openvoiceos.stop.response",
     "persona.openvoiceos.stop.response",
@@ -127,7 +138,7 @@ class TestStopNoSkills(TestCase):
                 expected_messages=[
                     message,
                     Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                    Message("complete_intent_failure", {}),
+                    Message(INTENT_UNMATCHED, {}),
                     Message(UTTERANCE_HANDLED, {}),
                 ]
             )
@@ -208,10 +219,6 @@ class TestCountSkills(TestCase):
             activate_skill = [
                 message,
                 Message(f"{self.skill_id}.activate", {}),  # skill is activated
-                # PIPELINE-1 §8.1: orchestrator start before dispatch
-                Message(HANDLER_START,
-                        {"skill_id": self.skill_id,
-                         "intent_name": "count_to_N.intent"}),
                 Message(f"{self.skill_id}:count_to_N.intent", {}),  # intent triggers
 
                 Message("mycroft.skill.handler.start", {
@@ -221,10 +228,6 @@ class TestCountSkills(TestCase):
                 Message("mycroft.skill.handler.complete", {
                     "name": "CountSkill.handle_how_are_you_intent"
                 }),
-                # PIPELINE-1 §8.1: orchestrator complete before the end-marker
-                Message(HANDLER_COMPLETE,
-                        {"skill_id": self.skill_id,
-                         "intent_name": "count_to_N.intent"}),
 
                 Message(UTTERANCE_HANDLED, {})
             ]

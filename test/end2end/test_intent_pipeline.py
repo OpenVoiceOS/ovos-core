@@ -49,7 +49,10 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value          # ovos.utterance.handle
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utterance
 SPEC_SPEAK = SpecMessage.SPEAK.value                  # ovos.utterance.speak
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
-# PIPELINE-1 §8 handler-lifecycle trio, emitted by the orchestrator (core).
+# PIPELINE-1 orchestrator-emitted terminal events: §9.2 matched, §8 trio, §9.3
+# unmatched (the spec replacement for legacy complete_intent_failure).
+INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value
+INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value
 HANDLER_START = SpecMessage.INTENT_HANDLER_START.value
 HANDLER_COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value
 
@@ -146,6 +149,14 @@ class TestIntentPipelineRouting(TestCase):
                     data={},
                     context={"skill_id": self.skill_id},
                 ),
+                # PIPELINE-1 §9.2: matched notification, before the dispatch
+                Message(
+                    INTENT_MATCHED,
+                    data={"skill_id": self.skill_id,
+                          "intent_name": f"{self.skill_id}:count_to_N.intent",
+                          "utterance": "count to 3", "lang": session.lang},
+                    context={"skill_id": self.skill_id},
+                ),
                 # PIPELINE-1 §8.1: orchestrator start before dispatch
                 Message(
                     HANDLER_START,
@@ -221,6 +232,14 @@ class TestIntentPipelineRouting(TestCase):
                     data={},
                     context={"skill_id": self.skill_id},
                 ),
+                # PIPELINE-1 §9.2: matched notification, before the dispatch
+                Message(
+                    INTENT_MATCHED,
+                    data={"skill_id": self.skill_id,
+                          "intent_name": f"{self.skill_id}:count_to_N.intent",
+                          "utterance": "count to 3", "lang": session.lang},
+                    context={"skill_id": self.skill_id},
+                ),
                 # PIPELINE-1 §8.1: orchestrator start before dispatch
                 Message(
                     HANDLER_START,
@@ -287,7 +306,7 @@ class TestIntentPipelineRouting(TestCase):
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {}),
+                Message(INTENT_UNMATCHED, {}),
                 Message(UTTERANCE_HANDLED, {}),
             ],
         )
@@ -322,7 +341,7 @@ class TestIntentPipelineRouting(TestCase):
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {}),
+                Message(INTENT_UNMATCHED, {}),
                 Message(UTTERANCE_HANDLED, {}),
             ],
         )

@@ -41,8 +41,10 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value              # ovos.utterance.handl
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utterance
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value   # ovos.utterance.handled
 SPEC_SPEAK = SpecMessage.SPEAK.value                      # ovos.utterance.speak
-# PIPELINE-1 §8 handler-lifecycle trio, emitted by the orchestrator (core).
+INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value         # ovos.intent.matched (§9.2)
+HANDLER_START = SpecMessage.INTENT_HANDLER_START.value    # §8.1
 HANDLER_COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value
+HANDLER_ERROR = SpecMessage.INTENT_HANDLER_ERROR.value
 
 # The two namespace paths every scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
@@ -59,6 +61,14 @@ NAMESPACE_PATHS = {
 # emit_legacy=False on both paths).
 _STOP_RESPONSES = [
     SPEC_SPEAK,
+    # ovos.intent.matched (§9.2) precedes every dispatch; these scenarios assert
+    # stop routing/activation, not the matched broadcast, so it is filtered here.
+    INTENT_MATCHED,
+    # the §8 handler-lifecycle trio also wraps every dispatch; filtered here
+    # (covered by the adapt/padatious suites).
+    HANDLER_START,
+    HANDLER_COMPLETE,
+    HANDLER_ERROR,
     "ovos.common_play.stop.response",
     "common_query.openvoiceos.stop.response",
     "persona.openvoiceos.stop.response",
@@ -281,14 +291,6 @@ class TestStopSkillCanHandleFalse(TestCase):
                     {"skill_id": self.skill_id}),
             Message("mycroft.skill.handler.complete",
                     {"name": "CountSkill.handle_how_are_you_intent"},
-                    {"skill_id": self.skill_id}),
-            # PIPELINE-1 §8.1: orchestrator completes the (pre-capture) count
-            # dispatch when it observes the count handler's completion (the
-            # in-flight count_to_N.intent dispatch resolves here). The matching
-            # start fired before capture began.
-            Message(HANDLER_COMPLETE,
-                    {"skill_id": self.skill_id,
-                     "intent_name": "count_to_N.intent"},
                     {"skill_id": self.skill_id}),
             Message(UTTERANCE_HANDLED,
                     {"name": "CountSkill.handle_how_are_you_intent"},
