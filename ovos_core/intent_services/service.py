@@ -525,7 +525,15 @@ class IntentService:
                     # if multilingual matching is enabled, attempt to match all user languages if main fails
                     langs += [l for l in get_valid_languages() if l != lang]
                 for intent_lang in langs:
-                    match = match_func(utterances, intent_lang, message)
+                    try:
+                        match = match_func(utterances, intent_lang, message)
+                    except Exception:
+                        # a misbehaving pipeline matcher (e.g. a malformed .voc
+                        # resource) must not abort the whole utterance — log and
+                        # treat it as a no-match so iteration continues.
+                        LOG.exception(f"{match_func} raised while matching "
+                                      f"'{intent_lang}'; treating as no-match")
+                        match = None
                     if match:
                         LOG.info(f"{pipeline} match ({intent_lang}): {match}")
                         if match.skill_id and match.skill_id in (sess.blacklisted_skills or []):
