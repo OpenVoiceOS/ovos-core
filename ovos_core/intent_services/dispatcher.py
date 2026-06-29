@@ -61,11 +61,13 @@ orchestrator owns the spec one.
 The §8.3 timeout backstops every dispatch so exactly one terminal is guaranteed
 even if no done-signal ever arrives.
 
-The end-marker ``ovos.utterance.handled`` (§9.5) is emitted by the orchestrator
-on the paths it already owns (no-match, cancel, and the §8.3 timeout here); on the
-ordinary matched path the skill framework still emits it, so the orchestrator does
-not (avoiding a double end-marker). Moving §9.5 fully into the orchestrator is a
-separate coordinated step.
+The end-marker ``ovos.utterance.handled`` (§9.5) is NOT this class's concern: it is
+the orchestrator's universal terminal, emitted uniformly across the no-match, cancel
+and matched paths by ``IntentService``. On the matched path this dispatcher invokes
+the orchestrator's ``on_terminal`` callback immediately after each §8 terminal is on
+the bus; the orchestrator then emits the single §9.5 end-marker. The callback (rather
+than blocking, or a separate terminal subscription) keeps the dispatcher non-blocking
+AND guarantees the terminal is observed before the end-marker.
 
 Correlation uses ``session.session_id`` (§6.5: "the session is the correlation key
 ... no additional correlation field is defined") plus the dispatched ``skill_id``.
@@ -73,7 +75,7 @@ In-flight dispatches are tracked per session as a LIFO stack so nested lifecycle
 (§6.5) resolve innermost-first.
 """
 import threading
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from ovos_bus_client.message import Message
 from ovos_spec_tools import SpecMessage
@@ -110,9 +112,17 @@ class IntentDispatcher:
     done-signals (``mycroft.skill.handler.complete``/``.error``).
     """
 
-    def __init__(self, bus, timeout: Optional[float] = DEFAULT_HANDLER_TIMEOUT):
+    def __init__(self, bus, timeout: Optional[float] = DEFAULT_HANDLER_TIMEOUT,
+                 on_terminal: Optional[Callable[[Message], None]] = None):
         self.bus = bus
         self.timeout = timeout
+        # Called synchronously with the dispatch Message immediately AFTER each §8
+        # terminal (complete/error/timeout) is emitted, so the orchestrator can emit
+        # its §9.5 ovos.utterance.handled end-marker. Doing this in the same step
+        # (rather than via a separate bus subscription) guarantees the terminal is
+        # observed before the end-marker — otherwise a consumer subscribed to the
+        # terminal could emit the end-marker before the terminal is recorded.
+        self.on_terminal = on_terminal
         # session_id -> stack of _InFlightDispatch (LIFO for nested lifecycles)
         self._in_flight: Dict[str, List[_InFlightDispatch]] = {}
         self._lock = threading.Lock()
@@ -141,7 +151,9 @@ class IntentDispatcher:
 
         Emits ``ovos.intent.handler.start`` (§8.1), the dispatch on
         ``<skill_id>:<intent_name>`` (§7), then exactly one terminal
-        (``complete``/``error``/timeout) once the handler reports.
+        (``complete``/``error``/timeout) once the handler reports. The dispatch goes
+        out asynchronously — this call does NOT block. The orchestrator reacts to the
+        §8 terminal to emit its §9.5 ``ovos.utterance.handled`` end-marker.
 
         ``skill_id``/``intent_name`` default to the two halves of the dispatch
         topic; the orchestrator passes them explicitly from its own ``Match`` so
@@ -179,6 +191,13 @@ class IntentDispatcher:
         session, preserved unchanged via MSG-1 §5.1 ``forward``)."""
         self.bus.emit(dispatch_msg.forward(topic, data))
 
+    def _notify_terminal(self, dispatch_msg: Message):
+        """Tell the orchestrator a §8 terminal just fired so it can emit its §9.5
+        end-marker. Called after the terminal is on the bus, so the terminal is
+        always observed before the end-marker."""
+        if self.on_terminal is not None:
+            self.on_terminal(dispatch_msg)
+
     # -- terminal resolution ---------------------------------------------
     def _pop(self, sid: str, skill_id: Optional[str]) -> Optional[_InFlightDispatch]:
         """Pop the most-recent unresolved in-flight dispatch for this session
@@ -204,19 +223,17 @@ class IntentDispatcher:
             return None
 
     def _on_skill_complete(self, message: Message):
-        """Framework done-signal -> ``complete`` (§8.1), then the §9.5 end-marker
-        ``ovos.utterance.handled``. The orchestrator owns the universal end-marker
-        on EVERY terminal path (matched included); core emits exactly one per
-        dispatch — the LIFO ``_pop`` guard fires one terminal per in-flight entry.
-        (A workshop build may still emit its own matched-path handled during the
-        migration window; that transient duplicate is expected and removed later
-        workshop-side.)"""
+        """Framework done-signal -> ``complete`` (§8.1). Exactly one terminal fires
+        per dispatch — the LIFO ``_pop`` guard claims one in-flight entry. The §9.5
+        ``ovos.utterance.handled`` end-marker is NOT emitted here: the orchestrator
+        owns it and reacts to this terminal, uniformly with the no-match / cancel
+        paths."""
         entry = self._pop(self._session_id(message), message.context.get("skill_id"))
         if entry is None:
             return
         self._emit(SpecMessage.INTENT_HANDLER_COMPLETE, entry.dispatch_msg,
                    {"skill_id": entry.skill_id, "intent_name": entry.intent_name})
-        self._emit(SpecMessage.UTTERANCE_HANDLED, entry.dispatch_msg, {})
+        self._notify_terminal(entry.dispatch_msg)
 
     def _on_skill_error(self, message: Message):
         """Framework done-signal -> ``error`` with the exception (§8.2)."""
@@ -230,12 +247,12 @@ class IntentDispatcher:
                    {"skill_id": entry.skill_id,
                     "intent_name": entry.intent_name,
                     "exception": str(exception)})
-        self._emit(SpecMessage.UTTERANCE_HANDLED, entry.dispatch_msg, {})
+        self._notify_terminal(entry.dispatch_msg)
 
     def _on_timeout(self, sid: str, entry: _InFlightDispatch):
-        """§8.3 — bound handler execution; on timeout emit ``error`` (timeout)
-        then ``ovos.utterance.handled`` (§9.5; the skill never reported, so the
-        orchestrator owns the end-marker on this path). MUST NOT re-dispatch."""
+        """§8.3 — bound handler execution; on timeout emit ``error`` (timeout) so the
+        orchestrator still gets exactly one terminal (and emits its §9.5 end-marker).
+        MUST NOT re-dispatch."""
         with self._lock:
             if entry.resolved:
                 return
@@ -252,4 +269,4 @@ class IntentDispatcher:
                    {"skill_id": entry.skill_id,
                     "intent_name": entry.intent_name,
                     "exception": f"handler timed out after {self.timeout} seconds"})
-        self._emit(SpecMessage.UTTERANCE_HANDLED, entry.dispatch_msg, {})
+        self._notify_terminal(entry.dispatch_msg)

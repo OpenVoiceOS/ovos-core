@@ -292,8 +292,13 @@ class TestStopSkillCanHandleFalse(TestCase):
             Message("mycroft.skill.handler.complete",
                     {"name": "CountSkill.handle_how_are_you_intent"},
                     {"skill_id": self.skill_id}),
+            # §8 spec terminal for that active-skill dispatch, emitted by the
+            # orchestrator when the daemon intent finally completes (on stop)
+            Message(HANDLER_COMPLETE,
+                    {},
+                    {"skill_id": self.skill_id}),
             Message(UTTERANCE_HANDLED,
-                    {"name": "CountSkill.handle_how_are_you_intent"},
+                    {},
                     {"skill_id": self.skill_id}),
         ]
 

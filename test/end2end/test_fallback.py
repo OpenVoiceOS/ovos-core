@@ -91,15 +91,26 @@ class TestFallback(TestCase):
                 Message(f"ovos.skills.fallback.{self.skill_id}.request",
                         {"utterances": ["hello world"], "lang": session.lang, "range": [90, 101], "skill_id": self.skill_id}),
                 Message(f"ovos.skills.fallback.{self.skill_id}.start", {}),
+                # core reports the fallback dispatch lifecycle as the framework
+                # done-signal by translating the skill's own .start/.response
+                # markers, so an orchestrator can resolve it
+                Message("mycroft.skill.handler.start",
+                        data={"handler": f"{self.skill_id}.fallback"},
+                        context={"skill_id": self.skill_id}),
                 Message(SPEC_SPEAK,
                         data={"lang": session.lang,
                               "expect_response": False,
                               "meta": {
+                                  "dialog": "unknown",
+                                  "data": {},
                                   "skill": self.skill_id
                               }},
                         context={"skill_id": self.skill_id}),
                 Message(f"ovos.skills.fallback.{self.skill_id}.response",
                         data={"fallback_handler": "UnknownSkill.handle_fallback"}),
+                Message("mycroft.skill.handler.complete",
+                        data={"handler": f"{self.skill_id}.fallback"},
+                        context={"skill_id": self.skill_id}),
 
                 Message(UTTERANCE_HANDLED, {})
             ]

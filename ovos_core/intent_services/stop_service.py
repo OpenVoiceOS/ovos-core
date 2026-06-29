@@ -4,6 +4,7 @@ from threading import Event
 from typing import Optional, Dict, List, Union
 
 from ovos_bus_client.client import MessageBusClient
+from ovos_bus_client.handler import HandlerLifecycle
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, UtteranceState
 
@@ -32,15 +33,20 @@ class StopService(ConfidenceMatcherPipeline, OVOSAbstractApplication):
         self.bus.on("stop:skill", self.handle_skill_stop)
 
     def handle_global_stop(self, message: Message) -> None:
-        """Emit a global mycroft.stop and mark the utterance handled."""
-        self.bus.emit(message.forward("mycroft.stop"))
-        # TODO - this needs a confirmation dialog if nothing was stopped
-        self.bus.emit(message.forward("ovos.utterance.handled"))
+        """Emit a global mycroft.stop; the §9.5 end-marker is the orchestrator's
+        responsibility (``IntentDispatcher._notify_terminal``)."""
+        with HandlerLifecycle(self.bus, message,
+                              skill_id="stop.openvoiceos",
+                              data={"name": "StopService.handle_global_stop"}):
+            self.bus.emit(message.forward("mycroft.stop"))
 
     def handle_skill_stop(self, message: Message) -> None:
         """Forward a stop request to the specific skill."""
         skill_id = message.data["skill_id"]
-        self.bus.emit(message.reply(f"{skill_id}.stop"))
+        with HandlerLifecycle(self.bus, message,
+                              skill_id="stop.openvoiceos",
+                              data={"name": "StopService.handle_skill_stop"}):
+            self.bus.emit(message.reply(f"{skill_id}.stop"))
 
     @staticmethod
     def get_active_skills(message: Optional[Message] = None) -> List[str]:

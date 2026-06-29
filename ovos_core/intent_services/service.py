@@ -129,7 +129,15 @@ class IntentService:
         # (seconds, §8.3) bounds handler execution so exactly one terminal is
         # guaranteed even if a handler never reports; 0/None disables the timer.
         handler_timeout = self.config.get("handler_timeout", DEFAULT_HANDLER_TIMEOUT)
-        self.intent_dispatcher = IntentDispatcher(bus, timeout=handler_timeout)
+        # OVOS-PIPELINE-1 §9.5: the orchestrator owns the universal end-marker. The
+        # dispatcher notifies us (on_terminal) immediately after each §8 terminal
+        # (complete/error/timeout) is on the bus, and we emit ovos.utterance.handled
+        # right then — uniformly with the no-match and cancel paths. This keeps the
+        # emission in the orchestrator without blocking handle_utterance, and without
+        # the ordering race a separate terminal subscription would have (the terminal
+        # is always observed before the end-marker).
+        self.intent_dispatcher = IntentDispatcher(
+            bus, timeout=handler_timeout, on_terminal=self._emit_utterance_handled)
 
         # connection SessionManager to the bus,
         # this will sync default session across all components
@@ -282,6 +290,17 @@ class IntentService:
         skill_id = message.data.get("skill_id")
         self._deactivations[sess.session_id].append(skill_id)
 
+    def _emit_utterance_handled(self, dispatch_msg: Message):
+        """OVOS-PIPELINE-1 §9.5 — emit the universal ``ovos.utterance.handled``
+        end-marker once a matched handler reaches its §8 terminal.
+
+        Invoked by the dispatcher (``on_terminal``) right after a complete/error/
+        timeout terminal is on the bus — non-blocking, and ordered after the terminal
+        so consumers never see the end-marker first. The no-match and cancel paths
+        emit their own end-marker inline; together they give exactly one per
+        utterance."""
+        self.bus.emit(dispatch_msg.forward(SpecMessage.UTTERANCE_HANDLED, {}))
+
     def _dispatch_match(self, match: IntentHandlerMatch, message: Message, lang: str,
                         pipeline_id: str = None):
         """Orchestrate the OVOS-PIPELINE-1 §6.1 post-match steps, then dispatch.
@@ -371,6 +390,9 @@ class IntentService:
             # from the orchestrator's own Match, not the skill.
             skill_id = match.skill_id or reply.msg_type.split(":", 1)[0]
             intent_name = reply.msg_type.split(":", 1)[-1]
+            # The §8 terminal (complete/error/timeout) the dispatcher emits drives
+            # the §9.5 ovos.utterance.handled end-marker via _emit_utterance_handled;
+            # no blocking here (see __init__).
             self.intent_dispatcher.dispatch(reply, skill_id, intent_name)
 
         else:  # upload intent metrics if enabled
