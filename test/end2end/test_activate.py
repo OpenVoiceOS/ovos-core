@@ -168,12 +168,12 @@ class TestDeactivate(TestCase):
                           {"utterances": ["deactivate skill from within converse"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
-        # the skill deactivates itself inside converse, but the converse
-        # pipeline re-activates it after handling the converse response, so it
-        # ends the utterance active again (identical on both namespace paths).
+        # the skill deactivates itself inside converse, so the session ends
+        # with the skill inactive (no re-activation — the skill explicitly
+        # requested deactivation).
         final_session = Session("123")
         final_session.lang = "en-US"
-        final_session.active_skills = [(self.skill_id, 0.0)]
+        final_session.active_skills = []
 
         test = End2EndTest(
             minicroft=minicroft,
