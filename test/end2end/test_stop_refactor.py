@@ -1,14 +1,15 @@
-"""End-to-end tests for the StopService OVOSAbstractApplication refactor.
+"""End-to-end tests for the StopService stop-vocabulary refactor.
 
-These tests verify behaviour introduced or changed when StopService was
-refactored to subclass OVOSAbstractApplication:
+StopService is a pipeline plugin (NOT an ovos-workshop skill); it matches the
+stop vocabulary via ovos-spec-tools (LocaleResources) instead of the
+OVOSAbstractApplication base class. These tests verify:
 
 1. Vocabulary loaded from .voc files (renamed from .intent) still matches.
 2. global_stop.voc phrases trigger a global stop even when skills are active.
 3. can_handle=False default: a skill that declines the stop ping is still
    tried via the active-skills fallback.
-4. StopService (as OVOSSkill) emits stop.openvoiceos.stop.response when
-   mycroft.stop is broadcast — verified via ignore_messages pattern.
+4. StopService does NOT register skill machinery — it never answers the
+   mycroft.stop broadcast with stop.openvoiceos.stop.response.
 
 Every scenario that injects an utterance is run on BOTH bus namespace paths via
 ``self.subTest(namespace=...)``:
@@ -75,8 +76,6 @@ _STOP_RESPONSES = [
     "common_query.openvoiceos.stop.response",
     "persona.openvoiceos.stop.response",
     "ovos-hivemind-pipeline-plugin.stop.response",
-    # StopService now subclasses OVOSAbstractApplication — it also responds to mycroft.stop
-    "stop.openvoiceos.stop.response",
     # timing-dependent cleanup of an interrupted skill (mid get_response /
     # active / mid-TTS) — ignore so the assertion stays stable across runs.
     "mycroft.skills.abort_question",
@@ -89,11 +88,11 @@ class TestGlobalStopVocabulary(TestCase):
     """global_stop.voc phrases trigger stop:global when no skills are active.
 
     These tests verify that the .voc file rename (from .intent) preserved the
-    vocabulary content and that voc_match (now delegated to OVOSAbstractApplication)
-    correctly distinguishes 'stop' from 'stop everything'.
+    vocabulary content and that voc_match (delegated to ovos-spec-tools
+    LocaleResources) correctly distinguishes 'stop' from 'stop everything'.
 
-    No skills are loaded here so mycroft.stop does not produce any extra
-    {skill_id}.stop.response messages beyond stop.openvoiceos.stop.response.
+    No skills are loaded here, so mycroft.stop produces no {skill_id}.stop.response
+    messages — and StopService itself no longer answers it.
     """
 
     def setUp(self):
@@ -303,47 +302,46 @@ class TestStopSkillCanHandleFalse(TestCase):
                           {"utterances": ["stop"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
 
+        # Assert ONLY the stop dispatch lifecycle (skill_id=stop.openvoiceos).
+        # Stopping a running skill produces two concurrent lifecycles whose
+        # messages interleave non-deterministically: the stop dispatch (asserted
+        # here) and the interrupted count intent's own §8 trio + §9.5 terminal,
+        # which completes asynchronously when the daemon unwinds. The skill_id
+        # filter isolates the stop dispatch; eof_count=2 lets capture span both
+        # utterances' ovos.utterance.handled before filtering.
         expected = [
-            message,
-            Message(f"{self.skill_id}.stop.ping", {"skill_id": self.skill_id}),
-            Message("skill.stop.pong",
-                    {"skill_id": self.skill_id, "can_handle": True},
-                    {"skill_id": self.skill_id}),
-            Message("stop.openvoiceos.activate", context={"skill_id": "stop.openvoiceos"}),
-            Message("stop:skill", context={"skill_id": "stop.openvoiceos"}),
-            # StopService wraps handle_skill_stop in HandlerLifecycle
+            Message("stop.openvoiceos.activate", {},
+                    {"skill_id": "stop.openvoiceos"}),
+            Message(INTENT_MATCHED,
+                    {"skill_id": "stop.openvoiceos", "intent_name": "stop:skill"},
+                    {"skill_id": "stop.openvoiceos"}),
+            Message(HANDLER_START,
+                    {"skill_id": "stop.openvoiceos", "intent_name": "skill"},
+                    {"skill_id": "stop.openvoiceos"}),
+            Message("stop:skill", {"skill_id": self.skill_id},
+                    {"skill_id": "stop.openvoiceos"}),
             Message("mycroft.skill.handler.start",
                     {"name": "StopService.handle_skill_stop"},
                     {"skill_id": "stop.openvoiceos"}),
-            Message(f"{self.skill_id}.stop", context={"skill_id": "stop.openvoiceos"}),
-            Message(f"{self.skill_id}.stop.response",
-                    {"skill_id": self.skill_id, "result": True},
-                    {"skill_id": self.skill_id}),
+            Message(f"{self.skill_id}.stop", {},
+                    {"skill_id": "stop.openvoiceos"}),
             Message("mycroft.skill.handler.complete",
                     {"name": "StopService.handle_skill_stop"},
                     {"skill_id": "stop.openvoiceos"}),
-            # stop turn terminates — capture stops here (eof_msgs). The interrupted
-            # count daemon then races in its own CountSkill complete + a second
-            # ovos.utterance.handled; that tail is non-deterministic (depends where
-            # the stop lands relative to the 1s count loop) so it is not asserted.
-            Message(UTTERANCE_HANDLED,
-                    {},
+            Message(HANDLER_COMPLETE,
+                    {"skill_id": "stop.openvoiceos", "intent_name": "skill"},
+                    {"skill_id": "stop.openvoiceos"}),
+            Message(UTTERANCE_HANDLED, {},
                     {"skill_id": "stop.openvoiceos"}),
         ]
 
         test = End2EndTest(
             minicroft=minicroft,
             skill_ids=[],
+            skill_id="stop.openvoiceos",
             eof_msgs=[UTTERANCE_HANDLED],
-            flip_points=[utt_topic],
-            entry_points=[utt_topic],
-            keep_original_src=[
-                f"{self.skill_id}.stop.ping",
-                f"{self.skill_id}.stop",
-                "mycroft.skills.abort_question",
-                "ovos.skills.converse.force_timeout",
-            ],
-            ignore_messages=_STOP_RESPONSES,
+            eof_count=2,
+            test_active_skills=False,
             source_message=message,
             expected_messages=expected,
         )
@@ -356,16 +354,14 @@ class TestStopSkillCanHandleFalse(TestCase):
                 self._run_stop_with_active_skill_ping_pong(namespace)
 
 
-class TestStopServiceAsSkill(TestCase):
-    """Verify that StopService behaves correctly as an OVOSAbstractApplication.
+class TestStopServiceNotASkill(TestCase):
+    """StopService is a pipeline plugin, NOT an ovos-workshop skill.
 
-    Since StopService now subclasses OVOSAbstractApplication it is registered
-    as a skill under skill_id='stop.openvoiceos'.  It therefore:
-      - responds to mycroft.stop with stop.openvoiceos.stop.response
-      - emits stop.openvoiceos.activate when the stop pipeline matches
-
-    These messages are already filtered via ignore_messages in other tests;
-    here we explicitly verify their presence.
+    It matches the stop vocabulary via ovos-spec-tools (LocaleResources) and owns
+    the stop dispatch, but it MUST NOT register skill machinery — in particular it
+    must NOT answer the mycroft.stop broadcast with stop.openvoiceos.stop.response
+    (that would make it stop "itself" and pollute the lifecycle). This is the
+    regression guard for dropping the OVOSAbstractApplication base class.
     """
 
     def setUp(self):
@@ -374,9 +370,9 @@ class TestStopServiceAsSkill(TestCase):
     def tearDown(self):
         LOG.set_level("CRITICAL")
 
-    def _run_stop_service_emits_activate_and_stop_response(self, namespace):
-        """After a global stop, stop.openvoiceos.activate and stop.openvoiceos.stop.response
-        are both emitted — confirming the service participates in skill lifecycle."""
+    def _run_stop_service_is_not_a_skill(self, namespace):
+        """A global stop with no skills loaded emits the stop dispatch lifecycle
+        and NO stop.openvoiceos.stop.response (StopService does not self-respond)."""
         modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
         minicroft = get_minicroft([], modernize=modernize, emit_legacy=emit_legacy)
 
@@ -387,16 +383,16 @@ class TestStopServiceAsSkill(TestCase):
                           {"utterances": ["stop"], "lang": session.lang},
                           {"session": session.serialize()})
 
-        # Do NOT ignore stop.openvoiceos.stop.response here — we want to assert it appears
-        ignore = [m for m in _STOP_RESPONSES if m != "stop.openvoiceos.stop.response"]
-
+        # stop.openvoiceos.stop.response is intentionally NOT ignored: if the
+        # skill machinery ever comes back it would appear as an extra message and
+        # fail the count.
         test = End2EndTest(
             minicroft=minicroft,
             skill_ids=[],
             eof_msgs=[UTTERANCE_HANDLED],
             flip_points=[utt_topic],
             entry_points=[utt_topic],
-            ignore_messages=ignore,
+            ignore_messages=_STOP_RESPONSES,
             source_message=message,
             expected_messages=[
                 message,
@@ -406,9 +402,6 @@ class TestStopServiceAsSkill(TestCase):
                 Message("mycroft.skill.handler.start",
                         {"name": "StopService.handle_global_stop"}),
                 Message("mycroft.stop", {}),
-                # StopService as OVOSSkill handles mycroft.stop and replies
-                Message("stop.openvoiceos.stop.response",
-                        {"result": False, "skill_id": "stop.openvoiceos"}),
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_global_stop"}),
                 Message(UTTERANCE_HANDLED, {}),
@@ -417,7 +410,7 @@ class TestStopServiceAsSkill(TestCase):
         test.execute()
         minicroft.stop()
 
-    def test_stop_service_emits_activate_and_stop_response(self):
+    def test_stop_service_is_not_a_skill(self):
         for namespace in NAMESPACE_PATHS:
             with self.subTest(namespace=namespace):
-                self._run_stop_service_emits_activate_and_stop_response(namespace)
+                self._run_stop_service_is_not_a_skill(namespace)

@@ -91,7 +91,6 @@ class TestIntentPipelineRouting(TestCase):
         "common_query.openvoiceos.stop.response",
         "persona.openvoiceos.stop.response",
         "ovos-hivemind-pipeline-plugin.stop.response",
-        "stop.openvoiceos.stop.response",
     ]
 
     def setUp(self) -> None:

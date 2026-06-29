@@ -64,9 +64,6 @@ IGNORE_MESSAGES = [
     "common_query.openvoiceos.stop.response",
     "persona.openvoiceos.stop.response",
     "ovos-hivemind-pipeline-plugin.stop.response",
-    # StopService now subclasses OVOSAbstractApplication,
-    # so it also emits a stop.response when mycroft.stop is broadcast
-    "stop.openvoiceos.stop.response",
     # The async stop-pipeline callback cleans up an interrupted skill depending
     # on exactly where the stop lands (mid get_response / active / mid-TTS). These
     # artifacts are timing-dependent — ignore them so the assertion stays stable.
@@ -74,6 +71,60 @@ IGNORE_MESSAGES = [
     "ovos.skills.converse.force_timeout",
     "mycroft.audio.speech.stop",
 ]
+
+
+def skill_stop_lifecycle(skill_id):
+    """The deterministic stop-dispatch §8 lifecycle, as seen filtered to
+    ``skill_id="stop.openvoiceos"`` (the StopService that owns the stop dispatch).
+
+    Stopping a *running* skill produces two concurrent dispatch lifecycles whose
+    messages interleave non-deterministically: the stop dispatch (asserted here)
+    and the interrupted skill's own §8 trio + §9.5 terminal, which completes
+    asynchronously once the daemon thread unwinds. The End2EndTest ``skill_id``
+    filter isolates the stop dispatch; ``eof_count=2`` lets capture span both
+    utterances' ``ovos.utterance.handled`` before filtering. The interrupted
+    skill's §8 trio is asserted deterministically (uninterrupted) by ``test_count``.
+    """
+    return [
+        Message("stop.openvoiceos.activate", {},
+                {"skill_id": "stop.openvoiceos"}),
+        # §9.2 matched notification precedes the dispatch
+        Message(INTENT_MATCHED,
+                {"skill_id": "stop.openvoiceos", "intent_name": "stop:skill"},
+                {"skill_id": "stop.openvoiceos"}),
+        # §8.1 orchestrator handler-start
+        Message(HANDLER_START,
+                {"skill_id": "stop.openvoiceos", "intent_name": "skill"},
+                {"skill_id": "stop.openvoiceos"}),
+        Message("stop:skill",
+                {"skill_id": skill_id},
+                {"skill_id": "stop.openvoiceos"}),
+        # StopService wraps handle_skill_stop in HandlerLifecycle (legacy done-signal)
+        Message("mycroft.skill.handler.start",
+                {"name": "StopService.handle_skill_stop"},
+                {"skill_id": "stop.openvoiceos"}),
+        Message(f"{skill_id}.stop", {},
+                {"skill_id": "stop.openvoiceos"}),
+        Message("mycroft.skill.handler.complete",
+                {"name": "StopService.handle_skill_stop"},
+                {"skill_id": "stop.openvoiceos"}),
+        # §8 orchestrator terminal + §9.5 end-marker
+        Message(HANDLER_COMPLETE,
+                {"skill_id": "stop.openvoiceos", "intent_name": "skill"},
+                {"skill_id": "stop.openvoiceos"}),
+        Message(UTTERANCE_HANDLED, {},
+                {"skill_id": "stop.openvoiceos"}),
+    ]
+
+
+# Shared End2EndTest config for the skill-stop (ping-pong) scenarios: isolate the
+# stop dispatch lifecycle and wait for BOTH utterances to terminate before filtering.
+SKILL_STOP_LIFECYCLE_KWARGS = dict(
+    skill_id="stop.openvoiceos",
+    eof_msgs=[UTTERANCE_HANDLED],
+    eof_count=2,
+    test_active_skills=False,
+)
 
 
 class TestStopNoSkills(TestCase):
@@ -301,56 +352,12 @@ class TestCountSkills(TestCase):
                               {"utterances": ["stop"], "lang": session.lang},
                               {"session": session.serialize(), "source": "A", "destination": "B"})
 
-            stop_skill_active = [
-                message,
-                Message(f"{self.skill_id}.stop.ping",
-                        {"skill_id": self.skill_id}),
-                Message("skill.stop.pong",
-                        {"skill_id": self.skill_id, "can_handle": True},
-                        {"skill_id": self.skill_id}),
-
-                Message("stop.openvoiceos.activate",
-                        context={"skill_id": "stop.openvoiceos"}),
-                Message("stop:skill",
-                        context={"skill_id": "stop.openvoiceos"}),
-                # StopService wraps handle_skill_stop in HandlerLifecycle
-                Message("mycroft.skill.handler.start",
-                        {"name": "StopService.handle_skill_stop"},
-                        {"skill_id": "stop.openvoiceos"}),
-                Message(f"{self.skill_id}.stop",
-                        context={"skill_id": "stop.openvoiceos"}),
-                Message(f"{self.skill_id}.stop.response",
-                        {"skill_id": self.skill_id, "result": True},
-                        {"skill_id": self.skill_id}),
-                Message("mycroft.skill.handler.complete",
-                        {"name": "StopService.handle_skill_stop"},
-                        {"skill_id": "stop.openvoiceos"}),
-                # stop turn terminates — capture stops here (eof_msgs). The
-                # interrupted count daemon then exits and races in its own
-                # CountSkill complete + a second ovos.utterance.handled; that tail
-                # is non-deterministic (depends where the stop lands relative to
-                # the 1s count loop) so it is intentionally not asserted.
-                Message(UTTERANCE_HANDLED,
-                        {},
-                        {"skill_id": "stop.openvoiceos"}),
-            ]
             test = End2EndTest(
                 minicroft=minicroft,
                 skill_ids=[],
-                eof_msgs=[UTTERANCE_HANDLED],
-                flip_points=[utt_topic],
-                entry_points=[utt_topic],
-                # messages in 'keep_original_src' would not be sent to hivemind clients
-                # i.e. they are directed towards ovos-core
-                keep_original_src=[f"{self.skill_id}.stop.ping",
-                                   f"{self.skill_id}.stop",
-                                   "mycroft.skills.abort_question",
-                                   "ovos.skills.converse.force_timeout",
-                                   # "stop.openvoiceos.activate" # TODO
-                                   ],
-                ignore_messages=IGNORE_MESSAGES,
                 source_message=message,
-                expected_messages=stop_skill_active
+                expected_messages=skill_stop_lifecycle(self.skill_id),
+                **SKILL_STOP_LIFECYCLE_KWARGS,
             )
             test.execute()
         finally:
@@ -387,33 +394,43 @@ class TestCountSkills(TestCase):
             message = Message(utt_topic,
                               {"utterances": ["stop"], "lang": session.lang},
                               {"session": session.serialize()})
+            # Assert ONLY the global-stop dispatch lifecycle (skill_id=stop.openvoiceos);
+            # the interrupted count intent's terminal races in asynchronously and is
+            # isolated out by the skill_id filter (eof_count=2 spans both utterances).
             stop_skill_from_global = [
-                message,
-                Message("stop.openvoiceos.activate", {}),  # stop pipeline counts as active_skill
-
-                Message("stop:global", {}),  # global stop, no active skill
-                # StopService wraps the global-stop handler in HandlerLifecycle;
-                # the count skill reacts to mycroft.stop (synchronous FakeBus) and
-                # emits its stop.response before the lifecycle context exits.
+                Message("stop.openvoiceos.activate", {},
+                        {"skill_id": "stop.openvoiceos"}),
+                Message(INTENT_MATCHED,
+                        {"skill_id": "stop.openvoiceos", "intent_name": "stop:global"},
+                        {"skill_id": "stop.openvoiceos"}),
+                Message(HANDLER_START,
+                        {"skill_id": "stop.openvoiceos", "intent_name": "global"},
+                        {"skill_id": "stop.openvoiceos"}),
+                Message("stop:global", {},
+                        {"skill_id": "stop.openvoiceos"}),
                 Message("mycroft.skill.handler.start",
-                        {"name": "StopService.handle_global_stop"}),
-                Message("mycroft.stop", {}),
-                Message(f"{self.skill_id}.stop.response",
-                        {"skill_id": self.skill_id, "result": True}),
+                        {"name": "StopService.handle_global_stop"},
+                        {"skill_id": "stop.openvoiceos"}),
+                Message("mycroft.stop", {},
+                        {"skill_id": "stop.openvoiceos"}),
                 Message("mycroft.skill.handler.complete",
-                        {"name": "StopService.handle_global_stop"}),
-                Message(UTTERANCE_HANDLED, {})
+                        {"name": "StopService.handle_global_stop"},
+                        {"skill_id": "stop.openvoiceos"}),
+                Message(HANDLER_COMPLETE,
+                        {"skill_id": "stop.openvoiceos", "intent_name": "global"},
+                        {"skill_id": "stop.openvoiceos"}),
+                Message(UTTERANCE_HANDLED, {},
+                        {"skill_id": "stop.openvoiceos"}),
             ]
             test = End2EndTest(
                 minicroft=minicroft,
                 skill_ids=[],
+                skill_id="stop.openvoiceos",
                 eof_msgs=[UTTERANCE_HANDLED],
-                flip_points=[utt_topic],
-                entry_points=[utt_topic],
-                ignore_messages=IGNORE_MESSAGES,
+                eof_count=2,
+                test_active_skills=False,
                 source_message=message,
                 expected_messages=stop_skill_from_global,
-                #keep_original_src=["stop.openvoiceos.activate"],  # TODO
             )
             test.execute()
         finally:
@@ -435,11 +452,9 @@ class TestCountSkills(TestCase):
                                 'ovos-stop-pipeline-plugin-low']
 
             def make_it_count():
-                nonlocal session
                 msg = Message(utt_topic,
                               {"utterances": ["count to infinity"], "lang": session.lang},
                               {"session": session.serialize(), "source": "A", "destination": "B"})
-                session.activate_skill(self.skill_id)  # ensure in active skill list
                 minicroft.bus.emit(msg)
 
             # count to infinity, the skill will keep running in the background
@@ -447,62 +462,19 @@ class TestCountSkills(TestCase):
 
             time.sleep(2)
 
+            # resend the live (singleton) session, as a client tracking responses
+            # would — the count intent self-activated the skill server-side
+            session = SessionManager.sessions[session.session_id]
             message = Message(utt_topic,
                               {"utterances": ["full stop"], "lang": session.lang},
                               {"session": session.serialize(), "source": "A", "destination": "B"})
 
-            stop_skill_active = [
-                message,
-                Message(f"{self.skill_id}.stop.ping",
-                        {"skill_id": self.skill_id}),
-                Message("skill.stop.pong",
-                        {"skill_id": self.skill_id, "can_handle": True},
-                        {"skill_id": self.skill_id}),
-
-                Message("stop.openvoiceos.activate",
-                        context={"skill_id": "stop.openvoiceos"}),
-                Message("stop:skill",
-                        context={"skill_id": "stop.openvoiceos"}),
-                # StopService wraps handle_skill_stop in HandlerLifecycle
-                Message("mycroft.skill.handler.start",
-                        {"name": "StopService.handle_skill_stop"},
-                        {"skill_id": "stop.openvoiceos"}),
-                Message(f"{self.skill_id}.stop",
-                        context={"skill_id": "stop.openvoiceos"}),
-                Message(f"{self.skill_id}.stop.response",
-                        {"skill_id": self.skill_id, "result": True},
-                        {"skill_id": self.skill_id}),
-                Message("mycroft.skill.handler.complete",
-                        {"name": "StopService.handle_skill_stop"},
-                        {"skill_id": "stop.openvoiceos"}),
-                # stop turn terminates — capture stops here (eof_msgs). The
-                # interrupted count daemon then exits and races in its own
-                # CountSkill complete + a second ovos.utterance.handled; that tail
-                # is non-deterministic (depends where the stop lands relative to
-                # the 1s count loop) so it is intentionally not asserted.
-                Message(UTTERANCE_HANDLED,
-                        {},
-                        {"skill_id": "stop.openvoiceos"}),
-            ]
             test = End2EndTest(
                 minicroft=minicroft,
                 skill_ids=[],
-                eof_msgs=[UTTERANCE_HANDLED],
-                flip_points=[utt_topic],
-                entry_points=[utt_topic],
-                # messages in 'keep_original_src' would not be sent to hivemind clients
-                # i.e. they are directed towards ovos-core
-                keep_original_src=[f"{self.skill_id}.stop.ping",
-                                   f"{self.skill_id}.stop",
-                                   "mycroft.skills.abort_question",
-                                   # "stop.openvoiceos.activate", # TODO
-                                   "ovos.skills.converse.force_timeout"],
-                ignore_messages=IGNORE_MESSAGES,
-                async_messages=[
-                    "ovos.skills.converse.force_timeout"
-                ],  # order that it wil be received unknown
                 source_message=message,
-                expected_messages=stop_skill_active
+                expected_messages=skill_stop_lifecycle(self.skill_id),
+                **SKILL_STOP_LIFECYCLE_KWARGS,
             )
             test.execute()
         finally:
