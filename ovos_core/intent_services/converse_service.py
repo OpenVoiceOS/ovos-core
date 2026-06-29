@@ -3,6 +3,7 @@ from threading import Event
 from typing import Optional, Dict, List, Union
 
 from ovos_bus_client.client import MessageBusClient
+from ovos_bus_client.handler import HandlerLifecycle
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, UtteranceState, Session
 from ovos_config.config import Configuration
@@ -32,7 +33,10 @@ class ConverseService(PipelinePlugin):
 
     def handle_converse(self, message: Message):
         skill_id = message.data["skill_id"]
-        self.bus.emit(message.reply(f"{skill_id}.converse.request", message.data))
+        with HandlerLifecycle(self.bus, message,
+                              skill_id="converse.openvoiceos",
+                              data={"name": "ConverseService.handle_converse"}):
+            self.bus.emit(message.reply(f"{skill_id}.converse.request", message.data))
 
     @property
     def active_skills(self):
