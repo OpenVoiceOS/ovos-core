@@ -1,5 +1,5 @@
 import time
-from threading import Event, Timer
+from threading import Event, Lock, Timer
 from typing import Optional, Dict, List, Union
 
 from ovos_bus_client.client import MessageBusClient
@@ -53,29 +53,43 @@ class ConverseService(PipelinePlugin):
         in-flight converse dispatch.
         """
         skill_id = message.data["skill_id"]
+        # the dispatch belongs to this session; only an ack carrying the same
+        # session may resolve it (a concurrent converse dispatch to the same
+        # skill in another session must not cross-resolve).
+        session_id = SessionManager.get(message).session_id
 
         lifecycle = HandlerLifecycle(self.bus, message, skill_id=skill_id,
                                      handler_name=f"{skill_id}.converse")
 
         # the skill answers asynchronously on skill.converse.response; resolve
         # the lifecycle when that ack arrives (complete) or when it never does
-        # (error/timeout). exactly one terminal is emitted.
+        # (error/timeout). exactly one terminal is emitted — the response thread
+        # and the timeout timer race for it, so claim the resolution atomically.
         resolved = Event()
+        resolve_lock = Lock()
+
+        def _claim() -> bool:
+            with resolve_lock:
+                if resolved.is_set():
+                    return False
+                resolved.set()
+                return True
 
         def _resolve_complete(msg: Message) -> None:
             if msg.data.get("skill_id") and msg.data.get("skill_id") != skill_id:
                 return  # ack from a different skill, ignore
-            if resolved.is_set():
+            if "session" in msg.context and \
+                    SessionManager.get(msg).session_id != session_id:
+                return  # ack from a different session, ignore
+            if not _claim():
                 return
-            resolved.set()
             timer.cancel()
             self.bus.remove("skill.converse.response", _resolve_complete)
             lifecycle.complete()
 
         def _resolve_timeout() -> None:
-            if resolved.is_set():
+            if not _claim():
                 return
-            resolved.set()
             self.bus.remove("skill.converse.response", _resolve_complete)
             LOG.warning(f"converse dispatch to {skill_id} timed out after "
                         f"{CONVERSE_HANDLER_TIMEOUT}s; emitting handler error")
