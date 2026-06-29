@@ -16,7 +16,7 @@ import time
 from unittest import TestCase
 
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import Session
+from ovos_bus_client.session import Session, SessionManager
 from ovos_spec_tools import SpecMessage, migration_counterpart
 from ovos_utils import create_daemon
 from ovos_utils.log import LOG
@@ -103,7 +103,12 @@ class TestStopNoSkills(TestCase):
                     Message("stop.openvoiceos.activate", {}),  # stop pipeline counts as active_skill
 
                     Message("stop:global", {}),  # global stop, no active skill
+                    # StopService wraps the global-stop handler in HandlerLifecycle
+                    Message("mycroft.skill.handler.start",
+                            {"name": "StopService.handle_global_stop"}),
                     Message("mycroft.stop", {}),
+                    Message("mycroft.skill.handler.complete",
+                            {"name": "StopService.handle_global_stop"}),
 
                     Message(UTTERANCE_HANDLED, {})
                 ]
@@ -179,7 +184,12 @@ class TestStopNoSkills(TestCase):
                     Message("stop.openvoiceos.activate", {}),  # stop pipeline counts as active_skill
 
                     Message("stop:global", {}),  # global stop, no active skill
+                    # StopService wraps the global-stop handler in HandlerLifecycle
+                    Message("mycroft.skill.handler.start",
+                            {"name": "StopService.handle_global_stop"}),
                     Message("mycroft.stop", {}),
+                    Message("mycroft.skill.handler.complete",
+                            {"name": "StopService.handle_global_stop"}),
 
                     Message(UTTERANCE_HANDLED, {})
                 ]
@@ -268,7 +278,6 @@ class TestCountSkills(TestCase):
                 msg = Message(utt_topic,
                               {"utterances": ["count to infinity"], "lang": session.lang},
                               {"session": session.serialize(), "source": "A", "destination": "B"})
-                session.activate_skill(self.skill_id)  # ensure in active skill list
                 minicroft.bus.emit(msg)
 
             # count to infinity, the skill will keep running in the background
@@ -276,6 +285,12 @@ class TestCountSkills(TestCase):
 
             time.sleep(2)
 
+            # The count intent self-activates the skill server-side; the Session
+            # singleton holds the authoritative state (SESSION-1 last-write-wins).
+            # A real client tracks the session via responses and resends it, so
+            # the stop turn carries the running skill in active_skills — no manual
+            # activation required.
+            session = SessionManager.sessions[session.session_id]
             message = Message(utt_topic,
                               {"utterances": ["stop"], "lang": session.lang},
                               {"session": session.serialize(), "source": "A", "destination": "B"})
@@ -292,11 +307,22 @@ class TestCountSkills(TestCase):
                         context={"skill_id": "stop.openvoiceos"}),
                 Message("stop:skill",
                         context={"skill_id": "stop.openvoiceos"}),
+                # StopService wraps handle_skill_stop in HandlerLifecycle
+                Message("mycroft.skill.handler.start",
+                        {"name": "StopService.handle_skill_stop"},
+                        {"skill_id": "stop.openvoiceos"}),
                 Message(f"{self.skill_id}.stop",
                         context={"skill_id": "stop.openvoiceos"}),
                 Message(f"{self.skill_id}.stop.response",
                         {"skill_id": self.skill_id, "result": True},
                         {"skill_id": self.skill_id}),
+                Message("mycroft.skill.handler.complete",
+                        {"name": "StopService.handle_skill_stop"},
+                        {"skill_id": "stop.openvoiceos"}),
+                # stop turn terminates
+                Message(UTTERANCE_HANDLED,
+                        {},
+                        {"skill_id": "stop.openvoiceos"}),
 
                 # async stop pipeline callback emits these messages
                 # but we cant guarantee where in the test they will be emitted
@@ -316,14 +342,11 @@ class TestCountSkills(TestCase):
                 #        {"skill_id": self.skill_id},
                 #        {"skill_id": self.skill_id}),
 
-                # the intent running in the daemon thread exits cleanly
+                # the interrupted count intent (daemon dispatch) exits cleanly;
+                # the §8 ovos.intent.handler.complete terminal is filtered via
+                # IGNORE_MESSAGES, so only the legacy complete + handled remain.
                 Message("mycroft.skill.handler.complete",
                         {"name": "CountSkill.handle_how_are_you_intent"},
-                        {"skill_id": self.skill_id}),
-                # §8 spec terminal for that active-skill dispatch, emitted by the
-                # orchestrator when the daemon intent finally completes (on stop)
-                Message(HANDLER_COMPLETE,
-                        {},
                         {"skill_id": self.skill_id}),
                 Message(UTTERANCE_HANDLED,
                         {},
@@ -390,10 +413,16 @@ class TestCountSkills(TestCase):
                 Message("stop.openvoiceos.activate", {}),  # stop pipeline counts as active_skill
 
                 Message("stop:global", {}),  # global stop, no active skill
+                # StopService wraps the global-stop handler in HandlerLifecycle;
+                # the count skill reacts to mycroft.stop (synchronous FakeBus) and
+                # emits its stop.response before the lifecycle context exits.
+                Message("mycroft.skill.handler.start",
+                        {"name": "StopService.handle_global_stop"}),
                 Message("mycroft.stop", {}),
-
                 Message(f"{self.skill_id}.stop.response",
                         {"skill_id": self.skill_id, "result": True}),
+                Message("mycroft.skill.handler.complete",
+                        {"name": "StopService.handle_global_stop"}),
                 Message(UTTERANCE_HANDLED, {})
             ]
             test = End2EndTest(
@@ -455,11 +484,22 @@ class TestCountSkills(TestCase):
                         context={"skill_id": "stop.openvoiceos"}),
                 Message("stop:skill",
                         context={"skill_id": "stop.openvoiceos"}),
+                # StopService wraps handle_skill_stop in HandlerLifecycle
+                Message("mycroft.skill.handler.start",
+                        {"name": "StopService.handle_skill_stop"},
+                        {"skill_id": "stop.openvoiceos"}),
                 Message(f"{self.skill_id}.stop",
                         context={"skill_id": "stop.openvoiceos"}),
                 Message(f"{self.skill_id}.stop.response",
                         {"skill_id": self.skill_id, "result": True},
                         {"skill_id": self.skill_id}),
+                Message("mycroft.skill.handler.complete",
+                        {"name": "StopService.handle_skill_stop"},
+                        {"skill_id": "stop.openvoiceos"}),
+                # stop turn terminates
+                Message(UTTERANCE_HANDLED,
+                        {},
+                        {"skill_id": "stop.openvoiceos"}),
 
                 # async stop pipeline callback emits these messages
                 # but we cant guarantee where in the test they will be emitted
@@ -479,14 +519,11 @@ class TestCountSkills(TestCase):
                 #        {"skill_id": self.skill_id},
                 #        {"skill_id": self.skill_id}),
 
-                # the intent running in the daemon thread exits cleanly
+                # the interrupted count intent (daemon dispatch) exits cleanly;
+                # the §8 ovos.intent.handler.complete terminal is filtered via
+                # IGNORE_MESSAGES, so only the legacy complete + handled remain.
                 Message("mycroft.skill.handler.complete",
                         {"name": "CountSkill.handle_how_are_you_intent"},
-                        {"skill_id": self.skill_id}),
-                # §8 spec terminal for that active-skill dispatch, emitted by the
-                # orchestrator when the daemon intent finally completes (on stop)
-                Message(HANDLER_COMPLETE,
-                        {},
                         {"skill_id": self.skill_id}),
                 Message(UTTERANCE_HANDLED,
                         {},
