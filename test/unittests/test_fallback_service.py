@@ -34,6 +34,7 @@ def _make_service(config=None) -> FallbackService:
         svc.bus = bus
         svc.config = config or {}
         svc.registered_fallbacks = {}
+        svc._lifecycle_handlers = {}
         svc._fallback_response_event = threading.Event()
         svc.bus.on("ovos.skills.fallback.register", svc.handle_register_fallback)
         svc.bus.on("ovos.skills.fallback.deregister", svc.handle_deregister_fallback)
@@ -421,6 +422,95 @@ class TestShutdown(unittest.TestCase):
         removed = {c[0][0] for c in svc.bus.remove.call_args_list}
         self.assertIn("ovos.skills.fallback.register", removed)
         self.assertIn("ovos.skills.fallback.deregister", removed)
+
+
+class TestFallbackHandlerLifecycle(unittest.TestCase):
+    """A registered fallback skill's own lifecycle markers are translated into
+    the framework done-signal so an orchestrator (OVOS-PIPELINE-1 §8) can
+    resolve a reserved ``fallback`` dispatch instead of hitting its timeout."""
+
+    def _service_with_capture(self):
+        svc = _make_service()
+        captured = []
+        # FakeBus emits the "message" catch-all as a serialized string; parse it
+        # back into a Message so assertions can read msg_type/context/data.
+        svc.bus.on("message", lambda s: captured.append(Message.deserialize(s)))
+        return svc, captured
+
+    def test_register_wires_lifecycle_listeners(self):
+        """Registering a fallback skill installs its .start/.response bridge."""
+        svc, _ = self._service_with_capture()
+        svc.handle_register_fallback(
+            Message("ovos.skills.fallback.register",
+                    {"skill_id": "skill_a", "priority": 50}))
+        self.assertIn("skill_a", svc._lifecycle_handlers)
+
+    def test_skill_start_emits_handler_start(self):
+        """The skill's fallback .start is re-emitted as handler.start with the
+        skill_id stamped in context."""
+        svc, captured = self._service_with_capture()
+        svc.handle_register_fallback(
+            Message("ovos.skills.fallback.register", {"skill_id": "skill_a"}))
+        captured.clear()
+
+        svc.bus.emit(Message("ovos.skills.fallback.skill_a.start"))
+        starts = [m for m in captured
+                  if m.msg_type == "mycroft.skill.handler.start"]
+        self.assertEqual(len(starts), 1)
+        self.assertEqual(starts[0].context.get("skill_id"), "skill_a")
+
+    def test_skill_response_emits_handler_complete(self):
+        """The skill's fallback .response is re-emitted as handler.complete,
+        regardless of the result bool."""
+        svc, captured = self._service_with_capture()
+        svc.handle_register_fallback(
+            Message("ovos.skills.fallback.register", {"skill_id": "skill_a"}))
+        captured.clear()
+
+        svc.bus.emit(Message("ovos.skills.fallback.skill_a.response",
+                             {"result": False}))
+        completes = [m for m in captured
+                     if m.msg_type == "mycroft.skill.handler.complete"]
+        self.assertEqual(len(completes), 1)
+        self.assertEqual(completes[0].context.get("skill_id"), "skill_a")
+
+    def test_deregister_unwires_lifecycle(self):
+        """Deregistering removes the bridge; later markers emit nothing."""
+        svc, captured = self._service_with_capture()
+        svc.handle_register_fallback(
+            Message("ovos.skills.fallback.register", {"skill_id": "skill_a"}))
+        svc.handle_deregister_fallback(
+            Message("ovos.skills.fallback.deregister", {"skill_id": "skill_a"}))
+        self.assertNotIn("skill_a", svc._lifecycle_handlers)
+        captured.clear()
+
+        svc.bus.emit(Message("ovos.skills.fallback.skill_a.response",
+                             {"result": True}))
+        topics = [m.msg_type for m in captured]
+        self.assertNotIn("mycroft.skill.handler.complete", topics)
+
+    def test_lifecycle_only_for_targeted_skill(self):
+        """A response for skill_a must not be reported under skill_b's id."""
+        svc, captured = self._service_with_capture()
+        svc.handle_register_fallback(
+            Message("ovos.skills.fallback.register", {"skill_id": "skill_a"}))
+        svc.handle_register_fallback(
+            Message("ovos.skills.fallback.register", {"skill_id": "skill_b"}))
+        captured.clear()
+
+        svc.bus.emit(Message("ovos.skills.fallback.skill_a.response",
+                             {"result": True}))
+        completes = [m for m in captured
+                     if m.msg_type == "mycroft.skill.handler.complete"]
+        self.assertEqual(len(completes), 1)
+        self.assertEqual(completes[0].context.get("skill_id"), "skill_a")
+
+    def test_register_without_skill_id_skips_wiring(self):
+        """A register message lacking skill_id must not wire a None lifecycle."""
+        svc, _ = self._service_with_capture()
+        svc.handle_register_fallback(
+            Message("ovos.skills.fallback.register", {}))
+        self.assertNotIn(None, svc._lifecycle_handlers)
 
 
 if __name__ == "__main__":

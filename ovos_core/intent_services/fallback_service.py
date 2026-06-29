@@ -19,6 +19,7 @@ from collections import namedtuple
 from typing import Optional, Dict, List, Union
 
 from ovos_bus_client.client import MessageBusClient
+from ovos_bus_client.handler import HandlerLifecycle
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_config import Configuration
@@ -40,9 +41,54 @@ class FallbackService(ConfidenceMatcherPipeline):
         config = config or Configuration().get("skills", {}).get("fallbacks", {})
         super().__init__(bus, config)
         self.registered_fallbacks = {}  # skill_id: priority
+        # skill_id -> (start_handler, response_handler) wired for the
+        # done-signal translation, so they can be removed on deregister
+        self._lifecycle_handlers = {}
         self._fallback_response_event = threading.Event()
         self.bus.on("ovos.skills.fallback.register", self.handle_register_fallback)
         self.bus.on("ovos.skills.fallback.deregister", self.handle_deregister_fallback)
+
+    def _wire_lifecycle(self, skill_id: str) -> None:
+        """Translate a fallback skill's own lifecycle topics into the framework
+        done-signal an orchestrator observes.
+
+        The skill framework already emits ``ovos.skills.fallback.<skill_id>.start``
+        when it begins handling a fallback request and
+        ``ovos.skills.fallback.<skill_id>.response`` (carrying a ``result`` bool)
+        when it finishes. core re-emits these as
+        ``mycroft.skill.handler.{start,complete}`` stamped with this ``skill_id``
+        so a dispatcher (OVOS-PIPELINE-1 §8) correlates them to the in-flight
+        fallback dispatch instead of waiting out its handler timeout. The
+        fallback dispatch itself is owned by the orchestrator (the
+        ``ovos.skills.fallback.<skill_id>.request`` emission), so this service
+        only *reports* the dispatch->outcome span by observing the skill's own
+        markers.
+        """
+        if skill_id in self._lifecycle_handlers:
+            return
+
+        def _on_start(message: Message) -> None:
+            HandlerLifecycle(self.bus, message, skill_id=skill_id,
+                             handler_name=f"{skill_id}.fallback").start()
+
+        def _on_response(message: Message) -> None:
+            # .response is emitted whether or not a handler matched; the dispatch
+            # itself completed either way (the result bool is orthogonal to the
+            # handler lifecycle), so this is always ``complete``.
+            HandlerLifecycle(self.bus, message, skill_id=skill_id,
+                             handler_name=f"{skill_id}.fallback").complete()
+
+        self.bus.on(f"ovos.skills.fallback.{skill_id}.start", _on_start)
+        self.bus.on(f"ovos.skills.fallback.{skill_id}.response", _on_response)
+        self._lifecycle_handlers[skill_id] = (_on_start, _on_response)
+
+    def _unwire_lifecycle(self, skill_id: str) -> None:
+        handlers = self._lifecycle_handlers.pop(skill_id, None)
+        if not handlers:
+            return
+        start_handler, response_handler = handlers
+        self.bus.remove(f"ovos.skills.fallback.{skill_id}.start", start_handler)
+        self.bus.remove(f"ovos.skills.fallback.{skill_id}.response", response_handler)
 
     def handle_register_fallback(self, message: Message):
         skill_id = message.data.get("skill_id")
@@ -57,10 +103,16 @@ class FallbackService(ConfidenceMatcherPipeline):
         else:
             self.registered_fallbacks[skill_id] = priority
 
+        # report this skill's fallback dispatch lifecycle as the framework
+        # done-signal so an orchestrator can resolve it (no skill_id -> skip)
+        if skill_id:
+            self._wire_lifecycle(skill_id)
+
     def handle_deregister_fallback(self, message: Message):
         skill_id = message.data.get("skill_id")
         if skill_id in self.registered_fallbacks:
             self.registered_fallbacks.pop(skill_id)
+        self._unwire_lifecycle(skill_id)
 
     def _fallback_allowed(self, skill_id: str) -> bool:
         """Checks if a skill_id is allowed to fallback
@@ -191,5 +243,7 @@ class FallbackService(ConfidenceMatcherPipeline):
                                     FallbackRange(90, 101))
 
     def shutdown(self):
+        for skill_id in list(self._lifecycle_handlers):
+            self._unwire_lifecycle(skill_id)
         self.bus.remove("ovos.skills.fallback.register", self.handle_register_fallback)
         self.bus.remove("ovos.skills.fallback.deregister", self.handle_deregister_fallback)

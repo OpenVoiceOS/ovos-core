@@ -705,5 +705,104 @@ class TestShutdown(unittest.TestCase):
         self.assertEqual(removed, expected)
 
 
+class TestConverseHandlerLifecycle(unittest.TestCase):
+    """The converse dispatch hop emits the framework done-signal so an
+    orchestrator (OVOS-PIPELINE-1 §8) can resolve the lifecycle of a reserved
+    ``converse`` dispatch instead of hitting its handler timeout."""
+
+    def _service_with_capture(self):
+        svc = _make_service()
+        bus = FakeBus()
+        captured = []
+        # FakeBus emits the "message" catch-all as a serialized string; parse it
+        # back into a Message so assertions can read msg_type/context/data.
+        bus.on("message", lambda s: captured.append(Message.deserialize(s)))
+        svc.bus = bus
+        return svc, captured
+
+    def test_dispatch_emits_handler_start_with_skill_id(self):
+        """handle_converse emits mycroft.skill.handler.start at dispatch,
+        stamped with the targeted skill_id, then the converse.request."""
+        svc, captured = self._service_with_capture()
+        msg = Message("converse:skill", {"skill_id": "skill_a",
+                                         "utterances": ["hello"]})
+        svc.handle_converse(msg)
+
+        topics = [m.msg_type for m in captured]
+        self.assertIn("mycroft.skill.handler.start", topics)
+        self.assertIn("skill_a.converse.request", topics)
+        # start fires before the dispatch
+        self.assertLess(topics.index("mycroft.skill.handler.start"),
+                        topics.index("skill_a.converse.request"))
+        start = next(m for m in captured
+                     if m.msg_type == "mycroft.skill.handler.start")
+        self.assertEqual(start.context.get("skill_id"), "skill_a")
+
+    def test_skill_response_emits_handler_complete(self):
+        """When the targeted skill replies skill.converse.response, the
+        lifecycle completes (mycroft.skill.handler.complete, same skill_id)."""
+        svc, captured = self._service_with_capture()
+        msg = Message("converse:skill", {"skill_id": "skill_a",
+                                         "utterances": ["hello"]})
+        svc.handle_converse(msg)
+        captured.clear()
+
+        svc.bus.emit(Message("skill.converse.response",
+                             {"skill_id": "skill_a", "result": True}))
+
+        topics = [m.msg_type for m in captured]
+        self.assertIn("mycroft.skill.handler.complete", topics)
+        complete = next(m for m in captured
+                        if m.msg_type == "mycroft.skill.handler.complete")
+        self.assertEqual(complete.context.get("skill_id"), "skill_a")
+
+    def test_response_from_other_skill_does_not_complete(self):
+        """A converse.response from a different skill must not resolve the
+        lifecycle for the targeted skill."""
+        svc, captured = self._service_with_capture()
+        msg = Message("converse:skill", {"skill_id": "skill_a",
+                                         "utterances": ["hello"]})
+        svc.handle_converse(msg)
+        captured.clear()
+
+        svc.bus.emit(Message("skill.converse.response",
+                             {"skill_id": "other_skill", "result": True}))
+        topics = [m.msg_type for m in captured]
+        self.assertNotIn("mycroft.skill.handler.complete", topics)
+
+    def test_exactly_one_terminal_on_repeated_response(self):
+        """Only the first converse.response resolves the lifecycle; a duplicate
+        does not emit a second terminal."""
+        svc, captured = self._service_with_capture()
+        msg = Message("converse:skill", {"skill_id": "skill_a",
+                                         "utterances": ["hello"]})
+        svc.handle_converse(msg)
+        captured.clear()
+
+        svc.bus.emit(Message("skill.converse.response",
+                             {"skill_id": "skill_a", "result": True}))
+        svc.bus.emit(Message("skill.converse.response",
+                             {"skill_id": "skill_a", "result": True}))
+        completes = [m for m in captured
+                     if m.msg_type == "mycroft.skill.handler.complete"]
+        self.assertEqual(len(completes), 1)
+
+    def test_timeout_emits_handler_error(self):
+        """When no converse.response arrives, the lifecycle errors out (a
+        mycroft.skill.handler.error terminal), patched to a tiny timeout."""
+        svc, captured = self._service_with_capture()
+        msg = Message("converse:skill", {"skill_id": "skill_a",
+                                         "utterances": ["hello"]})
+        with patch("ovos_core.intent_services.converse_service.CONVERSE_HANDLER_TIMEOUT", 0.05):
+            svc.handle_converse(msg)
+            time.sleep(0.2)
+        topics = [m.msg_type for m in captured]
+        self.assertIn("mycroft.skill.handler.error", topics)
+        err = next(m for m in captured
+                   if m.msg_type == "mycroft.skill.handler.error")
+        self.assertEqual(err.context.get("skill_id"), "skill_a")
+        self.assertIn("exception", err.data)
+
+
 if __name__ == "__main__":
     unittest.main()
