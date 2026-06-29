@@ -24,11 +24,14 @@ LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)
 SPEC_SPEAK = SpecMessage.SPEAK.value
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
 # PIPELINE-1 orchestrator-emitted matched-path messages: §9.2 ovos.intent.matched
-# (before dispatch) and §8.1 ovos.intent.handler.start. The fallback pipeline's
-# dispatch carries no mycroft.skill.handler.* done-signal, so its §8 terminal
-# resolves via the §8.3 timeout (after the end-marker, not captured here).
+# (before dispatch), §8.1 ovos.intent.handler.start (before the dispatch) and the
+# §8 ovos.intent.handler.complete terminal. The fallback service re-emits the
+# skill's own .start/.response markers as the mycroft.skill.handler.* done-signal,
+# which the dispatcher correlates (by the match_data skill_id) to emit the §8
+# terminal promptly — without waiting out the §8.3 handler timeout.
 INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value
 HANDLER_START = SpecMessage.INTENT_HANDLER_START.value
+HANDLER_COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value
 
 # key -> (modernize, emit_legacy, utterance_topic)
 NAMESPACE_PATHS = {
@@ -113,6 +116,10 @@ class TestFallback(TestCase):
                 Message("mycroft.skill.handler.complete",
                         data={"handler": f"{self.skill_id}.fallback"},
                         context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §8 terminal: the orchestrator correlates the done-signal
+                # to the in-flight fallback dispatch and emits its own complete.
+                Message(HANDLER_COMPLETE,
+                        data={"intent_name": f"ovos.skills.fallback.{self.skill_id}.request"}),
 
                 Message(UTTERANCE_HANDLED, {})
             ]

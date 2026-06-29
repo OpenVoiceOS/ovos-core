@@ -387,8 +387,15 @@ class IntentService:
             # dispatch Message to the IntentDispatcher, which emits
             # ovos.intent.handler.start (§8.1) before the dispatch and the matching
             # terminal (complete/error/timeout) after. skill_id / intent_name come
-            # from the orchestrator's own Match, not the skill.
-            skill_id = match.skill_id or reply.msg_type.split(":", 1)[0]
+            # from the orchestrator's own Match, not the skill. When the match
+            # topic carries no ``:`` (e.g. the fallback ``...request`` topic), fall
+            # back to match_data's skill_id so the dispatcher's correlation key
+            # equals the framework done-signal's skill_id (which the stop/converse/
+            # fallback services stamp with the real skill_id) — otherwise the whole
+            # topic becomes the key and the §8 terminal only fires on timeout.
+            skill_id = (match.skill_id
+                        or (match.match_data or {}).get("skill_id")
+                        or reply.msg_type.split(":", 1)[0])
             intent_name = reply.msg_type.split(":", 1)[-1]
             # The §8 terminal (complete/error/timeout) the dispatcher emits drives
             # the §9.5 ovos.utterance.handled end-marker via _emit_utterance_handled;
