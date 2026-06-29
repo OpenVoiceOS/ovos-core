@@ -69,6 +69,8 @@ class TestPadatiousIntent(TestCase):
             skill_ids=[self.skill_id],
             flip_points=[utt_topic],
             entry_points=[utt_topic],
+            ignore_messages=["recognizer_loop:audio_output_start",
+                              "recognizer_loop:audio_output_end"],
             source_message=message,
             final_session=final_session,
             activation_points=[f"{self.skill_id}:Greetings.intent"],

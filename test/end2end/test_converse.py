@@ -32,7 +32,9 @@ INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value      # ovos.intent.matched (§
 HANDLER_TRIO = [SpecMessage.INTENT_HANDLER_START.value,
                 SpecMessage.INTENT_HANDLER_COMPLETE.value,
                 SpecMessage.INTENT_HANDLER_ERROR.value,
-                "ovos.skills.settings_changed"]  # keep ovoscope's default ignore
+                "ovos.skills.settings_changed",  # keep ovoscope's default ignore
+                "recognizer_loop:audio_output_start",  # TTS mock duck
+                "recognizer_loop:audio_output_end"]  # TTS mock unduck
 INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value  # ovos.intent.unmatched (§9.3)
 
 # key -> (modernize, emit_legacy, utterance_topic)

@@ -85,6 +85,8 @@ class TestIntentPipelineRouting(TestCase):
     # mirror because emit_legacy=False on both paths).
     ignore_messages = [
         SPEC_SPEAK,
+        "recognizer_loop:audio_output_start",  # TTS mock duck
+        "recognizer_loop:audio_output_end",  # TTS mock unduck
         "ovos.common_play.stop.response",
         "common_query.openvoiceos.stop.response",
         "persona.openvoiceos.stop.response",

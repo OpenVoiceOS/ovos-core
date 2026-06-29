@@ -61,6 +61,8 @@ NAMESPACE_PATHS = {
 # emit_legacy=False on both paths).
 _STOP_RESPONSES = [
     SPEC_SPEAK,
+    "recognizer_loop:audio_output_start",  # TTS mock duck
+    "recognizer_loop:audio_output_end",  # TTS mock unduck
     # ovos.intent.matched (§9.2) precedes every dispatch; these scenarios assert
     # stop routing/activation, not the matched broadcast, so it is filtered here.
     INTENT_MATCHED,
