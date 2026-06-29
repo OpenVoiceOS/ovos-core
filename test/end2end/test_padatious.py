@@ -27,6 +27,12 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)
 SPEC_SPEAK = SpecMessage.SPEAK.value
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
+# PIPELINE-1 orchestrator-emitted terminal events: §9.2 matched, §8 trio, §9.3
+# unmatched (the spec replacement for legacy complete_intent_failure).
+INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value
+INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value
+HANDLER_START = SpecMessage.INTENT_HANDLER_START.value
+HANDLER_COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value
 
 NAMESPACE_PATHS = {
     "spec": (False, False, SPEC_UTTERANCE),
@@ -71,6 +77,17 @@ class TestPadatiousIntent(TestCase):
                 Message(f"{self.skill_id}.activate",
                         data={},
                         context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §9.2: matched notification, before the dispatch
+                Message(INTENT_MATCHED,
+                        data={"skill_id": self.skill_id,
+                              "intent_name": f"{self.skill_id}:Greetings.intent",
+                              "utterance": "good morning", "lang": session.lang},
+                        context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §8.1: orchestrator start before dispatch
+                Message(HANDLER_START,
+                        data={"skill_id": self.skill_id,
+                              "intent_name": "Greetings.intent"},
+                        context={"skill_id": self.skill_id}),
                 Message(f"{self.skill_id}:Greetings.intent",
                         data={"utterance": "good morning", "lang": session.lang},
                         context={"skill_id": self.skill_id}),
@@ -87,6 +104,11 @@ class TestPadatiousIntent(TestCase):
                         context={"skill_id": self.skill_id}),
                 Message("mycroft.skill.handler.complete",
                         data={"name": "HelloWorldSkill.handle_greetings"},
+                        context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §8.1: orchestrator complete before the end-marker
+                Message(HANDLER_COMPLETE,
+                        data={"skill_id": self.skill_id,
+                              "intent_name": "Greetings.intent"},
                         context={"skill_id": self.skill_id}),
                 Message(UTTERANCE_HANDLED,
                         data={},
@@ -125,7 +147,7 @@ class TestPadatiousIntent(TestCase):
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {}),
+                Message(INTENT_UNMATCHED, {}),
                 Message(UTTERANCE_HANDLED, {})
             ]
         )
@@ -161,7 +183,7 @@ class TestPadatiousIntent(TestCase):
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {}),
+                Message(INTENT_UNMATCHED, {}),
                 Message(UTTERANCE_HANDLED, {})
             ]
         )
@@ -196,7 +218,7 @@ class TestPadatiousIntent(TestCase):
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {}),
+                Message(INTENT_UNMATCHED, {}),
                 Message(UTTERANCE_HANDLED, {})
             ]
         )

@@ -27,6 +27,16 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)
 SPEC_SPEAK = SpecMessage.SPEAK.value
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
+# PIPELINE-1 orchestrator-emitted matched-path messages: §9.2 ovos.intent.matched
+# (before dispatch) and the §8 handler-lifecycle trio (start before dispatch,
+# complete on the framework done-signal). The skill's own ovos.utterance.handled
+# (§9.5) is left to ovos-workshop on this matched path.
+INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value
+HANDLER_START = SpecMessage.INTENT_HANDLER_START.value
+HANDLER_COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value
+# PIPELINE-1 §9.3: the no-match / all-filtered terminal is ovos.intent.unmatched
+# (the spec replacement for the legacy complete_intent_failure).
+INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value
 
 NAMESPACE_PATHS = {
     "spec": (False, False, SPEC_UTTERANCE),
@@ -71,6 +81,19 @@ class TestAdaptIntent(TestCase):
                 Message(f"{self.skill_id}.activate",
                         data={},
                         context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §9.2: matched notification, before the dispatch.
+                # intent_name carries the full <skill_id>:<intent_name> match_type.
+                Message(INTENT_MATCHED,
+                        data={"skill_id": self.skill_id,
+                              "intent_name": f"{self.skill_id}:HelloWorldIntent",
+                              "utterance": "hello world",
+                              "lang": session.lang},
+                        context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §8.1: orchestrator emits start immediately before dispatch
+                Message(HANDLER_START,
+                        data={"skill_id": self.skill_id,
+                              "intent_name": "HelloWorldIntent"},
+                        context={"skill_id": self.skill_id}),
                 Message(f"{self.skill_id}:HelloWorldIntent",
                         data={"utterance": "hello world", "lang": session.lang},
                         context={"skill_id": self.skill_id}),
@@ -88,6 +111,12 @@ class TestAdaptIntent(TestCase):
                         context={"skill_id": self.skill_id}),
                 Message("mycroft.skill.handler.complete",
                         data={"name": "HelloWorldSkill.handle_hello_world_intent"},
+                        context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §8.1: orchestrator emits complete on the handler's
+                # completion, before the end-marker (spec ordering §6.1).
+                Message(HANDLER_COMPLETE,
+                        data={"skill_id": self.skill_id,
+                              "intent_name": "HelloWorldIntent"},
                         context={"skill_id": self.skill_id}),
                 Message(UTTERANCE_HANDLED,
                         data={},
@@ -126,7 +155,7 @@ class TestAdaptIntent(TestCase):
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {}),
+                Message(INTENT_UNMATCHED, {}),
                 Message(UTTERANCE_HANDLED, {})
             ]
         )
@@ -162,7 +191,7 @@ class TestAdaptIntent(TestCase):
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {}),
+                Message(INTENT_UNMATCHED, {}),
                 Message(UTTERANCE_HANDLED, {})
             ]
         )
@@ -197,7 +226,7 @@ class TestAdaptIntent(TestCase):
             expected_messages=[
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {}),
+                Message(INTENT_UNMATCHED, {}),
                 Message(UTTERANCE_HANDLED, {})
             ]
         )

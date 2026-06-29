@@ -23,6 +23,12 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)
 SPEC_SPEAK = SpecMessage.SPEAK.value
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
+# PIPELINE-1 orchestrator-emitted matched-path messages: §9.2 ovos.intent.matched
+# (before dispatch) and §8.1 ovos.intent.handler.start. The fallback pipeline's
+# dispatch carries no mycroft.skill.handler.* done-signal, so its §8 terminal
+# resolves via the §8.3 timeout (after the end-marker, not captured here).
+INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value
+HANDLER_START = SpecMessage.INTENT_HANDLER_START.value
 
 # key -> (modernize, emit_legacy, utterance_topic)
 NAMESPACE_PATHS = {
@@ -73,6 +79,15 @@ class TestFallback(TestCase):
                 Message("ovos.skills.fallback.ping",
                         {"utterances": ["hello world"], "lang": session.lang, "range": [90, 101]}),
                 Message("ovos.skills.fallback.pong", {"skill_id": self.skill_id, "can_handle": True}),
+                # PIPELINE-1 §9.2: matched notification precedes the dispatch. The
+                # fallback match_type is the .request topic; it bears no ':' so
+                # skill_id/intent_name resolve to that topic.
+                Message(INTENT_MATCHED,
+                        data={"intent_name": f"ovos.skills.fallback.{self.skill_id}.request",
+                              "utterance": "hello world", "lang": session.lang}),
+                # PIPELINE-1 §8.1: orchestrator start immediately before the dispatch
+                Message(HANDLER_START,
+                        data={"intent_name": f"ovos.skills.fallback.{self.skill_id}.request"}),
                 Message(f"ovos.skills.fallback.{self.skill_id}.request",
                         {"utterances": ["hello world"], "lang": session.lang, "range": [90, 101], "skill_id": self.skill_id}),
                 Message(f"ovos.skills.fallback.{self.skill_id}.start", {}),
