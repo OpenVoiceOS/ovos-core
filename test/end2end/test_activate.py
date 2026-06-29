@@ -20,6 +20,7 @@ UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value   # ovos.utterance.handl
 # captured here).
 INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value         # ovos.intent.matched (§9.2)
 HANDLER_START = SpecMessage.INTENT_HANDLER_START.value    # ovos.intent.handler.start (§8.1)
+HANDLER_COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value  # ovos.intent.handler.complete (§8)
 
 # The two namespace paths the utterance-injecting scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
@@ -220,6 +221,11 @@ class TestDeactivate(TestCase):
                         data={"utterances": ["deactivate skill from within converse"], "lang": session.lang,
                               "skill_id": self.skill_id},
                         context={"skill_id": self.skill_id}),
+                # ConverseService reports the converse dispatch lifecycle to the
+                # orchestrator via the mycroft.skill.handler.* done-signal
+                Message("mycroft.skill.handler.start",
+                        data={"handler": f"{self.skill_id}.converse"},
+                        context={"skill_id": self.skill_id}),
                 Message(f"{self.skill_id}.converse.request",
                         data={"utterances": ["deactivate skill from within converse"], "lang": session.lang},
                         context={"skill_id": self.skill_id}),
@@ -236,6 +242,13 @@ class TestDeactivate(TestCase):
                 # post converse handler
                 Message("skill.converse.response",
                         data={"skill_id": self.skill_id},
+                        context={"skill_id": self.skill_id}),
+                Message("mycroft.skill.handler.complete",
+                        data={"handler": f"{self.skill_id}.converse"},
+                        context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §8 terminal: orchestrator correlates the done-signal
+                Message(HANDLER_COMPLETE,
+                        data={"skill_id": self.skill_id, "intent_name": "skill"},
                         context={"skill_id": self.skill_id}),
                 Message(UTTERANCE_HANDLED,
                         data={},

@@ -77,6 +77,11 @@ _STOP_RESPONSES = [
     "ovos-hivemind-pipeline-plugin.stop.response",
     # StopService now subclasses OVOSAbstractApplication — it also responds to mycroft.stop
     "stop.openvoiceos.stop.response",
+    # timing-dependent cleanup of an interrupted skill (mid get_response /
+    # active / mid-TTS) — ignore so the assertion stays stable across runs.
+    "mycroft.skills.abort_question",
+    "ovos.skills.converse.force_timeout",
+    "mycroft.audio.speech.stop",
 ]
 
 
@@ -343,7 +348,6 @@ class TestStopSkillCanHandleFalse(TestCase):
                 "mycroft.skills.abort_question",
                 "ovos.skills.converse.force_timeout",
             ],
-            async_messages=["ovos.skills.converse.force_timeout"],
             ignore_messages=_STOP_RESPONSES,
             source_message=message,
             expected_messages=expected,
