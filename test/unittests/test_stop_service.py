@@ -529,7 +529,8 @@ class TestBusHandlers(unittest.TestCase):
         svc.handle_global_stop(msg)
         types = [m.msg_type for m in emitted]
         self.assertIn("mycroft.stop", types)
-        self.assertIn("ovos.utterance.handled", types)
+        self.assertIn("mycroft.skill.handler.start", types)
+        self.assertIn("mycroft.skill.handler.complete", types)
 
     def test_handle_skill_stop_forwards_to_skill(self):
         svc = _make_service()
@@ -537,8 +538,10 @@ class TestBusHandlers(unittest.TestCase):
         svc.bus.emit = lambda m: emitted.append(m)
         msg = Message("stop:skill", {"skill_id": "my_skill"})
         svc.handle_skill_stop(msg)
-        self.assertEqual(len(emitted), 1)
-        self.assertEqual(emitted[0].msg_type, "my_skill.stop")
+        types = [m.msg_type for m in emitted]
+        self.assertIn("my_skill.stop", types)
+        self.assertIn("mycroft.skill.handler.start", types)
+        self.assertIn("mycroft.skill.handler.complete", types)
 
 
 class TestShutdown(unittest.TestCase):
