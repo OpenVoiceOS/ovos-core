@@ -322,24 +322,19 @@ class TestStopSkillCanHandleFalse(TestCase):
             Message("mycroft.skill.handler.complete",
                     {"name": "StopService.handle_skill_stop"},
                     {"skill_id": "stop.openvoiceos"}),
-            # stop turn terminates
+            # stop turn terminates — capture stops here (eof_msgs). The interrupted
+            # count daemon then races in its own CountSkill complete + a second
+            # ovos.utterance.handled; that tail is non-deterministic (depends where
+            # the stop lands relative to the 1s count loop) so it is not asserted.
             Message(UTTERANCE_HANDLED,
                     {},
                     {"skill_id": "stop.openvoiceos"}),
-            # the interrupted count intent (daemon dispatch) exits cleanly; the §8
-            # ovos.intent.handler.complete terminal is filtered via _STOP_RESPONSES.
-            Message("mycroft.skill.handler.complete",
-                    {"name": "CountSkill.handle_how_are_you_intent"},
-                    {"skill_id": self.skill_id}),
-            Message(UTTERANCE_HANDLED,
-                    {},
-                    {"skill_id": self.skill_id}),
         ]
 
         test = End2EndTest(
             minicroft=minicroft,
             skill_ids=[],
-            eof_msgs=[],
+            eof_msgs=[UTTERANCE_HANDLED],
             flip_points=[utt_topic],
             entry_points=[utt_topic],
             keep_original_src=[

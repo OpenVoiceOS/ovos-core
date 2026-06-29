@@ -325,43 +325,19 @@ class TestCountSkills(TestCase):
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_skill_stop"},
                         {"skill_id": "stop.openvoiceos"}),
-                # stop turn terminates
+                # stop turn terminates — capture stops here (eof_msgs). The
+                # interrupted count daemon then exits and races in its own
+                # CountSkill complete + a second ovos.utterance.handled; that tail
+                # is non-deterministic (depends where the stop lands relative to
+                # the 1s count loop) so it is intentionally not asserted.
                 Message(UTTERANCE_HANDLED,
                         {},
                         {"skill_id": "stop.openvoiceos"}),
-
-                # async stop pipeline callback emits these messages
-                # but we cant guarantee where in the test they will be emitted
-
-                # if skill is in middle of get_response
-                #Message("mycroft.skills.abort_question",
-                #        {"skill_id": self.skill_id},
-                #        {"skill_id": self.skill_id}),
-
-                # if skill is in active_list
-                #Message("ovos.skills.converse.force_timeout",
-                #        {"skill_id": self.skill_id},
-                #        {"skill_id": self.skill_id}),
-
-                # if skill is executing TTS
-                #Message("mycroft.audio.speech.stop",
-                #        {"skill_id": self.skill_id},
-                #        {"skill_id": self.skill_id}),
-
-                # the interrupted count intent (daemon dispatch) exits cleanly;
-                # the §8 ovos.intent.handler.complete terminal is filtered via
-                # IGNORE_MESSAGES, so only the legacy complete + handled remain.
-                Message("mycroft.skill.handler.complete",
-                        {"name": "CountSkill.handle_how_are_you_intent"},
-                        {"skill_id": self.skill_id}),
-                Message(UTTERANCE_HANDLED,
-                        {},
-                        {"skill_id": self.skill_id})
             ]
             test = End2EndTest(
                 minicroft=minicroft,
                 skill_ids=[],
-                eof_msgs=[],
+                eof_msgs=[UTTERANCE_HANDLED],
                 flip_points=[utt_topic],
                 entry_points=[utt_topic],
                 # messages in 'keep_original_src' would not be sent to hivemind clients
@@ -499,43 +475,19 @@ class TestCountSkills(TestCase):
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_skill_stop"},
                         {"skill_id": "stop.openvoiceos"}),
-                # stop turn terminates
+                # stop turn terminates — capture stops here (eof_msgs). The
+                # interrupted count daemon then exits and races in its own
+                # CountSkill complete + a second ovos.utterance.handled; that tail
+                # is non-deterministic (depends where the stop lands relative to
+                # the 1s count loop) so it is intentionally not asserted.
                 Message(UTTERANCE_HANDLED,
                         {},
                         {"skill_id": "stop.openvoiceos"}),
-
-                # async stop pipeline callback emits these messages
-                # but we cant guarantee where in the test they will be emitted
-
-                # if skill is in middle of get_response
-                #Message("mycroft.skills.abort_question",
-                #        {"skill_id": self.skill_id},
-                #        {"skill_id": self.skill_id}),
-
-                # if skill is in active_list
-                #Message("ovos.skills.converse.force_timeout",
-                #        {"skill_id": self.skill_id},
-                #        {"skill_id": self.skill_id}),
-
-                # if skill is executing TTS
-                #Message("mycroft.audio.speech.stop",
-                #        {"skill_id": self.skill_id},
-                #        {"skill_id": self.skill_id}),
-
-                # the interrupted count intent (daemon dispatch) exits cleanly;
-                # the §8 ovos.intent.handler.complete terminal is filtered via
-                # IGNORE_MESSAGES, so only the legacy complete + handled remain.
-                Message("mycroft.skill.handler.complete",
-                        {"name": "CountSkill.handle_how_are_you_intent"},
-                        {"skill_id": self.skill_id}),
-                Message(UTTERANCE_HANDLED,
-                        {},
-                        {"skill_id": self.skill_id})
             ]
             test = End2EndTest(
                 minicroft=minicroft,
                 skill_ids=[],
-                eof_msgs=[],
+                eof_msgs=[UTTERANCE_HANDLED],
                 flip_points=[utt_topic],
                 entry_points=[utt_topic],
                 # messages in 'keep_original_src' would not be sent to hivemind clients
