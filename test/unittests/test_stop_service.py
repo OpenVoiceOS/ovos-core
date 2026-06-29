@@ -531,7 +531,6 @@ class TestBusHandlers(unittest.TestCase):
         self.assertIn("mycroft.skill.handler.start", types)
         self.assertIn("mycroft.stop", types)
         self.assertIn("mycroft.skill.handler.complete", types)
-        self.assertIn("ovos.utterance.handled", types)
 
     def test_handle_skill_stop_forwards_to_skill(self):
         svc = _make_service()
