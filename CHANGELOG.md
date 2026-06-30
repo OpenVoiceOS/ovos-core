@@ -1,8 +1,20 @@
 # Changelog
 
+## [2.3.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.3.0a1) (2026-06-30)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.2.4a3...2.3.0a1)
+
+**Merged pull requests:**
+
+- feat: orchestrator owns the PIPELINE-1 §8 trio + §9 utterance-terminal events [\#788](https://github.com/OpenVoiceOS/ovos-core/pull/788) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.2.4a3](https://github.com/OpenVoiceOS/ovos-core/tree/2.2.4a3) (2026-06-28)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.2.4a1...2.2.4a3)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.2.4a2...2.2.4a3)
+
+## [2.2.4a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.2.4a2) (2026-06-28)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.2.4a1...2.2.4a2)
 
 **Merged pull requests:**
 
