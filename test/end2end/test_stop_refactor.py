@@ -36,6 +36,8 @@ from ovos_utils.log import LOG
 
 from ovoscope import End2EndTest, get_minicroft
 
+from test.end2end.test_stop import _wait_for_active_skill
+
 # Topics come from the ovos-spec-tools SpecMessage enum (spec namespace); the
 # legacy counterpart is derived via migration_counterpart, never hardcoded.
 SPEC_UTTERANCE = SpecMessage.UTTERANCE.value              # ovos.utterance.handle
@@ -234,6 +236,7 @@ class TestGlobalStopVocWithActiveSkill(TestCase):
             entry_points=[utt_topic],
             ignore_messages=ignore,
             source_message=message,
+            test_active_skills=False,  # global_stop drains the session; skip stale tracking
             expected_messages=[
                 message,
                 Message("stop.openvoiceos.activate", {}),
