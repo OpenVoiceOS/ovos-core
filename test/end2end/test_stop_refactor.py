@@ -297,13 +297,9 @@ class TestStopSkillCanHandleFalse(TestCase):
             minicroft.bus.emit(msg)
 
         create_daemon(make_it_count)
-        time.sleep(2)
-
-        # The count intent self-activates the skill server-side; the Session
-        # singleton holds the authoritative state (SESSION-1 last-write-wins).
-        # Resend the live session for the stop turn as a real client would, so
-        # the running skill is in active_skills — no manual activation required.
-        session = SessionManager.sessions[session.session_id]
+        # Wait for the skill to activate before sending stop, matching the
+        # deterministic polling in test_stop.py (CI xdist race condition fix)
+        _wait_for_active_skill(session.session_id, self.skill_id)
         message = Message(utt_topic,
                           {"utterances": ["stop"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
