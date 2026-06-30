@@ -303,6 +303,8 @@ class TestStopSkillCanHandleFalse(TestCase):
         # Wait for the skill to activate before sending stop, matching the
         # deterministic polling in test_stop.py (CI xdist race condition fix)
         _wait_for_active_skill(session.session_id, self.skill_id)
+        # Use the live server-side session so active_skills is populated
+        session = SessionManager.sessions[session.session_id]
         message = Message(utt_topic,
                           {"utterances": ["stop"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
