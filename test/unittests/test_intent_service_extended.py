@@ -26,6 +26,7 @@ from ovos_utils.fakebus import FakeBus
 from ovos_spec_tools import SpecMessage
 
 from ovos_core.intent_services.service import IntentService
+from ovos_core.intent_services.dispatcher import IntentDispatcher
 
 
 def _make_service(config=None) -> IntentService:
@@ -36,6 +37,8 @@ def _make_service(config=None) -> IntentService:
     svc.config = config or {}
     svc.pipeline_plugins = {}
     svc._deactivations = defaultdict(list)
+    # PIPELINE-1 §7/§8 dispatcher; timer disabled so unit tests stay deterministic
+    svc.intent_dispatcher = IntentDispatcher(bus, timeout=0)
 
     # Minimal stub objects for transformer services
     ut = MagicMock()
@@ -317,7 +320,7 @@ class TestSendCompleteIntentFailure(unittest.TestCase):
     """Tests for IntentService.send_complete_intent_failure."""
 
     def test_emits_three_messages(self):
-        """Three messages should be emitted: play_sound, complete_intent_failure, handled."""
+        """PIPELINE-1 §9.3/§9.5: play_sound, ovos.intent.unmatched, handled."""
         svc = _make_service()
         emitted = []
         svc.bus.emit = lambda m: emitted.append(m)
@@ -327,8 +330,9 @@ class TestSendCompleteIntentFailure(unittest.TestCase):
             svc.send_complete_intent_failure(msg)
         types = [m.msg_type for m in emitted]
         self.assertIn("mycroft.audio.play_sound", types)
-        self.assertIn("complete_intent_failure", types)
+        self.assertIn("ovos.intent.unmatched", types)
         self.assertIn("ovos.utterance.handled", types)
+        self.assertNotIn("complete_intent_failure", types)
 
     def test_error_sound_from_config_used(self):
         """The error sound path from config is used in the play_sound message."""
@@ -386,11 +390,11 @@ class TestHandleDeactivate(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# _emit_match_message
+# _dispatch_match
 # ---------------------------------------------------------------------------
 
 class TestEmitMatchMessage(unittest.TestCase):
-    """Tests for IntentService._emit_match_message."""
+    """Tests for IntentService._dispatch_match."""
 
     def test_reply_emitted_on_bus(self):
         """A reply message is emitted on the bus for a valid match."""
@@ -404,7 +408,7 @@ class TestEmitMatchMessage(unittest.TestCase):
                       context={"session": sess.serialize()})
         with patch("ovos_core.intent_services.service.SessionManager.get",
                    return_value=sess):
-            svc._emit_match_message(match, msg, "en-US")
+            svc._dispatch_match(match, msg, "en-US")
         types = [m.msg_type for m in emitted]
         self.assertIn("test:intent", types)
 
@@ -420,7 +424,7 @@ class TestEmitMatchMessage(unittest.TestCase):
                       context={"session": sess.serialize()})
         with patch("ovos_core.intent_services.service.SessionManager.get",
                    return_value=sess):
-            svc._emit_match_message(match, msg, "en-US")
+            svc._dispatch_match(match, msg, "en-US")
         types = [m.msg_type for m in emitted]
         self.assertTrue(any("activate" in t for t in types))
 
@@ -437,7 +441,7 @@ class TestEmitMatchMessage(unittest.TestCase):
                       context={"session": sess.serialize()})
         with patch("ovos_core.intent_services.service.SessionManager.get",
                    return_value=sess):
-            svc._emit_match_message(match, msg, "en-US")
+            svc._dispatch_match(match, msg, "en-US")
         types = [m.msg_type for m in emitted]
         self.assertFalse(any("activate" in t for t in types))
 
@@ -452,7 +456,7 @@ class TestEmitMatchMessage(unittest.TestCase):
                       context={"session": sess.serialize()})
         with patch("ovos_core.intent_services.service.SessionManager.get",
                    return_value=sess):
-            svc._emit_match_message(match, msg, "en-US")
+            svc._dispatch_match(match, msg, "en-US")
         svc.intent_plugins.transform.assert_called_once()
 
 

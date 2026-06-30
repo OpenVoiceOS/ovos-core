@@ -1,46 +1,48 @@
-import re
-from os.path import dirname
+from os.path import dirname, join
 from threading import Event
 from typing import Optional, Dict, List, Union
 
 from ovos_bus_client.client import MessageBusClient
+from ovos_bus_client.handler import HandlerLifecycle
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, UtteranceState
 
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import ConfidenceMatcherPipeline, IntentHandlerMatch
+from ovos_spec_tools import LocaleResources
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
 from ovos_utils.parse import match_one
-from ovos_workshop.app import OVOSAbstractApplication
 
 
-class StopService(ConfidenceMatcherPipeline, OVOSAbstractApplication):
+class StopService(ConfidenceMatcherPipeline):
     """Intent Service that handles stopping skills."""
 
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
-                 config: Optional[Dict] = None):
-        # OVOSAbstractApplication provides voc_match, voc_list, and locale
-        # resource loading — same pattern as CommonQAService and OCPPipelineMatcher
-        OVOSAbstractApplication.__init__(self, bus=bus or FakeBus(),
-                                         skill_id="stop.openvoiceos",
-                                         resources_dir=f"{dirname(__file__)}")
-        config = config or Configuration().get("skills", {}).get("stop") or {}
+                 config: Optional[Dict] = None) -> None:
+        config = config if config is not None else Configuration().get("skills", {}).get("stop") or {}
+        bus = bus or FakeBus()
         ConfidenceMatcherPipeline.__init__(self, config=config, bus=bus)
+        self._locale = LocaleResources(skill_locale=join(dirname(__file__), "locale"))
         self.bus.on("stop:global", self.handle_global_stop)
         self.bus.on("stop:skill", self.handle_skill_stop)
 
     def handle_global_stop(self, message: Message) -> None:
-        """Emit a global mycroft.stop and mark the utterance handled."""
-        self.bus.emit(message.forward("mycroft.stop"))
-        # TODO - this needs a confirmation dialog if nothing was stopped
-        self.bus.emit(message.forward("ovos.utterance.handled"))
+        """Emit a global mycroft.stop; the §9.5 end-marker is the orchestrator's
+        responsibility (``IntentDispatcher._notify_terminal``)."""
+        with HandlerLifecycle(self.bus, message,
+                              skill_id="stop.openvoiceos",
+                              data={"name": "StopService.handle_global_stop"}):
+            self.bus.emit(message.forward("mycroft.stop"))
 
     def handle_skill_stop(self, message: Message) -> None:
         """Forward a stop request to the specific skill."""
         skill_id = message.data["skill_id"]
-        self.bus.emit(message.reply(f"{skill_id}.stop"))
+        with HandlerLifecycle(self.bus, message,
+                              skill_id="stop.openvoiceos",
+                              data={"name": "StopService.handle_skill_stop"}):
+            self.bus.emit(message.reply(f"{skill_id}.stop"))
 
     @staticmethod
     def get_active_skills(message: Optional[Message] = None) -> List[str]:
@@ -183,8 +185,8 @@ class StopService(ConfidenceMatcherPipeline, OVOSAbstractApplication):
         # we call flatten in case someone is sending the old style list of tuples
         utterance = flatten_list(utterances)[0]
 
-        is_stop = self.voc_match(utterance, 'stop', lang=lang, exact=True)
-        is_global_stop = self.voc_match(utterance, 'global_stop', lang=lang, exact=True) or \
+        is_stop = self._locale.voc_match(utterance, 'stop', lang, exact=True)
+        is_global_stop = self._locale.voc_match(utterance, 'global_stop', lang, exact=True) or \
                          (is_stop and not len(self.get_active_skills(message)))
 
         conf = 1.0
@@ -241,9 +243,9 @@ class StopService(ConfidenceMatcherPipeline, OVOSAbstractApplication):
         # we call flatten in case someone is sending the old style list of tuples
         utterance = flatten_list(utterances)[0]
 
-        is_stop = self.voc_match(utterance, 'stop', lang=lang, exact=False)
+        is_stop = self._locale.voc_match(utterance, 'stop', lang, exact=False)
         if not is_stop:
-            is_global_stop = self.voc_match(utterance, 'global_stop', lang=lang, exact=False) or \
+            is_global_stop = self._locale.voc_match(utterance, 'global_stop', lang, exact=False) or \
                              (is_stop and not len(self.get_active_skills(message)))
             if not is_global_stop:
                 return None
@@ -274,7 +276,7 @@ class StopService(ConfidenceMatcherPipeline, OVOSAbstractApplication):
         # we call flatten in case someone is sending the old style list of tuples
         utterance = flatten_list(utterances)[0]
 
-        stop_vocs = self.voc_list('stop', lang)
+        stop_vocs = self._locale.voc_list('stop', lang)
         if not stop_vocs:
             return None
 

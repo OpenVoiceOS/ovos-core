@@ -24,6 +24,9 @@ SPEC_UTTERANCE = SpecMessage.UTTERANCE.value
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)
 SPEC_SPEAK = SpecMessage.SPEAK.value
 UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
+# OVOS-PIPELINE-1 §9.3: no-match terminal is ovos.intent.unmatched; the legacy
+# complete_intent_failure is only re-delivered by the emit_legacy bridge.
+INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value
 
 NAMESPACE_PATHS = {
     "spec": (False, False, SPEC_UTTERANCE),
@@ -42,27 +45,29 @@ class TestNoSkills(TestCase):
     def _run_complete_failure(self, namespace: str) -> None:
         modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
         minicroft = get_minicroft([], modernize=modernize, emit_legacy=emit_legacy)
+        try:
 
-        message = Message(utt_topic,
-                          {"utterances": ["hello world"]})
+            message = Message(utt_topic,
+                              {"utterances": ["hello world"]})
 
-        test = End2EndTest(
-            minicroft=minicroft,
-            skill_ids=[],
-            eof_msgs=[UTTERANCE_HANDLED],
-            flip_points=[utt_topic],
-            entry_points=[utt_topic],
-            source_message=message,
-            expected_messages=[
-                message,
-                Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {}),
-                Message(UTTERANCE_HANDLED, {}),
-            ]
-        )
+            test = End2EndTest(
+                minicroft=minicroft,
+                skill_ids=[],
+                eof_msgs=[UTTERANCE_HANDLED],
+                flip_points=[utt_topic],
+                entry_points=[utt_topic],
+                source_message=message,
+                expected_messages=[
+                    message,
+                    Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                    Message(INTENT_UNMATCHED, {}),
+                    Message(UTTERANCE_HANDLED, {}),
+                ]
+            )
 
-        test.execute()
-        minicroft.stop()
+            test.execute()
+        finally:
+            minicroft.stop()
 
     def test_complete_failure(self):
         for namespace in NAMESPACE_PATHS:
@@ -74,28 +79,30 @@ class TestNoSkills(TestCase):
         # done automatically if "source" and "destination" are in message.context
         modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
         minicroft = get_minicroft([], modernize=modernize, emit_legacy=emit_legacy)
+        try:
 
-        message = Message(utt_topic,
-                          {"utterances": ["hello world"]},
-                          {"source": "A", "destination": "B"})
+            message = Message(utt_topic,
+                              {"utterances": ["hello world"]},
+                              {"source": "A", "destination": "B"})
 
-        test = End2EndTest(
-            minicroft=minicroft,
-            skill_ids=[],
-            eof_msgs=[UTTERANCE_HANDLED],
-            flip_points=[utt_topic],
-            entry_points=[utt_topic],
-            source_message=message,
-            expected_messages=[
-                message,
-                Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message("complete_intent_failure", {}),
-                Message(UTTERANCE_HANDLED, {}),
-            ]
-        )
+            test = End2EndTest(
+                minicroft=minicroft,
+                skill_ids=[],
+                eof_msgs=[UTTERANCE_HANDLED],
+                flip_points=[utt_topic],
+                entry_points=[utt_topic],
+                source_message=message,
+                expected_messages=[
+                    message,
+                    Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                    Message(INTENT_UNMATCHED, {}),
+                    Message(UTTERANCE_HANDLED, {}),
+                ]
+            )
 
-        test.execute()
-        minicroft.stop()
+            test.execute()
+        finally:
+            minicroft.stop()
 
     def test_routing(self):
         for namespace in NAMESPACE_PATHS:

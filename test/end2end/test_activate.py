@@ -12,7 +12,11 @@ from ovoscope import End2EndTest, get_minicroft
 # legacy counterpart is derived via migration_counterpart, never hardcoded.
 SPEC_UTTERANCE = SpecMessage.UTTERANCE.value              # ovos.utterance.handle
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utterance
-UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value   # ovos.utterance.handled
+# PIPELINE-1 orchestrator-emitted matched-path messages: §9.2 ovos.intent.matched
+# (before dispatch) and §8.1 ovos.intent.handler.start. The converse:skill
+# dispatch is a reserved-name dispatch with no mycroft.skill.handler.* done-signal,
+# so its §8 terminal resolves via the §8.3 timeout (after the end-marker, not
+# captured here).
 
 # The two namespace paths the utterance-injecting scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
@@ -199,9 +203,24 @@ class TestDeactivate(TestCase):
                 Message(f"{self.skill_id}.activate",
                         data={},
                         context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §9.2: matched notification precedes the dispatch
+                Message(SpecMessage.INTENT_MATCHED,
+                        data={"skill_id": self.skill_id,
+                              "intent_name": "converse:skill"},
+                        context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §8.1: orchestrator start immediately before the dispatch
+                Message(SpecMessage.INTENT_HANDLER_START,
+                        data={"skill_id": self.skill_id,
+                              "intent_name": "skill"},
+                        context={"skill_id": self.skill_id}),
                 Message("converse:skill",
                         data={"utterances": ["deactivate skill from within converse"], "lang": session.lang,
                               "skill_id": self.skill_id},
+                        context={"skill_id": self.skill_id}),
+                # ConverseService reports the converse dispatch lifecycle to the
+                # orchestrator via the mycroft.skill.handler.* done-signal
+                Message("mycroft.skill.handler.start",
+                        data={"handler": f"{self.skill_id}.converse"},
                         context={"skill_id": self.skill_id}),
                 Message(f"{self.skill_id}.converse.request",
                         data={"utterances": ["deactivate skill from within converse"], "lang": session.lang},
@@ -220,7 +239,14 @@ class TestDeactivate(TestCase):
                 Message("skill.converse.response",
                         data={"skill_id": self.skill_id},
                         context={"skill_id": self.skill_id}),
-                Message(UTTERANCE_HANDLED,
+                Message("mycroft.skill.handler.complete",
+                        data={"handler": f"{self.skill_id}.converse"},
+                        context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §8 terminal: orchestrator correlates the done-signal
+                Message(SpecMessage.INTENT_HANDLER_COMPLETE,
+                        data={"skill_id": self.skill_id, "intent_name": "skill"},
+                        context={"skill_id": self.skill_id}),
+                Message(SpecMessage.UTTERANCE_HANDLED,
                         data={},
                         context={"skill_id": self.skill_id})
 

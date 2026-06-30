@@ -28,14 +28,14 @@ def _make_service() -> StopService:
     bus = FakeBus()
     bus.connected_event = Event()
     bus.connected_event.set()
-    with patch("ovos_core.intent_services.stop_service.OVOSAbstractApplication.__init__",
-               lambda self, *a, **kw: None), \
-         patch("ovos_core.intent_services.stop_service.ConfidenceMatcherPipeline.__init__",
+    with patch("ovos_core.intent_services.stop_service.ConfidenceMatcherPipeline.__init__",
                lambda self, *a, **kw: None):
         svc = StopService.__new__(StopService)
         svc.bus = bus
         svc.config = {}
-        svc.skill_id = "stop.openvoiceos"
+        # vocabulary matching is delegated to ovos-spec-tools LocaleResources;
+        # tests patch svc._locale.voc_match / voc_list.
+        svc._locale = MagicMock()
     return svc
 
 
@@ -327,13 +327,13 @@ class TestMatchHigh(unittest.TestCase):
 
     def test_no_vocab_returns_none(self):
         """If voc_list is empty for the language, match_high returns None."""
-        with patch.object(self.svc, "voc_match", return_value=False):
+        with patch.object(self.svc._locale, "voc_match", return_value=False):
             result = self.svc.match_high(["stop"], "en-US", Message("test"))
         self.assertIsNone(result)
 
     def test_exact_stop_with_no_active_skills_is_global_stop(self):
         """'stop' with no active skills → global stop."""
-        with patch.object(self.svc, "voc_match",
+        with patch.object(self.svc._locale, "voc_match",
                           side_effect=lambda utt, voc, lang, exact: voc == "stop"), \
              patch.object(StopService, "get_active_skills", return_value=[]), \
              patch("ovos_core.intent_services.stop_service.SessionManager.get",
@@ -345,7 +345,7 @@ class TestMatchHigh(unittest.TestCase):
 
     def test_exact_stop_with_active_skills_pings_skills(self):
         """'stop' with active skills → skill stop ping."""
-        with patch.object(self.svc, "voc_match",
+        with patch.object(self.svc._locale, "voc_match",
                           side_effect=lambda utt, voc, lang, exact: voc == "stop"), \
              patch.object(StopService, "get_active_skills", return_value=["skill_a"]), \
              patch.object(self.svc, "_collect_stop_skills", return_value=["skill_a"]), \
@@ -363,7 +363,7 @@ class TestMatchHigh(unittest.TestCase):
         def voc_match_side_effect(utt, voc, lang, exact):
             return voc == "global_stop"
 
-        with patch.object(self.svc, "voc_match", side_effect=voc_match_side_effect), \
+        with patch.object(self.svc._locale, "voc_match", side_effect=voc_match_side_effect), \
              patch.object(StopService, "get_active_skills", return_value=["skill_a"]), \
              patch("ovos_core.intent_services.stop_service.SessionManager.get",
                    return_value=Session("s")):
@@ -380,14 +380,14 @@ class TestMatchLow(unittest.TestCase):
 
     def test_no_voc_list_returns_none(self):
         """If voc_list returns empty, match_low returns None."""
-        with patch.object(self.svc, "voc_list", return_value=[]):
+        with patch.object(self.svc._locale, "voc_list", return_value=[]):
             result = self.svc.match_low(["stop please"], "en-US", Message("test"))
         self.assertIsNone(result)
 
     def test_low_confidence_below_threshold_returns_none(self):
         """Fuzzy score below min_conf should return None."""
         self.svc.config = {"min_conf": 0.9}
-        with patch.object(self.svc, "voc_list", return_value=["stop"]), \
+        with patch.object(self.svc._locale, "voc_list", return_value=["stop"]), \
              patch("ovos_core.intent_services.stop_service.match_one",
                    return_value=("stop", 0.3)), \
              patch.object(StopService, "get_active_skills", return_value=[]), \
@@ -399,7 +399,7 @@ class TestMatchLow(unittest.TestCase):
     def test_active_skills_boost_confidence(self):
         """Active skills add 0.1 to the confidence score."""
         self.svc.config = {"min_conf": 0.5}
-        with patch.object(self.svc, "voc_list", return_value=["stop"]), \
+        with patch.object(self.svc._locale, "voc_list", return_value=["stop"]), \
              patch("ovos_core.intent_services.stop_service.match_one",
                    return_value=("stop", 0.45)), \
              patch.object(StopService, "get_active_skills", return_value=["skill_a"]), \
@@ -416,7 +416,7 @@ class TestMatchLow(unittest.TestCase):
         """A confident match with a stoppable skill → skill stop."""
         self.svc.config = {"min_conf": 0.5}
         self.svc.bus.once = MagicMock()
-        with patch.object(self.svc, "voc_list", return_value=["stop"]), \
+        with patch.object(self.svc._locale, "voc_list", return_value=["stop"]), \
              patch("ovos_core.intent_services.stop_service.match_one",
                    return_value=("stop", 0.8)), \
              patch.object(StopService, "get_active_skills", return_value=["skill_a"]), \
@@ -481,13 +481,13 @@ class TestMatchMedium(unittest.TestCase):
         self.svc = _make_service()
 
     def test_no_stop_voc_and_no_global_stop_returns_none(self):
-        with patch.object(self.svc, "voc_match", return_value=False), \
+        with patch.object(self.svc._locale, "voc_match", return_value=False), \
              patch.object(StopService, "get_active_skills", return_value=[]):
             result = self.svc.match_medium(["hello"], "en-US", Message("test"))
         self.assertIsNone(result)
 
     def test_stop_voc_match_delegates_to_match_low(self):
-        with patch.object(self.svc, "voc_match", return_value=True), \
+        with patch.object(self.svc._locale, "voc_match", return_value=True), \
              patch.object(self.svc, "match_low", return_value="LOW_RESULT") as mock_low:
             result = self.svc.match_medium(["stop"], "en-US", Message("test"))
         self.assertEqual(result, "LOW_RESULT")
@@ -497,7 +497,7 @@ class TestMatchMedium(unittest.TestCase):
         def voc_match_side_effect(utt, voc, lang, exact):
             return voc == "global_stop"
 
-        with patch.object(self.svc, "voc_match", side_effect=voc_match_side_effect), \
+        with patch.object(self.svc._locale, "voc_match", side_effect=voc_match_side_effect), \
              patch.object(StopService, "get_active_skills", return_value=[]), \
              patch.object(self.svc, "match_low", return_value="LOW_RESULT") as mock_low:
             result = self.svc.match_medium(["stop everything"], "en-US", Message("test"))
@@ -528,8 +528,9 @@ class TestBusHandlers(unittest.TestCase):
         msg = Message("stop:global", {})
         svc.handle_global_stop(msg)
         types = [m.msg_type for m in emitted]
+        self.assertIn("mycroft.skill.handler.start", types)
         self.assertIn("mycroft.stop", types)
-        self.assertIn("ovos.utterance.handled", types)
+        self.assertIn("mycroft.skill.handler.complete", types)
 
     def test_handle_skill_stop_forwards_to_skill(self):
         svc = _make_service()
@@ -537,8 +538,10 @@ class TestBusHandlers(unittest.TestCase):
         svc.bus.emit = lambda m: emitted.append(m)
         msg = Message("stop:skill", {"skill_id": "my_skill"})
         svc.handle_skill_stop(msg)
-        self.assertEqual(len(emitted), 1)
-        self.assertEqual(emitted[0].msg_type, "my_skill.stop")
+        types = [m.msg_type for m in emitted]
+        self.assertIn("mycroft.skill.handler.start", types)
+        self.assertIn("my_skill.stop", types)
+        self.assertIn("mycroft.skill.handler.complete", types)
 
 
 class TestShutdown(unittest.TestCase):

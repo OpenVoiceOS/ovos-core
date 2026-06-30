@@ -17,7 +17,7 @@ import json
 import re
 import time
 from collections import defaultdict
-from typing import Tuple, Callable, List
+from typing import Optional, Tuple, Callable, List
 
 import requests
 from ovos_bus_client.message import Message
@@ -32,6 +32,7 @@ from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
 from ovos_utils.thread_utils import create_daemon
 
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService, IntentTransformersService
+from ovos_core.intent_services.dispatcher import IntentDispatcher, DEFAULT_HANDLER_TIMEOUT
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
 
@@ -94,7 +95,7 @@ class IntentService:
     def __init__(self, bus, config=None, preload_pipelines=True,
                  alive_hook=on_alive, started_hook=on_started,
                  ready_hook=on_ready,
-                 error_hook=on_error, stopping_hook=on_stopping):
+                 error_hook=on_error, stopping_hook=on_stopping) -> None:
         """
         Initializes the IntentService with all intent parsing pipelines, transformer services, and messagebus event handlers.
 
@@ -110,16 +111,20 @@ class IntentService:
                                       on_error=error_hook,
                                       on_stopping=stopping_hook)
         self.bus = bus
-        self.status = ProcessStatus('intents', bus=self.bus, callback_map=callbacks)
+        self.status: ProcessStatus = ProcessStatus('intents', bus=self.bus, callback_map=callbacks)
         self.status.set_started()
-        self.config = config or Configuration().get("intents", {})
+        self.config: dict = config or Configuration().get("intents", {})
 
         # load and cache the plugins right away so they receive all bus messages
-        self.pipeline_plugins = {}
+        self.pipeline_plugins: dict = {}
 
-        self.utterance_plugins = UtteranceTransformersService(bus)
-        self.metadata_plugins = MetadataTransformersService(bus)
-        self.intent_plugins = IntentTransformersService(bus)
+        self.utterance_plugins: UtteranceTransformersService = UtteranceTransformersService(bus)
+        self.metadata_plugins: MetadataTransformersService = MetadataTransformersService(bus)
+        self.intent_plugins: IntentTransformersService = IntentTransformersService(bus)
+
+        handler_timeout = self.config.get("handler_timeout", DEFAULT_HANDLER_TIMEOUT)
+        self.intent_dispatcher: IntentDispatcher = IntentDispatcher(
+            bus, timeout=handler_timeout, on_terminal=self._emit_utterance_handled)
 
         # connection SessionManager to the bus,
         # this will sync default session across all components
@@ -136,7 +141,7 @@ class IntentService:
         self.bus.on('intent.service.intent.get', self.handle_get_intent)
 
         # internal, track skills that call self.deactivate to avoid reactivating them again
-        self._deactivations = defaultdict(list)
+        self._deactivations: defaultdict = defaultdict(list)
         self.bus.on('intent.service.skills.deactivate', self._handle_deactivate)
         self.bus.on('intent.service.pipelines.reload', self.handle_reload_pipelines)
 
@@ -272,38 +277,43 @@ class IntentService:
         skill_id = message.data.get("skill_id")
         self._deactivations[sess.session_id].append(skill_id)
 
-    def _emit_match_message(self, match: IntentHandlerMatch, message: Message, lang: str):
-        """
-        Emit a reply message for a matched intent, updating session and skill activation.
+    def _emit_utterance_handled(self, dispatch_msg: Message):
+        """OVOS-PIPELINE-1 §9.5 — emit the universal ``ovos.utterance.handled``
+        end-marker once a matched handler reaches its §8 terminal.
 
-        This method processes matched intents from either a pipeline matcher or an intent handler,
-        creating a reply message with matched intent details and managing skill activation.
+        Invoked by the dispatcher (``on_terminal``) right after a complete/error/
+        timeout terminal is on the bus — non-blocking, and ordered after the terminal
+        so consumers never see the end-marker first. The no-match and cancel paths
+        emit their own end-marker inline; together they give exactly one per
+        utterance."""
+        self.bus.emit(dispatch_msg.forward(SpecMessage.UTTERANCE_HANDLED, {}))
+
+    def _dispatch_match(self, match: IntentHandlerMatch, message: Message, lang: str,
+                        pipeline_id: str = None) -> None:
+        """Orchestrate the OVOS-PIPELINE-1 §6.1 post-match steps, then dispatch.
+
+        Runs the service-state-dependent post-match orchestration — the
+        intent-transformer chain (TRANSFORM-1 §3.4), skill activation +
+        ``{skill_id}.activate``, session update, and ``context['pipeline_id']``
+        stamping (§7.1) — builds the dispatch Message, emits the §9.2
+        ``ovos.intent.matched`` notification, and hands the dispatch Message to
+        the IntentDispatcher, which owns the §7 dispatch + §8 handler-lifecycle
+        trio.
 
         Args:
-            match (IntentHandlerMatch): The matched intent object containing
-                utterance and matching information.
-            message (Message): The original messagebus message that triggered the intent match.
-            lang (str): The language of the pipeline plugin match
-
-        Details:
-            - Handles two types of matches: PipelineMatch and IntentHandlerMatch
-            - Creates a reply message with matched intent data
-            - Activates the corresponding skill if not previously deactivated
-            - Updates session information
-            - Emits the reply message on the messagebus
-
-        Side Effects:
-            - Modifies session state
-            - Emits a messagebus event
-            - Can trigger skill activation events
+            match (IntentHandlerMatch): The matched intent (utterance, match_type,
+                skill_id, match_data, optional updated_session).
+            message (Message): The originating utterance Message to derive from.
+            lang (str): The content language of the match.
+            pipeline_id (str): The pipeline plugin that produced the match (§3.1).
 
         Returns:
             None
         """
         try:
             match = self.intent_plugins.transform(match)
-        except Exception as e:
-            LOG.error(f"Error in IntentTransformers: {e}")
+        except Exception:
+            LOG.exception("_dispatch_match failed")
 
         reply = None
         sess = match.updated_session or SessionManager.get(message)
@@ -332,9 +342,6 @@ class IntentService:
                 # ensure skill_id is present in message.context
                 reply.context["skill_id"] = match.skill_id
 
-                # NOTE: do not re-activate if the skill called self.deactivate
-                # we could also skip activation if skill is already active,
-                # but we still want to update the timestamp
                 was_deactivated = match.skill_id in self._deactivations[sess.session_id]
                 if not was_deactivated:
                     sess.activate_skill(match.skill_id)
@@ -344,8 +351,24 @@ class IntentService:
             # update Session if modified by pipeline
             reply.context["session"] = sess.serialize()
 
-            # finally emit reply message
-            self.bus.emit(reply)
+            # stamp the matching plugin's identity on the dispatch (§3.1, §7.1)
+            if pipeline_id:
+                reply.context["pipeline_id"] = pipeline_id
+
+            skill_id = (match.skill_id
+                        or (match.match_data or {}).get("skill_id")
+                        or reply.msg_type.split(":", 1)[0])
+            self.bus.emit(reply.forward(SpecMessage.INTENT_MATCHED, {
+                "skill_id": skill_id,
+                "intent_name": match.match_type,
+                "lang": lang,
+                "utterance": match.utterance,
+                "slots": dict(match.match_data or {}),
+                "pipeline_id": reply.context.get("pipeline_id"),
+            }))
+
+            intent_name = reply.msg_type.split(":", 1)[-1]
+            self.intent_dispatcher.dispatch(reply, skill_id, intent_name)
 
         else:  # upload intent metrics if enabled
             if self.config.get("open_data", {}).get("intent_urls"):
@@ -409,8 +432,9 @@ class IntentService:
         sound = Configuration().get('sounds', {}).get('cancel', "snd/cancel.mp3")
         # NOTE: message.reply to ensure correct message destination
         self.bus.emit(message.reply('mycroft.audio.play_sound', {"uri": sound}))
-        self.bus.emit(message.reply("ovos.utterance.cancelled"))
-        self.bus.emit(message.reply("ovos.utterance.handled"))
+        # OVOS-PIPELINE-1 §6.4 cancellation terminal path: cancelled -> handled
+        self.bus.emit(message.reply(SpecMessage.UTTERANCE_CANCELLED))
+        self.bus.emit(message.reply(SpecMessage.UTTERANCE_HANDLED))
 
     def handle_utterance(self, message: Message):
         """Main entrypoint for handling user utterances
@@ -469,9 +493,20 @@ class IntentService:
                     # if multilingual matching is enabled, attempt to match all user languages if main fails
                     langs += [l for l in get_valid_languages() if l != lang]
                 for intent_lang in langs:
-                    match = match_func(utterances, intent_lang, message)
+                    try:
+                        match = match_func(utterances, intent_lang, message)
+                    except Exception:
+                        # a misbehaving pipeline matcher (e.g. a malformed .voc
+                        # resource) must not abort the whole utterance — log and
+                        # treat it as a no-match so iteration continues.
+                        LOG.exception(f"{match_func} raised while matching "
+                                      f"'{intent_lang}'; treating as no-match")
+                        match = None
                     if match:
                         LOG.info(f"{pipeline} match ({intent_lang}): {match}")
+                        if match and not match.match_type:
+                            LOG.warning(f"Matcher {type(match_func).__name__} returned a match with empty match_type; skipping")
+                            continue
                         if match.skill_id and match.skill_id in (sess.blacklisted_skills or []):
                             LOG.debug(
                                 f"ignoring match, skill_id '{match.skill_id}' blacklisted by Session '{sess.session_id}'")
@@ -481,7 +516,8 @@ class IntentService:
                                 f"ignoring match, intent '{match.match_type}' blacklisted by Session '{sess.session_id}'")
                             continue
                         try:
-                            self._emit_match_message(match, message, intent_lang)
+                            self._dispatch_match(match, message, intent_lang,
+                                                     pipeline_id=pipeline)
                             break
                         except Exception:
                             LOG.exception(f"{match_func} returned an invalid match")
@@ -505,7 +541,17 @@ class IntentService:
         return match, message.context, stopwatch
 
     def send_complete_intent_failure(self, message):
-        """Send a message that no skill could handle the utterance.
+        """Emit the OVOS-PIPELINE-1 §9.3 no-match terminal.
+
+        The orchestrator owns the no-match branch of the §6.1 lifecycle: it plays
+        the error sound, emits ``ovos.intent.unmatched`` (§9.3 — the intent-layer
+        failure signal) and then the universal end-marker ``ovos.utterance.handled``
+        (§9.5). Exactly one ``ovos.utterance.handled`` terminates the utterance.
+
+        ``ovos.intent.unmatched`` is the spec replacement for the legacy
+        ``complete_intent_failure``; the two are bridged by ovos-spec-tools'
+        MIGRATION_MAP, so emitting the spec topic re-delivers the legacy one to
+        any consumer still subscribed to it.
 
         Args:
             message (Message): original message to forward from
@@ -513,8 +559,10 @@ class IntentService:
         sound = Configuration().get('sounds', {}).get('error', "snd/error.mp3")
         # NOTE: message.reply to ensure correct message destination
         self.bus.emit(message.reply('mycroft.audio.play_sound', {"uri": sound}))
-        self.bus.emit(message.reply('complete_intent_failure', message.data))
-        self.bus.emit(message.reply("ovos.utterance.handled"))
+        # §9.3: intent-layer failure signal (carries lang from message.data)
+        self.bus.emit(message.reply(SpecMessage.INTENT_UNMATCHED, message.data))
+        # §9.5: universal end-marker
+        self.bus.emit(message.reply(SpecMessage.UTTERANCE_HANDLED))
 
     @staticmethod
     def handle_add_context(message: Message):
@@ -605,7 +653,8 @@ class IntentService:
         self.bus.emit(message.reply("intent.service.intent.reply",
                                     {"intent": None, "utterance": utterance}))
 
-    def shutdown(self):
+    def shutdown(self) -> None:
+        self.intent_dispatcher.shutdown()
         self.utterance_plugins.shutdown()
         self.metadata_plugins.shutdown()
         for pipeline in self.pipeline_plugins.values():

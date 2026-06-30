@@ -1,8 +1,9 @@
 import time
-from threading import Event
+from threading import Event, Lock, Timer
 from typing import Optional, Dict, List, Union
 
 from ovos_bus_client.client import MessageBusClient
+from ovos_bus_client.handler import HandlerLifecycle
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, UtteranceState, Session
 from ovos_config.config import Configuration
@@ -14,12 +15,20 @@ from ovos_utils.log import LOG
 from ovos_plugin_manager.templates.pipeline import PipelinePlugin, IntentHandlerMatch
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
 
+#: upper bound, seconds, on how long core waits for a skill's
+#: ``skill.converse.response`` before the dispatch lifecycle is declared a
+#: timeout (``mycroft.skill.handler.error``). Generous: converse handlers may
+#: legitimately run a while, but this must eventually backstop a silent skill so
+#: an orchestrator observing the done-signal never hangs on the in-flight
+#: dispatch.
+CONVERSE_HANDLER_TIMEOUT = 5 * 60
+
 
 class ConverseService(PipelinePlugin):
     """Intent Service handling conversational skills."""
 
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
-                 config: Optional[Dict] = None):
+                 config: Optional[Dict] = None) -> None:
         config = config or Configuration().get("skills", {}).get("converse", {})
         super().__init__(bus, config)
         self._consecutive_activations = {}
@@ -31,7 +40,54 @@ class ConverseService(PipelinePlugin):
         self.bus.on("converse:skill", self.handle_converse)
 
     def handle_converse(self, message: Message):
+        """Priority-based skill activation and deactivation. Tracks active skills per session, handles converse requests, and manages lifecycle events."""
         skill_id = message.data["skill_id"]
+        # the dispatch belongs to this session; only an ack carrying the same
+        # session may resolve it (a concurrent converse dispatch to the same
+        # skill in another session must not cross-resolve).
+        session_id = SessionManager.get(message).session_id
+
+        lifecycle = HandlerLifecycle(self.bus, message, skill_id=skill_id,
+                                     handler_name=f"{skill_id}.converse")
+
+        resolved = Event()
+        resolve_lock = Lock()
+
+        def _claim() -> bool:
+            with resolve_lock:
+                if resolved.is_set():
+                    return False
+                resolved.set()
+                return True
+
+        def _resolve_complete(msg: Message) -> None:
+            if msg.data.get("skill_id") and msg.data.get("skill_id") != skill_id:
+                return  # ack from a different skill, ignore
+            if "session" in msg.context and \
+                    SessionManager.get(msg).session_id != session_id:
+                return  # ack from a different session, ignore
+            if not _claim():
+                return
+            timer.cancel()
+            self.bus.remove("skill.converse.response", _resolve_complete)
+            lifecycle.complete()
+
+        def _resolve_timeout() -> None:
+            if not _claim():
+                return
+            self.bus.remove("skill.converse.response", _resolve_complete)
+            LOG.warning(f"converse dispatch to {skill_id} timed out after "
+                        f"{CONVERSE_HANDLER_TIMEOUT}s; emitting handler error")
+            lifecycle.error(TimeoutError(
+                f"converse handler timed out after {CONVERSE_HANDLER_TIMEOUT} seconds"))
+
+        timer = Timer(CONVERSE_HANDLER_TIMEOUT, _resolve_timeout)
+        timer.daemon = True
+
+        self.bus.on("skill.converse.response", _resolve_complete)
+        timer.start()
+        # mycroft.skill.handler.start, then the dispatch itself
+        lifecycle.start()
         self.bus.emit(message.reply(f"{skill_id}.converse.request", message.data))
 
     @property
@@ -58,7 +114,7 @@ class ConverseService(PipelinePlugin):
         return [skill[0] for skill in session.active_skills]
 
     def deactivate_skill(self, skill_id: str, source_skill: Optional[str] = None,
-                         message: Optional[Message] = None):
+                         message: Optional[Message] = None) -> None:
         """Remove a skill from being targetable by converse.
 
         Args:
@@ -68,13 +124,13 @@ class ConverseService(PipelinePlugin):
         """
         source_skill = source_skill or skill_id
         if self._deactivate_allowed(skill_id, source_skill):
+            message = message or Message("")
             session = SessionManager.get(message)
             if session.is_active(skill_id):
                 # update converse session
                 session.deactivate_skill(skill_id)
 
                 # keep message.context
-                message = message or Message("")
                 message.context["session"] = session.serialize()  # update session active skills
                 # send bus event
                 self.bus.emit(
@@ -97,12 +153,12 @@ class ConverseService(PipelinePlugin):
         """
         source_skill = source_skill or skill_id
         if self._activate_allowed(skill_id, source_skill):
+            message = message or Message("")
             # update converse session
             session = SessionManager.get(message)
             session.activate_skill(skill_id)
 
             # keep message.context
-            message = message or Message("")
             message.context["session"] = session.serialize()  # update session active skills
             message = message.forward("intent.service.skills.activated",
                                       {"skill_id": skill_id})
@@ -159,7 +215,7 @@ class ConverseService(PipelinePlugin):
         default_max = self.config.get("max_activations", -1)
         # per skill override limit of consecutive activations
         skill_max = self.config.get("skill_activations", {}).get(skill_id)
-        max_activations = skill_max or default_max
+        max_activations = skill_max if skill_max is not None else default_max
         if skill_id not in self._consecutive_activations:
             self._consecutive_activations[skill_id] = 0
         if max_activations < 0:
@@ -386,7 +442,7 @@ class ConverseService(PipelinePlugin):
         self.bus.emit(message.reply("intent.service.active_skills.reply",
                                     {"skills": self.get_active_skills(message)}))
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         self.bus.remove("converse:skill", self.handle_converse)
         self.bus.remove('intent.service.skills.deactivate', self.handle_deactivate_skill_request)
         self.bus.remove('intent.service.skills.activate', self.handle_activate_skill_request)
