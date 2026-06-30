@@ -27,12 +27,8 @@ from ovoscope import End2EndTest, get_minicroft
 # legacy counterpart is derived via migration_counterpart, never hardcoded.
 SPEC_UTTERANCE = SpecMessage.UTTERANCE.value              # ovos.utterance.handle
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utterance
-UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value   # ovos.utterance.handled
 SPEC_SPEAK = SpecMessage.SPEAK.value                      # ovos.utterance.speak
-INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value         # ovos.intent.matched (§9.2)
 INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value     # ovos.intent.unmatched (§9.3)
-HANDLER_START = SpecMessage.INTENT_HANDLER_START.value    # §8.1
-HANDLER_COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value
 HANDLER_ERROR = SpecMessage.INTENT_HANDLER_ERROR.value
 
 # The two namespace paths every scenario is run on.
@@ -53,12 +49,12 @@ IGNORE_MESSAGES = [
     "recognizer_loop:audio_output_end",  # TTS mock unduck
     # ovos.intent.matched (§9.2) precedes every dispatch; these scenarios assert
     # stop routing/activation, not the matched broadcast, so it is filtered here.
-    INTENT_MATCHED,
+    SpecMessage.INTENT_MATCHED,
     # the §8 handler-lifecycle trio also wraps every dispatch; these scenarios
     # assert stop routing, not the trio (it is covered by the adapt/padatious
     # suites), so it is filtered here too.
-    HANDLER_START,
-    HANDLER_COMPLETE,
+    SpecMessage.INTENT_HANDLER_START,
+    SpecMessage.INTENT_HANDLER_COMPLETE,
     HANDLER_ERROR,
     "ovos.common_play.stop.response",
     "common_query.openvoiceos.stop.response",
@@ -102,7 +98,7 @@ def skill_stop_lifecycle(skill_id):
                 {"name": "StopService.handle_skill_stop"},
                 {"skill_id": "stop.openvoiceos"}),
         # §9.5 end-marker
-        Message(UTTERANCE_HANDLED, {},
+        Message(SpecMessage.UTTERANCE_HANDLED, {},
                 {"skill_id": "stop.openvoiceos"}),
     ]
 
@@ -117,10 +113,10 @@ def skill_stop_lifecycle(skill_id):
 # asserted above.
 SKILL_STOP_LIFECYCLE_KWARGS = dict(
     skill_id="stop.openvoiceos",
-    eof_msgs=[UTTERANCE_HANDLED],
+    eof_msgs=[SpecMessage.UTTERANCE_HANDLED],
     eof_count=2,
     test_active_skills=False,
-    ignore_messages=[INTENT_MATCHED, HANDLER_START, HANDLER_COMPLETE, HANDLER_ERROR,
+    ignore_messages=[SpecMessage.INTENT_MATCHED, SpecMessage.INTENT_HANDLER_START, SpecMessage.INTENT_HANDLER_COMPLETE, HANDLER_ERROR,
                      "ovos.skills.settings_changed"],
 )
 
@@ -147,7 +143,7 @@ class TestStopNoSkills(TestCase):
             test = End2EndTest(
                 minicroft=minicroft,
                 skill_ids=[],
-                eof_msgs=[UTTERANCE_HANDLED],
+                eof_msgs=[SpecMessage.UTTERANCE_HANDLED],
                 flip_points=[utt_topic],
                 entry_points=[utt_topic],
                 ignore_messages=IGNORE_MESSAGES,
@@ -165,7 +161,7 @@ class TestStopNoSkills(TestCase):
                     Message("mycroft.skill.handler.complete",
                             {"name": "StopService.handle_global_stop"}),
 
-                    Message(UTTERANCE_HANDLED, {})
+                    Message(SpecMessage.UTTERANCE_HANDLED, {})
                 ]
             )
 
@@ -192,7 +188,7 @@ class TestStopNoSkills(TestCase):
             test = End2EndTest(
                 minicroft=minicroft,
                 skill_ids=[],
-                eof_msgs=[UTTERANCE_HANDLED],
+                eof_msgs=[SpecMessage.UTTERANCE_HANDLED],
                 flip_points=[utt_topic],
                 entry_points=[utt_topic],
                 ignore_messages=IGNORE_MESSAGES,
@@ -201,7 +197,7 @@ class TestStopNoSkills(TestCase):
                     message,
                     Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
                     Message(INTENT_UNMATCHED, {}),
-                    Message(UTTERANCE_HANDLED, {}),
+                    Message(SpecMessage.UTTERANCE_HANDLED, {}),
                 ]
             )
 
@@ -228,7 +224,7 @@ class TestStopNoSkills(TestCase):
             test = End2EndTest(
                 minicroft=minicroft,
                 skill_ids=[],
-                eof_msgs=[UTTERANCE_HANDLED],
+                eof_msgs=[SpecMessage.UTTERANCE_HANDLED],
                 flip_points=[utt_topic],
                 entry_points=[utt_topic],
                 source_message=message,
@@ -246,7 +242,7 @@ class TestStopNoSkills(TestCase):
                     Message("mycroft.skill.handler.complete",
                             {"name": "StopService.handle_global_stop"}),
 
-                    Message(UTTERANCE_HANDLED, {})
+                    Message(SpecMessage.UTTERANCE_HANDLED, {})
                 ]
             )
 
@@ -296,12 +292,12 @@ class TestCountSkills(TestCase):
                     "name": "CountSkill.handle_how_are_you_intent"
                 }),
 
-                Message(UTTERANCE_HANDLED, {})
+                Message(SpecMessage.UTTERANCE_HANDLED, {})
             ]
             test = End2EndTest(
                 minicroft=minicroft,
                 skill_ids=[],
-                eof_msgs=[UTTERANCE_HANDLED],
+                eof_msgs=[SpecMessage.UTTERANCE_HANDLED],
                 flip_points=[utt_topic],
                 entry_points=[utt_topic],
                 ignore_messages=IGNORE_MESSAGES,
@@ -408,7 +404,7 @@ class TestCountSkills(TestCase):
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_global_stop"},
                         {"skill_id": "stop.openvoiceos"}),
-                Message(UTTERANCE_HANDLED, {},
+                Message(SpecMessage.UTTERANCE_HANDLED, {},
                         {"skill_id": "stop.openvoiceos"}),
             ]
             test = End2EndTest(

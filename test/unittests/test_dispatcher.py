@@ -29,6 +29,7 @@ only sets each in-flight entry's ``done`` event on its §8 terminal. The orchest
 (``IntentService``) blocks on that and emits the single end-marker itself, uniformly
 with the no-match and cancel paths (see ``TestDispatchFromMatch``).
 """
+# ruff: noqa: RUF023
 import time
 import unittest
 from collections import defaultdict
@@ -268,7 +269,7 @@ class TestDispatchFromMatch(unittest.TestCase):
         match = IntentHandlerMatch(match_type="test.skill:do",
                                    match_data={}, skill_id="test.skill",
                                    utterance="hello")
-        msg = Message("ovos.utterance.handle",
+        msg = Message(SpecMessage.UTTERANCE,
                       {"utterances": ["hello"]},
                       {"session": Session("s1").serialize()})
         svc._dispatch_match(match, msg, "en-US", pipeline_id="p1")
@@ -286,7 +287,7 @@ class TestDispatchFromMatch(unittest.TestCase):
         match = IntentHandlerMatch(match_type="test.skill:do",
                                    match_data={}, skill_id="test.skill",
                                    utterance="hello")
-        msg = Message("ovos.utterance.handle",
+        msg = Message(SpecMessage.UTTERANCE,
                       {"utterances": ["hello"]},
                       {"session": Session("s1").serialize()})
         svc._dispatch_match(match, msg, "en-US", pipeline_id="p1")

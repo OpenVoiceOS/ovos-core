@@ -57,77 +57,79 @@ class TestAdaptIntent(TestCase):
         modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
         minicroft = get_minicroft([self.skill_id], modernize=modernize,
                                   emit_legacy=emit_legacy)
+        try:
 
-        session = Session("123")
-        session.lang = "en-US"
-        session.pipeline = ['ovos-adapt-pipeline-plugin-high']
-        message = Message(utt_topic,
-                          {"utterances": ["hello world"], "lang": session.lang},
-                          {"session": session.serialize(), "source": "A", "destination": "B"})
+            session = Session("123")
+            session.lang = "en-US"
+            session.pipeline = ['ovos-adapt-pipeline-plugin-high']
+            message = Message(utt_topic,
+                              {"utterances": ["hello world"], "lang": session.lang},
+                              {"session": session.serialize(), "source": "A", "destination": "B"})
 
-        final_session = deepcopy(session)
-        final_session.active_skills = [(self.skill_id, 0.0)]
+            final_session = deepcopy(session)
+            final_session.active_skills = [(self.skill_id, 0.0)]
 
-        test = End2EndTest(
-            minicroft=minicroft,
-            skill_ids=[self.skill_id],
-            flip_points=[utt_topic],
-            entry_points=[utt_topic],
-            ignore_messages=["recognizer_loop:audio_output_start",
-                              "recognizer_loop:audio_output_end"],
-            source_message=message,
-            final_session=final_session,
-            activation_points=[f"{self.skill_id}:HelloWorldIntent"],
-            expected_messages=[
-                message,
-                Message(f"{self.skill_id}.activate",
-                        data={},
-                        context={"skill_id": self.skill_id}),
+            test = End2EndTest(
+                minicroft=minicroft,
+                skill_ids=[self.skill_id],
+                flip_points=[utt_topic],
+                entry_points=[utt_topic],
+                ignore_messages=["recognizer_loop:audio_output_start",
+                                  "recognizer_loop:audio_output_end"],
+                source_message=message,
+                final_session=final_session,
+                activation_points=[f"{self.skill_id}:HelloWorldIntent"],
+                expected_messages=[
+                    message,
+                    Message(f"{self.skill_id}.activate",
+                            data={},
+                            context={"skill_id": self.skill_id}),
                 # PIPELINE-1 §9.2: matched notification, before the dispatch.
                 # intent_name carries the full <skill_id>:<intent_name> match_type.
-                Message(INTENT_MATCHED,
-                        data={"skill_id": self.skill_id,
-                              "intent_name": f"{self.skill_id}:HelloWorldIntent",
-                              "utterance": "hello world",
-                              "lang": session.lang},
-                        context={"skill_id": self.skill_id}),
+                    Message(INTENT_MATCHED,
+                            data={"skill_id": self.skill_id,
+                                  "intent_name": f"{self.skill_id}:HelloWorldIntent",
+                                  "utterance": "hello world",
+                                  "lang": session.lang},
+                            context={"skill_id": self.skill_id}),
                 # PIPELINE-1 §8.1: orchestrator emits start immediately before dispatch
-                Message(HANDLER_START,
-                        data={"skill_id": self.skill_id,
-                              "intent_name": "HelloWorldIntent"},
-                        context={"skill_id": self.skill_id}),
-                Message(f"{self.skill_id}:HelloWorldIntent",
-                        data={"utterance": "hello world", "lang": session.lang},
-                        context={"skill_id": self.skill_id}),
-                Message("mycroft.skill.handler.start",
-                        data={"name": "HelloWorldSkill.handle_hello_world_intent"},
-                        context={"skill_id": self.skill_id}),
-                Message(SPEC_SPEAK,
-                        data={"utterance": "Hello world",
-                              "expect_response": False,
-                              "meta": {
-                                  "dialog": "hello.world",
-                                  "data": {},
-                                  "skill": self.skill_id
-                              }},
-                        context={"skill_id": self.skill_id}),
-                Message("mycroft.skill.handler.complete",
-                        data={"name": "HelloWorldSkill.handle_hello_world_intent"},
-                        context={"skill_id": self.skill_id}),
+                    Message(HANDLER_START,
+                            data={"skill_id": self.skill_id,
+                                  "intent_name": "HelloWorldIntent"},
+                            context={"skill_id": self.skill_id}),
+                    Message(f"{self.skill_id}:HelloWorldIntent",
+                            data={"utterance": "hello world", "lang": session.lang},
+                            context={"skill_id": self.skill_id}),
+                    Message("mycroft.skill.handler.start",
+                            data={"name": "HelloWorldSkill.handle_hello_world_intent"},
+                            context={"skill_id": self.skill_id}),
+                    Message(SPEC_SPEAK,
+                            data={"utterance": "Hello world",
+                                  "expect_response": False,
+                                  "meta": {
+                                      "dialog": "hello.world",
+                                      "data": {},
+                                      "skill": self.skill_id
+                                  }},
+                            context={"skill_id": self.skill_id}),
+                    Message("mycroft.skill.handler.complete",
+                            data={"name": "HelloWorldSkill.handle_hello_world_intent"},
+                            context={"skill_id": self.skill_id}),
                 # PIPELINE-1 §8.1: orchestrator emits complete on the handler's
                 # completion, before the end-marker (spec ordering §6.1).
-                Message(HANDLER_COMPLETE,
-                        data={"skill_id": self.skill_id,
-                              "intent_name": "HelloWorldIntent"},
-                        context={"skill_id": self.skill_id}),
-                Message(UTTERANCE_HANDLED,
-                        data={},
-                        context={"skill_id": self.skill_id}),
-            ]
-        )
+                    Message(HANDLER_COMPLETE,
+                            data={"skill_id": self.skill_id,
+                                  "intent_name": "HelloWorldIntent"},
+                            context={"skill_id": self.skill_id}),
+                    Message(UTTERANCE_HANDLED,
+                            data={},
+                            context={"skill_id": self.skill_id}),
+                ]
+            )
 
-        test.execute(timeout=10)
-        minicroft.stop()
+            test.execute(timeout=10)
+        finally:
+            minicroft.stop()
 
     def test_adapt_match(self):
         for namespace in NAMESPACE_PATHS:
@@ -138,32 +140,34 @@ class TestAdaptIntent(TestCase):
         modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
         minicroft = get_minicroft([self.skill_id], modernize=modernize,
                                   emit_legacy=emit_legacy)
+        try:
 
-        session = Session("123")
-        session.lang = "en-US"
-        session.pipeline = ['ovos-adapt-pipeline-plugin-high']
-        session.blacklisted_skills = [self.skill_id]
-        message = Message(utt_topic,
-                          {"utterances": ["hello world"], "lang": session.lang},
-                          {"session": session.serialize(), "source": "A", "destination": "B"})
+            session = Session("123")
+            session.lang = "en-US"
+            session.pipeline = ['ovos-adapt-pipeline-plugin-high']
+            session.blacklisted_skills = [self.skill_id]
+            message = Message(utt_topic,
+                              {"utterances": ["hello world"], "lang": session.lang},
+                              {"session": session.serialize(), "source": "A", "destination": "B"})
 
-        test = End2EndTest(
-            minicroft=minicroft,
-            skill_ids=[self.skill_id],
-            flip_points=[utt_topic],
-            entry_points=[utt_topic],
-            source_message=message,
-            final_session=session,
-            expected_messages=[
-                message,
-                Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message(INTENT_UNMATCHED, {}),
-                Message(UTTERANCE_HANDLED, {})
-            ]
-        )
+            test = End2EndTest(
+                minicroft=minicroft,
+                skill_ids=[self.skill_id],
+                flip_points=[utt_topic],
+                entry_points=[utt_topic],
+                source_message=message,
+                final_session=session,
+                expected_messages=[
+                    message,
+                    Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                    Message(INTENT_UNMATCHED, {}),
+                    Message(UTTERANCE_HANDLED, {})
+                ]
+            )
 
-        test.execute(timeout=10)
-        minicroft.stop()
+            test.execute(timeout=10)
+        finally:
+            minicroft.stop()
 
     def test_skill_blacklist(self):
         for namespace in NAMESPACE_PATHS:
@@ -174,32 +178,34 @@ class TestAdaptIntent(TestCase):
         modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
         minicroft = get_minicroft([self.skill_id], modernize=modernize,
                                   emit_legacy=emit_legacy)
+        try:
 
-        session = Session("123")
-        session.lang = "en-US"
-        session.pipeline = ['ovos-adapt-pipeline-plugin-high']
-        session.blacklisted_intents = [f"{self.skill_id}:HelloWorldIntent"]
-        message = Message(utt_topic,
-                          {"utterances": ["hello world"], "lang": session.lang},
-                          {"session": session.serialize(), "source": "A", "destination": "B"})
+            session = Session("123")
+            session.lang = "en-US"
+            session.pipeline = ['ovos-adapt-pipeline-plugin-high']
+            session.blacklisted_intents = [f"{self.skill_id}:HelloWorldIntent"]
+            message = Message(utt_topic,
+                              {"utterances": ["hello world"], "lang": session.lang},
+                              {"session": session.serialize(), "source": "A", "destination": "B"})
 
-        test = End2EndTest(
-            minicroft=minicroft,
-            skill_ids=[self.skill_id],
-            flip_points=[utt_topic],
-            entry_points=[utt_topic],
-            source_message=message,
-            final_session=session,
-            expected_messages=[
-                message,
-                Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message(INTENT_UNMATCHED, {}),
-                Message(UTTERANCE_HANDLED, {})
-            ]
-        )
+            test = End2EndTest(
+                minicroft=minicroft,
+                skill_ids=[self.skill_id],
+                flip_points=[utt_topic],
+                entry_points=[utt_topic],
+                source_message=message,
+                final_session=session,
+                expected_messages=[
+                    message,
+                    Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                    Message(INTENT_UNMATCHED, {}),
+                    Message(UTTERANCE_HANDLED, {})
+                ]
+            )
 
-        test.execute(timeout=10)
-        minicroft.stop()
+            test.execute(timeout=10)
+        finally:
+            minicroft.stop()
 
     def test_intent_blacklist(self):
         for namespace in NAMESPACE_PATHS:
@@ -210,31 +216,33 @@ class TestAdaptIntent(TestCase):
         modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
         minicroft = get_minicroft([self.skill_id], modernize=modernize,
                                   emit_legacy=emit_legacy)
+        try:
 
-        session = Session("123")
-        session.lang = "en-US"
-        session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
-        message = Message(utt_topic,
-                          {"utterances": ["hello world"], "lang": session.lang},
-                          {"session": session.serialize(), "source": "A", "destination": "B"})
+            session = Session("123")
+            session.lang = "en-US"
+            session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
+            message = Message(utt_topic,
+                              {"utterances": ["hello world"], "lang": session.lang},
+                              {"session": session.serialize(), "source": "A", "destination": "B"})
 
-        test = End2EndTest(
-            minicroft=minicroft,
-            skill_ids=[self.skill_id],
-            flip_points=[utt_topic],
-            entry_points=[utt_topic],
-            final_session=session,
-            source_message=message,
-            expected_messages=[
-                message,
-                Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
-                Message(INTENT_UNMATCHED, {}),
-                Message(UTTERANCE_HANDLED, {})
-            ]
-        )
+            test = End2EndTest(
+                minicroft=minicroft,
+                skill_ids=[self.skill_id],
+                flip_points=[utt_topic],
+                entry_points=[utt_topic],
+                final_session=session,
+                source_message=message,
+                expected_messages=[
+                    message,
+                    Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                    Message(INTENT_UNMATCHED, {}),
+                    Message(UTTERANCE_HANDLED, {})
+                ]
+            )
 
-        test.execute(timeout=10)
-        minicroft.stop()
+            test.execute(timeout=10)
+        finally:
+            minicroft.stop()
 
     def test_padatious_no_match(self):
         for namespace in NAMESPACE_PATHS:

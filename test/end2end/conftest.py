@@ -7,7 +7,11 @@ reports within a second — or is explicitly stopped — so a long backstop only
 slow hang if a done-signal is ever dropped. Pin it low so such a regression fails
 fast (a few seconds) instead of stalling the whole run.
 """
-import ovos_core.intent_services.service as _service
+import pytest
 
-#: seconds — generous vs. the sub-second e2e handlers, tiny vs. the 300s default
-_service.DEFAULT_HANDLER_TIMEOUT = 10
+
+@pytest.fixture(autouse=True)
+def patch_handler_timeout(monkeypatch):
+    monkeypatch.setattr(
+        "ovos_core.intent_services.service.DEFAULT_HANDLER_TIMEOUT", 10
+    )

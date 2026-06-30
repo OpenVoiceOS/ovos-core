@@ -54,79 +54,81 @@ class TestFallback(TestCase):
         modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
         minicroft = get_minicroft([self.skill_id], modernize=modernize,
                                   emit_legacy=emit_legacy)
+        try:
 
-        session = Session("123")
-        session.lang = "en-US"
-        session.pipeline = ['ovos-fallback-pipeline-plugin-low']
-        message = Message(utt_topic,
-                          {"utterances": ["hello world"], "lang": session.lang},
-                          {"session": session.serialize(), "source": "A", "destination": "B"})
+            session = Session("123")
+            session.lang = "en-US"
+            session.pipeline = ['ovos-fallback-pipeline-plugin-low']
+            message = Message(utt_topic,
+                              {"utterances": ["hello world"], "lang": session.lang},
+                              {"session": session.serialize(), "source": "A", "destination": "B"})
 
-        final_session = deepcopy(session)
+            final_session = deepcopy(session)
 
-        test = End2EndTest(
-            minicroft=minicroft,
-            skill_ids=[self.skill_id],
-            eof_msgs=[UTTERANCE_HANDLED],
-            flip_points=[utt_topic],
-            entry_points=[utt_topic],
-            final_session=final_session,
-            keep_original_src=[
-                "ovos.skills.fallback.ping",
+            test = End2EndTest(
+                minicroft=minicroft,
+                skill_ids=[self.skill_id],
+                eof_msgs=[UTTERANCE_HANDLED],
+                flip_points=[utt_topic],
+                entry_points=[utt_topic],
+                final_session=final_session,
+                keep_original_src=[
+                    "ovos.skills.fallback.ping",
                 # "ovos.skills.fallback.pong", # TODO
-            ],
-            ignore_messages=["recognizer_loop:audio_output_start",
-                              "recognizer_loop:audio_output_end"],
-            activation_points=[f"ovos.skills.fallback.{self.skill_id}.request"],
-            source_message=message,
-            expected_messages=[
-                message,
-                Message("ovos.skills.fallback.ping",
-                        {"utterances": ["hello world"], "lang": session.lang, "range": [90, 101]}),
-                Message("ovos.skills.fallback.pong", {"skill_id": self.skill_id, "can_handle": True}),
+                ],
+                ignore_messages=["recognizer_loop:audio_output_start",
+                                  "recognizer_loop:audio_output_end"],
+                activation_points=[f"ovos.skills.fallback.{self.skill_id}.request"],
+                source_message=message,
+                expected_messages=[
+                    message,
+                    Message("ovos.skills.fallback.ping",
+                            {"utterances": ["hello world"], "lang": session.lang, "range": [90, 101]}),
+                    Message("ovos.skills.fallback.pong", {"skill_id": self.skill_id, "can_handle": True}),
                 # PIPELINE-1 §9.2: matched notification precedes the dispatch. The
                 # fallback match_type is the .request topic; it bears no ':' so
                 # skill_id/intent_name resolve to that topic.
-                Message(INTENT_MATCHED,
-                        data={"intent_name": f"ovos.skills.fallback.{self.skill_id}.request",
-                              "utterance": "hello world", "lang": session.lang}),
+                    Message(INTENT_MATCHED,
+                            data={"intent_name": f"ovos.skills.fallback.{self.skill_id}.request",
+                                  "utterance": "hello world", "lang": session.lang}),
                 # PIPELINE-1 §8.1: orchestrator start immediately before the dispatch
-                Message(HANDLER_START,
-                        data={"intent_name": f"ovos.skills.fallback.{self.skill_id}.request"}),
-                Message(f"ovos.skills.fallback.{self.skill_id}.request",
-                        {"utterances": ["hello world"], "lang": session.lang, "range": [90, 101], "skill_id": self.skill_id}),
-                Message(f"ovos.skills.fallback.{self.skill_id}.start", {}),
+                    Message(HANDLER_START,
+                            data={"intent_name": f"ovos.skills.fallback.{self.skill_id}.request"}),
+                    Message(f"ovos.skills.fallback.{self.skill_id}.request",
+                            {"utterances": ["hello world"], "lang": session.lang, "range": [90, 101], "skill_id": self.skill_id}),
+                    Message(f"ovos.skills.fallback.{self.skill_id}.start", {}),
                 # core reports the fallback dispatch lifecycle as the framework
                 # done-signal by translating the skill's own .start/.response
                 # markers, so an orchestrator can resolve it
-                Message("mycroft.skill.handler.start",
-                        data={"handler": f"{self.skill_id}.fallback"},
-                        context={"skill_id": self.skill_id}),
-                Message(SPEC_SPEAK,
-                        data={"lang": session.lang,
-                              "expect_response": False,
-                              "meta": {
-                                  "dialog": "unknown",
-                                  "data": {},
-                                  "skill": self.skill_id
-                              }},
-                        context={"skill_id": self.skill_id}),
-                Message(f"ovos.skills.fallback.{self.skill_id}.response",
-                        data={"fallback_handler": "UnknownSkill.handle_fallback"}),
-                Message("mycroft.skill.handler.complete",
-                        data={"handler": f"{self.skill_id}.fallback"},
-                        context={"skill_id": self.skill_id}),
+                    Message("mycroft.skill.handler.start",
+                            data={"handler": f"{self.skill_id}.fallback"},
+                            context={"skill_id": self.skill_id}),
+                    Message(SPEC_SPEAK,
+                            data={"lang": session.lang,
+                                  "expect_response": False,
+                                  "meta": {
+                                      "dialog": "unknown",
+                                      "data": {},
+                                      "skill": self.skill_id
+                                  }},
+                            context={"skill_id": self.skill_id}),
+                    Message(f"ovos.skills.fallback.{self.skill_id}.response",
+                            data={"fallback_handler": "UnknownSkill.handle_fallback"}),
+                    Message("mycroft.skill.handler.complete",
+                            data={"handler": f"{self.skill_id}.fallback"},
+                            context={"skill_id": self.skill_id}),
                 # PIPELINE-1 §8 terminal: the orchestrator correlates the done-signal
                 # to the in-flight fallback dispatch and emits its own complete.
-                Message(HANDLER_COMPLETE,
-                        data={"intent_name": f"ovos.skills.fallback.{self.skill_id}.request"}),
+                    Message(HANDLER_COMPLETE,
+                            data={"intent_name": f"ovos.skills.fallback.{self.skill_id}.request"}),
 
-                Message(UTTERANCE_HANDLED, {})
-            ]
-        )
+                    Message(UTTERANCE_HANDLED, {})
+                ]
+            )
 
-        test.execute(timeout=10)
-        minicroft.stop()
+            test.execute(timeout=10)
+        finally:
+            minicroft.stop()
 
     def test_fallback_match(self):
         for namespace in NAMESPACE_PATHS:

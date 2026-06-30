@@ -1,4 +1,3 @@
-import re
 from os.path import dirname, join
 from threading import Event
 from typing import Optional, Dict, List, Union
@@ -21,14 +20,10 @@ class StopService(ConfidenceMatcherPipeline):
     """Intent Service that handles stopping skills."""
 
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
-                 config: Optional[Dict] = None):
-        config = config or Configuration().get("skills", {}).get("stop") or {}
+                 config: Optional[Dict] = None) -> None:
+        config = config if config is not None else Configuration().get("skills", {}).get("stop") or {}
         bus = bus or FakeBus()
         ConfidenceMatcherPipeline.__init__(self, config=config, bus=bus)
-        # vocabulary matching via ovos-spec-tools — the stop/global_stop .voc files
-        # live in this package's locale/ folder. StopService is a pipeline plugin,
-        # NOT an ovos-workshop skill: it must not register skill machinery (e.g. a
-        # mycroft.stop responder emitting stop.openvoiceos.stop.response).
         self._locale = LocaleResources(skill_locale=join(dirname(__file__), "locale"))
         self.bus.on("stop:global", self.handle_global_stop)
         self.bus.on("stop:skill", self.handle_skill_stop)

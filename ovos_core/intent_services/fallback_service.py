@@ -16,7 +16,7 @@ import operator
 import threading
 import time
 from collections import namedtuple
-from typing import Optional, Dict, List, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.handler import HandlerLifecycle
@@ -37,33 +37,19 @@ class FallbackService(ConfidenceMatcherPipeline):
     """Intent Service handling fallback skills."""
 
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
-                 config: Optional[Dict] = None):
-        config = config or Configuration().get("skills", {}).get("fallbacks", {})
+                 config: Optional[Dict] = None) -> None:
+        config = config if config is not None else Configuration().get("skills", {}).get("fallbacks", {})
         super().__init__(bus, config)
-        self.registered_fallbacks = {}  # skill_id: priority
+        self.registered_fallbacks: Dict[str, int] = {}  # skill_id: priority
         # skill_id -> (start_handler, response_handler) wired for the
         # done-signal translation, so they can be removed on deregister
-        self._lifecycle_handlers = {}
+        self._lifecycle_handlers: Dict[str, Tuple[Callable, Callable]] = {}
         self._fallback_response_event = threading.Event()
         self.bus.on("ovos.skills.fallback.register", self.handle_register_fallback)
         self.bus.on("ovos.skills.fallback.deregister", self.handle_deregister_fallback)
 
     def _wire_lifecycle(self, skill_id: str) -> None:
-        """Translate a fallback skill's own lifecycle topics into the framework
-        done-signal an orchestrator observes.
-
-        The skill framework already emits ``ovos.skills.fallback.<skill_id>.start``
-        when it begins handling a fallback request and
-        ``ovos.skills.fallback.<skill_id>.response`` (carrying a ``result`` bool)
-        when it finishes. core re-emits these as
-        ``mycroft.skill.handler.{start,complete}`` stamped with this ``skill_id``
-        so a dispatcher (OVOS-PIPELINE-1 §8) correlates them to the in-flight
-        fallback dispatch instead of waiting out its handler timeout. The
-        fallback dispatch itself is owned by the orchestrator (the
-        ``ovos.skills.fallback.<skill_id>.request`` emission), so this service
-        only *reports* the dispatch->outcome span by observing the skill's own
-        markers.
-        """
+        """Translate lifecycle done-signal for a fallback skill."""
         if skill_id in self._lifecycle_handlers:
             return
 
@@ -90,9 +76,11 @@ class FallbackService(ConfidenceMatcherPipeline):
         self.bus.remove(f"ovos.skills.fallback.{skill_id}.start", start_handler)
         self.bus.remove(f"ovos.skills.fallback.{skill_id}.response", response_handler)
 
-    def handle_register_fallback(self, message: Message):
+    def handle_register_fallback(self, message: Message) -> None:
         skill_id = message.data.get("skill_id")
-        priority = message.data.get("priority") or 101
+        priority = message.data.get("priority")
+        if priority is None:
+            priority = 101
 
         # check if .conf is overriding the priority for this skill
         priority_overrides = self.config.get("fallback_priorities", {})
@@ -108,7 +96,7 @@ class FallbackService(ConfidenceMatcherPipeline):
         if skill_id:
             self._wire_lifecycle(skill_id)
 
-    def handle_deregister_fallback(self, message: Message):
+    def handle_deregister_fallback(self, message: Message) -> None:
         skill_id = message.data.get("skill_id")
         if skill_id in self.registered_fallbacks:
             self.registered_fallbacks.pop(skill_id)
@@ -147,6 +135,8 @@ class FallbackService(ConfidenceMatcherPipeline):
         fallback_skills = []  # skill_ids that want to handle fallback
 
         sess = SessionManager.get(message)
+        if sess is None:
+            return fallback_skills
         # filter skills outside the fallback_range
         in_range = [s for s, p in self.registered_fallbacks.items()
                     if fb_range.start < p <= fb_range.stop
@@ -204,6 +194,8 @@ class FallbackService(ConfidenceMatcherPipeline):
         message.data["lang"] = lang
 
         sess = SessionManager.get(message)
+        if sess is None:
+            return None
         # new style bus api
         available_skills = self._collect_fallback_skills(message, fb_range)
         fallbacks = [(k, v) for k, v in self.registered_fallbacks.items()
@@ -242,7 +234,7 @@ class FallbackService(ConfidenceMatcherPipeline):
         return self._fallback_range(utterances, lang, message,
                                     FallbackRange(90, 101))
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         for skill_id in list(self._lifecycle_handlers):
             self._unwire_lifecycle(skill_id)
         self.bus.remove("ovos.skills.fallback.register", self.handle_register_fallback)

@@ -47,14 +47,9 @@ from ovoscope import End2EndTest, get_minicroft
 # legacy counterpart is derived via migration_counterpart, never hardcoded.
 SPEC_UTTERANCE = SpecMessage.UTTERANCE.value          # ovos.utterance.handle
 LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utterance
-SPEC_SPEAK = SpecMessage.SPEAK.value                  # ovos.utterance.speak
-UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
 # PIPELINE-1 orchestrator-emitted terminal events: §9.2 matched, §8 trio, §9.3
 # unmatched (the spec replacement for legacy complete_intent_failure).
-INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value
 INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value
-HANDLER_START = SpecMessage.INTENT_HANDLER_START.value
-HANDLER_COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value
 
 # The two namespace paths every scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
@@ -84,7 +79,7 @@ class TestIntentPipelineRouting(TestCase):
     # count skill speaks on the spec topic ``ovos.utterance.speak`` (no legacy
     # mirror because emit_legacy=False on both paths).
     ignore_messages = [
-        SPEC_SPEAK,
+        SpecMessage.SPEAK,
         "recognizer_loop:audio_output_start",  # TTS mock duck
         "recognizer_loop:audio_output_end",  # TTS mock unduck
         "ovos.common_play.stop.response",
@@ -95,17 +90,23 @@ class TestIntentPipelineRouting(TestCase):
 
     def setUp(self) -> None:
         LOG.set_level("DEBUG")
+        self._minicrofts = []
 
     def tearDown(self) -> None:
         LOG.set_level("CRITICAL")
+        for mc in self._minicrofts:
+            mc.stop()
+        self._minicrofts.clear()
 
     # ------------------------------------------------------------------
     # helpers
     # ------------------------------------------------------------------
     def _make_minicroft(self, namespace: str) -> "MiniCroft":
         modernize, emit_legacy, _ = NAMESPACE_PATHS[namespace]
-        return get_minicroft([self.skill_id], modernize=modernize,
-                             emit_legacy=emit_legacy)
+        mc = get_minicroft([self.skill_id], modernize=modernize,
+                           emit_legacy=emit_legacy)
+        self._minicrofts.append(mc)
+        return mc
 
     def _source_message(self, namespace: str, utterance: str, pipeline,
                         session_id: str, blacklisted=None) -> Message:
@@ -136,7 +137,7 @@ class TestIntentPipelineRouting(TestCase):
         test = End2EndTest(
             minicroft=self._make_minicroft(namespace),
             skill_ids=[self.skill_id],
-            eof_msgs=[UTTERANCE_HANDLED],
+            eof_msgs=[SpecMessage.UTTERANCE_HANDLED],
             flip_points=[utt_topic],
             entry_points=[utt_topic],
             ignore_messages=self.ignore_messages,
@@ -152,7 +153,7 @@ class TestIntentPipelineRouting(TestCase):
                 ),
                 # PIPELINE-1 §9.2: matched notification, before the dispatch
                 Message(
-                    INTENT_MATCHED,
+                    SpecMessage.INTENT_MATCHED,
                     data={"skill_id": self.skill_id,
                           "intent_name": f"{self.skill_id}:count_to_N.intent",
                           "utterance": "count to 3", "lang": session.lang},
@@ -160,7 +161,7 @@ class TestIntentPipelineRouting(TestCase):
                 ),
                 # PIPELINE-1 §8.1: orchestrator start before dispatch
                 Message(
-                    HANDLER_START,
+                    SpecMessage.INTENT_HANDLER_START,
                     data={"skill_id": self.skill_id,
                           "intent_name": "count_to_N.intent"},
                     context={"skill_id": self.skill_id},
@@ -182,13 +183,13 @@ class TestIntentPipelineRouting(TestCase):
                 ),
                 # PIPELINE-1 §8.1: orchestrator complete before the end-marker
                 Message(
-                    HANDLER_COMPLETE,
+                    SpecMessage.INTENT_HANDLER_COMPLETE,
                     data={"skill_id": self.skill_id,
                           "intent_name": "count_to_N.intent"},
                     context={"skill_id": self.skill_id},
                 ),
                 Message(
-                    UTTERANCE_HANDLED,
+                    SpecMessage.UTTERANCE_HANDLED,
                     data={},
                     context={"skill_id": self.skill_id},
                 ),
@@ -219,7 +220,7 @@ class TestIntentPipelineRouting(TestCase):
         test = End2EndTest(
             minicroft=self._make_minicroft(namespace),
             skill_ids=[self.skill_id],
-            eof_msgs=[UTTERANCE_HANDLED],
+            eof_msgs=[SpecMessage.UTTERANCE_HANDLED],
             flip_points=[utt_topic],
             entry_points=[utt_topic],
             ignore_messages=self.ignore_messages,
@@ -235,7 +236,7 @@ class TestIntentPipelineRouting(TestCase):
                 ),
                 # PIPELINE-1 §9.2: matched notification, before the dispatch
                 Message(
-                    INTENT_MATCHED,
+                    SpecMessage.INTENT_MATCHED,
                     data={"skill_id": self.skill_id,
                           "intent_name": f"{self.skill_id}:count_to_N.intent",
                           "utterance": "count to 3", "lang": session.lang},
@@ -243,7 +244,7 @@ class TestIntentPipelineRouting(TestCase):
                 ),
                 # PIPELINE-1 §8.1: orchestrator start before dispatch
                 Message(
-                    HANDLER_START,
+                    SpecMessage.INTENT_HANDLER_START,
                     data={"skill_id": self.skill_id,
                           "intent_name": "count_to_N.intent"},
                     context={"skill_id": self.skill_id},
@@ -265,13 +266,13 @@ class TestIntentPipelineRouting(TestCase):
                 ),
                 # PIPELINE-1 §8.1: orchestrator complete before the end-marker
                 Message(
-                    HANDLER_COMPLETE,
+                    SpecMessage.INTENT_HANDLER_COMPLETE,
                     data={"skill_id": self.skill_id,
                           "intent_name": "count_to_N.intent"},
                     context={"skill_id": self.skill_id},
                 ),
                 Message(
-                    UTTERANCE_HANDLED,
+                    SpecMessage.UTTERANCE_HANDLED,
                     data={},
                     context={"skill_id": self.skill_id},
                 ),
@@ -298,7 +299,7 @@ class TestIntentPipelineRouting(TestCase):
         test = End2EndTest(
             minicroft=self._make_minicroft(namespace),
             skill_ids=[self.skill_id],
-            eof_msgs=[UTTERANCE_HANDLED],
+            eof_msgs=[SpecMessage.UTTERANCE_HANDLED],
             flip_points=[utt_topic],
             entry_points=[utt_topic],
             ignore_messages=self.ignore_messages,
@@ -308,7 +309,7 @@ class TestIntentPipelineRouting(TestCase):
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
                 Message(INTENT_UNMATCHED, {}),
-                Message(UTTERANCE_HANDLED, {}),
+                Message(SpecMessage.UTTERANCE_HANDLED, {}),
             ],
         )
         test.execute(timeout=15)
@@ -333,7 +334,7 @@ class TestIntentPipelineRouting(TestCase):
         test = End2EndTest(
             minicroft=self._make_minicroft(namespace),
             skill_ids=[self.skill_id],
-            eof_msgs=[UTTERANCE_HANDLED],
+            eof_msgs=[SpecMessage.UTTERANCE_HANDLED],
             flip_points=[utt_topic],
             entry_points=[utt_topic],
             ignore_messages=self.ignore_messages,
@@ -343,7 +344,7 @@ class TestIntentPipelineRouting(TestCase):
                 message,
                 Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
                 Message(INTENT_UNMATCHED, {}),
-                Message(UTTERANCE_HANDLED, {}),
+                Message(SpecMessage.UTTERANCE_HANDLED, {}),
             ],
         )
         test.execute(timeout=15)

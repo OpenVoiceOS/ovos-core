@@ -219,13 +219,18 @@ class TestCollectFallbackSkills(unittest.TestCase):
                     svc._collect_fallback_skills(
                         Message("test"), fb_range=FallbackRange(5, 90)))
 
-        t = threading.Thread(target=run)
-        t.start()
-        time.sleep(0.05)
-        if ack_handler:
-            ack_handler(Message("ovos.skills.fallback.pong",
-                                {"skill_id": "skill_a", "can_handle": True}))
-        t.join(timeout=1)
+        t = None
+        try:
+            t = threading.Thread(target=run)
+            t.start()
+            time.sleep(0.05)
+            if ack_handler:
+                ack_handler(Message("ovos.skills.fallback.pong",
+                                    {"skill_id": "skill_a", "can_handle": True}))
+        finally:
+            if t is not None:
+                t.join(timeout=1)
+            svc.shutdown()
 
         self.assertIn("skill_a", result_holder[0])
 
@@ -255,13 +260,18 @@ class TestCollectFallbackSkills(unittest.TestCase):
                     svc._collect_fallback_skills(
                         Message("test"), fb_range=FallbackRange(5, 90)))
 
-        t = threading.Thread(target=run)
-        t.start()
-        time.sleep(0.05)
-        if ack_handler:
-            ack_handler(Message("ovos.skills.fallback.pong",
-                                {"skill_id": "skill_a", "can_handle": False}))
-        t.join(timeout=1)
+        t = None
+        try:
+            t = threading.Thread(target=run)
+            t.start()
+            time.sleep(0.05)
+            if ack_handler:
+                ack_handler(Message("ovos.skills.fallback.pong",
+                                    {"skill_id": "skill_a", "can_handle": False}))
+        finally:
+            if t is not None:
+                t.join(timeout=1)
+            svc.shutdown()
 
         self.assertEqual(result_holder[0], [])
 

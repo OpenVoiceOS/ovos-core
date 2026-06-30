@@ -12,67 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""OVOS-PIPELINE-1 §7 / §8 — orchestrator-owned handler-lifecycle trio.
+"""§7/§8 handler-lifecycle trio — dispatcher.
 
-``IntentDispatcher`` encapsulates the orchestrator's act of dispatching a matched
-intent and owning its §8 handler-lifecycle trio. For each accepted ``Match`` the
-orchestrator calls :meth:`dispatch`, which wraps the §6.1 dispatch:
-
-    <skill_id>:<intent_name>         (§7, the dispatch)
-      ovos.intent.handler.start      (§8.1, immediately before the dispatch)
-      ...handler runs...
-      ovos.intent.handler.complete   (§8.1, normal return)         ─┐ exactly
-       / .error                      (§8.1/§8.3, exception/timeout)  ┘ one
-
-(The §9.2 ``ovos.intent.matched`` notification and §9.5 ``ovos.utterance.handled``
-end-marker ownership are separate, independently-sequenced changes — not part of
-this trio.)
-
-The orchestrator is the authoritative emitter of the §8 trio; the handler itself
-emits nothing (§8, §11 "A handler ... carries no normative obligation").
-§7.0/§7.3 polymorphism: a dispatch is a dispatch — every ``<skill_id>:<intent_name>``
-Message gets this treatment, with no special-casing of reserved intent_names
-(§7.3: the trio fires for them "identically to ordinary dispatches").
-
-Cross-process completion (the done-signal contract)
----------------------------------------------------
-The orchestrator dispatches by emitting ``<skill_id>:<intent_name>``; the handler
-runs in the skill process. ``emit`` is asynchronous, so the orchestrator never
-gets a synchronous return to wrap (§8). It instead observes a **framework
-done-signal** — emitted by the skill *framework* (ovos-workshop), which is
-orchestrator infrastructure, not the user's handler function, so consuming it is
-spec-consistent. The framework keeps emitting its long-standing legacy signals:
-
-- ``mycroft.skill.handler.complete`` → the orchestrator emits ``complete``;
-- ``mycroft.skill.handler.error`` (carrying a human-readable error) → the
-  orchestrator emits ``error`` with the reported ``exception`` (§8.2).
-
-These are **legacy-namespace** topics. **Hard dependency:** the ovos-spec-tools
-MIGRATION_MAP trio bridge (``mycroft.skill.handler.* ↔ ovos.intent.handler.*``)
-MUST be removed so the orchestrator's own spec emissions do not bridge back to a
-legacy done-signal. Until that lands the bridge is still active, but the
-resolved-guard in :meth:`_pop` keeps the terminal count at exactly one even if a
-bridged echo arrives (it claims an already-resolved entry and returns ``None``);
-the ``"message"``-aggregate consumers (the ovoscope harness) also never see the
-bridged counterpart. Once the bridge is removed, the framework done-signal and the
-spec trio live cleanly in separate namespaces: workshop owns the legacy one, the
-orchestrator owns the spec one.
-
-The §8.3 timeout backstops every dispatch so exactly one terminal is guaranteed
-even if no done-signal ever arrives.
-
-The end-marker ``ovos.utterance.handled`` (§9.5) is NOT this class's concern: it is
-the orchestrator's universal terminal, emitted uniformly across the no-match, cancel
-and matched paths by ``IntentService``. On the matched path this dispatcher invokes
-the orchestrator's ``on_terminal`` callback immediately after each §8 terminal is on
-the bus; the orchestrator then emits the single §9.5 end-marker. The callback (rather
-than blocking, or a separate terminal subscription) keeps the dispatcher non-blocking
-AND guarantees the terminal is observed before the end-marker.
-
-Correlation uses ``session.session_id`` (§6.5: "the session is the correlation key
-... no additional correlation field is defined") plus the dispatched ``skill_id``.
-In-flight dispatches are tracked per session as a LIFO stack so nested lifecycles
-(§6.5) resolve innermost-first.
+Emits ``ovos.intent.handler.start`` before each ``<skill_id>:<intent_name>``
+dispatch and exactly one terminal (``complete``/``error``/timeout) after. The
+framework done-signal (``mycroft.skill.handler.complete``/``.error``) is consumed
+as the completion hint. A §8.3 timeout backstops every dispatch. The §9.5
+``ovos.utterance.handled`` end-marker is NOT this class's concern — the
+orchestrator's ``on_terminal`` callback is invoked after each §8 terminal.
 """
 import threading
 from typing import Callable, Dict, List, Optional
@@ -135,10 +82,11 @@ class IntentDispatcher:
             self.bus.remove("mycroft.skill.handler.complete", self._on_skill_complete)
             self.bus.remove("mycroft.skill.handler.error", self._on_skill_error)
         except Exception:
-            pass
+            LOG.exception("failed to remove done-signal handlers during shutdown")
         with self._lock:
             for stack in self._in_flight.values():
                 for entry in stack:
+                    entry.resolved = True
                     if entry.timer is not None:
                         entry.timer.cancel()
             self._in_flight.clear()
@@ -223,17 +171,15 @@ class IntentDispatcher:
             return None
 
     def _on_skill_complete(self, message: Message):
-        """Framework done-signal -> ``complete`` (§8.1). Exactly one terminal fires
-        per dispatch — the LIFO ``_pop`` guard claims one in-flight entry. The §9.5
-        ``ovos.utterance.handled`` end-marker is NOT emitted here: the orchestrator
-        owns it and reacts to this terminal, uniformly with the no-match / cancel
-        paths."""
+        """Framework done-signal -> ``complete`` (§8.1)."""
         entry = self._pop(self._session_id(message), message.context.get("skill_id"))
         if entry is None:
             return
-        self._emit(SpecMessage.INTENT_HANDLER_COMPLETE, entry.dispatch_msg,
-                   {"skill_id": entry.skill_id, "intent_name": entry.intent_name})
-        self._notify_terminal(entry.dispatch_msg)
+        try:
+            self._emit(SpecMessage.INTENT_HANDLER_COMPLETE, entry.dispatch_msg,
+                       {"skill_id": entry.skill_id, "intent_name": entry.intent_name})
+        finally:
+            self._notify_terminal(entry.dispatch_msg)
 
     def _on_skill_error(self, message: Message):
         """Framework done-signal -> ``error`` with the exception (§8.2)."""
@@ -243,16 +189,16 @@ class IntentDispatcher:
         exception = (message.data.get("exception")
                      or message.data.get("error")
                      or "handler raised an exception")
-        self._emit(SpecMessage.INTENT_HANDLER_ERROR, entry.dispatch_msg,
-                   {"skill_id": entry.skill_id,
-                    "intent_name": entry.intent_name,
-                    "exception": str(exception)})
-        self._notify_terminal(entry.dispatch_msg)
+        try:
+            self._emit(SpecMessage.INTENT_HANDLER_ERROR, entry.dispatch_msg,
+                       {"skill_id": entry.skill_id,
+                        "intent_name": entry.intent_name,
+                        "exception": str(exception)})
+        finally:
+            self._notify_terminal(entry.dispatch_msg)
 
     def _on_timeout(self, sid: str, entry: _InFlightDispatch):
-        """§8.3 — bound handler execution; on timeout emit ``error`` (timeout) so the
-        orchestrator still gets exactly one terminal (and emits its §9.5 end-marker).
-        MUST NOT re-dispatch."""
+        """§8.3 — bound handler execution; on timeout emit ``error``."""
         with self._lock:
             if entry.resolved:
                 return
@@ -265,8 +211,10 @@ class IntentDispatcher:
                     self._in_flight.pop(sid, None)
         LOG.warning(f"handler timeout for {entry.skill_id}:{entry.intent_name} "
                     f"after {self.timeout}s; emitting ovos.intent.handler.error")
-        self._emit(SpecMessage.INTENT_HANDLER_ERROR, entry.dispatch_msg,
-                   {"skill_id": entry.skill_id,
-                    "intent_name": entry.intent_name,
-                    "exception": f"handler timed out after {self.timeout} seconds"})
-        self._notify_terminal(entry.dispatch_msg)
+        try:
+            self._emit(SpecMessage.INTENT_HANDLER_ERROR, entry.dispatch_msg,
+                       {"skill_id": entry.skill_id,
+                        "intent_name": entry.intent_name,
+                        "exception": f"handler timed out after {self.timeout} seconds"})
+        finally:
+            self._notify_terminal(entry.dispatch_msg)
