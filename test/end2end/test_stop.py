@@ -31,6 +31,21 @@ SPEC_SPEAK = SpecMessage.SPEAK.value                      # ovos.utterance.speak
 INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value     # ovos.intent.unmatched (§9.3)
 HANDLER_ERROR = SpecMessage.INTENT_HANDLER_ERROR.value
 
+
+def _wait_for_active_skill(session_id, skill_id, timeout=10, interval=0.1):
+    """Poll until *skill_id* appears in the session's active skills."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        sess = SessionManager.sessions.get(session_id)
+        if sess and sess.is_active(skill_id):
+            return
+        time.sleep(interval)
+    raise TimeoutError(
+        f"Skill {skill_id} did not activate in session {session_id} "
+        f"within {timeout}s"
+    )
+
+
 # The two namespace paths every scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
 NAMESPACE_PATHS = {
@@ -334,7 +349,9 @@ class TestCountSkills(TestCase):
             # count to infinity, the skill will keep running in the background
             create_daemon(make_it_count)
 
-            time.sleep(2)
+            # Wait for the skill to activate before sending stop; under parallel
+            # CI load the fixed sleep is too short, so poll deterministically.
+            _wait_for_active_skill(session.session_id, self.skill_id)
 
             # The count intent self-activates the skill server-side; the Session
             # singleton holds the authoritative state (SESSION-1 last-write-wins).
@@ -442,7 +459,9 @@ class TestCountSkills(TestCase):
             # count to infinity, the skill will keep running in the background
             create_daemon(make_it_count)
 
-            time.sleep(2)
+            # Wait for the skill to activate before sending stop; under parallel
+            # CI load the fixed sleep is too short, so poll deterministically.
+            _wait_for_active_skill(session.session_id, self.skill_id)
 
             # resend the live (singleton) session, as a client tracking responses
             # would — the count intent self-activated the skill server-side
