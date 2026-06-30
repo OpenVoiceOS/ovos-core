@@ -640,7 +640,7 @@ class TestStop1Draining(unittest.TestCase):
             {"skill_id": "new_skill", "activated_at": 500.0},
         ]
         self.svc.bus.once = MagicMock()
-        with patch.object(self.svc, "voc_match",
+        with patch.object(self.svc._locale, "voc_match",
                           side_effect=lambda utt, voc, lang, exact: voc == "stop"), \
              patch.object(StopService, "get_active_skills",
                           return_value=["new_skill", "old_skill"]), \
@@ -663,7 +663,7 @@ class TestStop1Draining(unittest.TestCase):
             {"skill_id": "target_skill", "activated_at": 500.0},
         ]
         self.svc.bus.once = MagicMock()
-        with patch.object(self.svc, "voc_match",
+        with patch.object(self.svc._locale, "voc_match",
                           side_effect=lambda utt, voc, lang, exact: voc == "stop"), \
              patch.object(StopService, "get_active_skills",
                           return_value=["target_skill", "keep_skill"]), \
@@ -683,7 +683,7 @@ class TestStop1Draining(unittest.TestCase):
         sess.active_handlers = [{"skill_id": "target_skill", "activated_at": 500.0}]
         sess.set_response_mode("target_skill", 9999999999.0)
         self.svc.bus.once = MagicMock()
-        with patch.object(self.svc, "voc_match",
+        with patch.object(self.svc._locale, "voc_match",
                           side_effect=lambda utt, voc, lang, exact: voc == "stop"), \
              patch.object(StopService, "get_active_skills",
                           return_value=["target_skill"]), \
@@ -706,7 +706,7 @@ class TestStop1Draining(unittest.TestCase):
         sess.active_skills = [["a", 1.0]]
         sess.set_response_mode("c", 9999999999.0)
 
-        with patch.object(self.svc, "voc_match",
+        with patch.object(self.svc._locale, "voc_match",
                           side_effect=lambda utt, voc, lang, exact: voc == "global_stop"), \
              patch.object(StopService, "get_active_skills", return_value=["a"]), \
              patch("ovos_core.intent_services.stop_service.SessionManager.get",
@@ -730,7 +730,7 @@ class TestStop1Draining(unittest.TestCase):
         sess.set_response_mode("a", 9999999999.0)
 
         self.svc.config = {"min_conf": 0.5}
-        with patch.object(self.svc, "voc_list", return_value=["stop"]), \
+        with patch.object(self.svc._locale, "voc_list", return_value=["stop"]), \
              patch("ovos_core.intent_services.stop_service.match_one",
                    return_value=("stop", 0.9)), \
              patch.object(StopService, "get_active_skills", return_value=["a"]), \
