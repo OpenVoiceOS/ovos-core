@@ -660,6 +660,7 @@ class IntentService:
 
     def shutdown(self) -> None:
         self.intent_dispatcher.shutdown()
+        self.intent_manifest.shutdown()
         self.utterance_plugins.shutdown()
         self.metadata_plugins.shutdown()
         for pipeline in self.pipeline_plugins.values():

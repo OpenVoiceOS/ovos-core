@@ -40,6 +40,16 @@ class IntentManifest:
         bus.on("ovos.intent.list", self._on_list)
         bus.on("ovos.intent.describe", self._on_describe)
 
+    def shutdown(self):
+        self.bus.remove("ovos.intent.register.keyword", self._on_register)
+        self.bus.remove("ovos.intent.register.template", self._on_register)
+        self.bus.remove("ovos.intent.deregister", self._on_deregister)
+        self.bus.remove("ovos.intent.enable", self._on_enable_disable)
+        self.bus.remove("ovos.intent.disable", self._on_enable_disable)
+        self.bus.remove("ovos.skill.deregister", self._on_skill_deregister)
+        self.bus.remove("ovos.intent.list", self._on_list)
+        self.bus.remove("ovos.intent.describe", self._on_describe)
+
     # ------------------------------------------------------------------
     # internal helpers
     # ------------------------------------------------------------------
