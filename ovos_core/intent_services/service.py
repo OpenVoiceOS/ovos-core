@@ -33,6 +33,7 @@ from ovos_utils.thread_utils import create_daemon
 
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService, IntentTransformersService
 from ovos_core.intent_services.dispatcher import IntentDispatcher, DEFAULT_HANDLER_TIMEOUT
+from ovos_core.intent_services.manifest import IntentManifest
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
 
@@ -125,6 +126,10 @@ class IntentService:
         handler_timeout = self.config.get("handler_timeout", DEFAULT_HANDLER_TIMEOUT)
         self.intent_dispatcher: IntentDispatcher = IntentDispatcher(
             bus, timeout=handler_timeout, on_terminal=self._emit_utterance_handled)
+
+        # INTENT-4 §10 manifest — indexes registration broadcasts and serves
+        # ovos.intent.list / ovos.intent.describe pull-queries.
+        self.intent_manifest: IntentManifest = IntentManifest(bus)
 
         # connection SessionManager to the bus,
         # this will sync default session across all components
@@ -655,6 +660,7 @@ class IntentService:
 
     def shutdown(self) -> None:
         self.intent_dispatcher.shutdown()
+        self.intent_manifest.shutdown()
         self.utterance_plugins.shutdown()
         self.metadata_plugins.shutdown()
         for pipeline in self.pipeline_plugins.values():
