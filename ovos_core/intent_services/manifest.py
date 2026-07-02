@@ -71,6 +71,28 @@ class IntentManifest:
                 seen[dedup] = entry
         return list(seen.values())
 
+    def get_required_slots(self, session_id: str, skill_id: str,
+                           intent_name: str, lang: str) -> list:
+        """OVOS-INTENT-4 §6.1 / §10 — the ``required_slots`` an intent declares.
+
+        The canonical source for the OVOS-PIPELINE-1 §6.2 orchestrator backstop:
+        the required-slot names an intent registered under its
+        ``ovos.intent.register.*`` payload. Merges the union across the intent's
+        keyword/template registrations in the session's effective pool (§11.2).
+        Returns ``[]`` when the intent is not in the manifest (e.g. registered via
+        a legacy in-process path), leaving engine-side enforcement authoritative.
+        """
+        lang = standardize_lang(lang)
+        slots: list = []
+        for entry in self._effective_pool(session_id):
+            if (entry["skill_id"] != skill_id or entry["intent_name"] != intent_name
+                    or entry["lang"] != lang):
+                continue
+            for slot in (entry.get("definition") or {}).get("required_slots") or []:
+                if slot not in slots:
+                    slots.append(slot)
+        return slots
+
     # ------------------------------------------------------------------
     # registration broadcasts  §§5–8
     # ------------------------------------------------------------------

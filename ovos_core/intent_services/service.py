@@ -65,6 +65,33 @@ _PIPELINE_MIGRATION_MAP = {
 
 _PIPELINE_RE = re.compile(r'-(high|medium|low)$')
 
+# OVOS-PIPELINE-1 §7.3 reserved intent_names. A Match produced by one of the
+# reserving pipeline-plugin roles below is a reserved-name dispatch: §7.1
+# requires the ``session.active_handlers`` push to be SUPPRESSED for it, because
+# a reserved name represents a continuation/termination of an already-active
+# skill's participation, not a fresh activation. Keyed off the producing
+# pipeline_id (the role that holds the namespace lease), with the confidence
+# suffix (``-high``/``-medium``/``-low``) stripped before lookup.
+#
+#   converse       -> ovos-converse-pipeline-plugin     (CONVERSE-1 §4/§5: converse, response)
+#   stop           -> ovos-stop-pipeline-plugin          (STOP-1 §4: stop)
+#   fallback       -> ovos-fallback-pipeline-plugin      (FALLBACK-1 §6.3: fallback)
+#   common_query   -> ovos-common-query-pipeline-plugin  (COMMON-QUERY-1 §3: common_query)
+_RESERVED_NAME_PIPELINES = {
+    "ovos-converse-pipeline-plugin",
+    "ovos-stop-pipeline-plugin",
+    "ovos-fallback-pipeline-plugin",
+    "ovos-common-query-pipeline-plugin",
+}
+
+
+def _produces_reserved_name(pipeline_id: Optional[str]) -> bool:
+    """OVOS-PIPELINE-1 §7.3: True when ``pipeline_id`` is a reserved-name role
+    whose dispatches must NOT stamp ``session.active_handlers`` (§7.1)."""
+    if not pipeline_id:
+        return False
+    return _PIPELINE_RE.sub("", pipeline_id) in _RESERVED_NAME_PIPELINES
+
 
 def on_started():
     LOG.info('IntentService is starting up.')
@@ -293,6 +320,38 @@ class IntentService:
         utterance."""
         self.bus.emit(dispatch_msg.forward(SpecMessage.UTTERANCE_HANDLED, {}))
 
+    def _missing_required_slots(self, match: IntentHandlerMatch,
+                                session_id: str, lang: str) -> List[str]:
+        """OVOS-PIPELINE-1 §6.2 orchestrator backstop for ``required_slots``.
+
+        After a plugin returns a Match, the orchestrator verifies the match's
+        slot map contains every slot the matched intent declares as required
+        (OVOS-INTENT-3 §5.3, OVOS-INTENT-4 §6.1). If any is absent, the
+        orchestrator treats the match as if the plugin had declined and
+        continues iteration — no bus event is emitted; the only observable
+        effect is a non-match (§6.2). The primary obligation to enforce
+        ``required_slots`` still lies with the engine during ``match()``; this
+        is a second line of defense against engine bugs.
+
+        The constraint is the intent's registered ``required_slots``, read from
+        the orchestrator's INTENT-4 §10 manifest. The captured slot map is
+        ``match.match_data`` (OVOS-INTENT-3 §7; ``Match.slots`` in PIPELINE-1
+        §4.3). An intent absent from the manifest yields no required slots, so
+        the backstop is a no-op and engine-side enforcement remains authoritative.
+
+        Returns:
+            List[str]: required slot names absent from the match's slot map.
+        """
+        if not match.skill_id or not match.match_type or ":" not in match.match_type:
+            return []
+        intent_name = match.match_type.split(":", 1)[-1]
+        required_slots = self.intent_manifest.get_required_slots(
+            session_id, match.skill_id, intent_name, lang)
+        if not required_slots:
+            return []
+        match_data = match.match_data or {}
+        return [slot for slot in required_slots if not match_data.get(slot)]
+
     def _dispatch_match(self, match: IntentHandlerMatch, message: Message, lang: str,
                         pipeline_id: str = None) -> None:
         """Orchestrate the OVOS-PIPELINE-1 §6.1 post-match steps, then dispatch.
@@ -349,7 +408,15 @@ class IntentService:
 
                 was_deactivated = match.skill_id in self._deactivations[sess.session_id]
                 if not was_deactivated:
-                    sess.activate_skill(match.skill_id)
+                    # OVOS-PIPELINE-1 §7.1 pushes the skill onto the session's
+                    # active-handler recency list. §7.3 SUPPRESSES that push for
+                    # reserved intent_name dispatches (converse/response/stop/
+                    # fallback/common_query): a reserved name is a continuation
+                    # or termination of an already-active skill's participation,
+                    # not a fresh activation. `activate_skill` is a back-compat
+                    # shim over `add_active_handler` (§7.1) in current bus-client.
+                    if not _produces_reserved_name(pipeline_id):
+                        sess.activate_skill(match.skill_id)
                     # emit event for skills callback -> self.handle_activate
                     self.bus.emit(reply.forward(f"{match.skill_id}.activate"))
 
@@ -519,6 +586,15 @@ class IntentService:
                         if isinstance(match, IntentHandlerMatch) and match.match_type in (sess.blacklisted_intents or []):
                             LOG.debug(
                                 f"ignoring match, intent '{match.match_type}' blacklisted by Session '{sess.session_id}'")
+                            continue
+                        # OVOS-PIPELINE-1 §6.2: if the matched intent is missing
+                        # any required slot, treat it as if the plugin had
+                        # declined and continue iteration; no bus event is emitted.
+                        missing = self._missing_required_slots(
+                            match, sess.session_id, intent_lang)
+                        if missing:
+                            LOG.debug(f"ignoring match '{match.match_type}': "
+                                      f"missing required slots {missing} (§6.2)")
                             continue
                         try:
                             self._dispatch_match(match, message, intent_lang,
