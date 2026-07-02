@@ -320,8 +320,8 @@ class IntentService:
         utterance."""
         self.bus.emit(dispatch_msg.forward(SpecMessage.UTTERANCE_HANDLED, {}))
 
-    @staticmethod
-    def _missing_required_slots(match: IntentHandlerMatch) -> List[str]:
+    def _missing_required_slots(self, match: IntentHandlerMatch,
+                                session_id: str, lang: str) -> List[str]:
         """OVOS-PIPELINE-1 §6.2 orchestrator backstop for ``required_slots``.
 
         After a plugin returns a Match, the orchestrator verifies the match's
@@ -333,20 +333,23 @@ class IntentService:
         ``required_slots`` still lies with the engine during ``match()``; this
         is a second line of defense against engine bugs.
 
-        The plugin surfaces the constraint in ``match.match_data``: the required
-        slot names under ``__required_slots__`` and the captured slot map as the
-        remaining keys (OVOS-INTENT-3 §7; ``Match.slots`` in PIPELINE-1 §4.3).
-        When a plugin does not surface it (the common case today) this returns
-        an empty list and the backstop is a no-op, leaving engine-side
-        enforcement authoritative — fully backward compatible.
+        The constraint is the intent's registered ``required_slots``, read from
+        the orchestrator's INTENT-4 §10 manifest. The captured slot map is
+        ``match.match_data`` (OVOS-INTENT-3 §7; ``Match.slots`` in PIPELINE-1
+        §4.3). An intent absent from the manifest yields no required slots, so
+        the backstop is a no-op and engine-side enforcement remains authoritative.
 
         Returns:
             List[str]: required slot names absent from the match's slot map.
         """
-        match_data = match.match_data or {}
-        required_slots = match_data.get("__required_slots__")
+        if not match.skill_id or not match.match_type or ":" not in match.match_type:
+            return []
+        intent_name = match.match_type.split(":", 1)[-1]
+        required_slots = self.intent_manifest.get_required_slots(
+            session_id, match.skill_id, intent_name, lang)
         if not required_slots:
             return []
+        match_data = match.match_data or {}
         return [slot for slot in required_slots if not match_data.get(slot)]
 
     def _dispatch_match(self, match: IntentHandlerMatch, message: Message, lang: str,
@@ -587,7 +590,8 @@ class IntentService:
                         # OVOS-PIPELINE-1 §6.2: if the matched intent is missing
                         # any required slot, treat it as if the plugin had
                         # declined and continue iteration; no bus event is emitted.
-                        missing = self._missing_required_slots(match)
+                        missing = self._missing_required_slots(
+                            match, sess.session_id, intent_lang)
                         if missing:
                             LOG.debug(f"ignoring match '{match.match_type}': "
                                       f"missing required slots {missing} (§6.2)")

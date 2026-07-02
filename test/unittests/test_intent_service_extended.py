@@ -607,26 +607,42 @@ class TestShutdown(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class TestRequiredSlotsBackstop(unittest.TestCase):
+    # §6.2 sources required_slots from the INTENT-4 §10 manifest.
 
-    def test_no_required_slots_is_noop(self):
-        m = _make_match()
-        m.match_data = {"skill_id": "s"}
-        self.assertEqual(IntentService._missing_required_slots(m), [])
+    def _register(self, svc, required_slots):
+        svc.intent_manifest._on_register(Message(
+            "ovos.intent.register.template",
+            {"skill_id": "test.skill", "intent_name": "intent",
+             "lang": "en-US", "samples": ["do it"],
+             "required_slots": required_slots},
+            {"session": {"session_id": "default"}}))
+
+    def test_intent_not_in_manifest_is_noop(self):
+        svc = _make_service()
+        m = _make_match(match_type="test.skill:intent")
+        m.match_data = {"skill_id": "test.skill"}
+        self.assertEqual(svc._missing_required_slots(m, "default", "en-US"), [])
 
     def test_all_required_slots_present(self):
-        m = _make_match()
-        m.match_data = {"__required_slots__": ["room"], "room": "kitchen"}
-        self.assertEqual(IntentService._missing_required_slots(m), [])
+        svc = _make_service()
+        self._register(svc, ["room"])
+        m = _make_match(match_type="test.skill:intent")
+        m.match_data = {"skill_id": "test.skill", "room": "kitchen"}
+        self.assertEqual(svc._missing_required_slots(m, "default", "en-US"), [])
 
     def test_missing_required_slot_reported(self):
-        m = _make_match()
-        m.match_data = {"__required_slots__": ["room", "device"], "room": "kitchen"}
-        self.assertEqual(IntentService._missing_required_slots(m), ["device"])
+        svc = _make_service()
+        self._register(svc, ["room", "device"])
+        m = _make_match(match_type="test.skill:intent")
+        m.match_data = {"skill_id": "test.skill", "room": "kitchen"}
+        self.assertEqual(svc._missing_required_slots(m, "default", "en-US"), ["device"])
 
     def test_falsy_slot_counts_as_missing(self):
-        m = _make_match()
-        m.match_data = {"__required_slots__": ["room"], "room": ""}
-        self.assertEqual(IntentService._missing_required_slots(m), ["room"])
+        svc = _make_service()
+        self._register(svc, ["room"])
+        m = _make_match(match_type="test.skill:intent")
+        m.match_data = {"skill_id": "test.skill", "room": ""}
+        self.assertEqual(svc._missing_required_slots(m, "default", "en-US"), ["room"])
 
 
 # ---------------------------------------------------------------------------
