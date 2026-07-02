@@ -689,38 +689,6 @@ class IntentService:
         if supplied:
             LOG.debug(f"context-supplied slots (§7): {supplied}")
 
-    def _apply_context_slots(self, match, sess, reply) -> None:
-        """OVOS-CONTEXT-1 §7 — apply the context-supplied slot rule to a
-        match before its dispatch is emitted.
-
-        The rule needs the matched intent's ``requires_context`` list and
-        its slot / vocabulary names. An engine that implements §7 fills
-        these slots itself; this orchestrator-resident pass is the
-        fallback for matches that surface the declaration on the Match
-        (``requires_context`` + ``slot_names`` attributes) but leave the
-        fill to core. It is a no-op for matches that expose neither, so
-        it never disturbs engines that already conform.
-
-        @param match: the IntentHandlerMatch being dispatched.
-        @param sess: the session whose intent_context is consulted.
-        @param reply: the dispatch Message whose ``data`` slots are filled.
-        """
-        requires = getattr(match, "requires_context", None)
-        slot_names = getattr(match, "slot_names", None)
-        if not requires or not slot_names:
-            return
-        supplied = context_supplied_slots(
-            intent_context=sess.intent_context or {},
-            requires=requires,
-            slot_names=slot_names,
-            owner_id=match.skill_id,
-            filled_slots=reply.data,
-        )
-        for key, value in supplied.items():
-            reply.data[key] = value
-        if supplied:
-            LOG.debug(f"context-supplied slots (§7): {supplied}")
-
     @staticmethod
     def handle_add_context(message: Message):
         """Add context
