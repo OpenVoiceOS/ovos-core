@@ -602,5 +602,79 @@ class TestShutdown(unittest.TestCase):
         pipeline.shutdown.assert_called_once()
 
 
+# ---------------------------------------------------------------------------
+# OVOS-PIPELINE-1 §6.2 required_slots backstop
+# ---------------------------------------------------------------------------
+
+class TestRequiredSlotsBackstop(unittest.TestCase):
+
+    def test_no_required_slots_is_noop(self):
+        m = _make_match()
+        m.match_data = {"skill_id": "s"}
+        self.assertEqual(IntentService._missing_required_slots(m), [])
+
+    def test_all_required_slots_present(self):
+        m = _make_match()
+        m.match_data = {"__required_slots__": ["room"], "room": "kitchen"}
+        self.assertEqual(IntentService._missing_required_slots(m), [])
+
+    def test_missing_required_slot_reported(self):
+        m = _make_match()
+        m.match_data = {"__required_slots__": ["room", "device"], "room": "kitchen"}
+        self.assertEqual(IntentService._missing_required_slots(m), ["device"])
+
+    def test_falsy_slot_counts_as_missing(self):
+        m = _make_match()
+        m.match_data = {"__required_slots__": ["room"], "room": ""}
+        self.assertEqual(IntentService._missing_required_slots(m), ["room"])
+
+
+# ---------------------------------------------------------------------------
+# OVOS-PIPELINE-1 §7.1/§7.3 active-handler push + reserved-name suppression
+# ---------------------------------------------------------------------------
+
+class TestReservedNameActivation(unittest.TestCase):
+
+    def _dispatch(self, pipeline_id):
+        svc = _make_service()
+        sess = Session("s1")
+        msg = Message("recognizer_loop:utterance", {"utterances": ["hi"]},
+                      {"session": sess.serialize()})
+        match = _make_match(match_type="test.skill:intent",
+                            skill_id="test.skill", session=sess)
+        svc._dispatch_match(match, msg, "en-US", pipeline_id=pipeline_id)
+        return sess
+
+    def test_regular_pipeline_pushes_active_handler(self):
+        sess = self._dispatch("ovos-adapt-pipeline-plugin-high")
+        ids = [h.get("skill_id") if isinstance(h, dict) else getattr(h, "skill_id", h)
+               for h in sess.active_handlers]
+        self.assertIn("test.skill", ids)
+
+    def test_reserved_name_pipeline_suppresses_push(self):
+        # §7.3: converse/stop/fallback/common_query dispatches must NOT push
+        for pid in ("ovos-converse-pipeline-plugin",
+                    "ovos-stop-pipeline-plugin-high",
+                    "ovos-fallback-pipeline-plugin-medium",
+                    "ovos-common-query-pipeline-plugin"):
+            sess = self._dispatch(pid)
+            ids = [h.get("skill_id") if isinstance(h, dict) else getattr(h, "skill_id", h)
+                   for h in sess.active_handlers]
+            self.assertNotIn("test.skill", ids, f"{pid} should suppress the push")
+
+
+class TestProducesReservedName(unittest.TestCase):
+
+    def test_reserved_roles_true_with_confidence_suffix(self):
+        from ovos_core.intent_services.service import _produces_reserved_name
+        self.assertTrue(_produces_reserved_name("ovos-stop-pipeline-plugin-high"))
+        self.assertTrue(_produces_reserved_name("ovos-converse-pipeline-plugin"))
+
+    def test_regular_role_false(self):
+        from ovos_core.intent_services.service import _produces_reserved_name
+        self.assertFalse(_produces_reserved_name("ovos-adapt-pipeline-plugin-high"))
+        self.assertFalse(_produces_reserved_name(None))
+
+
 if __name__ == "__main__":
     unittest.main()
