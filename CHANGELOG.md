@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.4.0a1) (2026-07-01)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.3.0a1...2.4.0a1)
+
+**Merged pull requests:**
+
+- feat: INTENT-4 §10 orchestrator manifest \(IntentManifest\) [\#798](https://github.com/OpenVoiceOS/ovos-core/pull/798) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.3.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.3.0a1) (2026-06-30)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.2.4a3...2.3.0a1)

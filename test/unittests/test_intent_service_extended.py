@@ -27,6 +27,7 @@ from ovos_spec_tools import SpecMessage
 
 from ovos_core.intent_services.service import IntentService
 from ovos_core.intent_services.dispatcher import IntentDispatcher
+from ovos_core.intent_services.manifest import IntentManifest
 
 
 def _make_service(config=None) -> IntentService:
@@ -55,6 +56,9 @@ def _make_service(config=None) -> IntentService:
     it = MagicMock()
     it.transform.side_effect = lambda intent: intent
     svc.intent_plugins = it
+
+    # INTENT-4 §10 manifest — indexes registration broadcasts
+    svc.intent_manifest = IntentManifest(bus)
 
     svc.status = MagicMock()
     return svc
