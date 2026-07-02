@@ -38,6 +38,7 @@ from ovos_plugin_manager.pipeline import OVOSPipelineFactory
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
 
 from ovos_core.intent_services.intent_context import (
+    gate_satisfied,
     context_supplied_slots,
     prune as prune_intent_context,
     decrement as decrement_intent_context,
@@ -661,6 +662,24 @@ class IntentService:
                             LOG.debug(f"ignoring match '{match.match_type}': "
                                       f"missing required slots {missing} (§6.2)")
                             continue
+                        # OVOS-CONTEXT-1 §6/§6.1 — orchestrator gate backstop. A
+                        # matcher SHOULD drop a candidate whose requires_context
+                        # is unmet or whose excludes_context is present; core
+                        # re-checks it so a misbehaving matcher cannot dispatch a
+                        # context-gated intent. The declared gates are read from
+                        # the passive INTENT-4 §10 manifest (the single source of
+                        # an intent's declaration), never off the Match. Absent
+                        # => ungated => unaffected.
+                        if isinstance(match, IntentHandlerMatch) and match.skill_id:
+                            intent_name = match.match_type.split(":", 1)[-1]
+                            requires, excludes = self.intent_manifest.get_context_requirements(
+                                sess.session_id, match.skill_id, intent_name, intent_lang)
+                            if (requires or excludes) and not gate_satisfied(
+                                    sess.intent_context or {}, requires, excludes,
+                                    owner_id=match.skill_id):
+                                LOG.debug(
+                                    f"ignoring match, context gate unsatisfied for '{match.match_type}'")
+                                continue
                         try:
                             self._dispatch_match(match, message, intent_lang,
                                                      pipeline_id=pipeline)
@@ -723,6 +742,43 @@ class IntentService:
         self.bus.emit(message.reply(SpecMessage.INTENT_UNMATCHED, message.data))
         # §9.5: universal end-marker
         self.bus.emit(message.reply(SpecMessage.UTTERANCE_HANDLED))
+
+    def _apply_context_slots(self, match, sess, reply) -> None:
+        """OVOS-CONTEXT-1 §7 — apply the context-supplied slot rule to a
+        match before its dispatch is emitted.
+
+        The rule needs the matched intent's ``requires_context`` list and
+        its slot / vocabulary names. Both are read from the passive INTENT-4
+        §10 manifest — the single source of an intent's declaration — never
+        off the Match. An engine that implements §7 fills these slots itself;
+        this orchestrator-resident pass is the fallback. It is a no-op for an
+        intent that declares no context-gated slot, so it never disturbs
+        engines that already conform.
+
+        @param match: the IntentHandlerMatch being dispatched.
+        @param sess: the session whose intent_context is consulted.
+        @param reply: the dispatch Message whose ``data`` slots are filled.
+        """
+        if not (isinstance(match, IntentHandlerMatch) and match.skill_id):
+            return
+        intent_name = match.match_type.split(":", 1)[-1]
+        requires, _ = self.intent_manifest.get_context_requirements(
+            sess.session_id, match.skill_id, intent_name, sess.lang)
+        slot_names = self.intent_manifest.get_slot_names(
+            sess.session_id, match.skill_id, intent_name, sess.lang)
+        if not requires or not slot_names:
+            return
+        supplied = context_supplied_slots(
+            intent_context=sess.intent_context or {},
+            requires=requires,
+            slot_names=slot_names,
+            owner_id=match.skill_id,
+            filled_slots=reply.data,
+        )
+        for key, value in supplied.items():
+            reply.data[key] = value
+        if supplied:
+            LOG.debug(f"context-supplied slots (§7): {supplied}")
 
     def _apply_context_slots(self, match, sess, reply) -> None:
         """OVOS-CONTEXT-1 §7 — apply the context-supplied slot rule to a

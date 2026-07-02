@@ -394,5 +394,80 @@ class TestLiveSessionManagerSync(unittest.TestCase):
         self.assertEqual(ctx["new.skill:flag"]["turns_remaining"], 1)
 
 
-if __name__ == "__main__":
-    unittest.main()
+# ---------------------------------------------------------------------------
+# §6/§6.1 — orchestrator gate backstop in the match loop
+# ---------------------------------------------------------------------------
+
+from unittest.mock import patch  # noqa: E402
+from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch  # noqa: E402
+from ovos_core.intent_services.manifest import IntentManifest  # noqa: E402
+
+
+class TestOrchestratorGate(unittest.TestCase):
+    """handle_utterance drops a context-gated match whose gate — declared in
+    the passive §10 manifest, not on the Match — is unsatisfied, and dispatches
+    it once the required context is live."""
+
+    def _gated_service(self, match, requires=("kitchen",)):
+        svc = _make_service()
+        svc._handle_transformers = lambda m: m
+        svc.disambiguate_lang = lambda m: "en-US"
+        svc.send_complete_intent_failure = MagicMock()
+        svc._dispatch_match = MagicMock()
+        svc.get_pipeline = lambda session: [("fake-high", lambda utts, lang, msg: match)]
+        # declare the intent's requires_context in the passive manifest
+        svc.intent_manifest = IntentManifest(svc.bus)
+        if requires:
+            svc.intent_manifest._on_register(Message(
+                "ovos.intent.register.keyword",
+                {"skill_id": "lights.skill", "intent_name": "on",
+                 "lang": "en-US", "requires_context": list(requires)}, {}))
+        return svc
+
+    def _session(self, intent_context=None):
+        sess = Session("s1")
+        sess.lang = "en-US"
+        sess.pipeline = ["fake-high"]
+        sess.intent_context = intent_context
+        SessionManager.update(sess)
+        return sess
+
+    def _match(self):
+        return IntentHandlerMatch(match_type="lights:on",
+                                  match_data={"conf": 1.0},
+                                  skill_id="lights.skill",
+                                  utterance="turn on")
+
+    def _utterance(self, sess):
+        return Message("ovos.utterance.handle",
+                       {"utterances": ["turn on"], "lang": "en-US"},
+                       {"session": sess.serialize()})
+
+    def test_gate_unsatisfied_drops_match(self):
+        match = self._match()
+        svc = self._gated_service(match)
+        sess = self._session(intent_context=None)  # no 'kitchen' context
+        with patch.object(svc, "_validate_session", return_value=sess):
+            svc.handle_utterance(self._utterance(sess))
+        svc._dispatch_match.assert_not_called()
+        svc.send_complete_intent_failure.assert_called_once()
+
+    def test_gate_satisfied_dispatches(self):
+        match = self._match()
+        svc = self._gated_service(match)
+        # private 'kitchen' under the declaring skill_id, live
+        ctx = {"lights.skill:kitchen": {"value": "kitchen", "turns_remaining": 2}}
+        sess = self._session(intent_context=ctx)
+        with patch.object(svc, "_validate_session", return_value=sess):
+            svc.handle_utterance(self._utterance(sess))
+        svc._dispatch_match.assert_called_once()
+        svc.send_complete_intent_failure.assert_not_called()
+
+    def test_ungated_match_unaffected(self):
+        match = IntentHandlerMatch(match_type="lights:on", match_data={"conf": 1.0},
+                                   skill_id="lights.skill", utterance="turn on")
+        svc = self._gated_service(match, requires=None)  # nothing declared
+        sess = self._session(intent_context=None)
+        with patch.object(svc, "_validate_session", return_value=sess):
+            svc.handle_utterance(self._utterance(sess))
+        svc._dispatch_match.assert_called_once()
