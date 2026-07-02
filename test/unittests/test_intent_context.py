@@ -394,10 +394,6 @@ class TestLiveSessionManagerSync(unittest.TestCase):
         self.assertEqual(ctx["new.skill:flag"]["turns_remaining"], 1)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 # ---------------------------------------------------------------------------
 # §6/§6.1 — orchestrator gate backstop in the match loop
 # ---------------------------------------------------------------------------

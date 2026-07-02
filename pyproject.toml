@@ -16,6 +16,9 @@ dependencies = [
     "watchdog>=2.1, <3.0",
     "combo-lock>=0.2.2, <0.4",
     "ovos-utils>=0.13.2a1,<1.0.0",
+    # OVOS-CONTEXT-1 §5.3: the SessionManager singleton owns the
+    # session.intent_context first-class field and the ovos.session.sync
+    # entry-by-entry merge (set + null-delete) — requires bus-client #239.
     "ovos_bus_client>=2.6.0a1,<3.0.0",
     "ovos-plugin-manager>=2.5.0a1,<3.0.0",
     "ovos-config>=0.0.13,<3.0.0",
