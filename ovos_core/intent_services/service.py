@@ -38,6 +38,7 @@ from ovos_plugin_manager.pipeline import OVOSPipelineFactory
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
 
 from ovos_core.intent_services.intent_context import (
+    gate_satisfied,
     context_supplied_slots,
     prune as prune_intent_context,
     decrement as decrement_intent_context,
@@ -570,6 +571,24 @@ class IntentService:
                             LOG.debug(
                                 f"ignoring match, intent '{match.match_type}' blacklisted by Session '{sess.session_id}'")
                             continue
+                        # OVOS-CONTEXT-1 §6/§6.1 — orchestrator gate backstop. A
+                        # matcher SHOULD drop a candidate whose requires_context
+                        # is unmet or whose excludes_context is present; core
+                        # re-checks it so a misbehaving matcher cannot dispatch a
+                        # context-gated intent. The declared gates are read from
+                        # the passive INTENT-4 §10 manifest (the single source of
+                        # an intent's declaration), never off the Match. Absent
+                        # => ungated => unaffected.
+                        if isinstance(match, IntentHandlerMatch) and match.skill_id:
+                            intent_name = match.match_type.split(":", 1)[-1]
+                            requires, excludes = self.intent_manifest.get_context_requirements(
+                                sess.session_id, match.skill_id, intent_name, intent_lang)
+                            if (requires or excludes) and not gate_satisfied(
+                                    sess.intent_context or {}, requires, excludes,
+                                    owner_id=match.skill_id):
+                                LOG.debug(
+                                    f"ignoring match, context gate unsatisfied for '{match.match_type}'")
+                                continue
                         try:
                             self._dispatch_match(match, message, intent_lang,
                                                      pipeline_id=pipeline)
@@ -638,19 +657,24 @@ class IntentService:
         match before its dispatch is emitted.
 
         The rule needs the matched intent's ``requires_context`` list and
-        its slot / vocabulary names. An engine that implements §7 fills
-        these slots itself; this orchestrator-resident pass is the
-        fallback for matches that surface the declaration on the Match
-        (``requires_context`` + ``slot_names`` attributes) but leave the
-        fill to core. It is a no-op for matches that expose neither, so
-        it never disturbs engines that already conform.
+        its slot / vocabulary names. Both are read from the passive INTENT-4
+        §10 manifest — the single source of an intent's declaration — never
+        off the Match. An engine that implements §7 fills these slots itself;
+        this orchestrator-resident pass is the fallback. It is a no-op for an
+        intent that declares no context-gated slot, so it never disturbs
+        engines that already conform.
 
         @param match: the IntentHandlerMatch being dispatched.
         @param sess: the session whose intent_context is consulted.
         @param reply: the dispatch Message whose ``data`` slots are filled.
         """
-        requires = getattr(match, "requires_context", None)
-        slot_names = getattr(match, "slot_names", None)
+        if not (isinstance(match, IntentHandlerMatch) and match.skill_id):
+            return
+        intent_name = match.match_type.split(":", 1)[-1]
+        requires, _ = self.intent_manifest.get_context_requirements(
+            sess.session_id, match.skill_id, intent_name, sess.lang)
+        slot_names = self.intent_manifest.get_slot_names(
+            sess.session_id, match.skill_id, intent_name, sess.lang)
         if not requires or not slot_names:
             return
         supplied = context_supplied_slots(
