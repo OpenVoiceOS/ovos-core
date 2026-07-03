@@ -667,6 +667,13 @@ class IntentService:
         entity['origin'] = origin
         sess = SessionManager.get(message)
         sess.context.inject_context(entity)
+        # OVOS-CONTEXT-1 §2/§7: pipelines gate and inject from the canonical
+        # `session.intent_context` map, so a keyword added via `set_context`
+        # must land there too or it never reaches matching. Keyed by the
+        # (skill-id-munged) context token, carrying its injected value.
+        ic = dict(sess.intent_context or {})
+        ic[context] = {"value": word or context}
+        sess.intent_context = ic
 
     @staticmethod
     def handle_remove_context(message: Message):
@@ -679,12 +686,20 @@ class IntentService:
         if context:
             sess = SessionManager.get(message)
             sess.context.remove_context(context)
+            # mirror the removal into the OVOS-CONTEXT-1 map (see
+            # `handle_add_context`)
+            if sess.intent_context and context in sess.intent_context:
+                ic = dict(sess.intent_context)
+                ic.pop(context, None)
+                sess.intent_context = ic or None
 
     @staticmethod
     def handle_clear_context(message: Message):
         """Clears all keywords from context """
         sess = SessionManager.get(message)
         sess.context.clear_context()
+        # mirror the clear into the OVOS-CONTEXT-1 map (see `handle_add_context`)
+        sess.intent_context = None
 
     def handle_get_intent(self, message):
         """Get intent from either adapt or padatious.

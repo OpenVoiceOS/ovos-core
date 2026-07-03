@@ -274,6 +274,10 @@ class TestContextHandlers(unittest.TestCase):
             IntentService.handle_add_context(msg)
         # The frame_stack should have an entry
         self.assertGreater(len(sess.context.frame_stack), 0)
+        # OVOS-CONTEXT-1: the token is mirrored into the intent_context map,
+        # keyed by the context token and carrying its injected value
+        self.assertEqual(sess.intent_context.get("MyContext"),
+                         {"value": "myword"})
 
     def test_handle_remove_context_removes_entity(self):
         """handle_remove_context removes the specified context."""
@@ -285,10 +289,13 @@ class TestContextHandlers(unittest.TestCase):
         msg = Message("remove_context",
                       data={"context": "MyCtx"},
                       context={"session": sess.serialize()})
+        sess.intent_context = {"MyCtx": {"value": "word"}}
         with patch("ovos_core.intent_services.service.SessionManager.get",
                    return_value=sess):
             IntentService.handle_remove_context(msg)
         self.assertEqual(len(sess.context.frame_stack), 0)
+        # OVOS-CONTEXT-1: the token is also dropped from the intent_context map
+        self.assertIsNone(sess.intent_context)
 
     def test_handle_clear_context_empties_stack(self):
         """handle_clear_context empties the entire frame stack."""
@@ -296,6 +303,7 @@ class TestContextHandlers(unittest.TestCase):
         entity = {"confidence": 1.0, "data": [("w", "C1")],
                   "match": "w", "key": "w", "origin": ""}
         sess.context.inject_context(entity)
+        sess.intent_context = {"C1": {"value": "w"}}
         msg = Message("clear_context",
                       data={},
                       context={"session": sess.serialize()})
@@ -303,6 +311,8 @@ class TestContextHandlers(unittest.TestCase):
                    return_value=sess):
             IntentService.handle_clear_context(msg)
         self.assertEqual(len(sess.context.frame_stack), 0)
+        # OVOS-CONTEXT-1: clearing context empties the intent_context map too
+        self.assertIsNone(sess.intent_context)
 
     def test_handle_add_context_non_string_word_converted(self):
         """Non-string word is converted to string without raising."""
