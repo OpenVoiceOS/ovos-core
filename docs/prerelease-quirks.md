@@ -54,6 +54,17 @@ denies every confidence tier, whichever spelling — legacy or canonical,
 suffixed or bare — the entry uses. Both the blacklist and the matcher id are
 now normalized to a bare plugin id before comparison.
 
+## #689 (alpha of 2026-08-31)
+
+The open-data intent-metrics upload (`IntentService._upload_match_data`,
+gated behind the opt-in `open_data.intent_urls` config, off by default) now
+carries `pipeline` (the session's pipe-joined matcher-id list) and
+`core_version` (`OVOS_VERSION_STR`) alongside the existing fields. This is
+an HTTP telemetry payload to a user-configured endpoint, not a bus message;
+existing collectors that only read the fields they expect are unaffected,
+but anyone parsing the payload strictly (e.g. rejecting unknown keys) needs
+to accept the two new ones.
+
 ## #868 (alpha of 2026-08-14)
 
 `handle_add_context`/`handle_remove_context`/`handle_clear_context` did a

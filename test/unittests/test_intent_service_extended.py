@@ -1555,6 +1555,36 @@ class TestBlacklistedPipelines(unittest.TestCase):
         self.assertIn("ovos-m2v-pipeline", info_calls)
 
 
+class TestUploadMatchData(unittest.TestCase):
+    """The intent-metrics payload carries the session pipeline and core version."""
+
+    def _post_payload(self, pipeline):
+        captured = {}
+
+        def _fake_post(url, data=None, headers=None, timeout=None):
+            captured.update(data)
+            return MagicMock(status_code=200)
+
+        cfg = {"open_data": {"intent_urls": ["http://localhost:8000/intents"]}}
+        with patch("ovos_core.intent_services.service.Configuration",
+                   return_value=cfg), \
+                patch("ovos_core.intent_services.service.requests.post",
+                      side_effect=_fake_post):
+            IntentService._upload_match_data(
+                "turn on the lights", "test:intent", "en-US",
+                {"skill_id": "test.skill"}, pipeline)
+        return captured
+
+    def test_pipeline_joined_into_payload(self):
+        captured = self._post_payload(["adapt_high", "padatious_high"])
+        self.assertEqual(captured["pipeline"], "adapt_high|padatious_high")
+
+    def test_core_version_in_payload(self):
+        from ovos_core.version import OVOS_VERSION_STR
+        captured = self._post_payload(["adapt_high"])
+        self.assertEqual(captured["core_version"], OVOS_VERSION_STR)
+
+
 if __name__ == "__main__":
     unittest.main()
 

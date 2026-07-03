@@ -37,6 +37,7 @@ from ovos_utils.thread_utils import create_daemon
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService, IntentTransformersService
 from ovos_core.intent_services.dispatcher import IntentDispatcher, DEFAULT_HANDLER_TIMEOUT
 from ovos_core.intent_services.manifest import IntentManifest
+from ovos_core.version import OVOS_VERSION_STR
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
 
@@ -577,7 +578,8 @@ class IntentService:
                 create_daemon(self._upload_match_data, (match.utterance,
                                                         match.match_type,
                                                         lang,
-                                                        match.match_data))
+                                                        match.match_data,
+                                                        sess.pipeline))
 
         if reply is not None:
             reply.data["utterance"] = match.utterance
@@ -646,10 +648,11 @@ class IntentService:
                 create_daemon(self._upload_match_data, (match.utterance,
                                                         "complete_intent_failure",
                                                         lang,
-                                                        match.match_data))
+                                                        match.match_data,
+                                                        sess.pipeline))
 
     @staticmethod
-    def _upload_match_data(utterance: str, intent: str, lang: str, match_data: dict):
+    def _upload_match_data(utterance: str, intent: str, lang: str, match_data: dict, pipeline: List[str]):
         """if enabled upload the intent match data to a server, allowing users and developers
         to collect metrics/datasets to improve the pipeline plugins and skills.
 
@@ -669,7 +672,9 @@ class IntentService:
             "utterance": utterance,
             "intent": intent,
             "lang": lang,
-            "match_data": json.dumps(match_data, ensure_ascii=False)
+            "match_data": json.dumps(match_data, ensure_ascii=False),
+            "pipeline": "|".join(pipeline),
+            "core_version": OVOS_VERSION_STR
         }
         for url in endpoints:
             try:
