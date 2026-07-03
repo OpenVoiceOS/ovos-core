@@ -15,6 +15,8 @@ from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
 from ovos_utils.parse import match_one
 
+from ovos_core.intent_services.stop_service_legacy import _LegacyStopBridge
+
 
 class StopService(ConfidenceMatcherPipeline):
     """Stop pipeline plugin implementing OVOS-STOP-1.
@@ -51,6 +53,7 @@ class StopService(ConfidenceMatcherPipeline):
         self.suppress_activation = suppress_activation
         # §5 global-stop dispatch target; bound once, shared across tiers (§3.1).
         self.bus.on(f"{self.pipeline_id}:global_stop", self.handle_global_stop)
+        self._legacy = _LegacyStopBridge(self)
 
     def handle_global_stop(self, message: Message) -> None:
         """OVOS-STOP-1 §5.3 — broadcast the universal ``ovos.stop``.
@@ -341,3 +344,4 @@ class StopService(ConfidenceMatcherPipeline):
     def shutdown(self) -> None:
         """Remove bus listeners registered by this service."""
         self.bus.remove(f"{self.pipeline_id}:global_stop", self.handle_global_stop)
+        self._legacy.shutdown()

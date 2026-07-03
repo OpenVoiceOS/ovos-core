@@ -21,6 +21,7 @@ from ovos_bus_client.session import Session, SessionManager, UtteranceState
 from ovos_utils.fakebus import FakeBus
 
 from ovos_core.intent_services.stop_service import StopService
+from ovos_core.intent_services.stop_service_legacy import _LegacyStopBridge
 
 GLOBAL_STOP = f"{StopService.pipeline_id}:global_stop"
 
@@ -39,6 +40,7 @@ def _make_service() -> StopService:
         # vocabulary matching is delegated to ovos-spec-tools LocaleResources;
         # tests patch svc._locale.voc_match / voc_list.
         svc._locale = MagicMock()
+        svc._legacy = MagicMock()
     return svc
 
 
@@ -526,6 +528,75 @@ class TestGetActiveSkills(unittest.TestCase):
         self.assertIn("skill_b", result)
 
 
+def _make_bridge() -> _LegacyStopBridge:
+    """Construct a _LegacyStopBridge without registering bus listeners."""
+    bridge = _LegacyStopBridge.__new__(_LegacyStopBridge)
+    service = MagicMock()
+    service.pipeline_id = StopService.pipeline_id
+    bridge.service = service
+    bridge.bus = FakeBus()
+    bridge._warned = False
+    return bridge
+
+
+class TestLegacyStopBridge(unittest.TestCase):
+    """The droppable pre-STOP-1 dispatch shim."""
+
+    def test_handle_global_stop_emits_mycroft_stop(self):
+        bridge = _make_bridge()
+        emitted = []
+        bridge.bus.emit = lambda m: emitted.append(m)
+        bridge.handle_global_stop(Message("stop:global", {}))
+        types = [m.msg_type for m in emitted]
+        self.assertIn("mycroft.skill.handler.start", types)
+        self.assertIn("mycroft.stop", types)
+        self.assertIn("mycroft.skill.handler.complete", types)
+
+    def test_handle_skill_stop_forwards_to_skill(self):
+        bridge = _make_bridge()
+        emitted = []
+        bridge.bus.emit = lambda m: emitted.append(m)
+        bridge.handle_skill_stop(Message("stop:skill", {"skill_id": "my_skill"}))
+        types = [m.msg_type for m in emitted]
+        self.assertIn("mycroft.skill.handler.start", types)
+        self.assertIn("my_skill.stop", types)
+        self.assertIn("mycroft.skill.handler.complete", types)
+
+    def test_intent_matched_global_reemits_legacy_dispatch(self):
+        bridge = _make_bridge()
+        emitted = []
+        bridge.bus.emit = lambda m: emitted.append(m)
+        bridge._on_intent_matched(Message(
+            "ovos.intent.matched",
+            {"pipeline_id": f"{StopService.pipeline_id}-high",
+             "intent_name": GLOBAL_STOP, "skill_id": StopService.pipeline_id}))
+        types = [m.msg_type for m in emitted]
+        self.assertIn("stop.openvoiceos.activate", types)
+        self.assertIn("stop:global", types)
+
+    def test_intent_matched_targeted_reemits_legacy_dispatch(self):
+        bridge = _make_bridge()
+        emitted = []
+        bridge.bus.emit = lambda m: emitted.append(m)
+        bridge._on_intent_matched(Message(
+            "ovos.intent.matched",
+            {"pipeline_id": f"{StopService.pipeline_id}-high",
+             "intent_name": "my_skill:stop", "skill_id": "my_skill"}))
+        stop_skill = [m for m in emitted if m.msg_type == "stop:skill"]
+        self.assertEqual(len(stop_skill), 1)
+        self.assertEqual(stop_skill[0].data["skill_id"], "my_skill")
+
+    def test_intent_matched_ignores_other_pipelines(self):
+        bridge = _make_bridge()
+        emitted = []
+        bridge.bus.emit = lambda m: emitted.append(m)
+        bridge._on_intent_matched(Message(
+            "ovos.intent.matched",
+            {"pipeline_id": "ovos-adapt-pipeline-plugin-high",
+             "intent_name": "my_skill:hello", "skill_id": "my_skill"}))
+        self.assertEqual(emitted, [])
+
+
 class TestShutdown(unittest.TestCase):
 
     def test_shutdown_removes_listeners(self):
@@ -534,6 +605,8 @@ class TestShutdown(unittest.TestCase):
         svc.shutdown()
         calls = {c[0][0] for c in svc.bus.remove.call_args_list}
         self.assertIn(GLOBAL_STOP, calls)
+        # the legacy listeners are removed by the (mocked) bridge
+        svc._legacy.shutdown.assert_called_once()
 
 
 if __name__ == "__main__":
