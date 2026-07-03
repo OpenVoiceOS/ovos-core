@@ -175,8 +175,8 @@ class IntentService:
         # OVOS-CONTEXT-1 — the flat, decaying ``session.intent_context``
         # map (§2) is owned by the ``SessionManager`` singleton: it carries
         # the field first-class on every Session and applies the §5.3
-        # ``ovos.session.sync`` entry-by-entry merge itself (bus-client
-        # #239, ``SessionManager.handle_session_sync``). The orchestrator
+        # ``ovos.session.sync`` entry-by-entry merge itself
+        # (``SessionManager.handle_session_sync``). The orchestrator
         # does NOT subscribe to ``ovos.session.sync`` and holds no parallel
         # store — it only applies the §4 decay lifecycle around each match
         # round on the session's own map (see ``handle_utterance``).
@@ -473,7 +473,7 @@ class IntentService:
             self._apply_context_slots(match, sess, reply)
 
             # update Session if modified by pipeline; the intent_context
-            # map round-trips on the Session itself (bus-client #239)
+            # map round-trips on the Session itself
             reply.context["session"] = sess.serialize()
 
             # stamp the matching plugin's identity on the dispatch (§3.1, §7.1)
@@ -607,7 +607,7 @@ class IntentService:
         sess = self._validate_session(message, lang)
 
         # OVOS-CONTEXT-1 §4 (pre-match) — the session carries its own flat
-        # ``intent_context`` map (owned by SessionManager, bus-client #239).
+        # ``intent_context`` map (owned by SessionManager).
         # Prune every dead entry so every matcher in this round sees the
         # same post-decay gating snapshot, then write the pruned map back
         # via the singleton so it stays authoritative.
@@ -766,38 +766,6 @@ class IntentService:
             sess.session_id, match.skill_id, intent_name, sess.lang)
         slot_names = self.intent_manifest.get_slot_names(
             sess.session_id, match.skill_id, intent_name, sess.lang)
-        if not requires or not slot_names:
-            return
-        supplied = context_supplied_slots(
-            intent_context=sess.intent_context or {},
-            requires=requires,
-            slot_names=slot_names,
-            owner_id=match.skill_id,
-            filled_slots=reply.data,
-        )
-        for key, value in supplied.items():
-            reply.data[key] = value
-        if supplied:
-            LOG.debug(f"context-supplied slots (§7): {supplied}")
-
-    def _apply_context_slots(self, match, sess, reply) -> None:
-        """OVOS-CONTEXT-1 §7 — apply the context-supplied slot rule to a
-        match before its dispatch is emitted.
-
-        The rule needs the matched intent's ``requires_context`` list and
-        its slot / vocabulary names. An engine that implements §7 fills
-        these slots itself; this orchestrator-resident pass is the
-        fallback for matches that surface the declaration on the Match
-        (``requires_context`` + ``slot_names`` attributes) but leave the
-        fill to core. It is a no-op for matches that expose neither, so
-        it never disturbs engines that already conform.
-
-        @param match: the IntentHandlerMatch being dispatched.
-        @param sess: the session whose intent_context is consulted.
-        @param reply: the dispatch Message whose ``data`` slots are filled.
-        """
-        requires = getattr(match, "requires_context", None)
-        slot_names = getattr(match, "slot_names", None)
         if not requires or not slot_names:
             return
         supplied = context_supplied_slots(

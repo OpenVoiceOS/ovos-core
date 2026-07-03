@@ -73,30 +73,29 @@ intent.service.intent.get  {utterance: "...", lang: "..."}
 ### OVOS-CONTEXT-1 intent context
 
 The orchestrator implements the **OVOS-CONTEXT-1** flat, decaying
-`session.intent_context` key/value store alongside the legacy
-frame-based `IntentContextManager`. The core-resident subsystem
-(`ovos_core.intent_services.intent_context`) owns:
+`session.intent_context` key/value store. The core-resident helpers
+(`ovos_core.intent_services.intent_context`) provide:
 
 - the entry shape and *liveness* predicate (§2);
 - the prune-then-decrement decay lifecycle, once per utterance dispatch
   (§4 / §4.1);
-- the `ovos.session.sync` entry-by-entry merge — present entry objects
-  set/replace, `null` entries delete, absent keys unchanged (§5.3);
 - the §3.1 scope-resolution helper, the §6 / §6.1 gating predicates, and
   the §7 context-supplied slot fill, as pure functions any in-process
   engine can apply.
 
-The orchestrator holds the authoritative map keyed by `session_id`,
-prunes/decrements it each turn, and stamps it onto every serialized
-session it emits, since the legacy `Session` object does not yet carry
-`intent_context` as a first-class field.
+The authoritative owner of the map is the `SessionManager` singleton: it
+carries `intent_context` as a first-class, round-tripping field on every
+`Session` and applies the §5.3 `ovos.session.sync` entry-by-entry merge
+itself — present entry objects set/replace, `null` entries delete, absent
+keys unchanged. Around each match round the orchestrator applies the §4
+decay lifecycle to the session's own map.
 
-> **Engine-side gating is out of scope here.** The §6 / §6.1
-> `requires_context` / `excludes_context` enforcement *inside a matcher*
-> (e.g. Adapt dropping a candidate whose required context is unsatisfied)
-> lives in each pipeline plugin, not in core. Core provides the shared
-> `gate_satisfied` / `context_supplied_slots` vocabulary those plugins
-> consult.
+> **Engine-side gating.** The §6 / §6.1 `requires_context` /
+> `excludes_context` enforcement *inside a matcher* (e.g. Adapt dropping a
+> candidate whose required context is unsatisfied) lives in each pipeline
+> plugin. Core provides the shared `gate_satisfied` /
+> `context_supplied_slots` vocabulary those plugins consult, and re-checks
+> the gate as an orchestrator backstop against a misbehaving matcher.
 
 ## Open Data / Metrics Upload
 

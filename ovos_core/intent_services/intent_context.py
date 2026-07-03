@@ -13,18 +13,16 @@
 # limitations under the License.
 """Core-resident helpers for OVOS-CONTEXT-1 — intent context.
 
-OVOS-CONTEXT-1 replaces the legacy frame-based ``IntentContextManager``
-(``ovos_bus_client.session.IntentContextManager``) with a **flat,
-decaying key/value map** stored at ``session.intent_context`` (§2).
+OVOS-CONTEXT-1 models intent context as a **flat, decaying key/value
+map** stored at ``session.intent_context`` (§2).
 
 The authoritative owner of that map is the ``SessionManager`` singleton
 (``ovos_bus_client.session.SessionManager``): it carries
 ``intent_context`` as a first-class, round-tripping field on every
 ``Session`` and applies the §5.3 ``ovos.session.sync`` entry-by-entry
 merge (set + null-delete) itself — see ``SessionManager.handle_session_sync``
-/ ``SessionManager.merge_intent_context`` (bus-client #239). The
-orchestrator does **not** subscribe to ``ovos.session.sync`` and does
-**not** hold a parallel store.
+/ ``SessionManager.merge_intent_context``. The orchestrator does **not**
+subscribe to ``ovos.session.sync`` and does **not** hold a parallel store.
 
 This module is therefore a set of **stateless helpers** the orchestrator
 (and any in-process engine) applies to a session's ``intent_context``
@@ -38,12 +36,11 @@ argument and returns a value or mutates the passed-in dict in place:
   stored key, the §6 / §6.1 gating predicates, and the §7
   context-supplied slot fill.
 
-The *engine-side* enforcement of §6 / §6.1 gating inside a matcher (e.g.
-the Adapt matcher dropping a candidate whose ``requires_context`` is
-unsatisfied) is **out of scope for this module** — it belongs to each
-pipeline plugin and is tracked as a follow-up. What lives here is the
-shared, engine-agnostic vocabulary those plugins (and the orchestrator)
-consult.
+Engine-side enforcement of §6 / §6.1 gating inside a matcher (e.g. a
+matcher dropping a candidate whose ``requires_context`` is unsatisfied)
+belongs to each pipeline plugin, not to this module. What lives here is
+the shared, engine-agnostic vocabulary those plugins (and the
+orchestrator) consult.
 """
 import time
 from typing import Any, Dict, List, Optional, Set, Union

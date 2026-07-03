@@ -14,8 +14,8 @@
 """OVOS-CONTEXT-1 conformance tests for the core-resident helpers.
 
 The §5.3 ``ovos.session.sync`` entry-by-entry merge is owned by the
-``SessionManager`` singleton (bus-client #239) and is covered there; core
-does **not** re-implement it. This module covers the stateless helpers the
+``SessionManager`` singleton and is covered there; core does **not**
+re-implement it. This module covers the stateless helpers the
 orchestrator applies to a session's ``intent_context`` map:
 
 - §2 the flat entry shape + liveness predicate + cap eviction;
@@ -471,3 +471,52 @@ class TestOrchestratorGate(unittest.TestCase):
         with patch.object(svc, "_validate_session", return_value=sess):
             svc.handle_utterance(self._utterance(sess))
         svc._dispatch_match.assert_called_once()
+
+
+class TestOrchestratorSlotFill(unittest.TestCase):
+    """The orchestrator's §7 slot-fill pass reads ``requires_context`` and the
+    slot names from the passive §10 manifest (never off the Match) and populates
+    an unfilled slot on the dispatch from the live context entry."""
+
+    def _service(self, requires, slot_names):
+        svc = _make_service()
+        svc.intent_manifest = IntentManifest(svc.bus)
+        svc.intent_manifest._on_register(Message(
+            "ovos.intent.register.keyword",
+            {"skill_id": "lights.skill", "intent_name": "on", "lang": "en-US",
+             "requires_context": list(requires), "required": list(slot_names)}, {}))
+        return svc
+
+    def _session(self, intent_context):
+        sess = Session("s1")
+        sess.lang = "en-US"
+        sess.intent_context = intent_context
+        return sess
+
+    def _match(self):
+        return IntentHandlerMatch(match_type="lights:on", match_data={"conf": 1.0},
+                                  skill_id="lights.skill", utterance="turn on")
+
+    def test_context_fills_unfilled_slot(self):
+        svc = self._service(requires=["room"], slot_names=["room"])
+        sess = self._session(
+            {"lights.skill:room": {"value": "kitchen", "turns_remaining": 2}})
+        reply = Message("lights:on", {})
+        svc._apply_context_slots(self._match(), sess, reply)
+        self.assertEqual(reply.data.get("room"), "kitchen")
+
+    def test_utterance_value_wins(self):
+        svc = self._service(requires=["room"], slot_names=["room"])
+        sess = self._session(
+            {"lights.skill:room": {"value": "kitchen", "turns_remaining": 2}})
+        reply = Message("lights:on", {"room": "bedroom"})
+        svc._apply_context_slots(self._match(), sess, reply)
+        self.assertEqual(reply.data.get("room"), "bedroom")
+
+    def test_ungated_intent_is_noop(self):
+        svc = self._service(requires=[], slot_names=[])
+        sess = self._session(
+            {"lights.skill:room": {"value": "kitchen", "turns_remaining": 2}})
+        reply = Message("lights:on", {})
+        svc._apply_context_slots(self._match(), sess, reply)
+        self.assertNotIn("room", reply.data)
