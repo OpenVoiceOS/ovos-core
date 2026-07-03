@@ -5,11 +5,11 @@ from typing import Optional, Dict, List, Union
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.handler import HandlerLifecycle
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import SessionManager, UtteranceState
+from ovos_bus_client.session import Session, SessionManager, UtteranceState
 
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import ConfidenceMatcherPipeline, IntentHandlerMatch
-from ovos_spec_tools import LocaleResources
+from ovos_spec_tools import LocaleResources, SpecMessage
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
@@ -17,38 +17,57 @@ from ovos_utils.parse import match_one
 
 
 class StopService(ConfidenceMatcherPipeline):
-    """Intent Service that handles stopping skills."""
+    """Stop pipeline plugin implementing OVOS-STOP-1.
+
+    Matches stop-command utterances and returns Matches under STOP-1 §2:
+
+    - a **targeted** stop dispatched on ``<skill_id>:stop`` (§2, §3.1) when a
+      recency-selected active handler declares itself stoppable via the §4
+      ping-pong cascade;
+    - a **global** stop dispatched on ``<pipeline_id>:global_stop`` (§5)
+      otherwise — explicit "stop everything" vocabulary (§3.2), an empty
+      ``active_handlers`` (§4.1 step 1), or no positive pong responder
+      (§4.1 step 5).
+
+    Both dispatches set ``suppress_activation`` (§6.2/§7.3): a stop terminates
+    an already-active skill's participation, so it registers no fresh
+    activation. The session drain mandated by §5.2/§6 is committed via
+    ``Match.updated_session`` before dispatch.
+    """
+
+    #: OVOS-STOP-1 §3.1 shared identity. Every confidence tier reports the same
+    #: ``pipeline_id`` so the global-stop handler binds a single topic across
+    #: tiers and exactly one ``ovos.stop`` broadcast is emitted per event.
+    pipeline_id = "ovos-stop-pipeline-plugin"
 
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
-                 config: Optional[Dict] = None) -> None:
+                 config: Optional[Dict] = None,
+                 suppress_activation: bool = True) -> None:
         config = config if config is not None else Configuration().get("skills", {}).get("stop") or {}
         bus = bus or FakeBus()
         ConfidenceMatcherPipeline.__init__(self, config=config, bus=bus)
         self._locale = LocaleResources(skill_locale=join(dirname(__file__), "locale"))
-        self.bus.on("stop:global", self.handle_global_stop)
-        self.bus.on("stop:skill", self.handle_skill_stop)
+        #: Stamped onto every Match this plugin returns (§6.2/§7.3).
+        self.suppress_activation = suppress_activation
+        # §5 global-stop dispatch target; bound once, shared across tiers (§3.1).
+        self.bus.on(f"{self.pipeline_id}:global_stop", self.handle_global_stop)
 
     def handle_global_stop(self, message: Message) -> None:
-        """Emit a global mycroft.stop; the §9.5 end-marker is the orchestrator's
-        responsibility (``IntentDispatcher._notify_terminal``)."""
-        with HandlerLifecycle(self.bus, message,
-                              skill_id="stop.openvoiceos",
-                              data={"name": "StopService.handle_global_stop"}):
-            self.bus.emit(message.forward("mycroft.stop"))
+        """OVOS-STOP-1 §5.3 — broadcast the universal ``ovos.stop``.
 
-    def handle_skill_stop(self, message: Message) -> None:
-        """Forward a stop request to the specific skill."""
-        skill_id = message.data["skill_id"]
+        Bound on ``<pipeline_id>:global_stop`` and wrapped in HandlerLifecycle
+        so the orchestrator observes the §8 terminal for the dispatch."""
         with HandlerLifecycle(self.bus, message,
-                              skill_id="stop.openvoiceos",
-                              data={"name": "StopService.handle_skill_stop"}):
-            self.bus.emit(message.reply(f"{skill_id}.stop"))
+                              skill_id=self.pipeline_id,
+                              data={"name": "StopService.handle_global_stop"}):
+            self.bus.emit(message.forward(SpecMessage.STOP.value))
 
     @staticmethod
     def get_active_skills(message: Optional[Message] = None) -> List[str]:
         """Active skill ids ordered by converse priority.
 
-        This represents the order in which stop will be called.
+        This is the OVOS-STOP-1 §4.1 recency input (``active_handlers``): the
+        order in which stop is attempted.
 
         Returns:
             active_skills (list): ordered list of skill_ids
@@ -58,7 +77,7 @@ class StopService(ConfidenceMatcherPipeline):
 
     def _collect_stop_skills(self, message: Message) -> List[str]:
         """
-        Collect skills that can be stopped based on a ping-pong mechanism.
+        Collect skills that can be stopped based on a ping-pong mechanism (§4).
 
         This method determines which active skills can handle a stop request by sending
         a stop ping to each active skill and waiting for their acknowledgment.
@@ -73,9 +92,9 @@ class StopService(ConfidenceMatcherPipeline):
                       indicate they can stop, returns all active skills.
 
         Notes:
-            - Excludes skills that are blacklisted in the current session
+            - Excludes skills that are blacklisted in the current session (§6.3)
             - Uses a non-blocking event mechanism to collect skill responses
-            - Waits up to 0.5 seconds for skills to respond
+            - Waits up to 0.5 seconds for skills to respond (§4.1)
             - Falls back to all active skills if no explicit stop confirmation is received
         """
         sess = SessionManager.get(message)
@@ -109,7 +128,7 @@ class StopService(ConfidenceMatcherPipeline):
                 return  # guard against malformed pong messages
 
             # validate the stop pong; default False — a non-responding skill
-            # should not be assumed stoppable
+            # should not be assumed stoppable (§4.2)
             if all((skill_id not in want_stop,
                     msg.data.get("can_handle", False),
                     skill_id in active_skills)):
@@ -160,15 +179,57 @@ class StopService(ConfidenceMatcherPipeline):
                 # force-kill any ongoing TTS
                 self.bus.emit(message.forward("mycroft.audio.speech.stop", {"skill_id": skill_id}))
 
+    def _targeted_stop(self, skill_id: str, conf: float, utterance: str,
+                       sess: Session) -> IntentHandlerMatch:
+        """Build the OVOS-STOP-1 §2 targeted ``<skill_id>:stop`` Match.
+
+        Drains the dispatch target from ``active_handlers`` and clears its
+        ``response_mode`` entry (§6.1/§6.2) via ``Match.updated_session``. The
+        §7.1 stamping push is suppressed (``suppress_activation``, §7.3), so the
+        removal is the final state.
+        """
+        LOG.debug(f"Telling skill to stop: {skill_id}")
+        sess.disable_response_mode(skill_id)
+        sess.deactivate_skill(skill_id)
+        self.bus.once(f"{skill_id}.stop.response", self.handle_stop_confirmation)
+        return IntentHandlerMatch(
+            match_type=f"{skill_id}:stop",
+            match_data={"conf": conf, "skill_id": skill_id},
+            updated_session=sess,
+            utterance=utterance,
+            skill_id=skill_id,
+            suppress_activation=self.suppress_activation,
+        )
+
+    def _global_stop(self, conf: float, utterance: str,
+                     sess: Session) -> IntentHandlerMatch:
+        """Build the OVOS-STOP-1 §5 global ``<pipeline_id>:global_stop`` Match.
+
+        Carries a fully-cleaned ``updated_session`` (§5.2): ``active_handlers``
+        and ``converse_handlers`` emptied and ``response_mode`` removed, all
+        committed before dispatch.
+        """
+        LOG.info(f"Emitting global stop, {len(sess.active_skills)} active skills")
+        sess.active_handlers = []
+        sess.converse_handlers = []
+        sess.clear_response_mode()
+        return IntentHandlerMatch(
+            match_type=f"{self.pipeline_id}:global_stop",
+            match_data={"conf": conf},
+            updated_session=sess,
+            utterance=utterance,
+            skill_id=self.pipeline_id,
+            suppress_activation=self.suppress_activation,
+        )
+
     def match_high(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """
-        Handles high-confidence stop requests by matching exact stop vocabulary and managing skill stopping.
+        Handle high-confidence stop requests by matching exact stop vocabulary (§4/§5).
 
-        Attempts to stop skills when an exact "stop" or "global_stop" command is detected. Performs the following actions:
-        - Checks for global stop command when no active skills exist
-        - Emits a global stop message if applicable
-        - Attempts to stop individual skills if a stop command is detected
-        - Disables response mode for stopped skills
+        - explicit ``global_stop`` vocabulary (or bare ``stop`` with no active
+          skills) yields a §5 global stop;
+        - a bare ``stop`` with active skills runs the §4 cascade and yields a
+          targeted ``<skill_id>:stop`` for the recency-selected stoppable skill.
 
         Parameters:
             utterances (List[str]): List of user utterances to match against stop vocabulary
@@ -176,9 +237,8 @@ class StopService(ConfidenceMatcherPipeline):
             message (Message): Message context for generating appropriate responses
 
         Returns:
-            Optional[IntentHandlerMatch]: Match result indicating whether stop was handled, with optional skill and session information
-            - Returns None if no stop action could be performed
-            - Returns IntentHandlerMatch with handled=True for successful global or skill-specific stop
+            Optional[IntentHandlerMatch]: the stop Match, or None if no stop
+            vocabulary matched.
         """
         sess = SessionManager.get(message)
 
@@ -192,29 +252,12 @@ class StopService(ConfidenceMatcherPipeline):
         conf = 1.0
 
         if is_global_stop:
-            LOG.info(f"Emitting global stop, {len(self.get_active_skills(message))} active skills")
-            # emit a global stop, full stop anything OVOS is doing
-            return IntentHandlerMatch(
-                match_type="stop:global",
-                match_data={"conf": conf},
-                updated_session=sess,
-                utterance=utterance,
-                skill_id="stop.openvoiceos"
-            )
+            return self._global_stop(conf, utterance, sess)
 
         if is_stop:
-            # check if any skill can stop
+            # check if any skill can stop (§4 cascade)
             for skill_id in self._collect_stop_skills(message):
-                LOG.debug(f"Telling skill to stop: {skill_id}")
-                sess.disable_response_mode(skill_id)
-                self.bus.once(f"{skill_id}.stop.response", self.handle_stop_confirmation)
-                return IntentHandlerMatch(
-                    match_type="stop:skill",
-                    match_data={"conf": conf, "skill_id": skill_id},
-                    updated_session=sess,
-                    utterance=utterance,
-                    skill_id="stop.openvoiceos"
-                )
+                return self._targeted_stop(skill_id, conf, utterance, sess)
 
         return None
 
@@ -288,30 +331,13 @@ class StopService(ConfidenceMatcherPipeline):
         if conf < self.config.get("min_conf", 0.5):
             return None
 
-        # check if any skill can stop
+        # check if any skill can stop (§4 cascade)
         for skill_id in self._collect_stop_skills(message):
-            LOG.debug(f"Telling skill to stop: {skill_id}")
-            sess.disable_response_mode(skill_id)
-            self.bus.once(f"{skill_id}.stop.response", self.handle_stop_confirmation)
-            return IntentHandlerMatch(
-                match_type="stop:skill",
-                match_data={"conf": conf, "skill_id": skill_id},
-                updated_session=sess,
-                utterance=utterance,
-                skill_id="stop.openvoiceos"
-            )
+            return self._targeted_stop(skill_id, conf, utterance, sess)
 
-        # emit a global stop, full stop anything OVOS is doing
-        LOG.debug(f"Emitting global stop signal, {len(self.get_active_skills(message))} active skills")
-        return IntentHandlerMatch(
-            match_type="stop:global",
-            match_data={"conf": conf},
-            updated_session=sess,
-            utterance=utterance,
-            skill_id="stop.openvoiceos"
-        )
+        # no positive pong responder -> escalate to a §5 global stop
+        return self._global_stop(conf, utterance, sess)
 
     def shutdown(self) -> None:
         """Remove bus listeners registered by this service."""
-        self.bus.remove("stop:global", self.handle_global_stop)
-        self.bus.remove("stop:skill", self.handle_skill_stop)
+        self.bus.remove(f"{self.pipeline_id}:global_stop", self.handle_global_stop)

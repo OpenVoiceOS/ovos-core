@@ -175,7 +175,7 @@ class TestTargetedStopSpec(TestCase):
                     f"{self.skill_id}.stop.response",
                     f"{self.skill_id}.stop.ping",
                     "skill.stop.pong",
-                    f"{self.skill_id}:count_to_N.intent",
+                    f"{self.skill_id}:count_to_n.intent",
                 ],
                 source_message=message,
                 expected_messages=[

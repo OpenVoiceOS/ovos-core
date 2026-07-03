@@ -661,13 +661,14 @@ class TestRequiredSlotsBackstop(unittest.TestCase):
 
 class TestReservedNameActivation(unittest.TestCase):
 
-    def _dispatch(self, pipeline_id):
+    def _dispatch(self, pipeline_id, suppress_activation=False):
         svc = _make_service()
         sess = Session("s1")
         msg = Message("recognizer_loop:utterance", {"utterances": ["hi"]},
                       {"session": sess.serialize()})
         match = _make_match(match_type="test.skill:intent",
                             skill_id="test.skill", session=sess)
+        match.suppress_activation = suppress_activation
         svc._dispatch_match(match, msg, "en-US", pipeline_id=pipeline_id)
         return sess
 
@@ -678,9 +679,8 @@ class TestReservedNameActivation(unittest.TestCase):
         self.assertIn("test.skill", ids)
 
     def test_reserved_name_pipeline_suppresses_push(self):
-        # §7.3: converse/stop/fallback/common_query dispatches must NOT push
+        # §7.3: converse/fallback/common_query dispatches must NOT push
         for pid in ("ovos-converse-pipeline-plugin",
-                    "ovos-stop-pipeline-plugin-high",
                     "ovos-fallback-pipeline-plugin-medium",
                     "ovos-common-query-pipeline-plugin"):
             sess = self._dispatch(pid)
@@ -688,13 +688,28 @@ class TestReservedNameActivation(unittest.TestCase):
                    for h in sess.active_handlers]
             self.assertNotIn("test.skill", ids, f"{pid} should suppress the push")
 
+    def test_suppress_activation_match_suppresses_push(self):
+        # OVOS-STOP-1 §6.2/§7.3: a Match.suppress_activation dispatch (a stop)
+        # must NOT push onto active_handlers regardless of its pipeline_id.
+        sess = self._dispatch("ovos-adapt-pipeline-plugin-high",
+                              suppress_activation=True)
+        ids = [h.get("skill_id") if isinstance(h, dict) else getattr(h, "skill_id", h)
+               for h in sess.active_handlers]
+        self.assertNotIn("test.skill", ids)
+
 
 class TestProducesReservedName(unittest.TestCase):
 
     def test_reserved_roles_true_with_confidence_suffix(self):
         from ovos_core.intent_services.service import _produces_reserved_name
-        self.assertTrue(_produces_reserved_name("ovos-stop-pipeline-plugin-high"))
         self.assertTrue(_produces_reserved_name("ovos-converse-pipeline-plugin"))
+        self.assertTrue(_produces_reserved_name("ovos-fallback-pipeline-plugin-low"))
+
+    def test_stop_role_not_in_reserved_table(self):
+        # STOP-1 expresses suppression per-Match (suppress_activation), so the
+        # stop pipeline is intentionally absent from the reserved-name table.
+        from ovos_core.intent_services.service import _produces_reserved_name
+        self.assertFalse(_produces_reserved_name("ovos-stop-pipeline-plugin-high"))
 
     def test_regular_role_false(self):
         from ovos_core.intent_services.service import _produces_reserved_name

@@ -22,6 +22,8 @@ from ovos_utils.fakebus import FakeBus
 
 from ovos_core.intent_services.stop_service import StopService
 
+GLOBAL_STOP = f"{StopService.pipeline_id}:global_stop"
+
 
 def _make_service() -> StopService:
     """Construct a StopService backed by a FakeBus."""
@@ -33,6 +35,7 @@ def _make_service() -> StopService:
         svc = StopService.__new__(StopService)
         svc.bus = bus
         svc.config = {}
+        svc.suppress_activation = True
         # vocabulary matching is delegated to ovos-spec-tools LocaleResources;
         # tests patch svc._locale.voc_match / voc_list.
         svc._locale = MagicMock()
@@ -341,7 +344,7 @@ class TestMatchHigh(unittest.TestCase):
             result = self.svc.match_high(["stop"], "en-US", Message("test"))
 
         self.assertIsNotNone(result)
-        self.assertEqual(result.match_type, "stop:global")
+        self.assertEqual(result.match_type, GLOBAL_STOP)
 
     def test_exact_stop_with_active_skills_pings_skills(self):
         """'stop' with active skills → skill stop ping."""
@@ -355,7 +358,9 @@ class TestMatchHigh(unittest.TestCase):
             result = self.svc.match_high(["stop"], "en-US", Message("test"))
 
         self.assertIsNotNone(result)
-        self.assertEqual(result.match_type, "stop:skill")
+        self.assertEqual(result.match_type, "skill_a:stop")
+        self.assertEqual(result.skill_id, "skill_a")
+        self.assertTrue(result.suppress_activation)
         self.assertEqual(result.match_data["skill_id"], "skill_a")
 
     def test_global_stop_voc_triggers_global_stop(self):
@@ -370,7 +375,7 @@ class TestMatchHigh(unittest.TestCase):
             result = self.svc.match_high(["stop everything"], "en-US", Message("test"))
 
         self.assertIsNotNone(result)
-        self.assertEqual(result.match_type, "stop:global")
+        self.assertEqual(result.match_type, GLOBAL_STOP)
 
 
 class TestMatchLow(unittest.TestCase):
@@ -410,7 +415,7 @@ class TestMatchLow(unittest.TestCase):
 
         # 0.45 + 0.1 = 0.55 ≥ 0.5, and no skills to stop → global stop
         self.assertIsNotNone(result)
-        self.assertEqual(result.match_type, "stop:global")
+        self.assertEqual(result.match_type, GLOBAL_STOP)
 
     def test_above_threshold_with_stoppable_skill(self):
         """A confident match with a stoppable skill → skill stop."""
@@ -426,7 +431,9 @@ class TestMatchLow(unittest.TestCase):
             result = self.svc.match_low(["stop"], "en-US", Message("test"))
 
         self.assertIsNotNone(result)
-        self.assertEqual(result.match_type, "stop:skill")
+        self.assertEqual(result.match_type, "skill_a:stop")
+        self.assertEqual(result.skill_id, "skill_a")
+        self.assertTrue(result.suppress_activation)
         self.assertEqual(result.match_data["skill_id"], "skill_a")
 
 
@@ -519,31 +526,6 @@ class TestGetActiveSkills(unittest.TestCase):
         self.assertIn("skill_b", result)
 
 
-class TestBusHandlers(unittest.TestCase):
-
-    def test_handle_global_stop_emits_mycroft_stop(self):
-        svc = _make_service()
-        emitted = []
-        svc.bus.emit = lambda m: emitted.append(m)
-        msg = Message("stop:global", {})
-        svc.handle_global_stop(msg)
-        types = [m.msg_type for m in emitted]
-        self.assertIn("mycroft.skill.handler.start", types)
-        self.assertIn("mycroft.stop", types)
-        self.assertIn("mycroft.skill.handler.complete", types)
-
-    def test_handle_skill_stop_forwards_to_skill(self):
-        svc = _make_service()
-        emitted = []
-        svc.bus.emit = lambda m: emitted.append(m)
-        msg = Message("stop:skill", {"skill_id": "my_skill"})
-        svc.handle_skill_stop(msg)
-        types = [m.msg_type for m in emitted]
-        self.assertIn("mycroft.skill.handler.start", types)
-        self.assertIn("my_skill.stop", types)
-        self.assertIn("mycroft.skill.handler.complete", types)
-
-
 class TestShutdown(unittest.TestCase):
 
     def test_shutdown_removes_listeners(self):
@@ -551,8 +533,7 @@ class TestShutdown(unittest.TestCase):
         svc.bus.remove = MagicMock()
         svc.shutdown()
         calls = {c[0][0] for c in svc.bus.remove.call_args_list}
-        self.assertIn("stop:global", calls)
-        self.assertIn("stop:skill", calls)
+        self.assertIn(GLOBAL_STOP, calls)
 
 
 if __name__ == "__main__":
