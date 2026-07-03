@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
 import unittest
 from collections import defaultdict
 from unittest.mock import MagicMock, patch
@@ -514,6 +515,118 @@ class TestHandleUtterance(unittest.TestCase):
                    return_value=["en-US"]):
             svc.handle_utterance(msg)
         svc.send_complete_intent_failure.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# handle_utterance — OVOS-PIPELINE-1 §9.5 exactly-one end-marker invariant
+# ---------------------------------------------------------------------------
+
+class TestUtteranceHandledInvariant(unittest.TestCase):
+    """OVOS-PIPELINE-1 §9.5: every utterance MUST terminate with exactly one
+    ``ovos.utterance.handled`` end-marker, on every terminal path (§6.4)."""
+
+    @staticmethod
+    def _count_handled(svc):
+        """Attach a counter for ``ovos.utterance.handled`` on the real bus so
+        dispatcher done-signals still route to their handlers."""
+        handled = []
+        svc.bus.on(SpecMessage.UTTERANCE_HANDLED, lambda m: handled.append(m))
+        return handled
+
+    @staticmethod
+    def _patched_session(sess):
+        return [
+            patch("ovos_core.intent_services.service.SessionManager.get",
+                  return_value=sess),
+            patch("ovos_core.intent_services.service.SessionManager.reset_default_session",
+                  return_value=sess),
+            patch("ovos_core.intent_services.service.SessionManager.update"),
+            patch("ovos_core.intent_services.service.SessionManager.sync"),
+            patch("ovos_core.intent_services.service.get_message_lang",
+                  return_value="en-US"),
+            patch("ovos_core.intent_services.service.get_valid_languages",
+                  return_value=["en-US"]),
+        ]
+
+    def test_no_match_emits_exactly_one_handled(self):
+        """No-match terminal (§9.3 -> §9.5) emits exactly one end-marker."""
+        svc = _make_service()
+        handled = self._count_handled(svc)
+        sess = Session("s")
+        sess.pipeline = []  # empty pipeline -> no matchers
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["xyz"]}, context={})
+        with contextlib.ExitStack() as stack:
+            for p in self._patched_session(sess):
+                stack.enter_context(p)
+            svc.handle_utterance(msg)
+        self.assertEqual(len(handled), 1)
+
+    def test_cancel_emits_exactly_one_handled(self):
+        """Cancel terminal (§6.4 -> §9.5) emits exactly one end-marker."""
+        svc = _make_service()
+        handled = self._count_handled(svc)
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["stop"]},
+                      context={"canceled": True, "cancel_word": "stop"})
+        svc.handle_utterance(msg)
+        self.assertEqual(len(handled), 1)
+
+    def test_matched_handler_complete_emits_exactly_one_handled(self):
+        """Matched terminal: no end-marker before the §8 handler terminal, then
+        exactly one once the framework done-signal arrives (via the dispatcher's
+        on_terminal). Wire the real on_terminal so the dispatcher owns §9.5."""
+        svc = _make_service()
+        # re-wire the dispatcher's on_terminal to the real orchestrator callback
+        svc.intent_dispatcher.on_terminal = svc._emit_utterance_handled
+        handled = self._count_handled(svc)
+
+        sess = Session("s")
+        match = _make_match(session=sess)
+        mock_matcher = MagicMock(return_value=match)
+        mock_matcher.__name__ = "test_matcher"
+        svc.get_pipeline = MagicMock(return_value=[("ovos-test-plugin", mock_matcher)])
+
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["hello"]},
+                      context={"session": sess.serialize()})
+        with contextlib.ExitStack() as stack:
+            for p in self._patched_session(sess):
+                stack.enter_context(p)
+            svc.handle_utterance(msg)
+            # dispatched, but the handler has not reported yet -> no end-marker
+            self.assertEqual(len(handled), 0)
+            # framework done-signal -> §8 complete -> §9.5 end-marker (exactly one)
+            svc.bus.emit(Message("mycroft.skill.handler.complete",
+                                 context={"session": sess.serialize(),
+                                          "skill_id": "test.skill"}))
+        self.assertEqual(len(handled), 1)
+
+    def test_transformer_exception_emits_backstop_handled(self):
+        """Unexpected error before iteration still terminates (§9.5 backstop)."""
+        svc = _make_service()
+        handled = self._count_handled(svc)
+        svc._handle_transformers = MagicMock(side_effect=RuntimeError("boom"))
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["hello"]}, context={})
+        with self.assertRaises(RuntimeError):
+            svc.handle_utterance(msg)
+        self.assertEqual(len(handled), 1)
+
+    def test_session_error_emits_backstop_handled(self):
+        """Unexpected error during session validation still terminates (§9.5)."""
+        svc = _make_service()
+        handled = self._count_handled(svc)
+        svc._validate_session = MagicMock(side_effect=RuntimeError("boom"))
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["hello"]}, context={})
+        with patch("ovos_core.intent_services.service.get_message_lang",
+                   return_value="en-US"), \
+             patch("ovos_core.intent_services.service.get_valid_languages",
+                   return_value=["en-US"]):
+            with self.assertRaises(RuntimeError):
+                svc.handle_utterance(msg)
+        self.assertEqual(len(handled), 1)
 
 
 # ---------------------------------------------------------------------------

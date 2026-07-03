@@ -550,91 +550,119 @@ class IntentService:
         Args:
             message (Message): The messagebus data
         """
-        # Get utterance utterance_plugins additional context
-        message = self._handle_transformers(message)
+        # OVOS-PIPELINE-1 §9.5: exactly one ``ovos.utterance.handled`` end-marker
+        # must terminate EVERY utterance, on every terminal path (§6.4). The three
+        # expected terminals each commit the end-marker themselves and set
+        # ``terminated``: the cancel path (``send_cancel_event`` — §6.4), the
+        # no-match path (``send_complete_intent_failure`` — §9.3), and the matched
+        # path (the dispatcher owns it, emitting from its §8 handler terminal via
+        # ``on_terminal``/``_emit_utterance_handled``, incl. the §8.3 timeout).
+        # The ``finally`` clause below is the backstop for an UNEXPECTED terminal —
+        # a transformer, language-disambiguation, session, or orchestration error
+        # that would otherwise leave the utterance with no end-marker, hanging
+        # every consumer that waits on it. ``terminated`` guards against a
+        # double-emit: a path that already committed the end-marker never re-emits.
+        terminated = False
+        try:
+            # Get utterance utterance_plugins additional context
+            message = self._handle_transformers(message)
 
-        if message.context.get("canceled"):
-            self.send_cancel_event(message)
-            return
+            if message.context.get("canceled"):
+                self.send_cancel_event(message)
+                terminated = True
+                return
 
-        # tag language of this utterance
-        lang = self.disambiguate_lang(message)
+            # tag language of this utterance
+            lang = self.disambiguate_lang(message)
 
-        utterances = message.data.get('utterances', [])
-        LOG.info(f"Parsing utterance: {utterances}")
+            utterances = message.data.get('utterances', [])
+            LOG.info(f"Parsing utterance: {utterances}")
 
-        stopwatch = Stopwatch()
+            stopwatch = Stopwatch()
 
-        # get session
-        sess = self._validate_session(message, lang)
-        message.context["session"] = sess.serialize()
+            # get session
+            sess = self._validate_session(message, lang)
+            message.context["session"] = sess.serialize()
 
-        # match
-        match = None
-        with stopwatch:
-            self._deactivations[sess.session_id] = []
-            # Loop through the matching functions until a match is found.
-            for pipeline, match_func in self.get_pipeline(session=sess):
-                langs = [lang]
-                if self.config.get("multilingual_matching"):
-                    # if multilingual matching is enabled, attempt to match all user languages if main fails
-                    langs += [l for l in get_valid_languages() if l != lang]
-                for intent_lang in langs:
-                    try:
-                        match = match_func(utterances, intent_lang, message)
-                    except Exception:
-                        # a misbehaving pipeline matcher (e.g. a malformed .voc
-                        # resource) must not abort the whole utterance — log and
-                        # treat it as a no-match so iteration continues.
-                        LOG.exception(f"{match_func} raised while matching "
-                                      f"'{intent_lang}'; treating as no-match")
-                        match = None
-                    if match:
-                        LOG.info(f"{pipeline} match ({intent_lang}): {match}")
-                        if match and not match.match_type:
-                            LOG.warning(f"Matcher {type(match_func).__name__} returned a match with empty match_type; skipping")
-                            continue
-                        if match.skill_id and match.skill_id in (sess.blacklisted_skills or []):
-                            LOG.debug(
-                                f"ignoring match, skill_id '{match.skill_id}' blacklisted by Session '{sess.session_id}'")
-                            continue
-                        if isinstance(match, IntentHandlerMatch) and match.match_type in (sess.blacklisted_intents or []):
-                            LOG.debug(
-                                f"ignoring match, intent '{match.match_type}' blacklisted by Session '{sess.session_id}'")
-                            continue
-                        # OVOS-PIPELINE-1 §6.2: if the matched intent is missing
-                        # any required slot, treat it as if the plugin had
-                        # declined and continue iteration; no bus event is emitted.
-                        missing = self._missing_required_slots(
-                            match, sess.session_id, intent_lang)
-                        if missing:
-                            LOG.debug(f"ignoring match '{match.match_type}': "
-                                      f"missing required slots {missing} (§6.2)")
-                            continue
+            # match
+            match = None
+            with stopwatch:
+                self._deactivations[sess.session_id] = []
+                # Loop through the matching functions until a match is found.
+                for pipeline, match_func in self.get_pipeline(session=sess):
+                    langs = [lang]
+                    if self.config.get("multilingual_matching"):
+                        # if multilingual matching is enabled, attempt to match all user languages if main fails
+                        langs += [l for l in get_valid_languages() if l != lang]
+                    for intent_lang in langs:
                         try:
-                            self._dispatch_match(match, message, intent_lang,
-                                                     pipeline_id=pipeline)
-                            break
+                            match = match_func(utterances, intent_lang, message)
                         except Exception:
-                            LOG.exception(f"{match_func} returned an invalid match")
+                            # a misbehaving pipeline matcher (e.g. a malformed .voc
+                            # resource) must not abort the whole utterance — log and
+                            # treat it as a no-match so iteration continues.
+                            LOG.exception(f"{match_func} raised while matching "
+                                          f"'{intent_lang}'; treating as no-match")
+                            match = None
+                        if match:
+                            LOG.info(f"{pipeline} match ({intent_lang}): {match}")
+                            if match and not match.match_type:
+                                LOG.warning(f"Matcher {type(match_func).__name__} returned a match with empty match_type; skipping")
+                                continue
+                            if match.skill_id and match.skill_id in (sess.blacklisted_skills or []):
+                                LOG.debug(
+                                    f"ignoring match, skill_id '{match.skill_id}' blacklisted by Session '{sess.session_id}'")
+                                continue
+                            if isinstance(match, IntentHandlerMatch) and match.match_type in (sess.blacklisted_intents or []):
+                                LOG.debug(
+                                    f"ignoring match, intent '{match.match_type}' blacklisted by Session '{sess.session_id}'")
+                                continue
+                            # OVOS-PIPELINE-1 §6.2: if the matched intent is missing
+                            # any required slot, treat it as if the plugin had
+                            # declined and continue iteration; no bus event is emitted.
+                            missing = self._missing_required_slots(
+                                match, sess.session_id, intent_lang)
+                            if missing:
+                                LOG.debug(f"ignoring match '{match.match_type}': "
+                                          f"missing required slots {missing} (§6.2)")
+                                continue
+                            try:
+                                self._dispatch_match(match, message, intent_lang,
+                                                         pipeline_id=pipeline)
+                                # the dispatcher now owns the §9.5 end-marker for
+                                # this utterance, emitting it from its §8 handler
+                                # terminal via on_terminal (_emit_utterance_handled)
+                                terminated = True
+                                break
+                            except Exception:
+                                LOG.exception(f"{match_func} returned an invalid match")
+                    else:
+                        LOG.debug(f"no match from {match_func}")
+                        continue
+                    break
                 else:
-                    LOG.debug(f"no match from {match_func}")
-                    continue
-                break
-            else:
-                # Nothing was able to handle the intent
-                # Ask politely for forgiveness for failing in this vital task
-                message.data["lang"] = lang
-                self.send_complete_intent_failure(message)
+                    # Nothing was able to handle the intent
+                    # Ask politely for forgiveness for failing in this vital task
+                    message.data["lang"] = lang
+                    self.send_complete_intent_failure(message)
+                    terminated = True
 
-        LOG.debug(f"intent matching took: {stopwatch.time}")
+            LOG.debug(f"intent matching took: {stopwatch.time}")
 
-        # sync any changes made to the default session, eg by ConverseService
-        if sess.session_id == "default":
-            SessionManager.sync(message)
-        elif sess.session_id in self._deactivations:
-            self._deactivations.pop(sess.session_id)
-        return match, message.context, stopwatch
+            # sync any changes made to the default session, eg by ConverseService
+            if sess.session_id == "default":
+                SessionManager.sync(message)
+            elif sess.session_id in self._deactivations:
+                self._deactivations.pop(sess.session_id)
+            return match, message.context, stopwatch
+        finally:
+            if not terminated:
+                # §9.5 backstop: no terminal path committed (unexpected error) —
+                # emit the end-marker so the utterance still terminates exactly
+                # once and no consumer waiting on it hangs.
+                LOG.exception("utterance processing did not reach a terminal; "
+                              "emitting ovos.utterance.handled backstop (§9.5)")
+                self.bus.emit(message.reply(SpecMessage.UTTERANCE_HANDLED))
 
     def send_complete_intent_failure(self, message):
         """Emit the OVOS-PIPELINE-1 §9.3 no-match terminal.
