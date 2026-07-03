@@ -295,7 +295,7 @@ class TestContextHandlers(unittest.TestCase):
             IntentService.handle_remove_context(msg)
         self.assertEqual(len(sess.context.frame_stack), 0)
         # OVOS-CONTEXT-1: the token is also dropped from the intent_context map
-        self.assertIsNone(sess.intent_context)
+        self.assertNotIn("MyCtx", sess.intent_context or {})
 
     def test_handle_clear_context_empties_stack(self):
         """handle_clear_context empties the entire frame stack."""
@@ -312,7 +312,7 @@ class TestContextHandlers(unittest.TestCase):
             IntentService.handle_clear_context(msg)
         self.assertEqual(len(sess.context.frame_stack), 0)
         # OVOS-CONTEXT-1: clearing context empties the intent_context map too
-        self.assertIsNone(sess.intent_context)
+        self.assertFalse(sess.intent_context)
 
     def test_handle_add_context_non_string_word_converted(self):
         """Non-string word is converted to string without raising."""
