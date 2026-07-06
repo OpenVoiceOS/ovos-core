@@ -15,6 +15,7 @@
 import operator
 import threading
 import time
+import uuid
 from collections import namedtuple
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
@@ -133,6 +134,14 @@ class FallbackService(ConfidenceMatcherPipeline):
             fb_range = FallbackRange(0, 100)
         skill_ids = []  # skill_ids that already answered to ping
         fallback_skills = []  # skill_ids that want to handle fallback
+        response_event = threading.Event()
+        request_id = (
+            message.data.get("fallback_request_id")
+            or message.context.get("fallback_request_id")
+            or uuid.uuid4().hex
+        )
+        message.data["fallback_request_id"] = request_id
+        message.context["fallback_request_id"] = request_id
 
         sess = SessionManager.get(message)
         if sess is None:
@@ -144,6 +153,12 @@ class FallbackService(ConfidenceMatcherPipeline):
         skill_ids += [s for s in self.registered_fallbacks if s not in in_range]
 
         def handle_ack(msg):
+            ack_request_id = (
+                msg.data.get("fallback_request_id")
+                or msg.context.get("fallback_request_id")
+            )
+            if ack_request_id and ack_request_id != request_id:
+                return
             skill_id = msg.data["skill_id"]
             if msg.data.get("can_handle", True):
                 if skill_id in in_range:
@@ -154,7 +169,7 @@ class FallbackService(ConfidenceMatcherPipeline):
             else:
                 LOG.debug(f"{skill_id} does NOT WANT to try to handle fallback")
             skill_ids.append(skill_id)
-            self._fallback_response_event.set()
+            response_event.set()
 
         if in_range:  # no need to search if no skills available
             self.bus.on("ovos.skills.fallback.pong", handle_ack)
@@ -167,8 +182,8 @@ class FallbackService(ConfidenceMatcherPipeline):
             start = time.time()
             while not all(s in skill_ids for s in self.registered_fallbacks) \
                     and time.time() - start <= 0.5:
-                self._fallback_response_event.clear()
-                self._fallback_response_event.wait(0.02)
+                response_event.clear()
+                response_event.wait(0.02)
 
             self.bus.remove("ovos.skills.fallback.pong", handle_ack)
         return fallback_skills

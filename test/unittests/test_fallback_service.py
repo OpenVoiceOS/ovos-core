@@ -275,6 +275,59 @@ class TestCollectFallbackSkills(unittest.TestCase):
 
         self.assertEqual(result_holder[0], [])
 
+    def test_pong_for_other_fallback_request_is_ignored(self):
+        """Concurrent fallback collectors must not consume each other's pongs."""
+        svc = _make_service()
+        svc.registered_fallbacks = {"skill_a": 50}
+
+        ack_handler = None
+
+        def capture_on(event, handler):
+            nonlocal ack_handler
+            if event == "ovos.skills.fallback.pong":
+                ack_handler = handler
+
+        svc.bus.on = capture_on
+        svc.bus.remove = MagicMock()
+        svc.bus.emit = MagicMock()
+
+        sess = Session("s")
+        result_holder = []
+
+        def run():
+            with patch("ovos_core.intent_services.fallback_service.SessionManager.get",
+                       return_value=sess):
+                result_holder.append(
+                    svc._collect_fallback_skills(
+                        Message("test"), fb_range=FallbackRange(5, 90)))
+
+        t = None
+        try:
+            t = threading.Thread(target=run)
+            t.start()
+            time.sleep(0.05)
+            self.assertIsNotNone(ack_handler)
+            ping = svc.bus.emit.call_args[0][0]
+            request_id = ping.data["fallback_request_id"]
+            ack_handler(Message("ovos.skills.fallback.pong", {
+                "skill_id": "skill_a",
+                "can_handle": True,
+                "fallback_request_id": "other-request",
+            }))
+            time.sleep(0.05)
+            self.assertEqual(result_holder, [])
+            ack_handler(Message("ovos.skills.fallback.pong", {
+                "skill_id": "skill_a",
+                "can_handle": True,
+                "fallback_request_id": request_id,
+            }))
+        finally:
+            if t is not None:
+                t.join(timeout=1)
+            svc.shutdown()
+
+        self.assertEqual(result_holder[0], ["skill_a"])
+
     def test_listener_removed_on_timeout(self):
         """bus.remove must be called even when no skill replies (timeout path)."""
         svc = _make_service()
