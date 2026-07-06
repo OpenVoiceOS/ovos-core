@@ -18,7 +18,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import Session, SessionManager
+from ovos_bus_client.session import Session
 from ovos_utils.fakebus import FakeBus
 from ovos_workshop.permissions import FallbackMode
 
