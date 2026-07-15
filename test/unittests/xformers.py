@@ -97,7 +97,7 @@ class TextTransformersTests(unittest.TestCase):
         # Check transformers adding utterances
         new_utterances, context = service.transform(deepcopy(utterances),
                                                     {'lang': lang})
-        self.assertEqual(context["parser_context"], "mod_2")
+        self.assertEqual(context["parser_context"], "mod_1")
         self.assertNotEqual(new_utterances, utterances)
         self.assertEqual(len(new_utterances),
                          len(utterances) + 2)
@@ -107,7 +107,7 @@ class TextTransformersTests(unittest.TestCase):
         service._sorted_plugins = None
         _, context = service.transform(deepcopy(utterances),
                                        {'lang': lang})
-        self.assertEqual(context["parser_context"], "mod_1")
+        self.assertEqual(context["parser_context"], "mod_2")
 
 
 if __name__ == "__main__":

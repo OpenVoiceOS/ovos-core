@@ -11,12 +11,12 @@ from ovos_plugin_manager.transformer_services import (
 
 
 class UtteranceTransformersService(_UtteranceTransformersService):
-    """Runs utterance transformers in legacy descending priority order:
-    a plugin of priority 1 runs last and has the final say."""
+    """Runs utterance transformers in OVOS-TRANSFORM §4 ascending priority
+    order: a plugin of priority 1 runs first."""
 
     def __init__(self, bus, config: Optional[dict] = None):
         config = config or Configuration()
-        super().__init__(bus=bus, config=config, sort_ascending=False)
+        super().__init__(bus=bus, config=config)
 
     @classmethod
     def find_plugins(cls):
@@ -24,12 +24,12 @@ class UtteranceTransformersService(_UtteranceTransformersService):
 
 
 class MetadataTransformersService(_MetadataTransformersService):
-    """Runs metadata transformers in legacy descending priority order:
-    a plugin of priority 1 runs last and has the final say."""
+    """Runs metadata transformers in OVOS-TRANSFORM §4 ascending priority
+    order: a plugin of priority 1 runs first."""
 
     def __init__(self, bus, config: Optional[dict] = None):
         config = config or Configuration()
-        super().__init__(bus=bus, config=config, sort_ascending=False)
+        super().__init__(bus=bus, config=config)
 
     @classmethod
     def find_plugins(cls):
@@ -37,12 +37,12 @@ class MetadataTransformersService(_MetadataTransformersService):
 
 
 class IntentTransformersService(_IntentTransformersService):
-    """Runs intent transformers in legacy descending priority order:
-    a plugin of priority 1 runs last and has the final say."""
+    """Runs intent transformers in OVOS-TRANSFORM §4 ascending priority
+    order: a plugin of priority 1 runs first."""
 
     def __init__(self, bus, config: Optional[dict] = None):
         config = config or Configuration()
-        super().__init__(bus=bus, config=config, sort_ascending=False)
+        super().__init__(bus=bus, config=config)
 
     @classmethod
     def find_plugins(cls):
