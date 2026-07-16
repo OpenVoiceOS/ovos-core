@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.1a1) (2026-07-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.0a2...2.5.1a1)
+
+**Merged pull requests:**
+
+- fix\(e2e\): expect empty active\_skills in final\_session [\#795](https://github.com/OpenVoiceOS/ovos-core/pull/795) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.5.0a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.0a2) (2026-07-04)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.0a1...2.5.0a2)
