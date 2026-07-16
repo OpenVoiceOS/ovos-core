@@ -19,32 +19,27 @@ from ovos_core.skill_manager import SkillManager
 
 
 class TestTrainRequestNonBlocking(TestCase):
-    def _make_manager(self, bus):
-        manager = SkillManager.__new__(SkillManager)
-        manager.bus = bus
-        manager._use_deferred_loading = False
-        manager._gui_event = Event()
-        manager._gui_event.set()  # skip the is_gui_connected bus round-trip
-        manager.load_plugin_skills = Mock(return_value=True)
-        return manager
+    def setUp(self):
+        self.bus = FakeBus()
+        self.train_requests = []
+        self.bus.on("mycroft.skills.train", self.train_requests.append)
+
+        self.manager = SkillManager.__new__(SkillManager)
+        self.manager.bus = self.bus
+        self.manager._use_deferred_loading = False
+        self.manager._gui_event = Event()
+        self.manager._gui_event.set()  # skip the is_gui_connected round-trip
+        self.manager.load_plugin_skills = Mock(return_value=True)
 
     def test_train_request_emitted_after_load(self):
-        bus = FakeBus()
-        train_requests = []
-        bus.on("mycroft.skills.train", train_requests.append)
-        manager = self._make_manager(bus)
-
-        manager._load_new_skills(network=True, internet=True, gui=False)
-
-        self.assertEqual(len(train_requests), 1)
+        self.manager._load_new_skills(network=True, internet=True, gui=False)
+        self.assertEqual(len(self.train_requests), 1)
 
     def test_completes_promptly_without_any_responder(self):
-        bus = FakeBus()
-        manager = self._make_manager(bus)
-
         start = time.monotonic()
         with patch("ovos_core.skill_manager.LOG") as mock_log:
-            manager._load_new_skills(network=True, internet=True, gui=False)
+            self.manager._load_new_skills(network=True, internet=True,
+                                          gui=False)
         elapsed = time.monotonic() - start
 
         # No blocking wait on a reply nobody is required to send.
@@ -54,12 +49,6 @@ class TestTrainRequestNonBlocking(TestCase):
         mock_log.exception.assert_not_called()
 
     def test_no_train_request_when_nothing_loaded(self):
-        bus = FakeBus()
-        train_requests = []
-        bus.on("mycroft.skills.train", train_requests.append)
-        manager = self._make_manager(bus)
-        manager.load_plugin_skills = Mock(return_value=False)
-
-        manager._load_new_skills(network=True, internet=True, gui=False)
-
-        self.assertEqual(train_requests, [])
+        self.manager.load_plugin_skills = Mock(return_value=False)
+        self.manager._load_new_skills(network=True, internet=True, gui=False)
+        self.assertEqual(self.train_requests, [])
