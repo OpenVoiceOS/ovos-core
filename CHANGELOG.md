@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.4a1) (2026-07-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.3a1...2.5.4a1)
+
+**Merged pull requests:**
+
+- fix: require registration-resilient plugin releases [\#815](https://github.com/OpenVoiceOS/ovos-core/pull/815) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.5.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.3a1) (2026-07-16)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.2a1...2.5.3a1)
