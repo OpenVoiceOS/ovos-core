@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.3a1) (2026-07-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.2a1...2.5.3a1)
+
+**Merged pull requests:**
+
+- fix: mirror set\_context into OVOS-CONTEXT-1 intent\_context [\#804](https://github.com/OpenVoiceOS/ovos-core/pull/804) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.5.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.2a1) (2026-07-16)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.1a1...2.5.2a1)
