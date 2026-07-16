@@ -318,7 +318,22 @@ class IntentService:
         so consumers never see the end-marker first. The no-match and cancel paths
         emit their own end-marker inline; together they give exactly one per
         utterance."""
-        self.bus.emit(dispatch_msg.forward(SpecMessage.UTTERANCE_HANDLED, {}))
+        msg = dispatch_msg.forward(SpecMessage.UTTERANCE_HANDLED, {})
+        # the dispatch message's session snapshot predates the handler run, and
+        # messages the handler itself emitted (e.g. the framework done-signal)
+        # carry that same stale snapshot — each inbound fold is last-writer-wins,
+        # so a skill that deactivated itself mid-handler gets re-activated by
+        # its own ack. Re-apply the tracked deactivations to the live session
+        # and stamp it on the end-marker so the utterance terminates with the
+        # session state the handler actually requested.
+        sid = (dispatch_msg.context.get("session") or {}).get("session_id")
+        live = SessionManager.sessions.get(sid) if sid else None
+        if live is not None:
+            for skill_id in self._deactivations.get(sid) or []:
+                if live.is_active(skill_id):
+                    live.deactivate_skill(skill_id)
+            msg.context["session"] = live.serialize()
+        self.bus.emit(msg)
 
     def _missing_required_slots(self, match: IntentHandlerMatch,
                                 session_id: str, lang: str) -> List[str]:
