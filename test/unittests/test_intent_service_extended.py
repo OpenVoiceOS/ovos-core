@@ -28,6 +28,7 @@ from ovos_spec_tools import SpecMessage
 from ovos_core.intent_services.service import IntentService
 from ovos_core.intent_services.dispatcher import IntentDispatcher
 from ovos_core.intent_services.manifest import IntentManifest
+from ovos_core.intent_services.registry import RegistrationRegistry
 
 
 def _make_service(config=None) -> IntentService:
@@ -56,6 +57,9 @@ def _make_service(config=None) -> IntentService:
 
     # INTENT-4 §10 manifest — indexes registration broadcasts
     svc.intent_manifest = IntentManifest(bus)
+
+    # INTENT-4 §10 engine-level registry — rebuilds pipeline compiled state
+    svc.registration_registry = RegistrationRegistry(bus)
 
     svc.status = MagicMock()
     return svc

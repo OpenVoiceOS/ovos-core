@@ -21,7 +21,7 @@ dependencies = [
     "ovos-config>=0.0.13,<3.0.0",
     "ovos-workshop>=9.0.2a1,<10.0.0",
     "rapidfuzz>=3.6,<4.0",
-    "ovos-spec-tools[langcodes]>=1.5.0a1,<2.0.0",
+    "ovos-spec-tools[langcodes]>=1.1.0a1,<2.0.0",
 ]
 
 [project.urls]
@@ -46,6 +46,8 @@ test = [
     "ovos-skill-hello-world>=0.2.5a2",
     "ovos-skill-parrot>=0.1.27a6",
     "ovos-skill-fallback-unknown>=0.1.10a2",
+    # real-messagebus end2end tests (websocket drop/reconnect scenarios)
+    "ovos-messagebus>=0.0.13a2,<1.0.0",
     # data-over-sound install path: ggwave audio -> skill installer
     "ovos-dinkum-listener>=0.8.2a1,<1.0.0",
     "ovos-audio-transformer-plugin-ggwave>=1.0.0a1,<2.0.0",

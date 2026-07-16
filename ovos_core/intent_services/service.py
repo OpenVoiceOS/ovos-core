@@ -34,6 +34,7 @@ from ovos_utils.thread_utils import create_daemon
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService, IntentTransformersService
 from ovos_core.intent_services.dispatcher import IntentDispatcher, DEFAULT_HANDLER_TIMEOUT
 from ovos_core.intent_services.manifest import IntentManifest
+from ovos_core.intent_services.registry import RegistrationRegistry
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
 
@@ -158,6 +159,14 @@ class IntentService:
         # ovos.intent.list / ovos.intent.describe pull-queries.
         self.intent_manifest: IntentManifest = IntentManifest(bus)
 
+        # INTENT-4 §10 engine-level registry — passive index of the
+        # registration broadcasts the pipeline plugins compile. Freshly
+        # (re)loaded plugins have missed every past broadcast (load-time
+        # announcements, no catch-up channel); the orchestrator rebuilds
+        # their compiled state from this registry instead.
+        self.registration_registry: RegistrationRegistry = \
+            RegistrationRegistry(bus)
+
         # connection SessionManager to the bus,
         # this will sync default session across all components
         SessionManager.connect_to_bus(self.bus)
@@ -177,9 +186,41 @@ class IntentService:
         self.bus.on('intent.service.skills.deactivate', self._handle_deactivate)
         self.bus.on('intent.service.pipelines.reload', self.handle_reload_pipelines)
 
+        # a messagebus restart drops and re-opens the websocket; rebuild the
+        # matchers from the registry once the connection is back so a
+        # matcher that lost registrations while disconnected recovers
+        self.bus.on('open', self._handle_bus_reconnect)
+
         self.status.set_alive()
         if preload_pipelines:
             self.bus.emit(Message('intent.service.pipelines.reload'))
+
+    def _dispatch_to_local_listeners(self, message: Message):
+        """Deliver ``message`` to in-process bus listeners only.
+
+        Used to rebuild pipeline-plugin compiled state from the registration
+        registry: the registrations were already broadcast once, so the
+        rebuild must not put them on the wire again.
+        """
+        emitter = getattr(self.bus, "emitter", None) or \
+            getattr(self.bus, "ee", None)
+        if emitter is None:
+            LOG.error("bus exposes no local emitter; "
+                      "cannot rebuild matcher state")
+            return
+        for handler in list(emitter.listeners(message.msg_type)):
+            try:
+                handler(message)
+            except Exception:
+                LOG.exception(f"'{message.msg_type}' handler failed during "
+                              "matcher state rebuild")
+
+    def _handle_bus_reconnect(self, *_):
+        if not self.pipeline_plugins:
+            return
+        LOG.info("messagebus connection re-established; "
+                 "rebuilding pipeline matcher state from the registry")
+        self.registration_registry.replay(self._dispatch_to_local_listeners)
 
     def handle_reload_pipelines(self, message: Message):
         pipeline_plugins = OVOSPipelineFactory.get_installed_pipeline_ids()
@@ -190,6 +231,11 @@ class IntentService:
                 LOG.debug(f"Loaded pipeline plugin: '{p}'")
             except Exception as e:
                 LOG.error(f"Failed to load pipeline plugin '{p}': {e}")
+        # the freshly constructed plugins hold no compiled state and have
+        # missed every registration broadcast (OVOS-INTENT-4 §10 — load-time
+        # announcements with no catch-up channel); rebuild them from the
+        # orchestrator's passive registry
+        self.registration_registry.replay(self._dispatch_to_local_listeners)
         self.status.set_ready()
 
     def _handle_transformers(self, message):
@@ -766,6 +812,8 @@ class IntentService:
     def shutdown(self) -> None:
         self.intent_dispatcher.shutdown()
         self.intent_manifest.shutdown()
+        self.registration_registry.shutdown()
+        self.bus.remove('open', self._handle_bus_reconnect)
         self.utterance_plugins.shutdown()
         self.metadata_plugins.shutdown()
         for pipeline in self.pipeline_plugins.values():
