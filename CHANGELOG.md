@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.2a1) (2026-07-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.1a1...2.5.2a1)
+
+**Merged pull requests:**
+
+- fix: repair malformed intent-service locale templates [\#810](https://github.com/OpenVoiceOS/ovos-core/pull/810) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.5.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.1a1) (2026-07-16)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.0a2...2.5.1a1)
