@@ -202,12 +202,8 @@ class IntentService:
         registry: the registrations were already broadcast once, so the
         rebuild must not put them on the wire again.
         """
-        emitter = getattr(self.bus, "emitter", None) or \
-            getattr(self.bus, "ee", None)
-        if emitter is None:
-            LOG.error("bus exposes no local emitter; "
-                      "cannot rebuild matcher state")
-            return
+        # MessageBusClient names the pyee emitter ``emitter``, FakeBus ``ee``
+        emitter = getattr(self.bus, "emitter", None) or self.bus.ee
         for handler in list(emitter.listeners(message.msg_type)):
             try:
                 handler(message)

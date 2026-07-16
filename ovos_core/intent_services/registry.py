@@ -15,8 +15,9 @@ in-process listeners only — nothing is put (back) on the wire and no message
 outside the existing registration contract is ever produced.
 """
 import json
+from functools import partial
 from threading import RLock
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 from ovos_bus_client.message import Message
 from ovos_utils.log import LOG
@@ -61,30 +62,24 @@ class RegistrationRegistry:
         # skill_id -> latest fallback registration
         self._fallbacks: Dict[str, Message] = {}
 
-        for topic in VOCAB_TOPICS:
-            bus.on(topic, self._on_vocab)
-        for topic in ENTITY_TOPICS:
-            bus.on(topic, self._on_entity)
-        for topic in INTENT_TOPICS:
-            bus.on(topic, self._on_intent)
-        bus.on(FALLBACK_REGISTER, self._on_fallback_register)
-        bus.on(FALLBACK_DEREGISTER, self._on_fallback_deregister)
-        bus.on(DETACH_INTENT, self._on_detach_intent)
-        bus.on(DETACH_SKILL, self._on_detach_skill)
-        bus.on(ENTITY_DEREGISTER, self._on_entity_deregister)
+        self._handlers = {
+            **{t: self._on_vocab for t in VOCAB_TOPICS},
+            **{t: partial(self._on_keyed, self._entities)
+               for t in ENTITY_TOPICS},
+            **{t: partial(self._on_keyed, self._intents)
+               for t in INTENT_TOPICS},
+            FALLBACK_REGISTER: self._on_fallback_register,
+            FALLBACK_DEREGISTER: self._on_fallback_deregister,
+            DETACH_INTENT: self._on_detach_intent,
+            DETACH_SKILL: self._on_detach_skill,
+            ENTITY_DEREGISTER: self._on_entity_deregister,
+        }
+        for topic, handler in self._handlers.items():
+            bus.on(topic, handler)
 
     def shutdown(self):
-        for topic in VOCAB_TOPICS:
-            self.bus.remove(topic, self._on_vocab)
-        for topic in ENTITY_TOPICS:
-            self.bus.remove(topic, self._on_entity)
-        for topic in INTENT_TOPICS:
-            self.bus.remove(topic, self._on_intent)
-        self.bus.remove(FALLBACK_REGISTER, self._on_fallback_register)
-        self.bus.remove(FALLBACK_DEREGISTER, self._on_fallback_deregister)
-        self.bus.remove(DETACH_INTENT, self._on_detach_intent)
-        self.bus.remove(DETACH_SKILL, self._on_detach_skill)
-        self.bus.remove(ENTITY_DEREGISTER, self._on_entity_deregister)
+        for topic, handler in self._handlers.items():
+            self.bus.remove(topic, handler)
 
     # ------------------------------------------------------------------
     # recording
@@ -94,17 +89,12 @@ class RegistrationRegistry:
         with self._lock:
             self._vocab.setdefault(_skill_id(message), {})[key] = message
 
-    def _on_entity(self, message: Message):
+    def _on_keyed(self, store: Dict[str, Dict[Tuple, Message]],
+                  message: Message):
         key = (message.msg_type, _record_name(message),
                message.data.get("lang"))
         with self._lock:
-            self._entities.setdefault(_skill_id(message), {})[key] = message
-
-    def _on_intent(self, message: Message):
-        key = (message.msg_type, _record_name(message),
-               message.data.get("lang"))
-        with self._lock:
-            self._intents.setdefault(_skill_id(message), {})[key] = message
+            store.setdefault(_skill_id(message), {})[key] = message
 
     def _on_fallback_register(self, message: Message):
         with self._lock:
@@ -135,7 +125,7 @@ class RegistrationRegistry:
         skill_id = _skill_id(message)
         name = message.data.get("entity_name")
         with self._lock:
-            records = self._entities.get(skill_id) or {}
+            records = self._entities.get(skill_id, {})
             for key in [k for k in records
                         if name is None or k[1] == name]:
                 del records[key]
@@ -153,13 +143,11 @@ class RegistrationRegistry:
         matcher has not (re)learned yet.
         """
         with self._lock:
-            skills = list(dict.fromkeys(list(self._vocab) +
-                                        list(self._entities) +
-                                        list(self._intents)))
-            batches: List[Message] = []
-            for skill_id in skills:
-                batches.append(Message(DETACH_SKILL, {"skill_id": skill_id},
-                                       {"skill_id": skill_id}))
+            skills = dict.fromkeys([*self._vocab, *self._entities,
+                                    *self._intents])
+            batches = [Message(DETACH_SKILL, {"skill_id": skill_id},
+                               {"skill_id": skill_id})
+                       for skill_id in skills]
             for skill_id in skills:
                 batches.extend(self._vocab.get(skill_id, {}).values())
                 batches.extend(self._entities.get(skill_id, {}).values())
