@@ -669,10 +669,11 @@ class IntentService:
         sess.context.inject_context(entity)
         # OVOS-CONTEXT-1 §2/§7: pipelines gate and inject from the canonical
         # `session.intent_context` map, so a keyword added via `set_context`
-        # must land there too or it never reaches matching. Write through the
-        # canonical Session helper, keyed (shared scope, bare key) by the
-        # context token and carrying its injected value.
-        sess.set_intent_context(context, word or context, scope="shared")
+        # must land there too or it never reaches matching. Entries are
+        # keyed by the context token and carry its injected value.
+        ctx = dict(sess.intent_context or {})
+        ctx[context] = {"value": word or context}
+        sess.intent_context = ctx
 
     @staticmethod
     def handle_remove_context(message: Message):
@@ -687,7 +688,9 @@ class IntentService:
             sess.context.remove_context(context)
             # mirror the removal into the OVOS-CONTEXT-1 map (see
             # `handle_add_context`)
-            sess.remove_intent_context(context, scope="shared")
+            ctx = dict(sess.intent_context or {})
+            ctx.pop(context, None)
+            sess.intent_context = ctx or None
 
     @staticmethod
     def handle_clear_context(message: Message):
@@ -695,7 +698,7 @@ class IntentService:
         sess = SessionManager.get(message)
         sess.context.clear_context()
         # mirror the clear into the OVOS-CONTEXT-1 map (see `handle_add_context`)
-        sess.clear_intent_context()
+        sess.intent_context = None
 
     def handle_get_intent(self, message):
         """Get intent from either adapt or padatious.
