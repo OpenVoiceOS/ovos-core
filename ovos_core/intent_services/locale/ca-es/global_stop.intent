@@ -1,4 +1,4 @@
-(acaba|finalitza)(-ho) tot
+(acaba|finalitza)-ho tot
 (atura|para)(-ho|) tot
 (atura|para)(|-ho) tot
 Acaba totes les tasques obertes
@@ -22,7 +22,7 @@ atura(-ho|) tot (ara mateix|)
 atura-ho tot
 avorta(-ho|) tot
 avorta(|-ho) tot
-cancel·la(-ho) tot
+cancel·la-ho tot
 cancel·la(-ho|) tot
 cessa tot
 cessa tot
