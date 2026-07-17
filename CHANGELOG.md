@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.5a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.5a2) (2026-07-17)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.5a1...2.5.5a2)
+
+**Merged pull requests:**
+
+- refactor: consume transformer runner services from ovos-plugin-manager [\#809](https://github.com/OpenVoiceOS/ovos-core/pull/809) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.5.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.5a1) (2026-07-17)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.4a1...2.5.5a1)
