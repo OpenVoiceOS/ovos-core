@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.5a1) (2026-07-17)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.4a1...2.5.5a1)
+
+**Merged pull requests:**
+
+- fix: stop blocking boot on a pipeline training reply [\#816](https://github.com/OpenVoiceOS/ovos-core/pull/816) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.5.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.4a1) (2026-07-16)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.3a1...2.5.4a1)
