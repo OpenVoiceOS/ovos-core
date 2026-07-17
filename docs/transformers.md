@@ -40,7 +40,19 @@ match = intent_transformers.transform(match)
 
 ## Plugin Priority
 
-All transformer services load plugins ordered by `priority` (higher number = called first). A priority-1 plugin is last to run and wins over all others — its changes are final.
+Chains run in **ascending priority order** per OVOS-TRANSFORM §4: a plugin
+with `priority = 1` runs first (default 50); later plugins see and may
+override earlier plugins' output. An explicit `"order"` list in the config
+section wins over priorities; loaded plugins absent from the list do not
+run.
+
+The runner services themselves are the canonical implementations from
+`ovos_plugin_manager.transformer_services` (re-exported by
+`ovos_core.transformers`); they also implement the OVOS-TRANSFORM §8.1
+cancellation contract — a plugin returning `"canceled": true` +
+`"cancel_reason"` stops the chain, and `handle_utterance` terminates the
+lifecycle with `ovos.utterance.cancelled` → `ovos.utterance.handled`.
+Full contract → [`ovos-plugin-manager/docs/transformers.md`](../../ovos-plugin-manager/docs/transformers.md).
 
 ## Enabling / Disabling Plugins
 
@@ -56,6 +68,11 @@ Each plugin is enabled or disabled in `mycroft.conf` under its service config ke
 ```
 
 A plugin not listed in config is not loaded even if installed.
+
+**Split deployments:** shared servers can run some of these chains too —
+ovos-stt-server runs utterance transformers on transcripts, hivemind-core
+runs utterance/metadata transformers for text clients. Enable each plugin
+in exactly one place per deployment or its effect is applied twice.
 
 ---
 

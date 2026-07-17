@@ -132,13 +132,13 @@ class TestUtteranceTransformersServiceInit(unittest.TestCase):
 class TestUtteranceTransformersServicePluginsProperty(unittest.TestCase):
     """Tests for the plugins property (priority ordering)."""
 
-    def test_plugins_sorted_by_priority_descending(self):
-        """Plugins with higher priority appear first."""
+    def test_plugins_sorted_by_priority_ascending(self):
+        """OVOS-TRANSFORM §4: lower priority number runs first."""
         low = _make_mock_plugin("low", priority=10)
         high = _make_mock_plugin("high", priority=90)
         svc = _make_utterance_service(plugins=[low, high])
-        self.assertEqual(svc.plugins[0].name, "high")
-        self.assertEqual(svc.plugins[1].name, "low")
+        self.assertEqual(svc.plugins[0].name, "low")
+        self.assertEqual(svc.plugins[1].name, "high")
 
     def test_plugins_sorted_result_is_cached(self):
         """The sorted list is computed once and cached in _sorted_plugins."""
@@ -182,13 +182,13 @@ class TestUtteranceTransformersServiceTransform(unittest.TestCase):
 
     def test_transform_passes_modified_utterances_forward(self):
         """Utterances modified by a plugin are passed to the next plugin."""
-        p1 = _make_mock_plugin("p1", priority=90)
+        p1 = _make_mock_plugin("p1", priority=10)
         p1.transform.return_value = (["modified"], {})
-        p2 = _make_mock_plugin("p2", priority=10)
+        p2 = _make_mock_plugin("p2", priority=90)
         p2.transform.return_value = (["modified"], {})
         svc = _make_utterance_service(plugins=[p1, p2])
         svc.transform(["original"])
-        # p2 should see ["modified"]
+        # p2 runs after p1 and should see ["modified"]
         call_args = p2.transform.call_args[0]
         self.assertEqual(call_args[0], ["modified"])
 
@@ -295,8 +295,8 @@ class TestMetadataTransformersServiceTransform(unittest.TestCase):
         svc = _make_metadata_service(plugins=[p])
         svc.transform({})
 
-    def test_plugins_sorted_by_priority_descending(self):
-        """Higher priority plugin is called first."""
+    def test_plugins_sorted_by_priority_ascending(self):
+        """OVOS-TRANSFORM §4: lower priority number runs first."""
         call_order = []
         low = _make_mock_plugin("low", priority=10)
         low.transform.side_effect = lambda ctx: call_order.append("low") or {}
@@ -304,7 +304,7 @@ class TestMetadataTransformersServiceTransform(unittest.TestCase):
         high.transform.side_effect = lambda ctx: call_order.append("high") or {}
         svc = _make_metadata_service(plugins=[low, high])
         svc.transform({})
-        self.assertEqual(call_order[0], "high")
+        self.assertEqual(call_order[0], "low")
 
     def test_shutdown_calls_plugin_shutdown(self):
         """shutdown() calls shutdown on each loaded plugin."""
@@ -388,8 +388,8 @@ class TestIntentTransformersServiceTransform(unittest.TestCase):
         result = svc.transform(intent)
         self.assertEqual(result.match_type, "test:intent")
 
-    def test_plugins_sorted_by_priority_descending(self):
-        """Higher priority plugin transforms first."""
+    def test_plugins_sorted_by_priority_ascending(self):
+        """OVOS-TRANSFORM §4: lower priority number runs first."""
         call_order = []
         intent = _make_intent_match()
 
@@ -400,7 +400,7 @@ class TestIntentTransformersServiceTransform(unittest.TestCase):
 
         svc = _make_intent_service(plugins=[low, high])
         svc.transform(intent)
-        self.assertEqual(call_order[0], "high")
+        self.assertEqual(call_order[0], "low")
 
     def test_shutdown_calls_plugin_shutdown(self):
         """shutdown() calls shutdown on each loaded plugin."""
