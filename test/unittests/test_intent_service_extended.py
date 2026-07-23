@@ -40,9 +40,6 @@ def _make_service(config=None) -> IntentService:
     svc._deactivations = defaultdict(list)
     # PIPELINE-1 §7/§8 dispatcher; timer disabled so unit tests stay deterministic
     svc.intent_dispatcher = IntentDispatcher(bus, timeout=0)
-    # OVOS-CONTEXT-1 — the session.intent_context map is owned by the
-    # SessionManager singleton (bus-client #239); the orchestrator holds
-    # no store, so nothing to seed here.
 
     # Minimal stub objects for transformer services
     ut = MagicMock()

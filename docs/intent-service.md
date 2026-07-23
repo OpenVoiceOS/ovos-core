@@ -72,30 +72,13 @@ intent.service.intent.get  {utterance: "...", lang: "..."}
 
 ### OVOS-CONTEXT-1 intent context
 
-The orchestrator implements the **OVOS-CONTEXT-1** flat, decaying
-`session.intent_context` key/value store. The core-resident helpers
-(`ovos_core.intent_services.intent_context`) provide:
-
-- the entry shape and *liveness* predicate (§2);
-- the prune-then-decrement decay lifecycle, once per utterance dispatch
-  (§4 / §4.1);
-- the §3.1 scope-resolution helper, the §6 / §6.1 gating predicates, and
-  the §7 context-supplied slot fill, as pure functions any in-process
-  engine can apply.
-
-The authoritative owner of the map is the `SessionManager` singleton: it
-carries `intent_context` as a first-class, round-tripping field on every
-`Session` and applies the §5.3 `ovos.session.sync` entry-by-entry merge
-itself — present entry objects set/replace, `null` entries delete, absent
-keys unchanged. Around each match round the orchestrator applies the §4
-decay lifecycle to the session's own map.
-
-> **Engine-side gating.** The §6 / §6.1 `requires_context` /
-> `excludes_context` enforcement *inside a matcher* (e.g. Adapt dropping a
-> candidate whose required context is unsatisfied) lives in each pipeline
-> plugin. Core provides the shared `gate_satisfied` /
-> `context_supplied_slots` vocabulary those plugins consult, and re-checks
-> the gate as an orchestrator backstop against a misbehaving matcher.
+The orchestrator implements the flat, decaying `session.intent_context`
+key/value store defined by **OVOS-CONTEXT-1**. `SessionManager` owns the
+map (carries it on every `Session`, applies the §5.3 `ovos.session.sync`
+merge); `IntentService` applies the §4 decay lifecycle each match round
+and provides the §6/§6.1 gating + §7 slot-fill as an orchestrator backstop
+— matcher plugins are expected to apply these themselves via the shared
+`ovos_spec_tools.context` helpers.
 
 ## Open Data / Metrics Upload
 

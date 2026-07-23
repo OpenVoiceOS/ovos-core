@@ -11,22 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""OVOS-CONTEXT-1 conformance tests for the core-resident helpers.
-
-The §5.3 ``ovos.session.sync`` entry-by-entry merge is owned by the
-``SessionManager`` singleton and is covered there; core does **not**
-re-implement it. This module covers the stateless helpers the
-orchestrator applies to a session's ``intent_context`` map:
-
-- §2 the flat entry shape + liveness predicate + cap eviction;
-- §4 / §4.1 prune-then-decrement decay across turns;
-- §3.1 scope resolution, §6 / §6.1 gating predicates;
-- §7 context-supplied slot fill.
-
-Plus a live FakeBus integration check that drives ``ovos.session.sync``
-through the **real** ``SessionManager`` and asserts the orchestrator sees
-the merged-then-decayed context on the session.
-"""
+"""OVOS-CONTEXT-1 conformance tests: liveness (§2), decay (§4/§4.1), scope
+resolution (§3.1), gating (§6/§6.1), slot fill (§7), plus a live FakeBus
+integration check through the real ``SessionManager``."""
 import time
 import unittest
 from collections import defaultdict
@@ -213,9 +200,7 @@ class TestSlotFill(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class TestLiveSessionManagerSync(unittest.TestCase):
-    """Drive ``ovos.session.sync`` through the real SessionManager (which
-    owns the §5.3 merge, bus-client #239) and assert the orchestrator sees
-    the merged-then-decayed context on the session."""
+    """Drive ``ovos.session.sync`` through the real SessionManager (§5.3)."""
 
     def setUp(self):
         # isolate the singleton between tests
@@ -229,11 +214,6 @@ class TestLiveSessionManagerSync(unittest.TestCase):
         SessionManager.bus = None
 
     def test_real_sessionmanager_merges_sync(self):
-        # the merge itself lives in SessionManager (bus-client #239); here
-        # we drive the *real* handler to confirm core consumes a managed
-        # session whose intent_context the singleton has merged. The full
-        # set + null-delete matrix is covered by bus-client's own suite —
-        # we assert the additive set + delete is visible on the session.
         sess = Session("live-sess")
         sess.intent_context = {"keep": {"value": "k"}}
         SessionManager.update(sess)
@@ -282,29 +262,21 @@ class TestLiveSessionManagerSync(unittest.TestCase):
             SessionManager.sessions["turn-sess"].intent_context or {})
 
     def test_midispatch_sync_survives_decay(self):
-        # §4.1: an entry merged onto the managed session mid-dispatch (via
-        # the real SessionManager handler) is NOT decremented by the
-        # dispatch it arrived in — it lands alive for exactly the next match
-        # round. Exercises core's post-match decrement (only_keys) against a
-        # session the real singleton has merged into.
+        # §4.1: a mid-dispatch entry is not decremented by the round it arrived in
         sess = Session("mid-sess")
         sess.intent_context = {"old.skill:flag": {"value": None,
                                                   "turns_remaining": 1}}
         SessionManager.update(sess)
 
-        # pre-match snapshot, as core captures it before the match round
         pre_match_keys = set(sess.intent_context.keys())
 
-        # mid-dispatch: a skill emits ovos.session.sync; the REAL handler
-        # merges the disjoint new key onto the managed session.
+        # mid-dispatch sync merges a disjoint new key
         snap = sess.serialize()
         snap[INTENT_CONTEXT_FIELD] = {
             "new.skill:flag": {"value": None, "turns_remaining": 1}}
         SessionManager.handle_session_sync(
             Message("ovos.session.sync", context={"session": snap}))
 
-        # core's post-match decrement: re-read authoritative session, skip
-        # mid-dispatch keys (only_keys) so they are not decremented.
         managed = SessionManager.sessions["mid-sess"]
         post_ctx = dict(managed.intent_context or {})
         decrement(post_ctx, only_keys=pre_match_keys)
@@ -312,19 +284,12 @@ class TestLiveSessionManagerSync(unittest.TestCase):
         SessionManager.update(managed)
 
         ctx = SessionManager.sessions["mid-sess"].intent_context
-        # the pre-existing entry was decremented (present at match time)
         self.assertEqual(ctx["old.skill:flag"]["turns_remaining"], 0)
-        # the mid-dispatch entry was NOT decremented (arrived after prune)
         self.assertEqual(ctx["new.skill:flag"]["turns_remaining"], 1)
 
     def test_midispatch_sync_refresh_of_existing_key_not_decremented(self):
-        # §4.1: a mid-dispatch ``ovos.session.sync`` MAY refresh an
-        # *existing* key (not just add a disjoint one) --
-        # ``merge_intent_context`` replaces the entry content in place. A
-        # bare pre-match key snapshot cannot tell a refreshed entry apart
-        # from an untouched one (the key was present both times), so the
-        # orchestrator must compare entry *value*, not just key presence,
-        # or it wrongly decrements the freshly-synced entry the same turn.
+        # §4.1: a mid-dispatch sync refreshing an existing key must be
+        # compared by entry value, not key presence, to avoid decrementing it
         bus = FakeBus()
         SessionManager.connect_to_bus(bus)
         svc = _make_service()
@@ -353,8 +318,6 @@ class TestLiveSessionManagerSync(unittest.TestCase):
         svc.handle_utterance(msg)
 
         ctx = SessionManager.sessions["refresh-sess"].intent_context
-        # refreshed mid-dispatch -> lands alive for exactly the next round,
-        # NOT decremented by the very dispatch that refreshed it
         self.assertEqual(ctx["tea.skill:flag"]["turns_remaining"], 5)
         self.assertEqual(ctx["tea.skill:flag"]["value"], "b")
 
@@ -370,9 +333,7 @@ from ovos_core.intent_services.dispatcher import IntentDispatcher  # noqa: E402
 
 
 class TestOrchestratorGate(unittest.TestCase):
-    """handle_utterance drops a context-gated match whose gate — declared in
-    the passive §10 manifest, not on the Match — is unsatisfied, and dispatches
-    it once the required context is live."""
+    """handle_utterance drops a context-gated match whose gate is unsatisfied."""
 
     def _gated_service(self, match, requires=("kitchen",)):
         svc = _make_service()
@@ -440,9 +401,7 @@ class TestOrchestratorGate(unittest.TestCase):
 
 
 class TestOrchestratorSlotFill(unittest.TestCase):
-    """The orchestrator's §7 slot-fill pass reads ``requires_context`` and the
-    slot names from the passive §10 manifest (never off the Match) and populates
-    an unfilled slot on the dispatch from the live context entry."""
+    """§7 slot-fill: an unfilled slot is populated from the live context entry."""
 
     def _service(self, requires, slot_names):
         svc = _make_service()
@@ -472,10 +431,6 @@ class TestOrchestratorSlotFill(unittest.TestCase):
         self.assertEqual(reply.data.get("room"), "kitchen")
 
     def test_utterance_value_wins(self):
-        # the slot was filled by the pipeline itself (present on
-        # ``match.match_data``, mirrored onto ``reply.data`` by
-        # ``_dispatch_match`` as real flows do) -- that value must win
-        # over the live context entry.
         svc = self._service(requires=["room"], slot_names=["room"])
         sess = self._session(
             {"lights.skill:room": {"value": "kitchen", "turns_remaining": 2}})
@@ -495,28 +450,20 @@ class TestOrchestratorSlotFill(unittest.TestCase):
         self.assertNotIn("room", reply.data)
 
     def test_reply_framework_field_does_not_block_context_fill(self):
-        # a declared slot colliding with a dispatch-reply framework field
-        # (e.g. "utterance") must NOT be treated as utterance-filled just
-        # because ``reply.data["utterance"]`` is always set by
-        # ``_dispatch_match`` -- the §7 rule judges "did the utterance fill
-        # slot k" against the pipeline's own ``match.match_data``, not the
-        # reply payload.
+        # a declared slot colliding with a reply framework field (e.g.
+        # "utterance") must not be treated as utterance-filled
         svc = self._service(requires=["utterance"], slot_names=["utterance"])
         sess = self._session(
             {"lights.skill:utterance": {"value": "kitchen", "turns_remaining": 2}})
         match = IntentHandlerMatch(match_type="lights:on", match_data={"conf": 1.0},
                                    skill_id="lights.skill", utterance="turn on")
         reply = Message("lights:on", dict(match.match_data))
-        # mirrors what _dispatch_match does before calling _apply_context_slots
         reply.data["utterance"] = match.utterance
         reply.data["lang"] = "en-US"
         svc._apply_context_slots(match, sess, reply)
         self.assertEqual(reply.data.get("utterance"), "kitchen")
 
     def test_match_data_slot_still_wins_over_context(self):
-        # the pipeline DID fill the colliding slot itself -- that value
-        # must still win over context, even though it is echoed onto
-        # reply.data too.
         svc = self._service(requires=["room"], slot_names=["room"])
         sess = self._session(
             {"lights.skill:room": {"value": "kitchen", "turns_remaining": 2}})
@@ -533,10 +480,8 @@ class TestOrchestratorSlotFill(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class TestDecayPropagatesToTerminalEmissions(unittest.TestCase):
-    """The post-match §4 decrement must be visible on the §8/§9.5 terminal
-    emissions the matched dispatch eventually produces -- not just on the
-    SessionManager-held session (which only helps the *next* turn for a
-    remote client, per SESSION-1 wholesale-replace semantics)."""
+    """The §4 decrement must be visible on the §8/§9.5 terminal emissions,
+    not just on the SessionManager-held session."""
 
     def setUp(self):
         SessionManager.sessions = {"default": Session("default")}
@@ -570,11 +515,8 @@ class TestDecayPropagatesToTerminalEmissions(unittest.TestCase):
         bus.on("ovos.utterance.handled", handled_frames.append)
         bus.on("ovos.intent.handler.complete", complete_frames.append)
 
-        # a real skill handler runs on a separate process/thread, over an
-        # actual websocket -- its "done" signal always arrives well after
-        # this synchronous match round (including the post-match decrement)
-        # has finished. Capture the dispatch instead of completing inline,
-        # so the test doesn't collapse that async gap the fix relies on.
+        # capture the dispatch instead of completing inline, to preserve the
+        # real async gap between dispatch and skill completion
         received = []
         bus.on("lights.skill:on", received.append)
 
@@ -585,16 +527,12 @@ class TestDecayPropagatesToTerminalEmissions(unittest.TestCase):
         svc.handle_utterance(msg)
 
         self.assertEqual(len(received), 1, "handler was never dispatched")
-        # simulate the skill's async completion arriving now, i.e. after
-        # the orchestrator's post-match decrement has already run.
         bus.emit(Message("mycroft.skill.handler.complete",
                          {}, {"skill_id": "lights.skill",
                               "session": received[0].context.get("session")}))
         return handled_frames, complete_frames
 
     def test_decrement_actually_runs(self):
-        # first, rule out that decrement isn't running at all: the managed
-        # session's own intent_context must show the decayed value.
         sess = Session("decay-sanity")
         sess.intent_context = {"person": {"value": "Bob", "turns_remaining": 3}}
         self._run_full_dispatch(sess)
@@ -617,8 +555,6 @@ class TestDecayPropagatesToTerminalEmissions(unittest.TestCase):
                          "ovos.intent.handler.complete must carry the decayed map (§4.2)")
 
     def test_two_turn_wire_decay_3_2_1(self):
-        # a remote client feeds back exactly what it was handed (SESSION-1
-        # wholesale-replace); decay must still progress turn over turn.
         sess = Session("client-sess")
         sess.intent_context = {"person": {"value": "Bob", "turns_remaining": 3}}
         handled_frames, _ = self._run_full_dispatch(sess)
@@ -633,18 +569,13 @@ class TestDecayPropagatesToTerminalEmissions(unittest.TestCase):
             turn2_session[INTENT_CONTEXT_FIELD]["person"]["turns_remaining"], 1)
 
     def test_same_dispatch_exemption_still_holds(self):
-        # regression guard (commit eec4ae03): a key genuinely synced mid-round
-        # (before this round's single §4.2 decrement point, e.g. from another
-        # matcher's synchronous side effect) must NOT be decremented by the
-        # very round that produced it.
+        # regression guard (commit eec4ae03): a key synced mid-round must not
+        # be decremented by the very round that produced it
         sess = Session("exempt-sess")
         sess.intent_context = {"person": {"value": "Bob", "turns_remaining": 3}}
         SessionManager.update(sess)
 
         def _mid_round_sync(utts, lang, msg):
-            # a matcher earlier in the pipeline chain (still strictly before
-            # the eventual match's §4.2 decrement point) syncs a disjoint
-            # new key. It must land alive for exactly the next round.
             snap = SessionManager.sessions["exempt-sess"].serialize()
             snap[INTENT_CONTEXT_FIELD] = {
                 "new.skill:flag": {"value": None, "turns_remaining": 1}}
@@ -675,9 +606,6 @@ class TestDecayPropagatesToTerminalEmissions(unittest.TestCase):
         received = []
 
         def _fake_handler(message):
-            # a real skill only ever folds the session it was actually
-            # dispatched -- which, per the fix, already carries the
-            # decremented map. This fold must be a no-op, not a re-clobber.
             SessionManager.get(message)
             received.append(message)
         bus.on("lights.skill:on", _fake_handler)

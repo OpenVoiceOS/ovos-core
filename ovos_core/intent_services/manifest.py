@@ -208,11 +208,7 @@ class IntentManifest:
                                         {"ok": False,
                                          "error": f"unknown intent {skill_id}:{intent_name}:{lang}"}))
 
-    # ------------------------------------------------------------------
-    # orchestrator lookups — the passive index is the single source of an
-    # intent's declared context gates and slot names (OVOS-CONTEXT-1);
-    # the orchestrator reads them from here, never off the Match.
-    # ------------------------------------------------------------------
+    # OVOS-CONTEXT-1: orchestrator lookups for declared context gates / slots
 
     def _matching_definitions(self, session_id: str, skill_id: str,
                               intent_name: str, lang: Optional[str]) -> list:
@@ -228,12 +224,11 @@ class IntentManifest:
 
     def get_context_requirements(self, session_id: str, skill_id: str,
                                  intent_name: str, lang: Optional[str] = None):
-        """OVOS-CONTEXT-1 §6/§6.1 — the ``requires_context`` / ``excludes_context``
-        declared for an intent, unioned across its registration definitions.
+        """OVOS-CONTEXT-1 §6/§6.1 — declared ``requires_context`` /
+        ``excludes_context``, unioned across registration definitions.
 
-        @return: a ``(requires, excludes)`` tuple of declaration lists (each a
-            bare-key string or a ``{key, scope}`` mapping); empty when the intent
-            declares no gates or is unknown.
+        @return: ``(requires, excludes)`` tuple of declaration lists; empty
+            when the intent declares no gates or is unknown.
         """
         requires, excludes = [], []
         for d in self._matching_definitions(session_id, skill_id, intent_name, lang):
@@ -247,10 +242,9 @@ class IntentManifest:
 
     def get_slot_names(self, session_id: str, skill_id: str,
                        intent_name: str, lang: Optional[str] = None) -> list:
-        """The intent's declared slot / keyword names, unioned across its
-        registration definitions — the keyword model's ``required``/``optional``/
-        ``one_of`` names (OVOS-INTENT-4 §5) and any template ``slots``. Used by
-        the §7 context-supplied slot rule."""
+        """The intent's declared slot / keyword names (``required``/
+        ``optional``/``one_of``/``slots``), unioned across registration
+        definitions. Used by the §7 context-supplied slot rule."""
         names = []
         for d in self._matching_definitions(session_id, skill_id, intent_name, lang):
             for field in ("required", "optional", "one_of", "slots"):
