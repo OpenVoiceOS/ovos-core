@@ -534,15 +534,30 @@ class SkillManager(Thread):
 
     def _unload_on_network_disconnect(self) -> None:
         """Unload skills that require a network connection to work."""
-        # TODO - implementation missing
+        with self._plugin_skills_lock:
+            skills = dict(self.plugin_skills)
+        for skill_id, skill_loader in skills.items():
+            requirements = skill_loader.runtime_requirements
+            if requirements.requires_network and not requirements.no_network_fallback:
+                self._unload_plugin_skill(skill_id)
 
     def _unload_on_internet_disconnect(self) -> None:
         """Unload skills that require an internet connection to work."""
-        # TODO - implementation missing
+        with self._plugin_skills_lock:
+            skills = dict(self.plugin_skills)
+        for skill_id, skill_loader in skills.items():
+            requirements = skill_loader.runtime_requirements
+            if requirements.requires_internet and not requirements.no_internet_fallback:
+                self._unload_plugin_skill(skill_id)
 
     def _unload_on_gui_disconnect(self) -> None:
         """Unload skills that require a GUI to work."""
-        # TODO - implementation missing
+        with self._plugin_skills_lock:
+            skills = dict(self.plugin_skills)
+        for skill_id, skill_loader in skills.items():
+            requirements = skill_loader.runtime_requirements
+            if requirements.requires_gui and not requirements.no_gui_fallback:
+                self._unload_plugin_skill(skill_id)
 
     def _load_on_startup(self) -> None:
         """Handle offline skills load on startup."""

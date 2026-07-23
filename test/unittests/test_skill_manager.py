@@ -24,6 +24,7 @@ from ovos_bus_client.message import Message
 from ovos_config import Configuration
 from ovos_config import LocalConf, DEFAULT_CONFIG
 from ovos_core.skill_manager import SkillManager
+from ovos_utils.process_utils import RuntimeRequirements
 from ovos_workshop.skill_launcher import SkillLoader
 
 
@@ -177,6 +178,106 @@ class TestSkillManager(TestCase):
         self.skill_manager.activate_skill(message)
         test_skill_loader.activate.assert_called_once()
         message.response.assert_called_once()
+
+    def _make_plugin_skill(self, skill_id, **requirement_overrides):
+        loader = Mock(spec=SkillLoader)
+        loader.skill_id = skill_id
+        loader.instance = Mock()
+        loader.runtime_requirements = RuntimeRequirements(**requirement_overrides)
+        return loader
+
+    def test_unload_on_network_disconnect_unloads_dependent_skills(self):
+        needs_network = self._make_plugin_skill(
+            'needs_network', requires_network=True, no_network_fallback=False)
+        has_fallback = self._make_plugin_skill(
+            'has_fallback', requires_network=True, no_network_fallback=True)
+        no_requirement = self._make_plugin_skill(
+            'no_requirement', requires_network=False, no_network_fallback=False)
+        self.skill_manager.plugin_skills = {
+            'needs_network': needs_network,
+            'has_fallback': has_fallback,
+            'no_requirement': no_requirement,
+        }
+
+        self.skill_manager._unload_on_network_disconnect()
+
+        self.assertNotIn('needs_network', self.skill_manager.plugin_skills)
+        self.assertIn('has_fallback', self.skill_manager.plugin_skills)
+        self.assertIn('no_requirement', self.skill_manager.plugin_skills)
+
+    def test_unload_on_internet_disconnect_unloads_dependent_skills(self):
+        needs_internet = self._make_plugin_skill(
+            'needs_internet', requires_internet=True, no_internet_fallback=False)
+        has_fallback = self._make_plugin_skill(
+            'has_fallback', requires_internet=True, no_internet_fallback=True)
+        no_requirement = self._make_plugin_skill(
+            'no_requirement', requires_internet=False, no_internet_fallback=False)
+        self.skill_manager.plugin_skills = {
+            'needs_internet': needs_internet,
+            'has_fallback': has_fallback,
+            'no_requirement': no_requirement,
+        }
+
+        self.skill_manager._unload_on_internet_disconnect()
+
+        self.assertNotIn('needs_internet', self.skill_manager.plugin_skills)
+        self.assertIn('has_fallback', self.skill_manager.plugin_skills)
+        self.assertIn('no_requirement', self.skill_manager.plugin_skills)
+
+    def test_unload_on_gui_disconnect_unloads_dependent_skills(self):
+        needs_gui = self._make_plugin_skill(
+            'needs_gui', requires_gui=True, no_gui_fallback=False)
+        has_fallback = self._make_plugin_skill(
+            'has_fallback', requires_gui=True, no_gui_fallback=True)
+        no_requirement = self._make_plugin_skill(
+            'no_requirement', requires_gui=False, no_gui_fallback=False)
+        self.skill_manager.plugin_skills = {
+            'needs_gui': needs_gui,
+            'has_fallback': has_fallback,
+            'no_requirement': no_requirement,
+        }
+
+        self.skill_manager._unload_on_gui_disconnect()
+
+        self.assertNotIn('needs_gui', self.skill_manager.plugin_skills)
+        self.assertIn('has_fallback', self.skill_manager.plugin_skills)
+        self.assertIn('no_requirement', self.skill_manager.plugin_skills)
+
+    def test_handle_network_disconnected_unloads_dependent_skills(self):
+        needs_network = self._make_plugin_skill(
+            'needs_network', requires_network=True, no_network_fallback=False)
+        self.skill_manager.plugin_skills = {'needs_network': needs_network}
+        self.skill_manager._network_event.set()
+
+        self.skill_manager.handle_network_disconnected(
+            Message("mycroft.network.disconnected"))
+
+        self.assertFalse(self.skill_manager._network_event.is_set())
+        self.assertNotIn('needs_network', self.skill_manager.plugin_skills)
+
+    def test_handle_internet_disconnected_unloads_dependent_skills(self):
+        needs_internet = self._make_plugin_skill(
+            'needs_internet', requires_internet=True, no_internet_fallback=False)
+        self.skill_manager.plugin_skills = {'needs_internet': needs_internet}
+        self.skill_manager._connected_event.set()
+
+        self.skill_manager.handle_internet_disconnected(
+            Message("mycroft.internet.disconnected"))
+
+        self.assertFalse(self.skill_manager._connected_event.is_set())
+        self.assertNotIn('needs_internet', self.skill_manager.plugin_skills)
+
+    def test_handle_gui_disconnected_unloads_dependent_skills(self):
+        needs_gui = self._make_plugin_skill(
+            'needs_gui', requires_gui=True, no_gui_fallback=False)
+        self.skill_manager.plugin_skills = {'needs_gui': needs_gui}
+        self.skill_manager._gui_event.set()
+
+        self.skill_manager.handle_gui_disconnected(
+            Message("mycroft.gui.unavailable"))
+
+        self.assertFalse(self.skill_manager._gui_event.is_set())
+        self.assertNotIn('needs_gui', self.skill_manager.plugin_skills)
 
     def test_handle_gui_connected_defers_skill_loading_until_startup_complete(self):
         self.skill_manager._load_new_skills = Mock()
