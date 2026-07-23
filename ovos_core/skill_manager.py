@@ -19,7 +19,6 @@ import time
 from threading import Thread, Event
 from typing import Callable, List, Optional
 
-from ovos_bus_client.apis.enclosure import EnclosureAPI
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
 from ovos_bus_client.util.scheduler import EventScheduler
@@ -127,7 +126,6 @@ class SkillManager(Thread):
         self.plugin_skills = {}
         self._plugin_skills_lock = threading.RLock()
         self._loading_plugin_skills = set()
-        self.enclosure = EnclosureAPI(bus)
         self.num_install_retries = 0
         self.empty_skill_dirs = set()  # Save a record of empty skill dirs.
 
