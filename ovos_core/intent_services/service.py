@@ -37,7 +37,7 @@ from ovos_core.intent_services.manifest import IntentManifest
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
 
-from ovos_core.intent_services.intent_context import (
+from ovos_spec_tools.context import (
     gate_satisfied,
     context_supplied_slots,
     prune as prune_intent_context,

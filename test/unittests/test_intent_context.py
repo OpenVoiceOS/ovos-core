@@ -36,7 +36,7 @@ from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session, SessionManager
 from ovos_utils.fakebus import FakeBus
 
-from ovos_core.intent_services.intent_context import (
+from ovos_spec_tools.context import (
     is_live,
     resolve_key,
     normalize_declaration,
