@@ -23,6 +23,9 @@ dependencies = [
     "ovos-config>=0.0.13,<3.0.0",
     "ovos-workshop>=9.0.2a1,<10.0.0",
     "rapidfuzz>=3.6,<4.0",
+    # OVOS-CONTEXT-1 §4/§4.1/§2: prune/decrement/enforce_cap intent_context
+    # decay+cap primitives moved to the session layer here, next to
+    # SessionManager.merge_intent_context — requires ovos-spec-tools #77.
     "ovos-spec-tools[langcodes]>=1.5.0a1,<2.0.0",
 ]
 

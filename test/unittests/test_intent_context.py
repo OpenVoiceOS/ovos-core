@@ -42,9 +42,7 @@ from ovos_core.intent_services.intent_context import (
     normalize_declaration,
     gate_satisfied,
     context_supplied_slots,
-    prune,
     decrement,
-    enforce_cap,
     INTENT_CONTEXT_FIELD,
 )
 from ovos_core.intent_services.service import IntentService
@@ -208,80 +206,6 @@ class TestSlotFill(unittest.TestCase):
         self.assertEqual(supplied, {})
 
 
-# ---------------------------------------------------------------------------
-# §4 — decay lifecycle (stateless helpers over a passed-in map)
-# ---------------------------------------------------------------------------
-
-class TestDecay(unittest.TestCase):
-    def test_prune_removes_dead(self):
-        ctx = {"live": {"value": "a", "turns_remaining": 1},
-               "dead": {"value": "b", "turns_remaining": 0}}
-        prune(ctx)
-        self.assertIn("live", ctx)
-        self.assertNotIn("dead", ctx)
-
-    def test_prune_is_in_place_and_returns_map(self):
-        ctx = {"dead": {"value": "b", "turns_remaining": 0}}
-        out = prune(ctx)
-        self.assertIs(out, ctx)
-        self.assertEqual(ctx, {})
-
-    def test_decrement_counts_down(self):
-        ctx = {"k": {"value": None, "turns_remaining": 2}}
-        decrement(ctx)
-        self.assertEqual(ctx["k"]["turns_remaining"], 1)
-
-    def test_turns_one_lives_exactly_next_round(self):
-        # §4: turns_remaining 1 is live for the next match round, gone after
-        ctx = {"k": {"value": None, "turns_remaining": 1}}
-        # round 1: prune keeps it (live), then decrement -> 0
-        prune(ctx)
-        self.assertIn("k", ctx)
-        decrement(ctx)
-        # round 2: prune removes it (turns 0 is dead)
-        prune(ctx)
-        self.assertNotIn("k", ctx)
-
-    def test_decrement_decrements_unmatched_turn(self):
-        # §4: decrement runs whether or not an intent matched
-        ctx = {"k": {"value": None, "turns_remaining": 1}}
-        decrement(ctx)
-        self.assertEqual(ctx["k"]["turns_remaining"], 0)
-
-    def test_decrement_only_keys_skips_midispatch(self):
-        # §4.1: an entry synced mid-dispatch is not decremented this turn
-        ctx = {"old": {"value": None, "turns_remaining": 1}}
-        pre = set(ctx.keys())
-        # mid-dispatch sync writes a fresh entry
-        ctx["new"] = {"value": None, "turns_remaining": 1}
-        decrement(ctx, only_keys=pre)
-        self.assertEqual(ctx["old"]["turns_remaining"], 0)
-        self.assertEqual(ctx["new"]["turns_remaining"], 1)
-
-    def test_decrement_leaves_untimed_entries(self):
-        ctx = {"perm": {"value": "x"}}
-        decrement(ctx)
-        self.assertNotIn("turns_remaining", ctx["perm"])
-
-
-# ---------------------------------------------------------------------------
-# §2 — live-entry cap eviction
-# ---------------------------------------------------------------------------
-
-class TestCapEviction(unittest.TestCase):
-    def test_cap_evicts_entry_closest_to_expiry(self):
-        ctx = {"near": {"value": "x", "turns_remaining": 1},
-               "far": {"value": "y", "turns_remaining": 99},
-               "perm": {"value": "z"}}
-        enforce_cap(ctx, max_entries=2)
-        self.assertEqual(len(ctx), 2)
-        # the entry closest to expiry (smallest turns_remaining) is evicted
-        self.assertNotIn("near", ctx)
-
-    def test_cap_noop_under_limit(self):
-        ctx = {"a": {"value": "1"}, "b": {"value": "2"}}
-        enforce_cap(ctx, max_entries=10)
-        self.assertEqual(set(ctx.keys()), {"a", "b"})
 
 
 # ---------------------------------------------------------------------------

@@ -43,7 +43,7 @@ the shared, engine-agnostic vocabulary those plugins (and the
 orchestrator) consult.
 """
 import time
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Union
 
 from ovos_utils.log import LOG
 
@@ -56,12 +56,6 @@ INTENT_CONTEXT_FIELD = "intent_context"
 #: separator between a private entry's owner and its sub-key. A prefixed
 #: (private) key contains exactly one ``:``; a bare (shared) key none.
 SCOPE_SEPARATOR = ":"
-
-#: OVOS-CONTEXT-1 §2 — the recommended maximum live entry count an
-#: orchestrator SHOULD enforce, evicting the entry closest to natural
-#: expiry when exceeded.
-DEFAULT_MAX_ENTRIES = 1024
-
 
 def is_live(entry: Dict[str, Any], now: Optional[float] = None) -> bool:
     """OVOS-CONTEXT-1 §2 liveness predicate.
@@ -231,89 +225,20 @@ def context_supplied_slots(intent_context: Dict[str, Any],
     return supplied
 
 
+
 # ---------------------------------------------------------------------------
-# §4 — decay lifecycle (stateless; operates on a passed-in intent_context map)
-# ---------------------------------------------------------------------------
-
-def prune(intent_context: Dict[str, Any],
-          now: Optional[float] = None) -> Dict[str, Any]:
-    """OVOS-CONTEXT-1 §4 (pre-match) — remove every non-live entry from
-    the given map, in place.
-
-    This is the gating snapshot every matcher sees during the upcoming
-    match round.
-
-    @param intent_context: the session's flat ``intent_context`` map
-        (mutated in place).
-    @param now: current Unix time; defaults to ``time.time()``.
-    @return: the same (pruned) map.
-    """
-    if not intent_context:
-        return intent_context
-    now = time.time() if now is None else now
-    dead = [k for k, e in intent_context.items() if not is_live(e, now)]
-    for k in dead:
-        intent_context.pop(k, None)
-    return intent_context
-
-
-def decrement(intent_context: Dict[str, Any],
-              only_keys: Optional[Set[str]] = None) -> Dict[str, Any]:
-    """OVOS-CONTEXT-1 §4 (post-match) — decrement ``turns_remaining`` on
-    every remaining entry that sets it, whether or not any intent
-    matched.
-
-    Per §4.1, an entry written by an ``ovos.session.sync`` emitted
-    **mid-dispatch** must not be decremented by the dispatch it was
-    written in. The orchestrator captures the key set present at the
-    pre-match prune and passes it as ``only_keys`` so freshly-synced keys
-    are skipped, landing alive for exactly the next match round.
-
-    @param intent_context: the session's flat ``intent_context`` map
-        (mutated in place).
-    @param only_keys: if given, decrement only entries whose key is in
-        this set (the snapshot present before the match round).
-    @return: the same map.
-    """
-    if not intent_context:
-        return intent_context
-    for key, entry in intent_context.items():
-        if only_keys is not None and key not in only_keys:
-            continue  # §4.1 — mid-dispatch sync entry, not decremented
-        if not isinstance(entry, dict):
-            continue
-        turns = entry.get("turns_remaining")
-        if turns is not None:
-            entry["turns_remaining"] = turns - 1
-    return intent_context
-
-
-def enforce_cap(intent_context: Dict[str, Any],
-                max_entries: int = DEFAULT_MAX_ENTRIES,
-                now: Optional[float] = None) -> Dict[str, Any]:
-    """OVOS-CONTEXT-1 §2 — bound the live entry count of the given map,
-    evicting the entry closest to natural expiry when exceeded (smallest
-    ``turns_remaining``, then earliest ``expires_at``, then arbitrary).
-
-    @param intent_context: the session's flat ``intent_context`` map
-        (mutated in place).
-    @param max_entries: the recommended live-entry ceiling.
-    @param now: current Unix time; defaults to ``time.time()`` (unused for
-        ranking but accepted for call-site symmetry).
-    @return: the same map.
-    """
-    if not intent_context or len(intent_context) <= max_entries:
-        return intent_context
-
-    def _expiry_rank(item):
-        _, entry = item
-        turns = entry.get("turns_remaining") if isinstance(entry, dict) else None
-        expires = entry.get("expires_at") if isinstance(entry, dict) else None
-        # entries with neither sort last (least eligible for eviction)
-        return (turns if turns is not None else float("inf"),
-                expires if expires is not None else float("inf"))
-
-    while len(intent_context) > max_entries:
-        victim = min(intent_context.items(), key=_expiry_rank)[0]
-        intent_context.pop(victim, None)
-    return intent_context
+# §4 decay lifecycle (prune / decrement) and §2 cap eviction moved to the
+# session layer (ovos_spec_tools.context, alongside the already-merged
+# SessionManager.merge_intent_context — see OVOS-CONTEXT-1 §5.3): they are
+# map-mutation mechanics, not orchestrator decisions, so they belong next to
+# the singleton that owns ``session.intent_context``. The orchestrator keeps
+# deciding WHEN a turn happened and which entries are exempt from decay
+# (``IntentService._apply_post_match_decay``, §4.1's same-dispatch refresh
+# exemption compared by value) — only the mechanics re-export here for
+# backward-compatible imports.
+from ovos_spec_tools.context import (  # noqa: E402,F401
+    prune,
+    decrement,
+    enforce_cap,
+    DEFAULT_MAX_ENTRIES,
+)
