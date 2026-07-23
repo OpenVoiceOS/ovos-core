@@ -1,8 +1,20 @@
 # Changelog
 
+## [2.5.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.6a1) (2026-07-23)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.5a4...2.5.6a1)
+
+**Merged pull requests:**
+
+- fix: update e2e intent-name expectations for OVOS-INTENT-2 lowercase rename [\#825](https://github.com/OpenVoiceOS/ovos-core/pull/825) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.5.5a4](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.5a4) (2026-07-23)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.5a2...2.5.5a4)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.5a3...2.5.5a4)
+
+## [2.5.5a3](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.5a3) (2026-07-23)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.5a2...2.5.5a3)
 
 **Merged pull requests:**
 
