@@ -442,6 +442,7 @@ class TestLiveSessionManagerSync(unittest.TestCase):
 from unittest.mock import patch  # noqa: E402
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch  # noqa: E402
 from ovos_core.intent_services.manifest import IntentManifest  # noqa: E402
+from ovos_core.intent_services.dispatcher import IntentDispatcher  # noqa: E402
 
 
 class TestOrchestratorGate(unittest.TestCase):
@@ -601,3 +602,172 @@ class TestOrchestratorSlotFill(unittest.TestCase):
         reply = Message("lights:on", dict(match.match_data))
         svc._apply_context_slots(match, sess, reply)
         self.assertEqual(reply.data.get("room"), "bedroom")
+
+
+# ---------------------------------------------------------------------------
+# §4.2 — decayed session must be folded onto the terminal emissions
+# ---------------------------------------------------------------------------
+
+class TestDecayPropagatesToTerminalEmissions(unittest.TestCase):
+    """The post-match §4 decrement must be visible on the §8/§9.5 terminal
+    emissions the matched dispatch eventually produces -- not just on the
+    SessionManager-held session (which only helps the *next* turn for a
+    remote client, per SESSION-1 wholesale-replace semantics)."""
+
+    def setUp(self):
+        SessionManager.sessions = {"default": Session("default")}
+        SessionManager.default_session = SessionManager.sessions["default"]
+        SessionManager.bus = None
+
+    def tearDown(self):
+        SessionManager.sessions = {"default": Session("default")}
+        SessionManager.default_session = SessionManager.sessions["default"]
+        SessionManager.bus = None
+
+    def _run_full_dispatch(self, sess):
+        bus = FakeBus()
+        SessionManager.connect_to_bus(bus)
+        svc = _make_service()
+        svc.bus = bus
+        svc._handle_transformers = lambda m: m
+        svc.disambiguate_lang = lambda m: "en-US"
+        svc.intent_manifest = IntentManifest(bus)
+        svc.intent_dispatcher = IntentDispatcher(
+            bus, timeout=0, on_terminal=svc._emit_utterance_handled)
+
+        match = IntentHandlerMatch(match_type="lights.skill:on",
+                                   match_data={"conf": 1.0},
+                                   skill_id="lights.skill", utterance="turn on")
+        svc.get_pipeline = lambda session: [
+            ("fake-high", lambda utts, lang, msg: match)]
+
+        handled_frames = []
+        complete_frames = []
+        bus.on("ovos.utterance.handled", handled_frames.append)
+        bus.on("ovos.intent.handler.complete", complete_frames.append)
+
+        # a real skill handler runs on a separate process/thread, over an
+        # actual websocket -- its "done" signal always arrives well after
+        # this synchronous match round (including the post-match decrement)
+        # has finished. Capture the dispatch instead of completing inline,
+        # so the test doesn't collapse that async gap the fix relies on.
+        received = []
+        bus.on("lights.skill:on", received.append)
+
+        SessionManager.update(sess)
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["turn on"]},
+                      context={"session": sess.serialize()})
+        svc.handle_utterance(msg)
+
+        self.assertEqual(len(received), 1, "handler was never dispatched")
+        # simulate the skill's async completion arriving now, i.e. after
+        # the orchestrator's post-match decrement has already run.
+        bus.emit(Message("mycroft.skill.handler.complete",
+                         {}, {"skill_id": "lights.skill",
+                              "session": received[0].context.get("session")}))
+        return handled_frames, complete_frames
+
+    def test_decrement_actually_runs(self):
+        # first, rule out that decrement isn't running at all: the managed
+        # session's own intent_context must show the decayed value.
+        sess = Session("decay-sanity")
+        sess.intent_context = {"person": {"value": "Bob", "turns_remaining": 3}}
+        self._run_full_dispatch(sess)
+        managed = SessionManager.sessions["decay-sanity"].intent_context
+        self.assertEqual(managed["person"]["turns_remaining"], 2)
+
+    def test_terminal_emissions_carry_decayed_context(self):
+        sess = Session("wire-sess")
+        sess.intent_context = {"person": {"value": "Bob", "turns_remaining": 3}}
+        handled_frames, complete_frames = self._run_full_dispatch(sess)
+
+        self.assertEqual(len(handled_frames), 1)
+        self.assertEqual(len(complete_frames), 1)
+
+        handled_ctx = handled_frames[0].context["session"][INTENT_CONTEXT_FIELD]
+        complete_ctx = complete_frames[0].context["session"][INTENT_CONTEXT_FIELD]
+        self.assertEqual(handled_ctx["person"]["turns_remaining"], 2,
+                         "ovos.utterance.handled must carry the decayed map (§4.2)")
+        self.assertEqual(complete_ctx["person"]["turns_remaining"], 2,
+                         "ovos.intent.handler.complete must carry the decayed map (§4.2)")
+
+    def test_two_turn_wire_decay_3_2_1(self):
+        # a remote client feeds back exactly what it was handed (SESSION-1
+        # wholesale-replace); decay must still progress turn over turn.
+        sess = Session("client-sess")
+        sess.intent_context = {"person": {"value": "Bob", "turns_remaining": 3}}
+        handled_frames, _ = self._run_full_dispatch(sess)
+        turn1_session = handled_frames[0].context["session"]
+        self.assertEqual(
+            turn1_session[INTENT_CONTEXT_FIELD]["person"]["turns_remaining"], 2)
+
+        sess2 = Session.deserialize(turn1_session)
+        handled_frames2, _ = self._run_full_dispatch(sess2)
+        turn2_session = handled_frames2[0].context["session"]
+        self.assertEqual(
+            turn2_session[INTENT_CONTEXT_FIELD]["person"]["turns_remaining"], 1)
+
+    def test_same_dispatch_exemption_still_holds(self):
+        # regression guard (commit eec4ae03): a key genuinely synced mid-round
+        # (before this round's single §4.2 decrement point, e.g. from another
+        # matcher's synchronous side effect) must NOT be decremented by the
+        # very round that produced it.
+        sess = Session("exempt-sess")
+        sess.intent_context = {"person": {"value": "Bob", "turns_remaining": 3}}
+        SessionManager.update(sess)
+
+        def _mid_round_sync(utts, lang, msg):
+            # a matcher earlier in the pipeline chain (still strictly before
+            # the eventual match's §4.2 decrement point) syncs a disjoint
+            # new key. It must land alive for exactly the next round.
+            snap = SessionManager.sessions["exempt-sess"].serialize()
+            snap[INTENT_CONTEXT_FIELD] = {
+                "new.skill:flag": {"value": None, "turns_remaining": 1}}
+            SessionManager.handle_session_sync(
+                Message("ovos.session.sync", context={"session": snap}))
+            return None  # this matcher itself does not match
+
+        match = IntentHandlerMatch(match_type="lights.skill:on",
+                                   match_data={"conf": 1.0},
+                                   skill_id="lights.skill", utterance="turn on")
+
+        bus = FakeBus()
+        SessionManager.connect_to_bus(bus)
+        svc = _make_service()
+        svc.bus = bus
+        svc._handle_transformers = lambda m: m
+        svc.disambiguate_lang = lambda m: "en-US"
+        svc.intent_manifest = IntentManifest(bus)
+        svc.intent_dispatcher = IntentDispatcher(
+            bus, timeout=0, on_terminal=svc._emit_utterance_handled)
+        svc.get_pipeline = lambda session: [
+            ("mid-round-sync", _mid_round_sync),
+            ("fake-high", lambda utts, lang, msg: match)]
+
+        handled_frames = []
+        bus.on("ovos.utterance.handled", handled_frames.append)
+
+        received = []
+
+        def _fake_handler(message):
+            # a real skill only ever folds the session it was actually
+            # dispatched -- which, per the fix, already carries the
+            # decremented map. This fold must be a no-op, not a re-clobber.
+            SessionManager.get(message)
+            received.append(message)
+        bus.on("lights.skill:on", _fake_handler)
+
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["turn on"]},
+                      context={"session": SessionManager.sessions["exempt-sess"].serialize()})
+        svc.handle_utterance(msg)
+
+        self.assertEqual(len(received), 1, "handler was never dispatched")
+        bus.emit(Message("mycroft.skill.handler.complete",
+                         {}, {"skill_id": "lights.skill",
+                              "session": received[0].context.get("session")}))
+
+        ctx = handled_frames[0].context["session"][INTENT_CONTEXT_FIELD]
+        self.assertEqual(ctx["person"]["turns_remaining"], 2)
+        self.assertEqual(ctx["new.skill:flag"]["turns_remaining"], 1)

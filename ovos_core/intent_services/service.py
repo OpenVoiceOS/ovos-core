@@ -384,17 +384,76 @@ class IntentService:
         match_data = match.match_data or {}
         return [slot for slot in required_slots if not match_data.get(slot)]
 
+    @staticmethod
+    def _apply_post_match_decay(session_id: str, pre_match_entries: dict):
+        """OVOS-CONTEXT-1 §4 (post-match) — decrement turns_remaining on every
+        surviving entry, whether or not any intent matched, and commit the
+        result to the ``SessionManager`` singleton.
+
+        Re-reads the authoritative managed session (any §5.1 promoted-context
+        merge, or a sync that landed in the narrow pre-dispatch window, is
+        already folded onto it) so this always decrements the *current*
+        state, not a stale local copy. ``pre_match_entries`` is the §4.1
+        key -> entry-value snapshot taken *before* the match round; only a
+        key whose entry value is still exactly that snapshot value is
+        decremented — a key whose entry was refreshed by a sync landing
+        between the snapshot and this call (§4.1 exemption) is left alone,
+        alive for exactly the next round. Value equality, not object
+        identity, is the correct test: routine ``message.reply``/``forward``
+        stamping serializes and deserializes the session, manufacturing a
+        new entry object for every key even when nothing changed.
+
+        Callers MUST run this before handing any dispatch derived from the
+        match round to the IntentDispatcher / before emitting any §9.3/§9.5
+        terminal — see ``_dispatch_match``'s docstring for why the ordering
+        (before, not after, the actual bus dispatch) is load-bearing.
+
+        Returns:
+            Session: the updated, already-``SessionManager.update``-committed
+                session for ``session_id``.
+        """
+        sess = SessionManager.sessions.get(session_id) or SessionManager.get_default_session()
+        post_ctx = dict(sess.intent_context or {})
+        unchanged_keys = {k for k in pre_match_entries
+                          if k in post_ctx and post_ctx[k] == pre_match_entries[k]}
+        decrement_intent_context(post_ctx, only_keys=unchanged_keys)
+        sess.intent_context = post_ctx or None
+        SessionManager.update(sess)
+        return sess
+
     def _dispatch_match(self, match: IntentHandlerMatch, message: Message, lang: str,
-                        pipeline_id: str = None) -> None:
+                        pipeline_id: str = None,
+                        pre_match_entries: Optional[dict] = None) -> Optional[Message]:
         """Orchestrate the OVOS-PIPELINE-1 §6.1 post-match steps, then dispatch.
 
         Runs the service-state-dependent post-match orchestration — the
         intent-transformer chain (TRANSFORM-1 §3.4), skill activation +
-        ``{skill_id}.activate``, session update, and ``context['pipeline_id']``
-        stamping (§7.1) — builds the dispatch Message, emits the §9.2
-        ``ovos.intent.matched`` notification, and hands the dispatch Message to
-        the IntentDispatcher, which owns the §7 dispatch + §8 handler-lifecycle
-        trio.
+        ``{skill_id}.activate``, session update, the OVOS-CONTEXT-1 §4.2
+        post-match decrement, and ``context['pipeline_id']`` stamping (§7.1)
+        — builds the dispatch Message, emits the §9.2 ``ovos.intent.matched``
+        notification, and hands the dispatch Message to the IntentDispatcher,
+        which owns the §7 dispatch + §8 handler-lifecycle trio.
+
+        The §4.2 decrement runs *before* the dispatch Message is handed to
+        the IntentDispatcher (i.e. before it is actually put on the bus for
+        the skill to receive) — not after, despite "post-match" in its name.
+        This matters: ``ovos_bus_client``'s ``Message.forward``/``reply``
+        always re-stamp an outbound message's ``context['session']`` from
+        the *live* ``SessionManager`` registry at emission time, and
+        ``SessionManager.get()`` unconditionally folds whatever session
+        snapshot an *inbound* message carries back onto that same registry
+        (SESSION-1 wholesale-replace). A skill handler always calls
+        ``SessionManager.get(message)`` on the dispatch it received to do
+        anything session-aware. If the dispatch still carried the
+        pre-decrement snapshot, that fold would silently undo the decrement
+        in the registry the moment the skill starts running — and every
+        later terminal (§8 ``ovos.intent.handler.complete``, §9.5
+        ``ovos.utterance.handled``), which re-stamps from that same
+        clobbered registry, would carry the stale, undecremented map even
+        though the decrement genuinely ran. Decrementing before dispatch
+        means the skill's own fold is a no-op (it folds back exactly what
+        was already there), so the registry — and everything that reads it
+        afterwards — stays correct.
 
         Args:
             match (IntentHandlerMatch): The matched intent (utterance, match_type,
@@ -402,9 +461,15 @@ class IntentService:
             message (Message): The originating utterance Message to derive from.
             lang (str): The content language of the match.
             pipeline_id (str): The pipeline plugin that produced the match (§3.1).
+            pre_match_entries (Optional[dict]): the §4.1 pre-match
+                key->entry-value snapshot (taken before the match round) the
+                orchestrator needs to tell a genuine mid-round sync apart
+                from an untouched entry when deciding what to decrement.
 
         Returns:
-            None
+            Optional[Message]: the dispatch Message handed to the
+                IntentDispatcher (§7), or ``None`` if the match had no
+                ``match_type`` and nothing was dispatched.
         """
         try:
             match = self.intent_plugins.transform(match)
@@ -412,7 +477,22 @@ class IntentService:
             LOG.exception("_dispatch_match failed")
 
         reply = None
-        sess = match.updated_session or SessionManager.get(message)
+        # NOTE: deliberately NOT ``SessionManager.get(message)`` here.
+        # ``message`` is the *original* utterance Message, whose
+        # ``context['session']`` snapshot was captured once, before the match
+        # round began. ``SessionManager.get()`` unconditionally folds an
+        # inbound session snapshot back onto the registry (SESSION-1
+        # wholesale-replace) — doing that with this stale snapshot would
+        # erase any legitimate mid-round sync an earlier matcher in this same
+        # round already folded in (e.g. via ``ovos.session.sync``), and (once
+        # ``updated_session`` is absent) any promoted §5.1 context an earlier
+        # call already committed. A plain registry read has no such side
+        # effect; the registry is only ever missing the id on a session's
+        # very first turn, when the plain default-session fallback applies.
+        sid = (message.context.get("session") or {}).get("session_id")
+        sess = (match.updated_session
+                or (sid and SessionManager.sessions.get(sid))
+                or SessionManager.get(message))
         sess.lang = lang  # ensure it is updated
 
         # Launch intent handler
@@ -472,6 +552,13 @@ class IntentService:
             # live entry's value (utterance-produced values always win).
             self._apply_context_slots(match, sess, reply)
 
+            # OVOS-CONTEXT-1 §4.2 — decrement now, before this dispatch Message
+            # is handed to the IntentDispatcher (i.e. before it is actually put
+            # on the bus). See the docstring above for why this ordering (and
+            # not decrementing after the match round instead) is required for
+            # the decayed map to survive onto the §8/§9.5 terminals.
+            sess = self._apply_post_match_decay(sess.session_id, pre_match_entries or {})
+
             # update Session if modified by pipeline; the intent_context
             # map round-trips on the Session itself
             reply.context["session"] = sess.serialize()
@@ -494,6 +581,7 @@ class IntentService:
 
             intent_name = reply.msg_type.split(":", 1)[-1]
             self.intent_dispatcher.dispatch(reply, skill_id, intent_name)
+            return reply
 
         else:  # upload intent metrics if enabled
             if self.config.get("open_data", {}).get("intent_urls"):
@@ -501,6 +589,7 @@ class IntentService:
                                                         "complete_intent_failure",
                                                         lang,
                                                         match.match_data))
+        return None
 
     @staticmethod
     def _upload_match_data(utterance: str, intent: str, lang: str, match_data: dict):
@@ -634,6 +723,12 @@ class IntentService:
 
         # match
         match = None
+        # the dispatch Message ``_dispatch_match`` handed to the
+        # IntentDispatcher, or ``None`` if nothing matched. ``no_match_lang``
+        # defers the §9.3/§9.5 no-match failure emission until after the
+        # OVOS-CONTEXT-1 §4.2 decay runs for that round (see below).
+        dispatched_msg = None
+        no_match_lang = None
         with stopwatch:
             self._deactivations[sess.session_id] = []
             # Loop through the matching functions until a match is found.
@@ -693,8 +788,9 @@ class IntentService:
                                     f"ignoring match, context gate unsatisfied for '{match.match_type}'")
                                 continue
                         try:
-                            self._dispatch_match(match, message, intent_lang,
-                                                     pipeline_id=pipeline)
+                            dispatched_msg = self._dispatch_match(
+                                match, message, intent_lang, pipeline_id=pipeline,
+                                pre_match_entries=pre_match_entries)
                             break
                         except Exception:
                             LOG.exception(f"{match_func} returned an invalid match")
@@ -703,37 +799,26 @@ class IntentService:
                     continue
                 break
             else:
-                # Nothing was able to handle the intent
-                # Ask politely for forgiveness for failing in this vital task
-                message.data["lang"] = lang
-                self.send_complete_intent_failure(message)
+                # Nothing was able to handle the intent. Defer the §9.3/§9.5
+                # emission until after the post-match decrement below so its
+                # end-marker carries the decayed intent_context (§4.2) rather
+                # than the pre-decrement snapshot.
+                no_match_lang = lang
 
         LOG.debug(f"intent matching took: {stopwatch.time}")
 
-        # OVOS-CONTEXT-1 §4 (post-match) — decrement turns_remaining on
-        # every surviving entry, whether or not any intent matched. This
-        # runs over the entries present at match time; entries written by
-        # an ``ovos.session.sync`` emitted mid-dispatch (§4.1) are merged
-        # onto the managed session by ``SessionManager.handle_session_sync``
-        # and are *not* decremented here, landing alive for exactly the next
-        # match round. We re-read the authoritative session so any such
-        # mid-dispatch merge is reflected. A mid-dispatch sync MAY refresh
-        # an *existing* key rather than add a new one — the key alone is
-        # not proof the entry survived unmolested, so we only decrement
-        # keys whose entry *value* is still the one seen at the pre-match
-        # snapshot (``merge_intent_context`` replaces the entry with fresh
-        # content on refresh; unrelated keys keep their original value).
-        # Value equality, not object identity, is the right test: routine
-        # ``message.reply``/``forward`` stamping serializes and
-        # deserializes the session mid-dispatch, which manufactures a new
-        # entry object for every key even when nothing changed.
-        sess = SessionManager.sessions.get(sess.session_id, sess)
-        post_ctx = dict(sess.intent_context or {})
-        unchanged_keys = {k for k in pre_match_entries
-                          if k in post_ctx and post_ctx[k] == pre_match_entries[k]}
-        decrement_intent_context(post_ctx, only_keys=unchanged_keys)
-        sess.intent_context = post_ctx or None
-        SessionManager.update(sess)
+        # OVOS-CONTEXT-1 §4.2 — no-match path. The matched path already ran
+        # this decrement (see ``_dispatch_match``, and its docstring for why
+        # it must happen *before* the dispatch goes out rather than here).
+        # For a no-match round there is no skill dispatch to race against —
+        # nothing else can fold a stale snapshot back onto the registry
+        # before ``send_complete_intent_failure``'s ``message.reply()`` calls
+        # re-stamp their outbound ``context['session']`` from it — so running
+        # it here, right before, is sufficient.
+        if no_match_lang is not None:
+            self._apply_post_match_decay(sess.session_id, pre_match_entries)
+            message.data["lang"] = no_match_lang
+            self.send_complete_intent_failure(message)
 
         # sync any changes made to the default session, eg by ConverseService
         if sess.session_id == "default":
