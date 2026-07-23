@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.7a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.7a1) (2026-07-23)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.6a1...2.5.7a1)
+
+**Merged pull requests:**
+
+- fix: align intent-transformer test with OVOS-TRANSFORM-1 §3.4 identity invariant [\#827](https://github.com/OpenVoiceOS/ovos-core/pull/827) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.5.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.6a1) (2026-07-23)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.5a4...2.5.6a1)
