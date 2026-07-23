@@ -143,7 +143,7 @@ class TestIntentPipelineRouting(TestCase):
             ignore_messages=self.ignore_messages,
             source_message=message,
             final_session=final_session,
-            activation_points=[f"{self.skill_id}:count_to_N.intent"],
+            activation_points=[f"{self.skill_id}:count_to_n.intent"],
             expected_messages=[
                 message,
                 Message(
@@ -155,7 +155,7 @@ class TestIntentPipelineRouting(TestCase):
                 Message(
                     SpecMessage.INTENT_MATCHED,
                     data={"skill_id": self.skill_id,
-                          "intent_name": f"{self.skill_id}:count_to_N.intent",
+                          "intent_name": f"{self.skill_id}:count_to_n.intent",
                           "utterance": "count to 3", "lang": session.lang},
                     context={"skill_id": self.skill_id},
                 ),
@@ -163,11 +163,11 @@ class TestIntentPipelineRouting(TestCase):
                 Message(
                     SpecMessage.INTENT_HANDLER_START,
                     data={"skill_id": self.skill_id,
-                          "intent_name": "count_to_N.intent"},
+                          "intent_name": "count_to_n.intent"},
                     context={"skill_id": self.skill_id},
                 ),
                 Message(
-                    f"{self.skill_id}:count_to_N.intent",
+                    f"{self.skill_id}:count_to_n.intent",
                     data={"utterance": "count to 3", "lang": session.lang},
                     context={"skill_id": self.skill_id},
                 ),
@@ -185,7 +185,7 @@ class TestIntentPipelineRouting(TestCase):
                 Message(
                     SpecMessage.INTENT_HANDLER_COMPLETE,
                     data={"skill_id": self.skill_id,
-                          "intent_name": "count_to_N.intent"},
+                          "intent_name": "count_to_n.intent"},
                     context={"skill_id": self.skill_id},
                 ),
                 Message(
@@ -226,7 +226,7 @@ class TestIntentPipelineRouting(TestCase):
             ignore_messages=self.ignore_messages,
             source_message=message,
             final_session=final_session,
-            activation_points=[f"{self.skill_id}:count_to_N.intent"],
+            activation_points=[f"{self.skill_id}:count_to_n.intent"],
             expected_messages=[
                 message,
                 Message(
@@ -238,7 +238,7 @@ class TestIntentPipelineRouting(TestCase):
                 Message(
                     SpecMessage.INTENT_MATCHED,
                     data={"skill_id": self.skill_id,
-                          "intent_name": f"{self.skill_id}:count_to_N.intent",
+                          "intent_name": f"{self.skill_id}:count_to_n.intent",
                           "utterance": "count to 3", "lang": session.lang},
                     context={"skill_id": self.skill_id},
                 ),
@@ -246,11 +246,11 @@ class TestIntentPipelineRouting(TestCase):
                 Message(
                     SpecMessage.INTENT_HANDLER_START,
                     data={"skill_id": self.skill_id,
-                          "intent_name": "count_to_N.intent"},
+                          "intent_name": "count_to_n.intent"},
                     context={"skill_id": self.skill_id},
                 ),
                 Message(
-                    f"{self.skill_id}:count_to_N.intent",
+                    f"{self.skill_id}:count_to_n.intent",
                     data={"utterance": "count to 3", "lang": session.lang},
                     context={"skill_id": self.skill_id},
                 ),
@@ -268,7 +268,7 @@ class TestIntentPipelineRouting(TestCase):
                 Message(
                     SpecMessage.INTENT_HANDLER_COMPLETE,
                     data={"skill_id": self.skill_id,
-                          "intent_name": "count_to_N.intent"},
+                          "intent_name": "count_to_n.intent"},
                     context={"skill_id": self.skill_id},
                 ),
                 Message(
