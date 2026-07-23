@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.5.5a4](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.5a4) (2026-07-23)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.5a2...2.5.5a4)
+
+**Merged pull requests:**
+
+- chore: drop deprecated bus-client EnclosureAPI from skill\_manager [\#822](https://github.com/OpenVoiceOS/ovos-core/pull/822) ([JarbasAl](https://github.com/JarbasAl))
+- chore: drop unused direct watchdog dependency [\#821](https://github.com/OpenVoiceOS/ovos-core/pull/821) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.5.5a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.5a2) (2026-07-17)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.5a1...2.5.5a2)
