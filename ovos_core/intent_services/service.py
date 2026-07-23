@@ -613,9 +613,21 @@ class IntentService:
         # via the singleton so it stays authoritative.
         intent_ctx = dict(sess.intent_context or {})
         prune_intent_context(intent_ctx)
-        # snapshot of keys present before the match round; entries synced
-        # in mid-dispatch (§4.1) are excluded from the post-match decrement
-        pre_match_keys = set(intent_ctx.keys())
+        # snapshot of key -> entry VALUE present before the match round.
+        # §4.1 exempts entries synced in **mid-dispatch** from the
+        # post-match decrement. A bare key snapshot is not enough: a
+        # mid-dispatch ``ovos.session.sync`` MAY refresh an *existing* key
+        # (SessionManager.merge_intent_context replaces the entry object
+        # in place), so the key stays present pre- and post-match while the
+        # entry itself is brand new. We therefore snapshot entry *value*
+        # (not identity — routine ``message.reply``/``forward`` stamping
+        # round-trips the session through serialize/deserialize during
+        # dispatch, which replaces every entry's object identity even when
+        # nothing changed, so an identity check would wrongly treat every
+        # entry as mid-dispatch-refreshed and never decrement) and only
+        # decrement keys whose entry value is unchanged from this snapshot
+        # (see the post-match block below).
+        pre_match_entries = dict(intent_ctx)
         sess.intent_context = intent_ctx or None
         SessionManager.update(sess)
         message.context["session"] = sess.serialize()
@@ -703,12 +715,23 @@ class IntentService:
         # runs over the entries present at match time; entries written by
         # an ``ovos.session.sync`` emitted mid-dispatch (§4.1) are merged
         # onto the managed session by ``SessionManager.handle_session_sync``
-        # and are *not* decremented here (``only_keys`` skips them), landing
-        # alive for exactly the next match round. We re-read the authoritative
-        # session so any such mid-dispatch merge is reflected.
+        # and are *not* decremented here, landing alive for exactly the next
+        # match round. We re-read the authoritative session so any such
+        # mid-dispatch merge is reflected. A mid-dispatch sync MAY refresh
+        # an *existing* key rather than add a new one — the key alone is
+        # not proof the entry survived unmolested, so we only decrement
+        # keys whose entry *value* is still the one seen at the pre-match
+        # snapshot (``merge_intent_context`` replaces the entry with fresh
+        # content on refresh; unrelated keys keep their original value).
+        # Value equality, not object identity, is the right test: routine
+        # ``message.reply``/``forward`` stamping serializes and
+        # deserializes the session mid-dispatch, which manufactures a new
+        # entry object for every key even when nothing changed.
         sess = SessionManager.sessions.get(sess.session_id, sess)
         post_ctx = dict(sess.intent_context or {})
-        decrement_intent_context(post_ctx, only_keys=pre_match_keys)
+        unchanged_keys = {k for k in pre_match_entries
+                          if k in post_ctx and post_ctx[k] == pre_match_entries[k]}
+        decrement_intent_context(post_ctx, only_keys=unchanged_keys)
         sess.intent_context = post_ctx or None
         SessionManager.update(sess)
 
@@ -768,12 +791,20 @@ class IntentService:
             sess.session_id, match.skill_id, intent_name, sess.lang)
         if not requires or not slot_names:
             return
+        # §7 "utterance did NOT itself fill slot k" must be judged against
+        # the pipeline's own matched slot values (``match.match_data``),
+        # never against ``reply.data`` — the reply carries framework/echo
+        # fields (``utterance``, ``lang``, and anything already present on
+        # the inbound message) alongside the matched slots, and a declared
+        # slot name that happens to collide with one of those (e.g. a slot
+        # literally named ``utterance``) would be wrongly treated as
+        # utterance-filled and skip the context fallback.
         supplied = context_supplied_slots(
             intent_context=sess.intent_context or {},
             requires=requires,
             slot_names=slot_names,
             owner_id=match.skill_id,
-            filled_slots=reply.data,
+            filled_slots=match.match_data or {},
         )
         for key, value in supplied.items():
             reply.data[key] = value

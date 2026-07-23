@@ -393,6 +393,47 @@ class TestLiveSessionManagerSync(unittest.TestCase):
         # the mid-dispatch entry was NOT decremented (arrived after prune)
         self.assertEqual(ctx["new.skill:flag"]["turns_remaining"], 1)
 
+    def test_midispatch_sync_refresh_of_existing_key_not_decremented(self):
+        # §4.1: a mid-dispatch ``ovos.session.sync`` MAY refresh an
+        # *existing* key (not just add a disjoint one) --
+        # ``merge_intent_context`` replaces the entry content in place. A
+        # bare pre-match key snapshot cannot tell a refreshed entry apart
+        # from an untouched one (the key was present both times), so the
+        # orchestrator must compare entry *value*, not just key presence,
+        # or it wrongly decrements the freshly-synced entry the same turn.
+        bus = FakeBus()
+        SessionManager.connect_to_bus(bus)
+        svc = _make_service()
+        svc.bus = bus
+
+        sess = Session("refresh-sess")
+        sess.intent_context = {"tea.skill:flag": {"value": "a",
+                                                  "turns_remaining": 1}}
+        SessionManager.update(sess)
+
+        def _mid_dispatch_refresh(utterances, lang, message):
+            # a skill refreshes the SAME key mid-dispatch via a real sync
+            snap = SessionManager.sessions["refresh-sess"].serialize()
+            snap[INTENT_CONTEXT_FIELD] = {
+                "tea.skill:flag": {"value": "b", "turns_remaining": 5}}
+            SessionManager.handle_session_sync(
+                Message("ovos.session.sync", context={"session": snap}))
+            return None  # no match, decay still runs to completion
+
+        svc.get_pipeline = lambda session: [("fake", _mid_dispatch_refresh)]
+
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["hello"]},
+                      context={"session":
+                               SessionManager.sessions["refresh-sess"].serialize()})
+        svc.handle_utterance(msg)
+
+        ctx = SessionManager.sessions["refresh-sess"].intent_context
+        # refreshed mid-dispatch -> lands alive for exactly the next round,
+        # NOT decremented by the very dispatch that refreshed it
+        self.assertEqual(ctx["tea.skill:flag"]["turns_remaining"], 5)
+        self.assertEqual(ctx["tea.skill:flag"]["value"], "b")
+
 
 # ---------------------------------------------------------------------------
 # §6/§6.1 — orchestrator gate backstop in the match loop
@@ -506,11 +547,18 @@ class TestOrchestratorSlotFill(unittest.TestCase):
         self.assertEqual(reply.data.get("room"), "kitchen")
 
     def test_utterance_value_wins(self):
+        # the slot was filled by the pipeline itself (present on
+        # ``match.match_data``, mirrored onto ``reply.data`` by
+        # ``_dispatch_match`` as real flows do) -- that value must win
+        # over the live context entry.
         svc = self._service(requires=["room"], slot_names=["room"])
         sess = self._session(
             {"lights.skill:room": {"value": "kitchen", "turns_remaining": 2}})
-        reply = Message("lights:on", {"room": "bedroom"})
-        svc._apply_context_slots(self._match(), sess, reply)
+        match = IntentHandlerMatch(match_type="lights:on",
+                                   match_data={"room": "bedroom"},
+                                   skill_id="lights.skill", utterance="turn on")
+        reply = Message("lights:on", dict(match.match_data))
+        svc._apply_context_slots(match, sess, reply)
         self.assertEqual(reply.data.get("room"), "bedroom")
 
     def test_ungated_intent_is_noop(self):
@@ -520,3 +568,36 @@ class TestOrchestratorSlotFill(unittest.TestCase):
         reply = Message("lights:on", {})
         svc._apply_context_slots(self._match(), sess, reply)
         self.assertNotIn("room", reply.data)
+
+    def test_reply_framework_field_does_not_block_context_fill(self):
+        # a declared slot colliding with a dispatch-reply framework field
+        # (e.g. "utterance") must NOT be treated as utterance-filled just
+        # because ``reply.data["utterance"]`` is always set by
+        # ``_dispatch_match`` -- the §7 rule judges "did the utterance fill
+        # slot k" against the pipeline's own ``match.match_data``, not the
+        # reply payload.
+        svc = self._service(requires=["utterance"], slot_names=["utterance"])
+        sess = self._session(
+            {"lights.skill:utterance": {"value": "kitchen", "turns_remaining": 2}})
+        match = IntentHandlerMatch(match_type="lights:on", match_data={"conf": 1.0},
+                                   skill_id="lights.skill", utterance="turn on")
+        reply = Message("lights:on", dict(match.match_data))
+        # mirrors what _dispatch_match does before calling _apply_context_slots
+        reply.data["utterance"] = match.utterance
+        reply.data["lang"] = "en-US"
+        svc._apply_context_slots(match, sess, reply)
+        self.assertEqual(reply.data.get("utterance"), "kitchen")
+
+    def test_match_data_slot_still_wins_over_context(self):
+        # the pipeline DID fill the colliding slot itself -- that value
+        # must still win over context, even though it is echoed onto
+        # reply.data too.
+        svc = self._service(requires=["room"], slot_names=["room"])
+        sess = self._session(
+            {"lights.skill:room": {"value": "kitchen", "turns_remaining": 2}})
+        match = IntentHandlerMatch(match_type="lights:on",
+                                   match_data={"room": "bedroom"},
+                                   skill_id="lights.skill", utterance="turn on")
+        reply = Message("lights:on", dict(match.match_data))
+        svc._apply_context_slots(match, sess, reply)
+        self.assertEqual(reply.data.get("room"), "bedroom")

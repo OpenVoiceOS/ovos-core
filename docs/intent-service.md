@@ -68,7 +68,7 @@ intent.service.intent.get  {utterance: "...", lang: "..."}
 | `add_context` | Inject entity into legacy frame-based session context |
 | `remove_context` | Remove named context entity (legacy frames) |
 | `clear_context` | Clear all context entities (legacy frames) |
-| `ovos.session.sync` | OVOS-CONTEXT-1 §5.3 — merge `session.intent_context` entry-by-entry |
+| `ovos.session.sync` | OVOS-CONTEXT-1 §5.3 — handled by `SessionManager.handle_session_sync`, which merges `session.intent_context` entry-by-entry. `IntentService` does not subscribe to this event |
 
 ### OVOS-CONTEXT-1 intent context
 
@@ -103,16 +103,19 @@ If `open_data.intent_urls` is configured, intent match results (utterance, inten
 
 ## Bus Events Handled
 
+`IntentService` itself subscribes to:
+
 | Event | Handler |
 |---|---|
 | `recognizer_loop:utterance` | `handle_utterance` |
 | `add_context` | `handle_add_context` |
 | `remove_context` | `handle_remove_context` |
 | `clear_context` | `handle_clear_context` |
-| `ovos.session.sync` | `handle_session_sync` |
 | `intent.service.intent.get` | `handle_get_intent` |
 | `intent.service.skills.deactivate` | `_handle_deactivate` |
 | `intent.service.pipelines.reload` | `handle_reload_pipelines` |
+
+`ovos.session.sync` is handled by `SessionManager.handle_session_sync` (bus-client), not by `IntentService` — see [Context Management](#context-management) above.
 
 ---
 
