@@ -362,14 +362,37 @@ class TestIntentTransformersServiceTransform(unittest.TestCase):
         p.transform.assert_called_once_with(intent)
 
     def test_transform_returns_modified_intent(self):
-        """The intent returned by a plugin is passed along and returned."""
-        original = _make_intent_match("original:intent")
-        modified = _make_intent_match("modified:intent")
+        """A legitimate capture enrichment (same identity) is passed along.
+
+        OVOS-TRANSFORM-1 §3.4 permits enriching ``Match.captures`` /
+        ``match_data`` while keeping the dispatch identity (match_type/skill_id)
+        unchanged.
+        """
+        original = IntentHandlerMatch(match_type="test:intent", match_data={},
+                                      skill_id="skillA", utterance="hello")
+        enriched = IntentHandlerMatch(match_type="test:intent",
+                                      match_data={"slot": "value"},
+                                      skill_id="skillA", utterance="hello")
+        p = _make_mock_plugin("p", priority=50)
+        p.transform.return_value = enriched
+        svc = _make_intent_service(plugins=[p])
+        result = svc.transform(original)
+        self.assertEqual(result.match_data.get("slot"), "value")
+
+    def test_transform_identity_change_rejected(self):
+        """OVOS-TRANSFORM-1 §3.4: a transformer changing match_type or
+        skill_id is rejected; the prior Match is kept."""
+        original = IntentHandlerMatch(match_type="original:intent",
+                                      match_data={}, skill_id="skillA",
+                                      utterance="hello")
+        modified = IntentHandlerMatch(match_type="modified:intent",
+                                      match_data={}, skill_id="skillA",
+                                      utterance="hello")
         p = _make_mock_plugin("p", priority=50)
         p.transform.return_value = modified
         svc = _make_intent_service(plugins=[p])
         result = svc.transform(original)
-        self.assertEqual(result.match_type, "modified:intent")
+        self.assertEqual(result.match_type, "original:intent")
 
     def test_transform_exception_is_swallowed(self):
         """A plugin exception is caught and processing continues."""
