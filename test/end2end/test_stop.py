@@ -297,7 +297,7 @@ class TestCountSkills(TestCase):
             activate_skill = [
                 message,
                 Message(f"{self.skill_id}.activate", {}),  # skill is activated
-                Message(f"{self.skill_id}:count_to_N.intent", {}),  # intent triggers
+                Message(f"{self.skill_id}:count_to_n.intent", {}),  # intent triggers
 
                 Message("mycroft.skill.handler.start", {
                     "name": "CountSkill.handle_how_are_you_intent"
