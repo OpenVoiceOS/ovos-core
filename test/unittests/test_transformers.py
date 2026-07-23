@@ -362,32 +362,27 @@ class TestIntentTransformersServiceTransform(unittest.TestCase):
         p.transform.assert_called_once_with(intent)
 
     def test_transform_returns_modified_intent(self):
-        """A legitimate capture enrichment (same identity) is passed along.
-
-        OVOS-TRANSFORM-1 §3.4 permits enriching ``Match.captures`` /
-        ``match_data`` while keeping the dispatch identity (match_type/skill_id)
-        unchanged.
-        """
-        original = IntentHandlerMatch(match_type="test:intent", match_data={},
-                                      skill_id="skillA", utterance="hello")
-        enriched = IntentHandlerMatch(match_type="test:intent",
-                                      match_data={"slot": "value"},
-                                      skill_id="skillA", utterance="hello")
+        """The intent returned by a plugin is passed along and returned,
+        as long as it preserves dispatch identity (OVOS-TRANSFORM-1 §3.4)."""
+        original = _make_intent_match("original:intent")
+        modified = IntentHandlerMatch(
+            match_type="original:intent",
+            match_data={"enriched": True},
+            skill_id=original.skill_id,
+            utterance="hello",
+        )
         p = _make_mock_plugin("p", priority=50)
-        p.transform.return_value = enriched
+        p.transform.return_value = modified
         svc = _make_intent_service(plugins=[p])
         result = svc.transform(original)
-        self.assertEqual(result.match_data.get("slot"), "value")
+        self.assertEqual(result.match_data, {"enriched": True})
 
-    def test_transform_identity_change_rejected(self):
-        """OVOS-TRANSFORM-1 §3.4: a transformer changing match_type or
-        skill_id is rejected; the prior Match is kept."""
-        original = IntentHandlerMatch(match_type="original:intent",
-                                      match_data={}, skill_id="skillA",
-                                      utterance="hello")
-        modified = IntentHandlerMatch(match_type="modified:intent",
-                                      match_data={}, skill_id="skillA",
-                                      utterance="hello")
+    def test_transform_rejects_dispatch_identity_change(self):
+        """OVOS-TRANSFORM-1 §3.4: a returned Match whose match_type/skill_id
+        differs from its input is a §7 shape violation -- discarded, prior
+        Match kept."""
+        original = _make_intent_match("original:intent")
+        modified = _make_intent_match("modified:intent")
         p = _make_mock_plugin("p", priority=50)
         p.transform.return_value = modified
         svc = _make_intent_service(plugins=[p])

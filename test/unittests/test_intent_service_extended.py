@@ -382,6 +382,40 @@ class TestSendCancelEvent(unittest.TestCase):
         self.assertIn("ovos.utterance.handled", types)
         self.assertIn("mycroft.audio.play_sound", types)
 
+    def test_cancelled_event_carries_cancel_reason_and_cancel_by(self):
+        """OVOS-TRANSFORM-1 §8.2: ovos.utterance.cancelled surfaces the
+        cancel_reason and orchestrator-stamped cancel_by from the §8.1
+        signal that triggered the cancellation."""
+        svc = _make_service()
+        emitted = []
+        svc.bus.emit = lambda m: emitted.append(m)
+        msg = Message("test", data={},
+                      context={"cancel_word": "stop",
+                               "cancel_reason": "user requested stop",
+                               "cancel_by": "some_transformer"})
+        with patch("ovos_core.intent_services.service.Configuration",
+                   return_value={}):
+            svc.send_cancel_event(msg)
+        cancelled = next(m for m in emitted
+                         if m.msg_type == "ovos.utterance.cancelled")
+        self.assertEqual(cancelled.data.get("cancel_reason"), "user requested stop")
+        self.assertEqual(cancelled.data.get("cancel_by"), "some_transformer")
+
+    def test_cancelled_event_omits_absent_cancel_fields(self):
+        """When cancel_reason/cancel_by are absent from context, they are
+        omitted from the emitted data rather than surfaced as None."""
+        svc = _make_service()
+        emitted = []
+        svc.bus.emit = lambda m: emitted.append(m)
+        msg = Message("test", data={}, context={"cancel_word": "stop"})
+        with patch("ovos_core.intent_services.service.Configuration",
+                   return_value={}):
+            svc.send_cancel_event(msg)
+        cancelled = next(m for m in emitted
+                         if m.msg_type == "ovos.utterance.cancelled")
+        self.assertNotIn("cancel_reason", cancelled.data)
+        self.assertNotIn("cancel_by", cancelled.data)
+
 
 # ---------------------------------------------------------------------------
 # _handle_deactivate
