@@ -12,6 +12,7 @@ requires-python = ">=3.10"
 
 dependencies = [
     "requests>=2.26, <3.0",
+    "packaging>=20.0",
     "python-dateutil>=2.6, <3.0",
     "combo-lock>=0.2.2, <0.4",
     "ovos-utils>=0.13.5a1,<1.0.0",
