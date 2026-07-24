@@ -40,7 +40,7 @@ test = [
     "ovoscope>=1.6.1a1,<2.0.0",
     "ovos-m2v-pipeline>=0.5.4a1,<1.0.0",
     "ovos-adapt-parser>=1.6.1a1,<2.0.0",
-    "ovos_padatious>=1.4.5a2,<2.0.0",
+    "ovos_padatious>=2.0.0a1,<3.0.0",
     "ovos-utterance-plugin-cancel>=0.3.3a1, <1.0.0",
     "ovos-skill-count>=0.0.6a1",
     "ovos-skill-hello-world>=0.2.6a2",
@@ -58,7 +58,7 @@ mycroft = [
     "ovos-dinkum-listener[extras]>=0.8.2a2,<1.0.0",
 ]
 lgpl = [
-    "ovos_padatious>=1.4.5a2,<2.0.0",
+    "ovos_padatious>=2.0.0a1,<3.0.0",
     "fann2>=1.0.7,<1.1.0",
 ]
 plugins = [
