@@ -19,7 +19,7 @@ dependencies = [
     "ovos_bus_client>=2.7.1a1,<3.0.0",
     "ovos-plugin-manager>=2.11.1a1,<3.0.0",
     "ovos-config>=2.1.4a5,<3.0.0",
-    "ovos-workshop>=9.3.1a2,<10.0.0",
+    "ovos-workshop>=9.3.2a1,<10.0.0",
     "rapidfuzz>=3.6,<4.0",
     "ovos-spec-tools[langcodes]>=1.5.1a2,<2.0.0",
 ]
@@ -40,7 +40,7 @@ test = [
     "ovoscope>=1.6.1a1,<2.0.0",
     "ovos-m2v-pipeline>=0.5.4a1,<1.0.0",
     "ovos-adapt-parser>=1.6.1a1,<2.0.0",
-    "ovos_padatious>=2.0.0a1,<3.0.0",
+    "ovos_padatious>=2.0.1a1,<3.0.0",
     "ovos-utterance-plugin-cancel>=0.3.3a1, <1.0.0",
     "ovos-skill-count>=0.0.6a1",
     "ovos-skill-hello-world>=0.2.6a2",
@@ -58,7 +58,7 @@ mycroft = [
     "ovos-dinkum-listener[extras]>=0.8.2a2,<1.0.0",
 ]
 lgpl = [
-    "ovos_padatious>=2.0.0a1,<3.0.0",
+    "ovos_padatious>=2.0.1a1,<3.0.0",
     "fann2>=1.0.7,<1.1.0",
 ]
 plugins = [
@@ -74,7 +74,7 @@ plugins = [
     "ovos-adapt-parser>=1.6.1a1,<2.0.0",
     "ovos_ocp_pipeline_plugin>=1.1.28a1, <2.0.0",
     "ovos-persona>=0.9.0a15,<1.0.0",
-    "padacioso>=2.2.1a1,<3.0.0",
+    "padacioso>=2.2.2a1,<3.0.0",
     "keyword-template-matcher>=0.1.3a1,<1.0.0",
     "ahocorasick-ner>=0.1.1,<1.0.0",
 ]
