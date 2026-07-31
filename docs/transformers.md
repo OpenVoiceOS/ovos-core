@@ -49,7 +49,7 @@ run.
 The runner services themselves are the canonical implementations from
 `ovos_plugin_manager.transformer_services` (re-exported by
 `ovos_core.transformers`); they also implement the OVOS-TRANSFORM §8.1
-cancellation contract — a plugin returning `"canceled": true` +
+cancellation contract: a plugin returning `"canceled": true` +
 `"cancel_reason"` stops the chain, and `handle_utterance` terminates the
 lifecycle with `ovos.utterance.cancelled` → `ovos.utterance.handled`.
 Full contract → [`ovos-plugin-manager/docs/transformers.md`](../../ovos-plugin-manager/docs/transformers.md).
@@ -69,10 +69,10 @@ Each plugin is enabled or disabled in `mycroft.conf` under its service config ke
 
 A plugin not listed in config is not loaded even if installed.
 
-**Split deployments:** shared servers can run some of these chains too —
-ovos-stt-server runs utterance transformers on transcripts, hivemind-core
-runs utterance/metadata transformers for text clients. Enable each plugin
-in exactly one place per deployment or its effect is applied twice.
+**Split deployments:** shared servers can run some of these chains too.
+`ovos-stt-server` runs utterance transformers on transcripts, and `hivemind-core`
+runs utterance and metadata transformers for text clients. Enable each plugin
+in exactly one place per deployment, or its effect is applied twice.
 
 ---
 
@@ -94,10 +94,13 @@ All three transformer types are discovered via `ovos-plugin-manager`:
 - Writing guide → [`ovos-plugin-manager/docs/writing-plugins.md`](../../ovos-plugin-manager/docs/writing-plugins.md).
 
 ### Listener-level transformers (distinct from these)
-`ovos-dinkum-listener` has its own STT-level transformer stage that runs **before** audio is converted to text. These run post-STT but before `recognizer_loop:utterance` is emitted — distinct from the three transformer stages here. See [`ovos-dinkum-listener/docs/transformers.md`](../../ovos-dinkum-listener/docs/transformers.md).
+`ovos-dinkum-listener` has its own STT-level transformer stage that runs **before** audio is converted to text. These run post-STT but before `recognizer_loop:utterance` is emitted: distinct from the three transformer stages here. See [`ovos-dinkum-listener/docs/transformers.md`](../../ovos-dinkum-listener/docs/transformers.md).
 
 ### Audio-level transformers
 `ovos-audio` has TTS and dialog transformer stages that run when TTS is synthesised. See [`ovos-audio/docs/transformers.md`](../../ovos-audio/docs/transformers.md).
 
 ### IntentHandlerMatch
-- `IntentHandlerMatch` — `ovos_plugin_manager.templates.pipeline.IntentHandlerMatch`. Fields: `match_type`, `match_data`, `skill_id`, `utterance`, `updated_session`. Used by `IntentTransformersService`. See [`ovos-plugin-manager/docs/plugin-types.md`](../../ovos-plugin-manager/docs/plugin-types.md).
+- `IntentHandlerMatch`: `ovos_plugin_manager.templates.pipeline.IntentHandlerMatch`. Fields: `match_type`, `match_data`, `skill_id`, `utterance`, `updated_session`. Used by `IntentTransformersService`. See [`ovos-plugin-manager/docs/plugin-types.md`](../../ovos-plugin-manager/docs/plugin-types.md).
+
+---
+[← Pipeline](pipeline.md) · [Home](index.md) · [Next →](converse-fallback.md)
