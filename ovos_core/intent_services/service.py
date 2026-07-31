@@ -184,7 +184,30 @@ class IntentService:
     def handle_reload_pipelines(self, message: Message):
         pipeline_plugins = OVOSPipelineFactory.get_installed_pipeline_ids()
         LOG.debug(f"Installed pipeline plugins: {pipeline_plugins}")
+
+        # `intents.blacklisted_pipelines` lets a deployment opt a plugin out
+        # of ovos-core entirely, so it is never imported/instantiated.
+        # ovos-core still deliberately loads every OTHER installed plugin
+        # regardless of the active `intents.pipeline` selection, because a
+        # remote client/session may select a different pipeline at runtime.
+        # Matching is by exact installed plugin id (as returned by
+        # `OVOSPipelineFactory.get_installed_pipeline_ids`, eg.
+        # "ovos-m2v-pipeline"), NOT by confidence-suffixed matcher id (eg.
+        # "ovos-m2v-pipeline-high"); blacklisting the plugin id covers all of
+        # its matcher variants since they are all produced by the same class.
+        blacklist = set(self.config.get("blacklisted_pipelines", []))
+        active_pipeline = self.config.get("pipeline", [])
+
         for p in pipeline_plugins:
+            if p in blacklist:
+                LOG.info(f"Skipping blacklisted pipeline plugin: '{p}'")
+                if any(matcher_id == p or matcher_id.startswith(f"{p}-")
+                       for matcher_id in active_pipeline):
+                    LOG.warning(f"Pipeline plugin '{p}' is blacklisted in "
+                                f"'intents.blacklisted_pipelines' but also "
+                                f"selected in 'intents.pipeline'; the "
+                                f"blacklist wins and it will stay disabled")
+                continue
             try:
                 self.pipeline_plugins[p] = OVOSPipelineFactory.load_plugin(p, bus=self.bus)
                 LOG.debug(f"Loaded pipeline plugin: '{p}'")

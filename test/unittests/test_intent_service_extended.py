@@ -702,5 +702,83 @@ class TestProducesReservedName(unittest.TestCase):
         self.assertFalse(_produces_reserved_name(None))
 
 
+# ---------------------------------------------------------------------------
+# handle_reload_pipelines - blacklisted_pipelines
+# ---------------------------------------------------------------------------
+
+class TestBlacklistedPipelines(unittest.TestCase):
+    """
+    Pipeline plugins listed in `intents.blacklisted_pipelines` must never be
+    imported/instantiated, even though ovos-core otherwise loads every
+    installed pipeline plugin (a remote client/session may select any of
+    them at runtime).
+    """
+
+    def _make_service_with_installed(self, installed, config=None):
+        svc = _make_service(config=config)
+        return svc
+
+    @patch("ovos_core.intent_services.service.OVOSPipelineFactory")
+    def test_blacklisted_plugin_never_loaded(self, mock_factory):
+        mock_factory.get_installed_pipeline_ids.return_value = [
+            "ovos-adapt-pipeline-plugin",
+            "ovos-m2v-pipeline",
+        ]
+        mock_factory.load_plugin.side_effect = lambda p, bus=None: MagicMock(name=p)
+
+        svc = _make_service(config={"blacklisted_pipelines": ["ovos-m2v-pipeline"]})
+        svc.handle_reload_pipelines(Message("intent.service.pipelines.reload"))
+
+        self.assertIn("ovos-adapt-pipeline-plugin", svc.pipeline_plugins)
+        self.assertNotIn("ovos-m2v-pipeline", svc.pipeline_plugins)
+        loaded_ids = [c.args[0] for c in mock_factory.load_plugin.call_args_list]
+        self.assertNotIn("ovos-m2v-pipeline", loaded_ids)
+
+    @patch("ovos_core.intent_services.service.OVOSPipelineFactory")
+    def test_non_blacklisted_plugins_load_as_before(self, mock_factory):
+        mock_factory.get_installed_pipeline_ids.return_value = [
+            "ovos-adapt-pipeline-plugin",
+            "ovos-padatious-pipeline-plugin",
+        ]
+        mock_factory.load_plugin.side_effect = lambda p, bus=None: MagicMock(name=p)
+
+        svc = _make_service(config={"blacklisted_pipelines": []})
+        svc.handle_reload_pipelines(Message("intent.service.pipelines.reload"))
+
+        self.assertIn("ovos-adapt-pipeline-plugin", svc.pipeline_plugins)
+        self.assertIn("ovos-padatious-pipeline-plugin", svc.pipeline_plugins)
+        self.assertEqual(mock_factory.load_plugin.call_count, 2)
+
+    @patch("ovos_core.intent_services.service.LOG")
+    @patch("ovos_core.intent_services.service.OVOSPipelineFactory")
+    def test_blacklisted_plugin_still_in_active_pipeline_warns(self, mock_factory, mock_log):
+        # config contradiction: plugin blacklisted but also selected as active matcher
+        mock_factory.get_installed_pipeline_ids.return_value = ["ovos-m2v-pipeline"]
+        mock_factory.load_plugin.side_effect = lambda p, bus=None: MagicMock(name=p)
+
+        svc = _make_service(config={
+            "blacklisted_pipelines": ["ovos-m2v-pipeline"],
+            "pipeline": ["ovos-m2v-pipeline-high"],
+        })
+        svc.handle_reload_pipelines(Message("intent.service.pipelines.reload"))
+
+        self.assertNotIn("ovos-m2v-pipeline", svc.pipeline_plugins)
+        self.assertTrue(mock_log.warning.called)
+        warned = " ".join(str(c) for c in mock_log.warning.call_args_list)
+        self.assertIn("ovos-m2v-pipeline", warned)
+
+    @patch("ovos_core.intent_services.service.LOG")
+    @patch("ovos_core.intent_services.service.OVOSPipelineFactory")
+    def test_blacklisted_plugin_logs_skip_info(self, mock_factory, mock_log):
+        mock_factory.get_installed_pipeline_ids.return_value = ["ovos-m2v-pipeline"]
+
+        svc = _make_service(config={"blacklisted_pipelines": ["ovos-m2v-pipeline"]})
+        svc.handle_reload_pipelines(Message("intent.service.pipelines.reload"))
+
+        self.assertFalse(mock_factory.load_plugin.called)
+        info_calls = " ".join(str(c) for c in mock_log.info.call_args_list)
+        self.assertIn("ovos-m2v-pipeline", info_calls)
+
+
 if __name__ == "__main__":
     unittest.main()
