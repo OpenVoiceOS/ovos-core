@@ -257,6 +257,89 @@ class TestGetPipeline(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# get_pipeline - session.blacklisted_pipelines (OVOS-PIPELINE-1 §5.2/§5.5)
+# ---------------------------------------------------------------------------
+
+class TestGetPipelineSessionBlacklist(unittest.TestCase):
+    """Tests for per-session runtime enforcement of
+    `session.blacklisted_pipelines` in IntentService.get_pipeline.
+
+    OVOS-PIPELINE-1 §5.2: `blacklisted_pipelines` is the policy channel and
+    MUST NOT be invoked for the session, even if also requested in
+    `session.pipeline`. §5.5: policy overrides preference. Filtering is
+    orchestrator-only - no `match` call, no bus event; observable only as
+    non-invocation. Unknown pipeline_ids are harmless no-ops.
+    """
+
+    @staticmethod
+    def _svc_with_adapt_fallback():
+        svc = _make_service()
+        adapt = MagicMock(spec=ConfidenceMatcherPipeline)
+        adapt.match_high = MagicMock()
+        svc.pipeline_plugins["ovos-adapt-pipeline-plugin"] = adapt
+        fallback = MagicMock(spec=ConfidenceMatcherPipeline)
+        fallback.match_high = MagicMock()
+        svc.pipeline_plugins["ovos-fallback-pipeline-plugin"] = fallback
+        return svc
+
+    def test_blacklisted_matcher_skipped_other_session_unaffected(self):
+        """A session with a matcher blacklisted skips it; a concurrent
+        session without the blacklist still matches it (§5.2)."""
+        svc = self._svc_with_adapt_fallback()
+
+        blocked = Session("blocked")
+        blocked.pipeline = ["adapt_high", "fallback_high"]
+        blocked.blacklisted_pipelines = ["adapt_high"]
+        blocked_result = svc.get_pipeline(session=blocked)
+        self.assertEqual([m[0] for m in blocked_result], ["fallback_high"])
+
+        free = Session("free")
+        free.pipeline = ["adapt_high", "fallback_high"]
+        free_result = svc.get_pipeline(session=free)
+        self.assertEqual([m[0] for m in free_result], ["adapt_high", "fallback_high"])
+
+    def test_blacklist_overrides_explicit_pipeline_preference(self):
+        """A matcher listed in BOTH session.pipeline and
+        session.blacklisted_pipelines MUST NOT be invoked - policy overrides
+        preference (§5.5 step 3)."""
+        svc = self._svc_with_adapt_fallback()
+
+        sess = Session("s")
+        sess.pipeline = ["adapt_high", "fallback_high"]
+        sess.blacklisted_pipelines = ["adapt_high", "fallback_high"]
+        result = svc.get_pipeline(session=sess)
+        self.assertEqual(result, [])
+
+    def test_unknown_blacklisted_id_is_harmless_noop(self):
+        """Unknown pipeline_ids in blacklisted_pipelines are ignored without
+        error and don't affect the effective pipeline (§5.2)."""
+        svc = self._svc_with_adapt_fallback()
+
+        sess = Session("s")
+        sess.pipeline = ["adapt_high"]
+        sess.blacklisted_pipelines = ["totally-unknown-pipeline-id"]
+        result = svc.get_pipeline(session=sess)
+        self.assertEqual([m[0] for m in result], ["adapt_high"])
+
+    def test_no_bus_emission_accompanies_skip(self):
+        """The skip is orchestrator-only: no `match` call and no bus event
+        is emitted for a blacklisted matcher (§5.2)."""
+        svc = self._svc_with_adapt_fallback()
+        emitted = []
+        svc.bus.on("message", lambda m: emitted.append(m))
+
+        sess = Session("s")
+        sess.pipeline = ["adapt_high", "fallback_high"]
+        sess.blacklisted_pipelines = ["adapt_high"]
+        result = svc.get_pipeline(session=sess)
+
+        self.assertEqual([m[0] for m in result], ["fallback_high"])
+        adapt_plugin = svc.pipeline_plugins["ovos-adapt-pipeline-plugin"]
+        adapt_plugin.match_high.assert_not_called()
+        self.assertEqual(emitted, [])
+
+
+# ---------------------------------------------------------------------------
 # handle_add_context / handle_remove_context / handle_clear_context
 # ---------------------------------------------------------------------------
 

@@ -290,12 +290,28 @@ class IntentService:
         the list can be configured in mycroft.conf under intents.pipeline,
         in the future plugins will be supported for users to define their own pipeline"""
         session = session or SessionManager.get()
-        matchers = [(p, self.get_pipeline_matcher(p)) for p in session.pipeline]
+
+        # OVOS-PIPELINE-1 §5.2/§5.5: `session.blacklisted_pipelines` is the
+        # policy channel and overrides `session.pipeline` preference - a
+        # pipeline_id listed here MUST NOT be invoked for this session even
+        # if it is also present in `session.pipeline`. Filtering here is
+        # orchestrator-only: no `match` call is made and no bus event is
+        # emitted for the skip, it is observable only as a non-invocation.
+        # Unknown pipeline_ids in the blacklist are harmless no-ops.
+        blacklisted = set(session.blacklisted_pipelines or [])
+        requested = [p for p in session.pipeline if p not in blacklisted]
+        if blacklisted:
+            skipped = [p for p in session.pipeline if p in blacklisted]
+            if skipped:
+                LOG.debug(f"Session '{session.session_id}' blacklisted "
+                          f"pipelines skipped: {skipped}")
+
+        matchers = [(p, self.get_pipeline_matcher(p)) for p in requested]
         matchers = [m for m in matchers if m[1] is not None]  # filter any that failed to load
         final_pipeline = [k[0] for k in matchers]
-        if session.pipeline != final_pipeline:
+        if requested != final_pipeline:
             LOG.warning(f"Requested some invalid pipeline components! "
-                        f"filtered: {[k for k in session.pipeline if k not in final_pipeline]}")
+                        f"filtered: {[k for k in requested if k not in final_pipeline]}")
         LOG.debug(f"Session final pipeline: {final_pipeline}")
         return matchers
 
