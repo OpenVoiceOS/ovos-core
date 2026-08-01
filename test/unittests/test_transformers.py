@@ -377,17 +377,39 @@ class TestIntentTransformersServiceTransform(unittest.TestCase):
         result = svc.transform(original)
         self.assertEqual(result.match_data, {"enriched": True})
 
-    def test_transform_rejects_dispatch_identity_change(self):
-        """OVOS-TRANSFORM-1 §3.4: a returned Match whose match_type/skill_id
+    def test_transform_rejects_match_type_change(self):
+        """OVOS-TRANSFORM-1 §3.4: a returned Match whose match_type
         differs from its input is a §7 shape violation -- discarded, prior
         Match kept."""
-        original = _make_intent_match("original:intent")
-        modified = _make_intent_match("modified:intent")
+        original = IntentHandlerMatch(match_type="original:intent",
+                                      match_data={}, skill_id="skillA",
+                                      utterance="hello")
+        modified = IntentHandlerMatch(match_type="modified:intent",
+                                      match_data={}, skill_id="skillA",
+                                      utterance="hello")
         p = _make_mock_plugin("p", priority=50)
         p.transform.return_value = modified
         svc = _make_intent_service(plugins=[p])
         result = svc.transform(original)
         self.assertEqual(result.match_type, "original:intent")
+        self.assertEqual(result.skill_id, "skillA")
+
+    def test_transform_rejects_skill_id_change(self):
+        """OVOS-TRANSFORM-1 §3.4: identity spans skill_id too. A returned
+        Match that keeps match_type but swaps skill_id is discarded and the
+        prior Match kept."""
+        original = IntentHandlerMatch(match_type="same:intent",
+                                      match_data={}, skill_id="skillA",
+                                      utterance="hello")
+        modified = IntentHandlerMatch(match_type="same:intent",
+                                      match_data={"enriched": True},
+                                      skill_id="skillB", utterance="hello")
+        p = _make_mock_plugin("p", priority=50)
+        p.transform.return_value = modified
+        svc = _make_intent_service(plugins=[p])
+        result = svc.transform(original)
+        self.assertEqual(result.skill_id, "skillA")
+        self.assertEqual(result.match_data, {})
 
     def test_transform_exception_is_swallowed(self):
         """A plugin exception is caught and processing continues."""
