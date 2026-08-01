@@ -81,6 +81,11 @@ class TestDeactivate(TestCase):
             deactivation_points=[message.msg_type],
             final_session=final_session,
             activation_points=["intent.service.skills.activated"],
+            # this scenario is a plain bus event, NOT an utterance: no pipeline
+            # runs, so PIPELINE-1 §9.5 ``ovos.utterance.handled`` (the ovoscope
+            # default end-marker) is never emitted and must not be waited for.
+            # The skill's own activation ack is the terminal message here.
+            eof_msgs=[f"{self.skill_id}.activate"],
             # messages internal to ovos-core, i.e. would not be sent to clients such as hivemind
             keep_original_src=[
                 #"intent.service.skills.activate", # TODO
@@ -123,6 +128,8 @@ class TestDeactivate(TestCase):
             final_session=final_session,
             activation_points=[message.msg_type], # starts activated
             deactivation_points=["intent.service.skills.deactivated"],
+            # plain bus event, not an utterance — see test_activate above.
+            eof_msgs=[f"{self.skill_id}.deactivate"],
             # messages internal to ovos-core, i.e. would not be sent to clients such as hivemind
             keep_original_src=[
                 #"intent.service.skills.deactivate", # TODO
