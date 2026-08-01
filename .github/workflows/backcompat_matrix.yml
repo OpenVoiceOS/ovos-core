@@ -9,6 +9,13 @@ name: Mixed-version back-compat matrix
 # `test/backcompat/test_mixed_version_matrix.py` and
 # `test/backcompat/build_venvs.sh`.
 #
+# Alongside the boundary-pin cells there are four channel cells
+# (stable-skill/dev-core, dev-skill/stable-core, testing-skill/dev-core,
+# dev-skill/testing-core) built from the OVOS distro's own constraint
+# files, fetched fresh at build time. Those track the fleet rather than a
+# boundary: a distro pin bump past a behavior boundary flips one of these
+# red at that exact moment.
+#
 # The `old-skill/new-core` cell is expected to xfail until ovos-bus-client#271
 # releases. It is `strict=True`, so the day the fix ships the job goes RED with
 # an XPASS. That is the intended signal, not a regression: drop the marker and
@@ -50,6 +57,21 @@ jobs:
           - combo: new-skill/new-core
             skill: venv_skill_new
             core: venv_core_new
+          # channel cells: one side pinned by a live OVOS distro constraints
+          # file (fetched fresh in build_venvs.sh), the other at dev. These
+          # verify the fleet, not a boundary — see test_mixed_version_matrix.py.
+          - combo: stable-skill/dev-core
+            skill: venv_skill_stable
+            core: venv_core_new
+          - combo: dev-skill/stable-core
+            skill: venv_skill_new
+            core: venv_core_stable
+          - combo: testing-skill/dev-core
+            skill: venv_skill_testing
+            core: venv_core_new
+          - combo: dev-skill/testing-core
+            skill: venv_skill_new
+            core: venv_core_testing
     name: ${{ matrix.combo }}
     steps:
       - uses: actions/checkout@v4
@@ -87,6 +109,17 @@ jobs:
         with:
           name: venv-freeze-${{ strategy.job-index }}
           path: venv-freeze.txt
+
+      # Channel cells only produce these, but the glob is harmless for the
+      # boundary-pin cells. Kept so a red channel cell can be traced back to
+      # exactly what the distro pinned that day.
+      - name: Upload the fetched constraints files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: constraints-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/venvs/*.constraints.txt
+          if-no-files-found: ignore
 
       - name: Run the combo
         env:
