@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.5.9a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.9a1) (2026-08-01)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.8a3...2.5.9a1)
+
+**Merged pull requests:**
+
+- fix: declare real end-markers for non-utterance e2e scenarios [\#839](https://github.com/OpenVoiceOS/ovos-core/pull/839) ([JarbasAl](https://github.com/JarbasAl))
+
+## [2.5.8a3](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.8a3) (2026-07-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.8a2...2.5.8a3)
+
+**Merged pull requests:**
+
+- docs: rewrite README in Simplified Technical English [\#833](https://github.com/OpenVoiceOS/ovos-core/pull/833) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.5.8a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.8a2) (2026-07-31)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.8a1...2.5.8a2)

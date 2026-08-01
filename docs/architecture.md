@@ -7,19 +7,19 @@
 ovos-messagebus  (WebSocket pub/sub)
       │
       ├── ovos-core  (this repo)
-      │     ├── SkillManager          – loads/unloads skill plugins
-      │     ├── IntentService         – routes utterances through the pipeline
+      │     ├── SkillManager          - loads/unloads skill plugins
+      │     ├── IntentService         - routes utterances through the pipeline
       │     │     ├── UtteranceTransformersService
       │     │     ├── MetadataTransformersService
       │     │     ├── IntentTransformersService
       │     │     └── Pipeline plugins (Adapt, Padatious, Converse, Fallback, …)
-      │     ├── SkillsStore           – runtime pip install/uninstall
-      │     └── EventScheduler        – timed bus events
+      │     ├── SkillsStore           - runtime pip install/uninstall
+      │     └── EventScheduler        - timed bus events
       │
-      ├── ovos-dinkum-listener  – STT / wake-word → recognizer_loop:utterance
-      ├── ovos-audio            – TTS playback
-      ├── ovos-gui              – GUI layer
-      └── ovos-PHAL             – hardware/platform plugins
+      ├── ovos-dinkum-listener  - STT / wake-word → recognizer_loop:utterance
+      ├── ovos-audio            - TTS playback
+      ├── ovos-gui              - GUI layer
+      └── ovos-PHAL             - hardware/platform plugins
 ```
 
 ## Startup Flow (`ovos-core`)
@@ -63,7 +63,7 @@ started → alive → ready → stopping
 
 ## Integration Testing
 
-ovos-core's own end-to-end tests live at `test/end2end/` and use **ovoscope** — the OVOS
+ovos-core's own end-to-end tests live at `test/end2end/` and use **ovoscope**: the OVOS
 end-to-end testing framework. Each test spins up a `MiniCroft` (a `SkillManager` subclass backed
 by `FakeBus`) with a specific set of skill plugins and asserts on the full bus message sequence
 produced by a test utterance.
@@ -91,12 +91,15 @@ See [ovoscope/docs/usage-guide.md](../../ovoscope/docs/usage-guide.md) for the f
 
 | Component | Package | Documentation |
 |---|---|---|
-| **MessageBus server** | `ovos-messagebus` | [`ovos-messagebus/docs/server.md`](../../ovos-messagebus/docs/server.md) — WebSocket Tornado broker, host/port/SSL config |
-| **`MessageBusClient`** | `ovos-bus-client` | [`ovos-bus-client/docs/client.md`](../../ovos-bus-client/docs/client.md) — connect, emit, on, `wait_for_response` |
-| **`Message`** | `ovos-bus-client` | [`ovos-bus-client/docs/message.md`](../../ovos-bus-client/docs/message.md) — structure, routing, context keys |
-| **`ProcessStatus`** | `ovos-utils` | [`ovos-utils/docs/process-utils.md`](../../ovos-utils/docs/process-utils.md) — state machine, callbacks |
-| **`Configuration`** | `ovos-config` | [`ovos-config/docs/configuration.md`](../../ovos-config/docs/configuration.md) — config stack, `mycroft.conf` location |
-| **`ovos-dinkum-listener`** | `ovos-dinkum-listener` | [`ovos-dinkum-listener/docs/index.md`](../../ovos-dinkum-listener/docs/index.md) — produces `recognizer_loop:utterance` |
-| **`ovos-audio`** | `ovos-audio` | [`ovos-audio/docs/index.md`](../../ovos-audio/docs/index.md) — TTS playback, `mycroft.audio.play_sound` |
-| **`ovos-gui`** | `ovos-gui` | [`ovos-gui/docs/architecture.md`](../../ovos-gui/docs/architecture.md) — GUI adapter plugin system, site_id routing |
-| **`ovos-PHAL`** | `ovos-PHAL` | [`ovos-PHAL/docs/index.md`](../../ovos-PHAL/docs/index.md) — connectivity events, `ovos.PHAL.internet_check` |
+| **MessageBus server** | `ovos-messagebus` | [`ovos-messagebus/docs/server.md`](../../ovos-messagebus/docs/server.md): WebSocket Tornado broker, host/port/SSL config |
+| **`MessageBusClient`** | `ovos-bus-client` | [`ovos-bus-client/docs/client.md`](../../ovos-bus-client/docs/client.md): connect, emit, on, `wait_for_response` |
+| **`Message`** | `ovos-bus-client` | [`ovos-bus-client/docs/message.md`](../../ovos-bus-client/docs/message.md): structure, routing, context keys |
+| **`ProcessStatus`** | `ovos-utils` | [`ovos-utils/docs/process-utils.md`](../../ovos-utils/docs/process-utils.md): state machine, callbacks |
+| **`Configuration`** | `ovos-config` | [`ovos-config/docs/configuration.md`](../../ovos-config/docs/configuration.md): config stack, `mycroft.conf` location |
+| **`ovos-dinkum-listener`** | `ovos-dinkum-listener` | [`ovos-dinkum-listener/docs/index.md`](../../ovos-dinkum-listener/docs/index.md): produces `recognizer_loop:utterance` |
+| **`ovos-audio`** | `ovos-audio` | [`ovos-audio/docs/index.md`](../../ovos-audio/docs/index.md): TTS playback, `mycroft.audio.play_sound` |
+| **`ovos-gui`** | `ovos-gui` | [`ovos-gui/docs/architecture.md`](../../ovos-gui/docs/architecture.md): GUI adapter plugin system, site_id routing |
+| **`ovos-PHAL`** | `ovos-PHAL` | [`ovos-PHAL/docs/index.md`](../../ovos-PHAL/docs/index.md): connectivity events, `ovos.PHAL.internet_check` |
+
+---
+[Home](index.md) · [Next →](skill-manager.md)

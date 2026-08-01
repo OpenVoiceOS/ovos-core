@@ -8,12 +8,12 @@
 | Document | Description |
 |---|---|
 | [architecture.md](architecture.md) | High-level component overview and startup flow |
-| [skill-manager.md](skill-manager.md) | `SkillManager` — skill loading, activation, connectivity gating |
-| [intent-service.md](intent-service.md) | `IntentService` — utterance handling and pipeline matching |
+| [skill-manager.md](skill-manager.md) | `SkillManager`: skill loading, activation, connectivity gating |
+| [intent-service.md](intent-service.md) | `IntentService`: utterance handling and pipeline matching |
 | [pipeline.md](pipeline.md) | Pipeline configuration, plugin IDs, and ordering |
 | [transformers.md](transformers.md) | Utterance, metadata, and intent transformer plugins |
 | [converse-fallback.md](converse-fallback.md) | `ConverseService` and `FallbackService` |
-| [skill-installer.md](skill-installer.md) | `SkillsStore` — runtime pip install/uninstall via the bus |
+| [skill-installer.md](skill-installer.md) | `SkillsStore`: runtime pip install/uninstall via the bus |
 | [bus-events.md](bus-events.md) | MessageBus events reference |
 
 ## Quick Start
@@ -45,10 +45,10 @@ ovos-intent-service
 | Package | Role | Docs |
 |---|---|---|
 | **ovos-messagebus** | WebSocket message broker that all services connect to | [`ovos-messagebus/docs/index.md`](../../ovos-messagebus/docs/index.md) |
-| **ovos-bus-client** | `MessageBusClient`, `Message`, `Session` — the bus API | [`ovos-bus-client/docs/index.md`](../../ovos-bus-client/docs/index.md) |
-| **ovos-workshop** | `OVOSSkill`, `FallbackSkill`, `PluginSkillLoader` — skill base classes | [`ovos-workshop/docs/index.md`](../../ovos-workshop/docs/index.md) |
+| **ovos-bus-client** | `MessageBusClient`, `Message`, `Session`: the bus API | [`ovos-bus-client/docs/index.md`](../../ovos-bus-client/docs/index.md) |
+| **ovos-workshop** | `OVOSSkill`, `FallbackSkill`, `PluginSkillLoader`: skill base classes | [`ovos-workshop/docs/index.md`](../../ovos-workshop/docs/index.md) |
 | **ovos-plugin-manager** | Entry point discovery (`find_skill_plugins`, `OVOSPipelineFactory`) | [`ovos-plugin-manager/docs/index.md`](../../ovos-plugin-manager/docs/index.md) |
-| **ovos-config** | `Configuration` singleton — reads `mycroft.conf` | [`ovos-config/docs/index.md`](../../ovos-config/docs/index.md) |
+| **ovos-config** | `Configuration` singleton: reads `mycroft.conf` | [`ovos-config/docs/index.md`](../../ovos-config/docs/index.md) |
 | **ovos-utils** | `LOG`, `ProcessStatus`, `FileWatcher`, `is_connected_http` | [`ovos-utils/docs/index.md`](../../ovos-utils/docs/index.md) |
 | **ovos-dinkum-listener** | Produces `recognizer_loop:utterance` that `IntentService` consumes | [`ovos-dinkum-listener/docs/index.md`](../../ovos-dinkum-listener/docs/index.md) |
 | **ovos-audio** | Consumes `mycroft.audio.play_sound` emitted by `IntentService` | [`ovos-audio/docs/index.md`](../../ovos-audio/docs/index.md) |
@@ -56,7 +56,7 @@ ovos-intent-service
 | **ovos-gui** | Consumes GUI template events emitted by skills via `GUIInterface` | [`ovos-gui/docs/index.md`](../../ovos-gui/docs/index.md) |
 
 ### Skill-writing guide
-If you are **writing a skill**, start with [`ovos-workshop/docs/index.md`](../../ovos-workshop/docs/index.md). Skills register via the `opm.skills` entry point — see [`ovos-plugin-manager/docs/plugin-types.md`](../../ovos-plugin-manager/docs/plugin-types.md).
+If you are **writing a skill**, start with [`ovos-workshop/docs/index.md`](../../ovos-workshop/docs/index.md). Skills register via the `opm.skills` entry point: see [`ovos-plugin-manager/docs/plugin-types.md`](../../ovos-plugin-manager/docs/plugin-types.md).
 
 ### Pipeline plugin guide
 If you are **writing a pipeline plugin**, see [`ovos-plugin-manager/docs/writing-plugins.md`](../../ovos-plugin-manager/docs/writing-plugins.md) and [`pipeline.md`](pipeline.md).
