@@ -153,6 +153,11 @@ class TestLegacyIntentIdBackCompat(TestCase):
                 # which is what a raw dual-bound handler dispatch preserves.
                 ignore_messages=["recognizer_loop:audio_output_start",
                                   "recognizer_loop:audio_output_end"],
+                # a raw dispatch is not an utterance: the orchestrator never
+                # ran, so it emits no PIPELINE-1 §9.5 ``ovos.utterance.handled``
+                # end-marker (ovoscope's default). The workshop done-signal is
+                # the terminal message of this scenario.
+                eof_msgs=["mycroft.skill.handler.complete"],
                 source_message=message,
                 final_session=session,
                 expected_messages=[
