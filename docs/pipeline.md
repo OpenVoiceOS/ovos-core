@@ -58,7 +58,7 @@ Plugins that implement `ConfidenceMatcherPipeline` expose `match_high`, `match_m
 3. Look up the loaded plugin in `self.pipeline_plugins`
 4. Return the appropriate method (`match`, `match_high`, `match_medium`, or `match_low`)
 
-Unloaded or unknown plugins are skipped with a warning — they do not cause startup failures.
+Unloaded or unknown plugins are skipped with a warning: they do not cause startup failures.
 
 ## Reloading
 
@@ -79,11 +79,11 @@ All other pipeline plugins (`adapt`, `padatious`, `ocp`, etc.) come from separat
 ## Cross-References
 
 ### Plugin framework
-- **`OVOSPipelineFactory`** — `ovos_plugin_manager.pipeline.OVOSPipelineFactory` → [`ovos-plugin-manager/docs/plugin-types.md`](../../ovos-plugin-manager/docs/plugin-types.md). Scans the `opm.pipeline` entry point group and instantiates each plugin with a `bus` connection.
-- **`ConfidenceMatcherPipeline`** / **`PipelinePlugin`** — base templates in `ovos_plugin_manager.templates.pipeline`. Writing a new pipeline plugin: [`ovos-plugin-manager/docs/writing-plugins.md`](../../ovos-plugin-manager/docs/writing-plugins.md).
+- **`OVOSPipelineFactory`**: `ovos_plugin_manager.pipeline.OVOSPipelineFactory` → [`ovos-plugin-manager/docs/plugin-types.md`](../../ovos-plugin-manager/docs/plugin-types.md). Scans the `opm.pipeline` entry point group and instantiates each plugin with a `bus` connection.
+- **`ConfidenceMatcherPipeline`** / **`PipelinePlugin`**: base templates in `ovos_plugin_manager.templates.pipeline`. Writing a new pipeline plugin: [`ovos-plugin-manager/docs/writing-plugins.md`](../../ovos-plugin-manager/docs/writing-plugins.md).
 
 ### Per-session pipeline
-- The pipeline list is stored on the **`Session`** object — `ovos_bus_client.session.Session.pipeline`. Each HiveMind client or remote session can have an independent pipeline. See [`ovos-bus-client/docs/session.md`](../../ovos-bus-client/docs/session.md).
+- The pipeline list is stored on the **`Session`** object: `ovos_bus_client.session.Session.pipeline`. Each HiveMind client or remote session can have an independent pipeline. See [`ovos-bus-client/docs/session.md`](../../ovos-bus-client/docs/session.md).
 
 ### External pipeline plugins (separate packages)
 | Plugin | Package | Notes |
@@ -97,3 +97,6 @@ All other pipeline plugins (`adapt`, `padatious`, `ocp`, etc.) come from separat
 
 ### Converse & Fallback detail
 → [`converse-fallback.md`](converse-fallback.md)
+
+---
+[← Intent Service](intent-service.md) · [Home](index.md) · [Next →](transformers.md)

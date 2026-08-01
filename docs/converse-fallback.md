@@ -130,3 +130,6 @@ Skills declare converse handlers with `@converse_handler` from `ovos-workshop` �
 
 ### Full bus events list
 See [`bus-events.md`](bus-events.md) for the Converse and Fallback event reference.
+
+---
+[← Transformers](transformers.md) · [Home](index.md) · [Next →](skill-installer.md)
