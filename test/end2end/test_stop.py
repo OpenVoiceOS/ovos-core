@@ -54,12 +54,16 @@ NAMESPACE_PATHS = {
     "spec": (False, False, SPEC_UTTERANCE),
 }
 
-# Messages produced by other pipeline-plugin skills in response to mycroft.stop;
+# Messages produced by other pipeline-plugin skills in response to ovos.stop;
 # always ignored so they don't pollute assertion counts. The count skill speaks
 # on the spec topic ovos.utterance.speak (no legacy mirror, emit_legacy=False).
 IGNORE_MESSAGES = [
     SPEC_SPEAK,
     SpecMessage.AUDIO_OUTPUT_STARTED,  # TTS mock duck
+    # ovoscope's TTS mock still emits the LEGACY spelling and nothing
+    # bridges it now, so both are filtered until ovoscope adopts AUDIO-1.
+    "recognizer_loop:audio_output_start",
+    "recognizer_loop:audio_output_end",
     SpecMessage.AUDIO_OUTPUT_ENDED,  # TTS mock unduck
     # ovos.intent.matched (§9.2) precedes every dispatch; these scenarios assert
     # stop routing/activation, not the matched broadcast, so it is filtered here.
@@ -171,7 +175,7 @@ class TestStopNoSkills(TestCase):
                     # StopService wraps the global-stop handler in HandlerLifecycle
                     Message("mycroft.skill.handler.start",
                             {"name": "StopService.handle_global_stop"}),
-                    Message("mycroft.stop", {}),
+                    Message(SpecMessage.STOP, {}),
                     Message("mycroft.skill.handler.complete",
                             {"name": "StopService.handle_global_stop"}),
 
@@ -252,7 +256,7 @@ class TestStopNoSkills(TestCase):
                     # StopService wraps the global-stop handler in HandlerLifecycle
                     Message("mycroft.skill.handler.start",
                             {"name": "StopService.handle_global_stop"}),
-                    Message("mycroft.stop", {}),
+                    Message(SpecMessage.STOP, {}),
                     Message("mycroft.skill.handler.complete",
                             {"name": "StopService.handle_global_stop"}),
 
@@ -418,7 +422,7 @@ class TestCountSkills(TestCase):
                 Message("mycroft.skill.handler.start",
                         {"name": "StopService.handle_global_stop"},
                         {"skill_id": "stop.openvoiceos"}),
-                Message("mycroft.stop", {},
+                Message(SpecMessage.STOP, {},
                         {"skill_id": "stop.openvoiceos"}),
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_global_stop"},

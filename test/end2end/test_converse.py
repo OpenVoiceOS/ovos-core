@@ -34,6 +34,10 @@ HANDLER_TRIO = [SpecMessage.INTENT_HANDLER_START.value,
                 SpecMessage.INTENT_HANDLER_ERROR.value,
                 "ovos.skills.settings_changed",  # keep ovoscope's default ignore
                 SpecMessage.AUDIO_OUTPUT_STARTED,  # TTS mock duck
+    # ovoscope's TTS mock still emits the LEGACY spelling and nothing
+    # bridges it now, so both are filtered until ovoscope adopts AUDIO-1.
+    "recognizer_loop:audio_output_start",
+    "recognizer_loop:audio_output_end",
                 SpecMessage.AUDIO_OUTPUT_ENDED]  # TTS mock unduck
 INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value  # ovos.intent.unmatched (§9.3)
 

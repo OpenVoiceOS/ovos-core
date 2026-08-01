@@ -80,6 +80,10 @@ class TestIntentPipelineRouting(TestCase):
     ignore_messages = [
         SpecMessage.SPEAK,
         SpecMessage.AUDIO_OUTPUT_STARTED,  # TTS mock duck
+    # ovoscope's TTS mock still emits the LEGACY spelling and nothing
+    # bridges it now, so both are filtered until ovoscope adopts AUDIO-1.
+    "recognizer_loop:audio_output_start",
+    "recognizer_loop:audio_output_end",
         SpecMessage.AUDIO_OUTPUT_ENDED,  # TTS mock unduck
         "ovos.common_play.stop.response",
         "common_query.openvoiceos.stop.response",
@@ -206,7 +210,7 @@ class TestIntentPipelineRouting(TestCase):
     # ------------------------------------------------------------------
     def _run_high_priority_stage_handles_before_low(self, namespace: str) -> None:
         """When padatious-high is listed first it matches; stop-high is listed after
-        and must NOT fire (no ``stop:global`` / ``mycroft.stop`` messages)."""
+        and must NOT fire (no ``stop:global`` / ``ovos.stop`` messages)."""
         utt_topic = utterance_topic(namespace)
         message, session = self._source_message(
             namespace, "count to 3",

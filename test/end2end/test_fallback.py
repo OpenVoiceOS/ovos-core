@@ -75,7 +75,9 @@ class TestFallback(TestCase):
                     "ovos.skills.fallback.ping",
                 # "ovos.skills.fallback.pong", # TODO
                 ],
-                ignore_messages=[SpecMessage.AUDIO_OUTPUT_STARTED,
+                ignore_messages=["recognizer_loop:audio_output_start",
+                                 "recognizer_loop:audio_output_end",
+                                 SpecMessage.AUDIO_OUTPUT_STARTED,
                                   SpecMessage.AUDIO_OUTPUT_ENDED],
                 activation_points=[f"ovos.skills.fallback.{self.skill_id}.request"],
                 source_message=message,
