@@ -51,11 +51,11 @@ How it gets fixed, and why the fix lands where it does
 The old container does **not** ship an old ``ovos-bus-client``. Its workshop
 pin declares a floor, not a ceiling, so a rebuilt container resolves the
 current client — this suite asserts that, because the whole repair strategy
-depends on it. ``ovos-bus-client#271`` puts an alias-driven mirror on the
-**receive** side of every client: the old skill's own ``bus.on("…​.intent")``
-fills an ``IntentAliasRegistry``, and when the canonical dispatch arrives from
-the wire the client mirrors it locally onto the suffixed twin. The handler
-then runs without the skill or the wire changing at all.
+depends on it. ``ovos-bus-client#271`` bridges with two stateless rules: the emitter
+also sends a marked ``.intent``-suffixed twin frame for every intent topic
+(reaches truly frozen old clients over the wire), and a receiver
+canonicalizes unmarked suffixed traffic locally. Either way the old
+handler runs without the skill changing at all.
 
 That is also why the mirror is receive-side rather than emit-side: the fix has
 to execute in the process that owns the stale binding, and only that process

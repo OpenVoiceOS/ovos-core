@@ -14,9 +14,9 @@ never appears in any alias registry.
 That re-emit is NOT implemented yet anywhere in the stack. It needs, in
 order:
 
-* ``ovos-spec-tools#88`` — ``legacy_reemit_targets`` / ``IntentAliasRegistry``
-  (see ``ovos_spec_tools.intent_topics``, already vendored unreleased) wired
-  into the bus/core dispatch path, gated by an ``emit_legacy`` config knob;
+* ``ovos-spec-tools`` 1.6.0a1 — the pure ``canonical_intent_topic`` /
+  ``legacy_intent_topic`` helpers (the alias registry was dropped in
+  ovos-spec-tools#92: the compat is two stateless rules now);
 * ``bus-client#271`` — the client-side hook the wiring above needs;
 * ``ovos-utils#411`` — ``FakeBus`` support for the same hook, so this test
   can exercise it at all without a live MQ.
