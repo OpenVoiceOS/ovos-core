@@ -80,9 +80,9 @@ ovos.skills.settings_changed  {skill_id: "..."}
 ## Cross-References
 
 ### Skill discovery & loading
-- **`find_skill_plugins()`** — `ovos_plugin_manager.skills.find_skill_plugins` → [`ovos-plugin-manager/docs/plugin-types.md`](../../ovos-plugin-manager/docs/plugin-types.md). Entry point group: `opm.skills`.
-- **`PluginSkillLoader`** — `ovos_workshop.skill_launcher.PluginSkillLoader` → [`ovos-workshop/docs/skill-launcher.md`](../../ovos-workshop/docs/skill-launcher.md). Handles load, hot-reload, and settings watching for a single skill.
-- **`RuntimeRequirements`** — declared by each skill class to specify `network_before_load`, `internet_before_load`, `requires_gui`. Defined in `ovos-workshop` → [`ovos-workshop/docs/ovos-skill.md`](../../ovos-workshop/docs/ovos-skill.md).
+- **`find_skill_plugins()`**: `ovos_plugin_manager.skills.find_skill_plugins` → [`ovos-plugin-manager/docs/plugin-types.md`](../../ovos-plugin-manager/docs/plugin-types.md). Entry point group: `opm.skills`.
+- **`PluginSkillLoader`**: `ovos_workshop.skill_launcher.PluginSkillLoader` → [`ovos-workshop/docs/skill-launcher.md`](../../ovos-workshop/docs/skill-launcher.md). Handles load, hot-reload, and settings watching for a single skill.
+- **`RuntimeRequirements`**: declared by each skill class to specify `network_before_load`, `internet_before_load`, `requires_gui`. Defined in `ovos-workshop` → [`ovos-workshop/docs/ovos-skill.md`](../../ovos-workshop/docs/ovos-skill.md).
 
 ### Writing skills
 - Skill base classes (`OVOSSkill`, `FallbackSkill`, `ConversationalSkill`) → [`ovos-workshop/docs/skill-classes.md`](../../ovos-workshop/docs/skill-classes.md).
@@ -90,15 +90,18 @@ ovos.skills.settings_changed  {skill_id: "..."}
 - Skill settings & settings.json → [`ovos-workshop/docs/settings.md`](../../ovos-workshop/docs/settings.md).
 
 ### Bus & session
-- **`MessageBusClient`** — `ovos_bus_client.client.MessageBusClient` → [`ovos-bus-client/docs/client.md`](../../ovos-bus-client/docs/client.md).
-- **Shared vs. isolated bus connections** — `websocket.shared_connection` in `mycroft.conf`. See [`ovos-config/docs/configuration.md`](../../ovos-config/docs/configuration.md).
+- **`MessageBusClient`**: `ovos_bus_client.client.MessageBusClient` → [`ovos-bus-client/docs/client.md`](../../ovos-bus-client/docs/client.md).
+- **Shared vs. isolated bus connections**: `websocket.shared_connection` in `mycroft.conf`. See [`ovos-config/docs/configuration.md`](../../ovos-config/docs/configuration.md).
 
 ### Connectivity detection
-- **`ovos.PHAL.internet_check`** — emitted by `SkillManager._sync_skill_loading_state()`, answered by the connectivity PHAL plugin → [`ovos-PHAL/docs/index.md`](../../ovos-PHAL/docs/index.md).
-- **`is_connected_http()`** — fallback from `ovos_utils.network_utils` → [`ovos-utils/docs/utilities.md`](../../ovos-utils/docs/utilities.md).
+- **`ovos.PHAL.internet_check`**: emitted by `SkillManager._sync_skill_loading_state()`, answered by the connectivity PHAL plugin → [`ovos-PHAL/docs/index.md`](../../ovos-PHAL/docs/index.md).
+- **`is_connected_http()`**: fallback from `ovos_utils.network_utils` → [`ovos-utils/docs/utilities.md`](../../ovos-utils/docs/utilities.md).
 
 ### Settings file watcher
-- **`FileWatcher`** — `ovos_utils.file_utils.FileWatcher` → [`ovos-utils/docs/utilities.md`](../../ovos-utils/docs/utilities.md).
+- **`FileWatcher`**: `ovos_utils.file_utils.FileWatcher` → [`ovos-utils/docs/utilities.md`](../../ovos-utils/docs/utilities.md).
 
 ### Full bus events list
 See [`bus-events.md`](bus-events.md) for the complete SkillManager event reference.
+
+---
+[← Architecture](architecture.md) · [Home](index.md) · [Next →](intent-service.md)

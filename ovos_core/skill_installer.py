@@ -8,6 +8,7 @@ from typing import Optional
 
 import requests
 from combo_lock import NamedLock
+from packaging.utils import canonicalize_name
 from ovos_bus_client import Message
 from ovos_config.config import Configuration
 from ovos_utils.log import LOG
@@ -182,11 +183,15 @@ class SkillsStore:
             cpkgs = ["ovos-core", "ovos-utils", "ovos-plugin-manager",
                      "ovos-config", "ovos-bus-client", "ovos-workshop"]
 
-        # remove version pinning and normalize _ to - (pip accepts both)
-        cpkgs = [p.split("~")[0].split("<")[0].split(">")[0].split("=")[0].replace("_", "-")
-                 for p in cpkgs]
+        # remove version pinning and canonicalize names (PEP 503) so
+        # "ovos_core", "OVOS-Core", "ovos.core", etc. all compare equal
+        # to "ovos-core", matching how pip/pypi identify distributions
+        cpkgs = [canonicalize_name(p.split("~")[0].split("<")[0].split(">")[0].split("=")[0])
+                 for p in cpkgs if p]
 
-        if any(p in cpkgs for p in packages):
+        norm_packages = [canonicalize_name(p) for p in packages]
+
+        if any(p in cpkgs for p in norm_packages):
             LOG.error(f'tried to uninstall a protected package: {cpkgs}')
             self.play_error_sound()
             return False

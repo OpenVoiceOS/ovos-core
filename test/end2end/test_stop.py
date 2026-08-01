@@ -297,7 +297,10 @@ class TestCountSkills(TestCase):
             activate_skill = [
                 message,
                 Message(f"{self.skill_id}.activate", {}),  # skill is activated
-                Message(f"{self.skill_id}:count_to_n.intent", {}),  # intent triggers
+                # INTENT-4 / register-time alias collapse (padatious-pipeline#89,
+                # padacioso#73): canonical suffix-less intent id, not the legacy
+                # `.intent`-suffixed one (see test_padatious.py for full rationale).
+                Message(f"{self.skill_id}:count_to_n", {}),  # intent triggers
 
                 Message("mycroft.skill.handler.start", {
                     "name": "CountSkill.handle_how_are_you_intent"

@@ -74,7 +74,14 @@ class TestPadatiousIntent(TestCase):
                                   "recognizer_loop:audio_output_end"],
                 source_message=message,
                 final_session=final_session,
-                activation_points=[f"{self.skill_id}:Greetings.intent"],
+                # INTENT-4 / register-time alias collapse (padatious-pipeline#89,
+                # padacioso#73): the pipeline now matches and dispatches on the
+                # canonical suffix-less intent id, not the legacy `.intent`-suffixed
+                # one. ovos-workshop's register_intent_file binds the skill handler
+                # to both ids during the migration window (see ovos-workshop#497),
+                # but the wire identity the orchestrator/pipeline report here is
+                # the canonical one.
+                activation_points=[f"{self.skill_id}:Greetings"],
                 expected_messages=[
                     message,
                     Message(f"{self.skill_id}.activate",
@@ -83,15 +90,15 @@ class TestPadatiousIntent(TestCase):
                 # PIPELINE-1 §9.2: matched notification, before the dispatch
                     Message(INTENT_MATCHED,
                             data={"skill_id": self.skill_id,
-                                  "intent_name": f"{self.skill_id}:Greetings.intent",
+                                  "intent_name": f"{self.skill_id}:Greetings",
                                   "utterance": "good morning", "lang": session.lang},
                             context={"skill_id": self.skill_id}),
                 # PIPELINE-1 §8.1: orchestrator start before dispatch
                     Message(HANDLER_START,
                             data={"skill_id": self.skill_id,
-                                  "intent_name": "Greetings.intent"},
+                                  "intent_name": "Greetings"},
                             context={"skill_id": self.skill_id}),
-                    Message(f"{self.skill_id}:Greetings.intent",
+                    Message(f"{self.skill_id}:Greetings",
                             data={"utterance": "good morning", "lang": session.lang},
                             context={"skill_id": self.skill_id}),
                     Message("mycroft.skill.handler.start",
@@ -111,7 +118,7 @@ class TestPadatiousIntent(TestCase):
                 # PIPELINE-1 §8.1: orchestrator complete before the end-marker
                     Message(HANDLER_COMPLETE,
                             data={"skill_id": self.skill_id,
-                                  "intent_name": "Greetings.intent"},
+                                  "intent_name": "Greetings"},
                             context={"skill_id": self.skill_id}),
                     Message(UTTERANCE_HANDLED,
                             data={},
@@ -175,7 +182,9 @@ class TestPadatiousIntent(TestCase):
             session = Session("123")
             session.lang = "en-US"
             session.pipeline = ["ovos-padatious-pipeline-plugin-high"]
-            session.blacklisted_intents = [f"{self.skill_id}:Greetings.intent"]
+            # canonical id: match.match_type is what the blacklist check compares
+            # against (INTENT-4 register-time alias collapse; see comment above)
+            session.blacklisted_intents = [f"{self.skill_id}:Greetings"]
             message = Message(utt_topic,
                               {"utterances": ["good morning"], "lang": session.lang},
                               {"session": session.serialize(), "source": "A", "destination": "B"})
