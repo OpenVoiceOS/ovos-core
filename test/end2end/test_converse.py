@@ -86,9 +86,13 @@ class TestConverse(TestCase):
                         context={"skill_id": self.skill_id}),
                 Message(INTENT_MATCHED,
                         data={"skill_id": self.skill_id,
-                              "intent_name": f"{self.skill_id}:start_parrot.intent"},
+                              # INTENT-4 / register-time alias collapse (padatious-pipeline#89,
+                              # padacioso#73): the pipeline now matches and dispatches on the
+                              # canonical suffix-less intent id, not the legacy `.intent`-suffixed
+                              # one (see test_padatious.py for full rationale).
+                              "intent_name": f"{self.skill_id}:start_parrot"},
                         context={"skill_id": self.skill_id}),
-                Message(f"{self.skill_id}:start_parrot.intent",
+                Message(f"{self.skill_id}:start_parrot",
                         data={"utterance": "start parrot mode", "lang": session.lang},
                         context={"skill_id": self.skill_id}),
                 Message("mycroft.skill.handler.start",
@@ -223,7 +227,7 @@ class TestConverse(TestCase):
                 source_message=[message1, message2, message3, message4],
                 expected_messages=expected1 + expected2 + expected3 + expected4,
                 ignore_messages=HANDLER_TRIO,
-                activation_points=[f"{self.skill_id}:start_parrot.intent"],
+                activation_points=[f"{self.skill_id}:start_parrot"],
             # messages internal to ovos-core, i.e. would not be sent to clients such as hivemind
                 keep_original_src=[f"{self.skill_id}.converse.ping",
                                    f"{self.skill_id}.converse.request"

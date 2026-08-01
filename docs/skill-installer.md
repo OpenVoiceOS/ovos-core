@@ -110,3 +110,6 @@ Config is read from `mycroft.conf` via `ovos_config.config.Configuration` → [`
 
 ### Full bus events list
 See [`bus-events.md`](bus-events.md) for the complete SkillsStore event reference.
+
+---
+[← Converse & Fallback](converse-fallback.md) · [Home](index.md) · [Next →](bus-events.md)

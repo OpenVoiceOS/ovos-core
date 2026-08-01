@@ -140,6 +140,21 @@ def test_pip_uninstall_happy_path():
     assert True
 
 
+@pytest.mark.parametrize("requested", ["ovos-core", "ovos_core", "OVOS-Core", "ovos.core"])
+def test_pip_uninstall_protected_package_separator_and_case_variants(skills_store, requested):
+    """The protected-package guard must reject "-", "_" and "." separator
+    variants, and case variants, of a protected name -- not just the exact
+    spelling used in the constraints list (pip/PyPI treat them as the same
+    distribution, per PEP 503)."""
+    skills_store.play_error_sound = Mock()
+    # bypass the constraints-file existence check so we exercise the
+    # built-in default protected-package list ("ovos-core", ...)
+    skills_store.validate_constraints = Mock(return_value=True)
+    res = skills_store.pip_uninstall([requested], constraints="not/a/real/constraints/path")
+    assert res is False
+    skills_store.play_error_sound.assert_called_once()
+
+
 def test_validate_skill_non_github_urls(skills_store):
     """Non-GitHub URLs are always rejected without any network call."""
     assert skills_store.validate_skill("https://gitlab.com/foo/skill-bar") is False
