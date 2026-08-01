@@ -22,10 +22,9 @@ UTTERANCE_CANCELLED = SpecMessage.UTTERANCE_CANCELLED.value  # ovos.utterance.ca
 # The two namespace paths the scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
 NAMESPACE_PATHS = {
-    # pure spec: inject on ovos.* and assert no bridging
+    # the only path left: the bridge is gone, so a legacy producer reaches
+    # nothing (pinned in test_no_legacy_wire_compat.py)
     "spec": (False, False, SPEC_UTTERANCE),
-    # legacy producer bridged to the spec listener via modernize
-    "legacy": (True, False, LEGACY_UTTERANCE),
 }
 
 
@@ -88,7 +87,7 @@ class TestCancelIntentMidSentence(TestCase):
                 final_session=session,
                 expected_messages=[
                     message,
-                    Message("mycroft.audio.play_sound", {"uri": "snd/cancel.mp3"}),
+                    Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": "snd/cancel.mp3"}),
                     Message(UTTERANCE_CANCELLED, {}),
                     Message(UTTERANCE_HANDLED, {}),
 
@@ -110,7 +109,7 @@ class TestCancelIntentMidSentence(TestCase):
                 source_message=message,
                 expected_messages=[
                     message,
-                    Message("mycroft.audio.play_sound", {"uri": "snd/cancel.mp3"}),
+                    Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": "snd/cancel.mp3"}),
                     Message(UTTERANCE_CANCELLED, {}),
                     Message(UTTERANCE_HANDLED, {}),
 

@@ -9,7 +9,7 @@ from ovos_bus_client.session import SessionManager, UtteranceState
 
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import ConfidenceMatcherPipeline, IntentHandlerMatch
-from ovos_spec_tools import LocaleResources
+from ovos_spec_tools import LocaleResources, SpecMessage
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
@@ -29,12 +29,12 @@ class StopService(ConfidenceMatcherPipeline):
         self.bus.on("stop:skill", self.handle_skill_stop)
 
     def handle_global_stop(self, message: Message) -> None:
-        """Emit a global mycroft.stop; the §9.5 end-marker is the orchestrator's
-        responsibility (``IntentDispatcher._notify_terminal``)."""
+        """Emit the STOP-1 §5.3 universal stop broadcast; the §9.5 end-marker is
+        the orchestrator's responsibility (``IntentDispatcher._notify_terminal``)."""
         with HandlerLifecycle(self.bus, message,
                               skill_id="stop.openvoiceos",
                               data={"name": "StopService.handle_global_stop"}):
-            self.bus.emit(message.forward("mycroft.stop"))
+            self.bus.emit(message.forward(SpecMessage.STOP))
 
     def handle_skill_stop(self, message: Message) -> None:
         """Forward a stop request to the specific skill."""
@@ -122,7 +122,7 @@ class StopService(ConfidenceMatcherPipeline):
                 # all skills answered the ping!
                 event.set()
 
-        self.bus.on("skill.stop.pong", handle_ack)
+        self.bus.on(SpecMessage.STOP_PONG, handle_ack)
         try:
             # ask skills if they can stop
             for skill_id in active_skills:
@@ -132,7 +132,7 @@ class StopService(ConfidenceMatcherPipeline):
             # wait for all skills to acknowledge they can stop
             event.wait(timeout=0.5)
         finally:
-            self.bus.remove("skill.stop.pong", handle_ack)
+            self.bus.remove(SpecMessage.STOP_PONG, handle_ack)
         return want_stop or active_skills
 
     def handle_stop_confirmation(self, message: Message) -> None:
@@ -158,7 +158,7 @@ class StopService(ConfidenceMatcherPipeline):
             # TODO - track if speech is coming from this skill! not currently tracked (ovos-audio)
             if sess.is_speaking:
                 # force-kill any ongoing TTS
-                self.bus.emit(message.forward("mycroft.audio.speech.stop", {"skill_id": skill_id}))
+                self.bus.emit(message.forward(SpecMessage.AUDIO_STOP, {"skill_id": skill_id}))
 
     def match_high(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """

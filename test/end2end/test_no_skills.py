@@ -30,7 +30,6 @@ INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value
 
 NAMESPACE_PATHS = {
     "spec": (False, False, SPEC_UTTERANCE),
-    "legacy": (True, False, LEGACY_UTTERANCE),
 }
 
 
@@ -59,7 +58,7 @@ class TestNoSkills(TestCase):
                 source_message=message,
                 expected_messages=[
                     message,
-                    Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                    Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": "snd/error.mp3"}),
                     Message(INTENT_UNMATCHED, {}),
                     Message(UTTERANCE_HANDLED, {}),
                 ]
@@ -94,7 +93,7 @@ class TestNoSkills(TestCase):
                 source_message=message,
                 expected_messages=[
                     message,
-                    Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                    Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": "snd/error.mp3"}),
                     Message(INTENT_UNMATCHED, {}),
                     Message(UTTERANCE_HANDLED, {}),
                 ]

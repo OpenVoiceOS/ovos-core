@@ -36,7 +36,6 @@ HANDLER_COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value
 # key -> (modernize, emit_legacy, utterance_topic)
 NAMESPACE_PATHS = {
     "spec": (False, False, SPEC_UTTERANCE),
-    "legacy": (True, False, LEGACY_UTTERANCE),
 }
 
 
@@ -77,7 +76,9 @@ class TestFallback(TestCase):
                 # "ovos.skills.fallback.pong", # TODO
                 ],
                 ignore_messages=["recognizer_loop:audio_output_start",
-                                  "recognizer_loop:audio_output_end"],
+                                 "recognizer_loop:audio_output_end",
+                                 SpecMessage.AUDIO_OUTPUT_STARTED,
+                                  SpecMessage.AUDIO_OUTPUT_ENDED],
                 activation_points=[f"ovos.skills.fallback.{self.skill_id}.request"],
                 source_message=message,
                 expected_messages=[

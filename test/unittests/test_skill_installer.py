@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch, MagicMock
 import pytest
 
 from ovos_bus_client import Message
+from ovos_spec_tools import SpecMessage
 from ovos_core.skill_installer import SkillsStore
 
 
@@ -71,7 +72,7 @@ def test_play_error_sound(skills_store):
     assert skills_store.bus.message_data[-1] == {
         "uri": "snd/error.mp3"
     }
-    assert skills_store.bus.message_types[-1] == "mycroft.audio.play_sound"
+    assert skills_store.bus.message_types[-1] == SpecMessage.AUDIO_PLAY_SOUND
 
 
 @pytest.mark.parametrize("skills_store", [{"sounds": {"pip_error": "snd/custom_error.mp3"}}], indirect=True)
@@ -80,7 +81,7 @@ def test_play_error_sound_custom(skills_store):
     assert skills_store.bus.message_data[-1] == {
         "uri": "snd/custom_error.mp3"
     }
-    assert skills_store.bus.message_types[-1] == "mycroft.audio.play_sound"
+    assert skills_store.bus.message_types[-1] == SpecMessage.AUDIO_PLAY_SOUND
 
 
 def test_play_success_sound(skills_store):
@@ -88,7 +89,7 @@ def test_play_success_sound(skills_store):
     assert skills_store.bus.message_data[-1] == {
         "uri": "snd/acknowledge.mp3"
     }
-    assert skills_store.bus.message_types[-1] == "mycroft.audio.play_sound"
+    assert skills_store.bus.message_types[-1] == SpecMessage.AUDIO_PLAY_SOUND
 
 
 @pytest.mark.parametrize("skills_store", [{"sounds": {"pip_success": "snd/custom_success.mp3"}}], indirect=True)
@@ -97,7 +98,7 @@ def test_play_success_sound_custom(skills_store):
     assert skills_store.bus.message_data[-1] == {
         "uri": "snd/custom_success.mp3"
     }
-    assert skills_store.bus.message_types[-1] == "mycroft.audio.play_sound"
+    assert skills_store.bus.message_types[-1] == SpecMessage.AUDIO_PLAY_SOUND
 
 
 def test_pip_install_no_packages(skills_store):

@@ -54,10 +54,9 @@ INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value
 # The two namespace paths every scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
 NAMESPACE_PATHS = {
-    # pure spec: inject on ovos.* and assert no bridging
+    # the only path left: the bridge is gone, so a legacy producer reaches
+    # nothing (pinned in test_no_legacy_wire_compat.py)
     "spec": (False, False, SPEC_UTTERANCE),
-    # legacy producer bridged to the spec listener via modernize
-    "legacy": (True, False, LEGACY_UTTERANCE),
 }
 
 
@@ -80,8 +79,12 @@ class TestIntentPipelineRouting(TestCase):
     # mirror because emit_legacy=False on both paths).
     ignore_messages = [
         SpecMessage.SPEAK,
-        "recognizer_loop:audio_output_start",  # TTS mock duck
-        "recognizer_loop:audio_output_end",  # TTS mock unduck
+        SpecMessage.AUDIO_OUTPUT_STARTED,  # TTS mock duck
+    # ovoscope's TTS mock still emits the LEGACY spelling and nothing
+    # bridges it now, so both are filtered until ovoscope adopts AUDIO-1.
+    "recognizer_loop:audio_output_start",
+    "recognizer_loop:audio_output_end",
+        SpecMessage.AUDIO_OUTPUT_ENDED,  # TTS mock unduck
         "ovos.common_play.stop.response",
         "common_query.openvoiceos.stop.response",
         "persona.openvoiceos.stop.response",
@@ -207,7 +210,7 @@ class TestIntentPipelineRouting(TestCase):
     # ------------------------------------------------------------------
     def _run_high_priority_stage_handles_before_low(self, namespace: str) -> None:
         """When padatious-high is listed first it matches; stop-high is listed after
-        and must NOT fire (no ``stop:global`` / ``mycroft.stop`` messages)."""
+        and must NOT fire (no ``stop:global`` / ``ovos.stop`` messages)."""
         utt_topic = utterance_topic(namespace)
         message, session = self._source_message(
             namespace, "count to 3",
@@ -307,7 +310,7 @@ class TestIntentPipelineRouting(TestCase):
             final_session=session,
             expected_messages=[
                 message,
-                Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": "snd/error.mp3"}),
                 Message(INTENT_UNMATCHED, {}),
                 Message(SpecMessage.UTTERANCE_HANDLED, {}),
             ],
@@ -342,7 +345,7 @@ class TestIntentPipelineRouting(TestCase):
             final_session=session,
             expected_messages=[
                 message,
-                Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": "snd/error.mp3"}),
                 Message(INTENT_UNMATCHED, {}),
                 Message(SpecMessage.UTTERANCE_HANDLED, {}),
             ],

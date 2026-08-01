@@ -1,27 +1,25 @@
-"""End-to-end back-compat coverage for the INTENT-4 register-time alias
-collapse (ovos-padatious 2.0.1a1 / padacioso 2.2.2a1) and workshop dual-bind
-(ovos-workshop 9.3.2a1, see ovos-workshop#497).
+"""End-to-end coverage for the two legacy ``.intent``-suffixed intent
+surfaces: one that still works, one that is now gone.
 
-``test_padatious.py`` now asserts the pipeline reports the CANONICAL
-suffix-less intent id (``<skill_id>:<file>``) on the wire. That is correct per
-OVOS-PIPELINE-1 §5.4, but nothing proves the LEGACY ``.intent``-suffixed
-surfaces — which ovos-core#831 explicitly promises to keep working during the
-migration window — still function. This file closes that gap:
+``test_padatious.py`` asserts the pipeline reports the CANONICAL suffix-less
+intent id (``<skill_id>:<file>``) on the wire, per OVOS-PIPELINE-1 §5.4. This
+file pins what happens to a caller that still uses the old spelling.
 
 - ``test_legacy_blacklist_id_suppresses``: a session ``blacklisted_intents``
-  entry using the legacy ``<skill_id>:<file>.intent`` id must still suppress
-  the intent (the padatious/padacioso engines canonicalize the blacklist at
-  match time — see ``_canonicalize_blacklist`` in ``ovos_padatious.opm``) and
-  must log a one-time deprecation warning pointing at the canonical
-  replacement.
-- ``test_legacy_dispatch_topic_fires_handler``: emitting the legacy
-  ``<skill_id>:<file>.intent`` bus topic directly still fires the skill
-  handler, because ``register_intent_file`` binds both the legacy and
-  canonical names (ovos_workshop.skills.ovos.OVOSSkill.register_intent_file).
+  entry using the legacy ``<skill_id>:<file>.intent`` id must STILL suppress
+  the intent, with a one-time deprecation warning pointing at the canonical
+  replacement. This is engine-side compat inside ovos-padatious
+  (``_canonicalize_blacklist`` in ``ovos_padatious.opm``), not bus compat, so
+  the wire kill-switch leaves it alone.
 
-Both are exercised on both bus namespaces (spec / legacy), matching the
-parametrization style of ``test_padatious.py``.
+- ``test_legacy_dispatch_topic_reaches_nothing``: emitting the legacy
+  ``<skill_id>:<file>.intent`` bus topic reaches NOBODY. It used to fire the
+  handler two ways, and both are gone — ovos-workshop bound the handler under
+  both spellings (ovos-workshop#497, dropped by ovos-workshop#500), and the
+  bus mirrored a canonical dispatch onto the suffixed twin (bus-client#271,
+  dropped by the kill-switch).
 """
+import time
 from unittest import TestCase
 from unittest.mock import patch
 from ovos_bus_client.message import Message
@@ -42,7 +40,6 @@ HANDLER_COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value
 
 NAMESPACE_PATHS = {
     "spec": (False, False, SPEC_UTTERANCE),
-    "legacy": (True, False, LEGACY_UTTERANCE),
 }
 
 
@@ -96,7 +93,7 @@ class TestLegacyIntentIdBackCompat(TestCase):
                 final_session=session,
                 expected_messages=[
                     message,
-                    Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                    Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": "snd/error.mp3"}),
                     Message(INTENT_UNMATCHED, {}),
                     Message(UTTERANCE_HANDLED, {})
                 ]
@@ -124,61 +121,45 @@ class TestLegacyIntentIdBackCompat(TestCase):
                 self._run_legacy_blacklist(namespace)
 
     def _run_legacy_dispatch_topic(self, namespace):
+        """The legacy suffixed dispatch topic must reach nothing.
+
+        Two things used to make it work and both are gone: ovos-workshop
+        bound the handler under the legacy AND the canonical name
+        (ovos-workshop#497, dropped by ovos-workshop#500), and the bus
+        mirrored a canonical dispatch onto the suffixed twin
+        (bus-client#271, dropped by the kill-switch). Emitting the old
+        spelling now reaches nobody.
+        """
         modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
         minicroft = get_minicroft([self.skill_id], modernize=modernize,
                                   emit_legacy=emit_legacy)
         try:
             session = Session("123")
             session.lang = "en-US"
-
-            # LEGACY dispatch: bypass intent matching entirely and emit
-            # directly on the pre-INTENT-4 `<skill_id>:<file>.intent` topic.
-            # ovos_workshop.skills.ovos.OVOSSkill.register_intent_file binds
-            # the skill handler under BOTH the legacy and canonical names
-            # (ovos-workshop#497), so this must still fire the handler.
             legacy_intent_topic = f"{self.skill_id}:Greetings.intent"
-            message = Message(legacy_intent_topic,
-                              {"utterance": "good morning", "lang": session.lang},
-                              {"session": session.serialize(), "source": "A", "destination": "B"})
+            canonical_intent_topic = f"{self.skill_id}:Greetings"
 
-            test = End2EndTest(
-                minicroft=minicroft,
-                skill_ids=[self.skill_id],
-                # a raw direct injection on the legacy intent topic (bypassing
-                # the orchestrator/pipeline entirely) does not flip
-                # source/destination the way a routed utterance->dispatch
-                # cycle does, so no flip/entry points are declared here — the
-                # generic source/destination routing check then compares
-                # every message against the injected message's own (A, B),
-                # which is what a raw dual-bound handler dispatch preserves.
-                ignore_messages=["recognizer_loop:audio_output_start",
-                                  "recognizer_loop:audio_output_end"],
-                source_message=message,
-                final_session=session,
-                expected_messages=[
-                    message,
-                    Message("mycroft.skill.handler.start",
-                            data={"name": "HelloWorldSkill.handle_greetings"},
-                            context={"skill_id": self.skill_id}),
-                    Message(SPEC_SPEAK,
-                            data={"expect_response": False,
-                                  "meta": {
-                                      "dialog": "hello",
-                                      "data": {},
-                                      "skill": self.skill_id
-                                  }},
-                            context={"skill_id": self.skill_id}),
-                    Message("mycroft.skill.handler.complete",
-                            data={"name": "HelloWorldSkill.handle_greetings"},
-                            context={"skill_id": self.skill_id}),
-                ]
-            )
+            # nothing is bound to the old spelling any more
+            self.assertEqual(minicroft.bus.ee.listeners(legacy_intent_topic), [])
+            self.assertNotEqual(
+                minicroft.bus.ee.listeners(canonical_intent_topic), [])
 
-            test.execute(timeout=10)
+            seen = []
+            minicroft.bus.on(SPEC_SPEAK, lambda m: seen.append(m.msg_type))
+            minicroft.bus.on("mycroft.skill.handler.start",
+                             lambda m: seen.append(m.msg_type))
+
+            minicroft.bus.emit(Message(
+                legacy_intent_topic,
+                {"utterance": "good morning", "lang": session.lang},
+                {"session": session.serialize(), "source": "A",
+                 "destination": "B"}))
+            time.sleep(1)
+            self.assertEqual(seen, [])
         finally:
             minicroft.stop()
 
-    def test_legacy_dispatch_topic_fires_handler(self):
+    def test_legacy_dispatch_topic_reaches_nothing(self):
         for namespace in NAMESPACE_PATHS:
             with self.subTest(namespace=namespace):
                 self._run_legacy_dispatch_topic(namespace)

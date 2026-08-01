@@ -9,7 +9,7 @@ OVOSAbstractApplication base class. These tests verify:
 3. can_handle=False default: a skill that declines the stop ping is still
    tried via the active-skills fallback.
 4. StopService does NOT register skill machinery — it never answers the
-   mycroft.stop broadcast with stop.openvoiceos.stop.response.
+   ovos.stop broadcast with stop.openvoiceos.stop.response.
 
 Every scenario that injects an utterance is run on BOTH bus namespace paths via
 ``self.subTest(namespace=...)``:
@@ -46,20 +46,23 @@ HANDLER_ERROR = SpecMessage.INTENT_HANDLER_ERROR.value
 # The two namespace paths every scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
 NAMESPACE_PATHS = {
-    # pure spec: inject on ovos.* and assert no bridging
+    # the only path left: the bridge is gone, so a legacy producer reaches
+    # nothing (pinned in test_no_legacy_wire_compat.py)
     "spec": (False, False, SPEC_UTTERANCE),
-    # legacy producer bridged to the spec listener via modernize
-    "legacy": (True, False, LEGACY_UTTERANCE),
 }
 
-# Messages produced by other pipeline-plugin skills in response to mycroft.stop;
+# Messages produced by other pipeline-plugin skills in response to ovos.stop;
 # always ignored so they don't pollute assertion counts. The stop pipeline
 # speaks on the spec topic ovos.utterance.speak (no legacy mirror because
 # emit_legacy=False on both paths).
 _STOP_RESPONSES = [
     SPEC_SPEAK,
-    "recognizer_loop:audio_output_start",  # TTS mock duck
-    "recognizer_loop:audio_output_end",  # TTS mock unduck
+    SpecMessage.AUDIO_OUTPUT_STARTED,  # TTS mock duck
+    # ovoscope's TTS mock still emits the LEGACY spelling and nothing
+    # bridges it now, so both are filtered until ovoscope adopts AUDIO-1.
+    "recognizer_loop:audio_output_start",
+    "recognizer_loop:audio_output_end",
+    SpecMessage.AUDIO_OUTPUT_ENDED,  # TTS mock unduck
     # ovos.intent.matched (§9.2) precedes every dispatch; these scenarios assert
     # stop routing/activation, not the matched broadcast, so it is filtered here.
     SpecMessage.INTENT_MATCHED,
@@ -87,7 +90,7 @@ class TestGlobalStopVocabulary(TestCase):
     vocabulary content and that voc_match (delegated to ovos-spec-tools
     LocaleResources) correctly distinguishes 'stop' from 'stop everything'.
 
-    No skills are loaded here, so mycroft.stop produces no {skill_id}.stop.response
+    No skills are loaded here, so ovos.stop produces no {skill_id}.stop.response
     messages — and StopService itself no longer answers it.
     """
 
@@ -124,7 +127,7 @@ class TestGlobalStopVocabulary(TestCase):
                 # StopService wraps the global-stop handler in HandlerLifecycle
                 Message("mycroft.skill.handler.start",
                         {"name": "StopService.handle_global_stop"}),
-                Message("mycroft.stop", {}),
+                Message(SpecMessage.STOP, {}),
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_global_stop"}),
                 Message(SpecMessage.UTTERANCE_HANDLED, {}),
@@ -168,7 +171,7 @@ class TestGlobalStopVocabulary(TestCase):
                 # StopService wraps the global-stop handler in HandlerLifecycle
                 Message("mycroft.skill.handler.start",
                         {"name": "StopService.handle_global_stop"}),
-                Message("mycroft.stop", {}),
+                Message(SpecMessage.STOP, {}),
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_global_stop"}),
                 Message(SpecMessage.UTTERANCE_HANDLED, {}),
@@ -214,7 +217,7 @@ class TestGlobalStopVocWithActiveSkill(TestCase):
                           {"utterances": ["stop everything now"], "lang": session.lang},
                           {"session": session.serialize()})
 
-        # count skill also emits stop.response when mycroft.stop is broadcast
+        # count skill also emits stop.response when ovos.stop is broadcast
         ignore = _STOP_RESPONSES + [f"{self.skill_id}.stop.response"]
 
         test = End2EndTest(
@@ -232,7 +235,7 @@ class TestGlobalStopVocWithActiveSkill(TestCase):
                 # StopService wraps the global-stop handler in HandlerLifecycle
                 Message("mycroft.skill.handler.start",
                         {"name": "StopService.handle_global_stop"}),
-                Message("mycroft.stop", {}),
+                Message(SpecMessage.STOP, {}),
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_global_stop"}),
                 Message(SpecMessage.UTTERANCE_HANDLED, {}),
@@ -354,7 +357,7 @@ class TestStopServiceNotASkill(TestCase):
 
     It matches the stop vocabulary via ovos-spec-tools (LocaleResources) and owns
     the stop dispatch, but it MUST NOT register skill machinery — in particular it
-    must NOT answer the mycroft.stop broadcast with stop.openvoiceos.stop.response
+    must NOT answer the ovos.stop broadcast with stop.openvoiceos.stop.response
     (that would make it stop "itself" and pollute the lifecycle). This is the
     regression guard for dropping the OVOSAbstractApplication base class.
     """
@@ -396,7 +399,7 @@ class TestStopServiceNotASkill(TestCase):
                 # StopService wraps the global-stop handler in HandlerLifecycle
                 Message("mycroft.skill.handler.start",
                         {"name": "StopService.handle_global_stop"}),
-                Message("mycroft.stop", {}),
+                Message(SpecMessage.STOP, {}),
                 Message("mycroft.skill.handler.complete",
                         {"name": "StopService.handle_global_stop"}),
                 Message(SpecMessage.UTTERANCE_HANDLED, {}),

@@ -20,6 +20,8 @@ from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session, SessionManager, UtteranceState
 from ovos_utils.fakebus import FakeBus
 
+from ovos_spec_tools import SpecMessage
+
 from ovos_core.intent_services.stop_service import StopService
 
 
@@ -69,7 +71,7 @@ class TestCollectStopSkills(unittest.TestCase):
 
         def capture_on(event, handler):
             nonlocal ack_handler
-            if event == "skill.stop.pong":
+            if event == SpecMessage.STOP_PONG:
                 ack_handler = handler
 
         svc.bus.on = capture_on
@@ -93,15 +95,15 @@ class TestCollectStopSkills(unittest.TestCase):
             import time
             time.sleep(0.05)  # let the thread register the handler
             if ack_handler:
-                ack_handler(Message("skill.stop.pong",
+                ack_handler(Message(SpecMessage.STOP_PONG,
                                     {"skill_id": "skill_a", "can_handle": True}))
-                ack_handler(Message("skill.stop.pong",
+                ack_handler(Message(SpecMessage.STOP_PONG,
                                     {"skill_id": "skill_b", "can_handle": True}))
             t.join(timeout=1)
 
         self.assertEqual(set(result_holder[0]), {"skill_a", "skill_b"})
         # listener must be removed
-        svc.bus.remove.assert_called_once_with("skill.stop.pong", ack_handler)
+        svc.bus.remove.assert_called_once_with(SpecMessage.STOP_PONG, ack_handler)
 
     def test_skills_that_decline_are_excluded(self):
         """Skills that respond with can_handle=False are not in want_stop,
@@ -113,7 +115,7 @@ class TestCollectStopSkills(unittest.TestCase):
 
         def capture_on(event, handler):
             nonlocal ack_handler
-            if event == "skill.stop.pong":
+            if event == SpecMessage.STOP_PONG:
                 ack_handler = handler
 
         svc.bus.on = capture_on
@@ -136,7 +138,7 @@ class TestCollectStopSkills(unittest.TestCase):
             import time
             time.sleep(0.05)
             if ack_handler:
-                ack_handler(Message("skill.stop.pong",
+                ack_handler(Message(SpecMessage.STOP_PONG,
                                     {"skill_id": "skill_a", "can_handle": False}))
             t.join(timeout=1)
 
@@ -164,7 +166,7 @@ class TestCollectStopSkills(unittest.TestCase):
         # bus.remove must have been called regardless of timeout
         svc.bus.remove.assert_called_once()
         args = svc.bus.remove.call_args[0]
-        self.assertEqual(args[0], "skill.stop.pong")
+        self.assertEqual(args[0], SpecMessage.STOP_PONG)
 
     def test_listener_removed_on_handler_exception(self):
         """Listener must be cleaned up even if handle_ack raises."""
@@ -177,7 +179,7 @@ class TestCollectStopSkills(unittest.TestCase):
 
         def capture_on(event, handler):
             nonlocal ack_handler
-            if event == "skill.stop.pong":
+            if event == SpecMessage.STOP_PONG:
                 ack_handler = handler
 
         svc.bus.on = capture_on
@@ -202,7 +204,7 @@ class TestCollectStopSkills(unittest.TestCase):
             time.sleep(0.05)
             # Send a malformed message that triggers the guard (skill_id missing)
             if ack_handler:
-                ack_handler(Message("skill.stop.pong", {}))  # no skill_id → guard fires
+                ack_handler(Message(SpecMessage.STOP_PONG, {}))  # no skill_id → guard fires
             t.join(timeout=1)
 
         # Listener must still have been removed
@@ -219,7 +221,7 @@ class TestCollectStopSkills(unittest.TestCase):
 
         def capture_on(event, handler):
             nonlocal ack_handler
-            if event == "skill.stop.pong":
+            if event == SpecMessage.STOP_PONG:
                 ack_handler = handler
 
         svc.bus.on = capture_on
@@ -238,8 +240,8 @@ class TestCollectStopSkills(unittest.TestCase):
             t.start()
             time.sleep(0.05)
             if ack_handler:
-                ack_handler(Message("skill.stop.pong", {}))          # bad — no skill_id
-                ack_handler(Message("skill.stop.pong",
+                ack_handler(Message(SpecMessage.STOP_PONG, {}))          # bad — no skill_id
+                ack_handler(Message(SpecMessage.STOP_PONG,
                                     {"skill_id": "real_skill", "can_handle": True}))  # good
             t.join(timeout=1)
 
@@ -472,7 +474,7 @@ class TestHandleStopConfirmationExtra(unittest.TestCase):
             svc.handle_stop_confirmation(msg)
 
         emitted = [c[0][0].msg_type for c in svc.bus.emit.call_args_list]
-        self.assertIn("mycroft.audio.speech.stop", emitted)
+        self.assertIn(SpecMessage.AUDIO_STOP, emitted)
 
 
 class TestMatchMedium(unittest.TestCase):
@@ -521,7 +523,7 @@ class TestGetActiveSkills(unittest.TestCase):
 
 class TestBusHandlers(unittest.TestCase):
 
-    def test_handle_global_stop_emits_mycroft_stop(self):
+    def test_handle_global_stop_emits_the_spec_stop_broadcast(self):
         svc = _make_service()
         emitted = []
         svc.bus.emit = lambda m: emitted.append(m)
@@ -529,7 +531,9 @@ class TestBusHandlers(unittest.TestCase):
         svc.handle_global_stop(msg)
         types = [m.msg_type for m in emitted]
         self.assertIn("mycroft.skill.handler.start", types)
-        self.assertIn("mycroft.stop", types)
+        self.assertIn(SpecMessage.STOP, types)
+        # STOP-1 §5.3: the legacy mycroft.stop is gone, nothing bridges it
+        self.assertNotIn("mycroft.stop", types)
         self.assertIn("mycroft.skill.handler.complete", types)
 
     def test_handle_skill_stop_forwards_to_skill(self):

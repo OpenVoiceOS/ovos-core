@@ -36,7 +36,6 @@ HANDLER_COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value
 
 NAMESPACE_PATHS = {
     "spec": (False, False, SPEC_UTTERANCE),
-    "legacy": (True, False, LEGACY_UTTERANCE),
 }
 
 
@@ -71,7 +70,9 @@ class TestPadatiousIntent(TestCase):
                 flip_points=[utt_topic],
                 entry_points=[utt_topic],
                 ignore_messages=["recognizer_loop:audio_output_start",
-                                  "recognizer_loop:audio_output_end"],
+                                 "recognizer_loop:audio_output_end",
+                                 SpecMessage.AUDIO_OUTPUT_STARTED,
+                                  SpecMessage.AUDIO_OUTPUT_ENDED],
                 source_message=message,
                 final_session=final_session,
                 # INTENT-4 / register-time alias collapse (padatious-pipeline#89,
@@ -158,7 +159,7 @@ class TestPadatiousIntent(TestCase):
                 final_session=session,
                 expected_messages=[
                     message,
-                    Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                    Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": "snd/error.mp3"}),
                     Message(INTENT_UNMATCHED, {}),
                     Message(UTTERANCE_HANDLED, {})
                 ]
@@ -198,7 +199,7 @@ class TestPadatiousIntent(TestCase):
                 final_session=session,
                 expected_messages=[
                     message,
-                    Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                    Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": "snd/error.mp3"}),
                     Message(INTENT_UNMATCHED, {}),
                     Message(UTTERANCE_HANDLED, {})
                 ]
@@ -235,7 +236,7 @@ class TestPadatiousIntent(TestCase):
                 final_session=session,
                 expected_messages=[
                     message,
-                    Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                    Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": "snd/error.mp3"}),
                     Message(INTENT_UNMATCHED, {}),
                     Message(UTTERANCE_HANDLED, {})
                 ]
