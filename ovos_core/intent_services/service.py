@@ -201,7 +201,12 @@ class IntentService:
         for p in pipeline_plugins:
             if p in blacklist:
                 LOG.info(f"Skipping blacklisted pipeline plugin: '{p}'")
-                if any(matcher_id == p or matcher_id.startswith(f"{p}-")
+                # `intents.pipeline` may list legacy matcher ids (eg.
+                # "adapt_high"); normalize through _PIPELINE_MIGRATION_MAP
+                # before comparing against the installed plugin id, or this
+                # warning silently fails to fire for legacy configs.
+                if any(_PIPELINE_MIGRATION_MAP.get(matcher_id, matcher_id) == p or
+                       _PIPELINE_MIGRATION_MAP.get(matcher_id, matcher_id).startswith(f"{p}-")
                        for matcher_id in active_pipeline):
                     LOG.warning(f"Pipeline plugin '{p}' is blacklisted in "
                                 f"'intents.blacklisted_pipelines' but also "

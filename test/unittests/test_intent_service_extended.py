@@ -852,6 +852,30 @@ class TestBlacklistedPipelines(unittest.TestCase):
 
     @patch("ovos_core.intent_services.service.LOG")
     @patch("ovos_core.intent_services.service.OVOSPipelineFactory")
+    def test_blacklisted_plugin_still_in_active_pipeline_warns_legacy_matcher_id(
+            self, mock_factory, mock_log):
+        # `intents.pipeline` may list legacy matcher ids (eg "adapt_high")
+        # instead of the installed plugin id; the warning must still fire
+        # when the blacklisted plugin backs that legacy matcher id
+        # (CodeRabbit review, ovos-core#832).
+        mock_factory.get_installed_pipeline_ids.return_value = [
+            "ovos-adapt-pipeline-plugin",
+        ]
+        mock_factory.load_plugin.side_effect = lambda p, bus=None: MagicMock(name=p)
+
+        svc = _make_service(config={
+            "blacklisted_pipelines": ["ovos-adapt-pipeline-plugin"],
+            "pipeline": ["adapt_high"],
+        })
+        svc.handle_reload_pipelines(Message("intent.service.pipelines.reload"))
+
+        self.assertNotIn("ovos-adapt-pipeline-plugin", svc.pipeline_plugins)
+        self.assertTrue(mock_log.warning.called)
+        warned = " ".join(str(c) for c in mock_log.warning.call_args_list)
+        self.assertIn("ovos-adapt-pipeline-plugin", warned)
+
+    @patch("ovos_core.intent_services.service.LOG")
+    @patch("ovos_core.intent_services.service.OVOSPipelineFactory")
     def test_blacklisted_plugin_logs_skip_info(self, mock_factory, mock_log):
         mock_factory.get_installed_pipeline_ids.return_value = ["ovos-m2v-pipeline"]
 
