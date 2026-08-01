@@ -40,7 +40,6 @@ INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value
 
 NAMESPACE_PATHS = {
     "spec": (False, False, SPEC_UTTERANCE),
-    "legacy": (True, False, LEGACY_UTTERANCE),
 }
 
 
@@ -74,8 +73,8 @@ class TestAdaptIntent(TestCase):
                 skill_ids=[self.skill_id],
                 flip_points=[utt_topic],
                 entry_points=[utt_topic],
-                ignore_messages=["recognizer_loop:audio_output_start",
-                                  "recognizer_loop:audio_output_end"],
+                ignore_messages=[SpecMessage.AUDIO_OUTPUT_STARTED,
+                                  SpecMessage.AUDIO_OUTPUT_ENDED],
                 source_message=message,
                 final_session=final_session,
                 activation_points=[f"{self.skill_id}:HelloWorldIntent"],
@@ -159,7 +158,7 @@ class TestAdaptIntent(TestCase):
                 final_session=session,
                 expected_messages=[
                     message,
-                    Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                    Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": "snd/error.mp3"}),
                     Message(INTENT_UNMATCHED, {}),
                     Message(UTTERANCE_HANDLED, {})
                 ]
@@ -197,7 +196,7 @@ class TestAdaptIntent(TestCase):
                 final_session=session,
                 expected_messages=[
                     message,
-                    Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                    Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": "snd/error.mp3"}),
                     Message(INTENT_UNMATCHED, {}),
                     Message(UTTERANCE_HANDLED, {})
                 ]
@@ -234,7 +233,7 @@ class TestAdaptIntent(TestCase):
                 source_message=message,
                 expected_messages=[
                     message,
-                    Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                    Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": "snd/error.mp3"}),
                     Message(INTENT_UNMATCHED, {}),
                     Message(UTTERANCE_HANDLED, {})
                 ]

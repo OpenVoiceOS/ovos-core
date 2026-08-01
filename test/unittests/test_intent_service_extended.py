@@ -343,7 +343,7 @@ class TestSendCompleteIntentFailure(unittest.TestCase):
                    return_value={"sounds": {"error": "snd/error.mp3"}}):
             svc.send_complete_intent_failure(msg)
         types = [m.msg_type for m in emitted]
-        self.assertIn("mycroft.audio.play_sound", types)
+        self.assertIn(SpecMessage.AUDIO_PLAY_SOUND, types)
         self.assertIn("ovos.intent.unmatched", types)
         self.assertIn("ovos.utterance.handled", types)
         self.assertNotIn("complete_intent_failure", types)
@@ -357,7 +357,7 @@ class TestSendCompleteIntentFailure(unittest.TestCase):
         with patch("ovos_core.intent_services.service.Configuration",
                    return_value={"sounds": {"error": "custom/error.wav"}}):
             svc.send_complete_intent_failure(msg)
-        sound_msg = next(m for m in emitted if m.msg_type == "mycroft.audio.play_sound")
+        sound_msg = next(m for m in emitted if m.msg_type == SpecMessage.AUDIO_PLAY_SOUND)
         self.assertEqual(sound_msg.data["uri"], "custom/error.wav")
 
 
@@ -380,7 +380,7 @@ class TestSendCancelEvent(unittest.TestCase):
         types = [m.msg_type for m in emitted]
         self.assertIn("ovos.utterance.cancelled", types)
         self.assertIn("ovos.utterance.handled", types)
-        self.assertIn("mycroft.audio.play_sound", types)
+        self.assertIn(SpecMessage.AUDIO_PLAY_SOUND, types)
 
 
 # ---------------------------------------------------------------------------

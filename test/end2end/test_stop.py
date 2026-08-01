@@ -49,10 +49,9 @@ def _wait_for_active_skill(session_id, skill_id, timeout=10, interval=0.1):
 # The two namespace paths every scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
 NAMESPACE_PATHS = {
-    # pure spec: inject on ovos.* and assert no bridging
+    # the only path left: the bridge is gone, so a legacy producer reaches
+    # nothing (pinned in test_no_legacy_wire_compat.py)
     "spec": (False, False, SPEC_UTTERANCE),
-    # legacy producer bridged to the spec listener via modernize
-    "legacy": (True, False, LEGACY_UTTERANCE),
 }
 
 # Messages produced by other pipeline-plugin skills in response to mycroft.stop;
@@ -60,8 +59,8 @@ NAMESPACE_PATHS = {
 # on the spec topic ovos.utterance.speak (no legacy mirror, emit_legacy=False).
 IGNORE_MESSAGES = [
     SPEC_SPEAK,
-    "recognizer_loop:audio_output_start",  # TTS mock duck
-    "recognizer_loop:audio_output_end",  # TTS mock unduck
+    SpecMessage.AUDIO_OUTPUT_STARTED,  # TTS mock duck
+    SpecMessage.AUDIO_OUTPUT_ENDED,  # TTS mock unduck
     # ovos.intent.matched (§9.2) precedes every dispatch; these scenarios assert
     # stop routing/activation, not the matched broadcast, so it is filtered here.
     SpecMessage.INTENT_MATCHED,
@@ -210,7 +209,7 @@ class TestStopNoSkills(TestCase):
                 source_message=message,
                 expected_messages=[
                     message,
-                    Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                    Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": "snd/error.mp3"}),
                     Message(INTENT_UNMATCHED, {}),
                     Message(SpecMessage.UTTERANCE_HANDLED, {}),
                 ]

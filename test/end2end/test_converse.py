@@ -33,14 +33,13 @@ HANDLER_TRIO = [SpecMessage.INTENT_HANDLER_START.value,
                 SpecMessage.INTENT_HANDLER_COMPLETE.value,
                 SpecMessage.INTENT_HANDLER_ERROR.value,
                 "ovos.skills.settings_changed",  # keep ovoscope's default ignore
-                "recognizer_loop:audio_output_start",  # TTS mock duck
-                "recognizer_loop:audio_output_end"]  # TTS mock unduck
+                SpecMessage.AUDIO_OUTPUT_STARTED,  # TTS mock duck
+                SpecMessage.AUDIO_OUTPUT_ENDED]  # TTS mock unduck
 INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value  # ovos.intent.unmatched (§9.3)
 
 # key -> (modernize, emit_legacy, utterance_topic)
 NAMESPACE_PATHS = {
     "spec": (False, False, SPEC_UTTERANCE),
-    "legacy": (True, False, LEGACY_UTTERANCE),
 }
 
 
@@ -209,7 +208,7 @@ class TestConverse(TestCase):
                 Message("skill.converse.pong",
                         data={"can_handle": False, "skill_id": self.skill_id},
                         context={"skill_id": self.skill_id}),
-                Message("mycroft.audio.play_sound", data={"uri": "snd/error.mp3"}),
+                Message(SpecMessage.AUDIO_PLAY_SOUND, data={"uri": "snd/error.mp3"}),
                 Message(INTENT_UNMATCHED),
                 Message(UTTERANCE_HANDLED)
             ]

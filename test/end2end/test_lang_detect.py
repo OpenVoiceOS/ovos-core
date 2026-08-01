@@ -31,7 +31,6 @@ INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value
 
 NAMESPACE_PATHS = {
     "spec": (False, False, SPEC_UTTERANCE),
-    "legacy": (True, False, LEGACY_UTTERANCE),
 }
 
 
@@ -68,7 +67,7 @@ class TestLangDisambiguation(TestCase):
             source_message=message,
             expected_messages=[
                 message,
-                Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": "snd/error.mp3"}),
                 Message(INTENT_UNMATCHED, {"lang": lang_keys["stt_lang"]}),
                 Message(UTTERANCE_HANDLED, {}),
             ]
@@ -105,7 +104,7 @@ class TestLangDisambiguation(TestCase):
             source_message=message,
             expected_messages=[
                 message,
-                Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": "snd/error.mp3"}),
                 Message(INTENT_UNMATCHED, {"lang": lang_keys["detected_lang"]}),
                 Message(UTTERANCE_HANDLED, {}),
             ]
@@ -143,7 +142,7 @@ class TestLangDisambiguation(TestCase):
             source_message=message,
             expected_messages=[
                 message,
-                Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": "snd/error.mp3"}),
                 Message(INTENT_UNMATCHED, {"lang": lang_keys["request_lang"]}),
                 Message(UTTERANCE_HANDLED, {}),
             ]
@@ -180,7 +179,7 @@ class TestLangDisambiguation(TestCase):
             source_message=message,
             expected_messages=[
                 message,
-                Message("mycroft.audio.play_sound", {"uri": "snd/error.mp3"}),
+                Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": "snd/error.mp3"}),
                 Message(INTENT_UNMATCHED, {"lang": session.lang}),
                 Message(UTTERANCE_HANDLED, {}),
             ]

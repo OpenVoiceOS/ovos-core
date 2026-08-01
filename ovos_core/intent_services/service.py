@@ -506,7 +506,7 @@ class IntentService:
             message (Message): The original message that triggered the cancellation.
 
         Events Emitted:
-            - 'mycroft.audio.play_sound': Plays a cancel sound from configuration
+            - 'ovos.audio.play_sound': Plays a cancel sound from configuration
             - 'ovos.utterance.cancelled': Signals that the utterance was canceled
             - 'ovos.utterance.handled': Indicates the utterance processing is complete
 
@@ -518,7 +518,7 @@ class IntentService:
         # play dedicated cancel sound
         sound = Configuration().get('sounds', {}).get('cancel', "snd/cancel.mp3")
         # NOTE: message.reply to ensure correct message destination
-        self.bus.emit(message.reply('mycroft.audio.play_sound', {"uri": sound}))
+        self.bus.emit(message.reply(SpecMessage.AUDIO_PLAY_SOUND, {"uri": sound}))
         # OVOS-PIPELINE-1 §6.4 cancellation terminal path: cancelled -> handled
         self.bus.emit(message.reply(SpecMessage.UTTERANCE_CANCELLED))
         self.bus.emit(message.reply(SpecMessage.UTTERANCE_HANDLED))
@@ -644,17 +644,16 @@ class IntentService:
         failure signal) and then the universal end-marker ``ovos.utterance.handled``
         (§9.5). Exactly one ``ovos.utterance.handled`` terminates the utterance.
 
-        ``ovos.intent.unmatched`` is the spec replacement for the legacy
-        ``complete_intent_failure``; the two are bridged by ovos-spec-tools'
-        MIGRATION_MAP, so emitting the spec topic re-delivers the legacy one to
-        any consumer still subscribed to it.
+        ``ovos.intent.unmatched`` replaced the legacy ``complete_intent_failure``.
+        Nothing bridges the two any more: a consumer still subscribed to the
+        legacy topic hears nothing.
 
         Args:
             message (Message): original message to forward from
         """
         sound = Configuration().get('sounds', {}).get('error', "snd/error.mp3")
         # NOTE: message.reply to ensure correct message destination
-        self.bus.emit(message.reply('mycroft.audio.play_sound', {"uri": sound}))
+        self.bus.emit(message.reply(SpecMessage.AUDIO_PLAY_SOUND, {"uri": sound}))
         # §9.3: intent-layer failure signal (carries lang from message.data)
         self.bus.emit(message.reply(SpecMessage.INTENT_UNMATCHED, message.data))
         # §9.5: universal end-marker

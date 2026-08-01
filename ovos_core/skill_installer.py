@@ -11,6 +11,7 @@ from combo_lock import NamedLock
 from packaging.utils import canonicalize_name
 from ovos_bus_client import Message
 from ovos_config.config import Configuration
+from ovos_spec_tools import SpecMessage
 from ovos_utils.log import LOG
 
 import ovos_plugin_manager
@@ -47,12 +48,12 @@ class SkillsStore:
     def play_error_sound(self) -> None:
         """Emit a message to play the configured error sound."""
         snd = self.config.get("sounds", {}).get("pip_error", "snd/error.mp3")
-        self.bus.emit(Message("mycroft.audio.play_sound", {"uri": snd}))
+        self.bus.emit(Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": snd}))
 
     def play_success_sound(self) -> None:
         """Emit a message to play the configured success sound."""
         snd = self.config.get("sounds", {}).get("pip_success", "snd/acknowledge.mp3")
-        self.bus.emit(Message("mycroft.audio.play_sound", {"uri": snd}))
+        self.bus.emit(Message(SpecMessage.AUDIO_PLAY_SOUND, {"uri": snd}))
 
     @staticmethod
     def validate_constraints(constraints: str) -> bool:

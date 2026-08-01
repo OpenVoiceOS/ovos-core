@@ -46,10 +46,9 @@ HANDLER_ERROR = SpecMessage.INTENT_HANDLER_ERROR.value
 # The two namespace paths every scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
 NAMESPACE_PATHS = {
-    # pure spec: inject on ovos.* and assert no bridging
+    # the only path left: the bridge is gone, so a legacy producer reaches
+    # nothing (pinned in test_no_legacy_wire_compat.py)
     "spec": (False, False, SPEC_UTTERANCE),
-    # legacy producer bridged to the spec listener via modernize
-    "legacy": (True, False, LEGACY_UTTERANCE),
 }
 
 # Messages produced by other pipeline-plugin skills in response to mycroft.stop;
@@ -58,8 +57,8 @@ NAMESPACE_PATHS = {
 # emit_legacy=False on both paths).
 _STOP_RESPONSES = [
     SPEC_SPEAK,
-    "recognizer_loop:audio_output_start",  # TTS mock duck
-    "recognizer_loop:audio_output_end",  # TTS mock unduck
+    SpecMessage.AUDIO_OUTPUT_STARTED,  # TTS mock duck
+    SpecMessage.AUDIO_OUTPUT_ENDED,  # TTS mock unduck
     # ovos.intent.matched (§9.2) precedes every dispatch; these scenarios assert
     # stop routing/activation, not the matched broadcast, so it is filtered here.
     SpecMessage.INTENT_MATCHED,

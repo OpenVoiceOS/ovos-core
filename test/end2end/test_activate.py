@@ -21,10 +21,9 @@ LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)  # recognizer_loop:utte
 # The two namespace paths the utterance-injecting scenario is run on.
 #   key       -> (modernize, emit_legacy, utterance_topic)
 NAMESPACE_PATHS = {
-    # pure spec: inject on ovos.* and assert no bridging
+    # the only path left: the bridge is gone, so a legacy producer reaches
+    # nothing (pinned in test_no_legacy_wire_compat.py)
     "spec": (False, False, SPEC_UTTERANCE),
-    # legacy producer bridged to the spec listener via modernize
-    "legacy": (True, False, LEGACY_UTTERANCE),
 }
 
 
