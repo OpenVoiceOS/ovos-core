@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.6.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.0a1) (2026-08-02)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.10a1...2.6.0a1)
+
+**Merged pull requests:**
+
+- feat: blacklist pipeline plugins at load time and per session [\#832](https://github.com/OpenVoiceOS/ovos-core/pull/832) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.5.10a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.10a1) (2026-08-02)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.9a1...2.5.10a1)
@@ -318,7 +326,6 @@
 **Merged pull requests:**
 
 - Release 2.0.6a1 [\#731](https://github.com/OpenVoiceOS/ovos-core/pull/731) ([github-actions[bot]](https://github.com/apps/github-actions))
-- fix\(setup\): set utf-8 encoding when opening files [\#728](https://github.com/OpenVoiceOS/ovos-core/pull/728) ([mikejgray](https://github.com/mikejgray))
 
 ## [2.0.5a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.5a2) (2025-10-08)
 
