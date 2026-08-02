@@ -184,7 +184,35 @@ class IntentService:
     def handle_reload_pipelines(self, message: Message):
         pipeline_plugins = OVOSPipelineFactory.get_installed_pipeline_ids()
         LOG.debug(f"Installed pipeline plugins: {pipeline_plugins}")
+
+        # `intents.blacklisted_pipelines` lets a deployment opt a plugin out
+        # of ovos-core entirely, so it is never imported/instantiated.
+        # ovos-core still deliberately loads every OTHER installed plugin
+        # regardless of the active `intents.pipeline` selection, because a
+        # remote client/session may select a different pipeline at runtime.
+        # Matching is by exact installed plugin id (as returned by
+        # `OVOSPipelineFactory.get_installed_pipeline_ids`, eg.
+        # "ovos-m2v-pipeline"), NOT by confidence-suffixed matcher id (eg.
+        # "ovos-m2v-pipeline-high"); blacklisting the plugin id covers all of
+        # its matcher variants since they are all produced by the same class.
+        blacklist = set(self.config.get("blacklisted_pipelines", []))
+        active_pipeline = self.config.get("pipeline", [])
+
         for p in pipeline_plugins:
+            if p in blacklist:
+                LOG.info(f"Skipping blacklisted pipeline plugin: '{p}'")
+                # `intents.pipeline` may list legacy matcher ids (eg.
+                # "adapt_high"); normalize through _PIPELINE_MIGRATION_MAP
+                # before comparing against the installed plugin id, or this
+                # warning silently fails to fire for legacy configs.
+                if any(_PIPELINE_MIGRATION_MAP.get(matcher_id, matcher_id) == p or
+                       _PIPELINE_MIGRATION_MAP.get(matcher_id, matcher_id).startswith(f"{p}-")
+                       for matcher_id in active_pipeline):
+                    LOG.warning(f"Pipeline plugin '{p}' is blacklisted in "
+                                f"'intents.blacklisted_pipelines' but also "
+                                f"selected in 'intents.pipeline'; the "
+                                f"blacklist wins and it will stay disabled")
+                continue
             try:
                 self.pipeline_plugins[p] = OVOSPipelineFactory.load_plugin(p, bus=self.bus)
                 LOG.debug(f"Loaded pipeline plugin: '{p}'")
@@ -267,12 +295,28 @@ class IntentService:
         the list can be configured in mycroft.conf under intents.pipeline,
         in the future plugins will be supported for users to define their own pipeline"""
         session = session or SessionManager.get()
-        matchers = [(p, self.get_pipeline_matcher(p)) for p in session.pipeline]
+
+        # OVOS-PIPELINE-1 §5.2/§5.5: `session.blacklisted_pipelines` is the
+        # policy channel and overrides `session.pipeline` preference - a
+        # pipeline_id listed here MUST NOT be invoked for this session even
+        # if it is also present in `session.pipeline`. Filtering here is
+        # orchestrator-only: no `match` call is made and no bus event is
+        # emitted for the skip, it is observable only as a non-invocation.
+        # Unknown pipeline_ids in the blacklist are harmless no-ops.
+        blacklisted = set(session.blacklisted_pipelines or [])
+        requested = [p for p in session.pipeline if p not in blacklisted]
+        if blacklisted:
+            skipped = [p for p in session.pipeline if p in blacklisted]
+            if skipped:
+                LOG.debug(f"Session '{session.session_id}' blacklisted "
+                          f"pipelines skipped: {skipped}")
+
+        matchers = [(p, self.get_pipeline_matcher(p)) for p in requested]
         matchers = [m for m in matchers if m[1] is not None]  # filter any that failed to load
         final_pipeline = [k[0] for k in matchers]
-        if session.pipeline != final_pipeline:
+        if requested != final_pipeline:
             LOG.warning(f"Requested some invalid pipeline components! "
-                        f"filtered: {[k for k in session.pipeline if k not in final_pipeline]}")
+                        f"filtered: {[k for k in requested if k not in final_pipeline]}")
         LOG.debug(f"Session final pipeline: {final_pipeline}")
         return matchers
 
