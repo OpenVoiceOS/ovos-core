@@ -23,3 +23,14 @@ jobs:
       bus_coverage_include: ""
       bus_coverage_exclude: "^Thread-|^intents$|^skills$|^__core__$"
       pr_comment: true
+      # Kill-switch companions: the legacy-wire-compat removal in this PR is
+      # only complete once ovos-bus-client / ovos-utils / ovos-workshop drop
+      # their halves of the bridge too (siblings ovos-bus-client#272,
+      # ovos-utils#412, ovos-workshop#501). Re-pin those dev branches after
+      # the normal test-extras install so ovoscope exercises the same
+      # post-kill-switch stack this PR assumes. Drop this block once the
+      # companion PRs merge and a release picks up the change.
+      post_install_pip: >-
+        git+https://github.com/OpenVoiceOS/ovos-bus-client@feat/drop-legacy-wire-compat
+        git+https://github.com/OpenVoiceOS/ovos-utils@feat/drop-fakebus-legacy-compat
+        git+https://github.com/OpenVoiceOS/ovos-workshop@feat/drop-legacy-compat
