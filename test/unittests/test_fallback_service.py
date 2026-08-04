@@ -219,7 +219,10 @@ class TestCollectFallbackSkills(unittest.TestCase):
                        return_value=sess):
                 result_holder.append(
                     svc._collect_fallback_skills(
-                        Message("test"), fb_range=FallbackRange(5, 90)))
+                        Message("test", context={
+                            "source": "client",
+                            "destination": "skills",
+                        }), fb_range=FallbackRange(5, 90)))
 
         t = None
         try:
@@ -239,6 +242,8 @@ class TestCollectFallbackSkills(unittest.TestCase):
         self.assertEqual(ping.msg_type, "skill_a.fallback.ping")
         self.assertEqual(ping.data, {"utterances": [], "lang": None})
         self.assertNotIn("fallback_request_id", ping.context)
+        self.assertEqual(ping.context["source"], "client")
+        self.assertEqual(ping.context["destination"], "skills")
 
     def test_skill_responds_can_handle_false_excluded(self):
         """A skill that replies can_handle=False is not included."""
@@ -353,7 +358,7 @@ class TestCollectFallbackSkills(unittest.TestCase):
 
     def test_concurrent_sessions_do_not_consume_each_others_pongs(self):
         """Same-topic pongs are correlated by their propagated session."""
-        svc = _make_service()
+        svc = _make_service(config={"fallback_query_timeout": 2})
         svc.registered_fallbacks = {"skill_a": 50}
         handlers = []
         results = {}
@@ -584,6 +589,35 @@ class TestFallbackHandlerLifecycle(unittest.TestCase):
         svc.handle_register_fallback(
             Message("ovos.skills.fallback.register",
                     {"skill_id": "skill_a", "priority": 50}))
+        self.assertIn("skill_a", svc._lifecycle_handlers)
+
+    def test_concurrent_registration_wires_one_listener_pair(self):
+        """Concurrent registration cannot leak duplicate lifecycle handlers."""
+        svc = _make_service()
+        topics = []
+        start = threading.Barrier(8)
+
+        def slow_on(topic, handler):
+            topics.append(topic)
+            time.sleep(0.01)
+
+        svc.bus.on = slow_on
+
+        def wire():
+            start.wait()
+            svc._wire_lifecycle("skill_a")
+
+        threads = [threading.Thread(target=wire) for _ in range(8)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=1)
+
+        self.assertTrue(all(not thread.is_alive() for thread in threads))
+        self.assertEqual(topics, [
+            "ovos.skills.fallback.skill_a.start",
+            "ovos.skills.fallback.skill_a.response",
+        ])
         self.assertIn("skill_a", svc._lifecycle_handlers)
 
     def test_skill_start_emits_handler_start(self):

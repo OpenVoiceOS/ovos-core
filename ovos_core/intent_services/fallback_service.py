@@ -53,9 +53,6 @@ class FallbackService(ConfidenceMatcherPipeline):
 
     def _wire_lifecycle(self, skill_id: str) -> None:
         """Translate lifecycle done-signal for a fallback skill."""
-        if skill_id in self._lifecycle_handlers:
-            return
-
         def _on_start(message: Message) -> None:
             HandlerLifecycle(self.bus, message, skill_id=skill_id,
                              handler_name=f"{skill_id}.fallback").start()
@@ -67,17 +64,21 @@ class FallbackService(ConfidenceMatcherPipeline):
             HandlerLifecycle(self.bus, message, skill_id=skill_id,
                              handler_name=f"{skill_id}.fallback").complete()
 
-        self.bus.on(f"ovos.skills.fallback.{skill_id}.start", _on_start)
-        self.bus.on(f"ovos.skills.fallback.{skill_id}.response", _on_response)
-        self._lifecycle_handlers[skill_id] = (_on_start, _on_response)
+        with self._registered_fallbacks_lock:
+            if skill_id in self._lifecycle_handlers:
+                return
+            self.bus.on(f"ovos.skills.fallback.{skill_id}.start", _on_start)
+            self.bus.on(f"ovos.skills.fallback.{skill_id}.response", _on_response)
+            self._lifecycle_handlers[skill_id] = (_on_start, _on_response)
 
     def _unwire_lifecycle(self, skill_id: str) -> None:
-        handlers = self._lifecycle_handlers.pop(skill_id, None)
-        if not handlers:
-            return
-        start_handler, response_handler = handlers
-        self.bus.remove(f"ovos.skills.fallback.{skill_id}.start", start_handler)
-        self.bus.remove(f"ovos.skills.fallback.{skill_id}.response", response_handler)
+        with self._registered_fallbacks_lock:
+            handlers = self._lifecycle_handlers.pop(skill_id, None)
+            if not handlers:
+                return
+            start_handler, response_handler = handlers
+            self.bus.remove(f"ovos.skills.fallback.{skill_id}.start", start_handler)
+            self.bus.remove(f"ovos.skills.fallback.{skill_id}.response", response_handler)
 
     def handle_register_fallback(self, message: Message) -> None:
         skill_id = message.data.get("skill_id")
@@ -216,7 +217,7 @@ class FallbackService(ConfidenceMatcherPipeline):
                 "lang": message.data.get("lang")
             }
             for skill_id in pool:
-                self.bus.emit(message.reply(
+                self.bus.emit(message.forward(
                     f"{skill_id}.fallback.ping", query_data))
 
             try:
@@ -286,7 +287,7 @@ class FallbackService(ConfidenceMatcherPipeline):
                      if k in available_skills]
         sorted_handlers = sorted(fallbacks, key=operator.itemgetter(1))
 
-        for skill_id, prio in sorted_handlers:
+        for skill_id, _priority in sorted_handlers:
             if skill_id in (sess.blacklisted_skills or []):
                 LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{sess.session_id}'")
                 continue
