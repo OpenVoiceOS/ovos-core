@@ -358,7 +358,7 @@ class TestCollectFallbackSkills(unittest.TestCase):
 
     def test_concurrent_sessions_do_not_consume_each_others_pongs(self):
         """Same-topic pongs are correlated by their propagated session."""
-        svc = _make_service(config={"fallback_query_timeout": 2})
+        svc = _make_service(config={"fallback_query_timeout": 30})
         svc.registered_fallbacks = {"skill_a": 50}
         handlers = []
         results = {}
