@@ -18,7 +18,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import Session, SessionManager
+from ovos_bus_client.session import Session
 from ovos_utils.fakebus import FakeBus
 from ovos_workshop.permissions import FallbackMode
 
@@ -34,8 +34,10 @@ def _make_service(config=None) -> FallbackService:
         svc.bus = bus
         svc.config = config or {}
         svc.registered_fallbacks = {}
+        svc._registered_fallbacks_lock = threading.RLock()
+        svc._fallback_session_locks = {}
+        svc._fallback_session_locks_lock = threading.Lock()
         svc._lifecycle_handlers = {}
-        svc._fallback_response_event = threading.Event()
         svc.bus.on("ovos.skills.fallback.register", svc.handle_register_fallback)
         svc.bus.on("ovos.skills.fallback.deregister", svc.handle_deregister_fallback)
     return svc
@@ -202,7 +204,7 @@ class TestCollectFallbackSkills(unittest.TestCase):
 
         def capture_on(event, handler):
             nonlocal ack_handler
-            if event == "ovos.skills.fallback.pong":
+            if event == "skill_a.fallback.pong":
                 ack_handler = handler
 
         svc.bus.on = capture_on
@@ -225,7 +227,7 @@ class TestCollectFallbackSkills(unittest.TestCase):
             t.start()
             time.sleep(0.05)
             if ack_handler:
-                ack_handler(Message("ovos.skills.fallback.pong",
+                ack_handler(Message("skill_a.fallback.pong",
                                     {"skill_id": "skill_a", "can_handle": True}))
         finally:
             if t is not None:
@@ -233,6 +235,10 @@ class TestCollectFallbackSkills(unittest.TestCase):
             svc.shutdown()
 
         self.assertIn("skill_a", result_holder[0])
+        ping = svc.bus.emit.call_args[0][0]
+        self.assertEqual(ping.msg_type, "skill_a.fallback.ping")
+        self.assertEqual(ping.data, {"utterances": [], "lang": None})
+        self.assertNotIn("fallback_request_id", ping.context)
 
     def test_skill_responds_can_handle_false_excluded(self):
         """A skill that replies can_handle=False is not included."""
@@ -243,7 +249,7 @@ class TestCollectFallbackSkills(unittest.TestCase):
 
         def capture_on(event, handler):
             nonlocal ack_handler
-            if event == "ovos.skills.fallback.pong":
+            if event == "skill_a.fallback.pong":
                 ack_handler = handler
 
         svc.bus.on = capture_on
@@ -266,7 +272,7 @@ class TestCollectFallbackSkills(unittest.TestCase):
             t.start()
             time.sleep(0.05)
             if ack_handler:
-                ack_handler(Message("ovos.skills.fallback.pong",
+                ack_handler(Message("skill_a.fallback.pong",
                                     {"skill_id": "skill_a", "can_handle": False}))
         finally:
             if t is not None:
@@ -275,9 +281,137 @@ class TestCollectFallbackSkills(unittest.TestCase):
 
         self.assertEqual(result_holder[0], [])
 
+    def test_first_willing_skill_is_selected_in_priority_order(self):
+        """Reply arrival does not override registered fallback priority."""
+        svc = _make_service()
+        svc.registered_fallbacks = {"skill_low": 80, "skill_high": 10}
+        handlers = {}
+
+        def capture_on(event, handler):
+            handlers[event] = handler
+
+        def emit(message):
+            skill_id = message.msg_type.removesuffix(".fallback.ping")
+            handlers[f"{skill_id}.fallback.pong"](message.reply(
+                f"{skill_id}.fallback.pong",
+                {"skill_id": skill_id,
+                 "can_handle": skill_id == "skill_low"}))
+
+        svc.bus.on = capture_on
+        svc.bus.remove = MagicMock()
+        svc.bus.emit = emit
+        sess = Session("s")
+        message = Message("test", context={"session": sess.serialize()})
+
+        with patch("ovos_core.intent_services.fallback_service.SessionManager.get",
+                   return_value=sess):
+            result = svc._collect_fallback_skills(
+                message, fb_range=FallbackRange(5, 90))
+
+        self.assertEqual(result, ["skill_low"])
+
+    def test_malformed_pong_is_treated_as_declined(self):
+        """A non-boolean can_handle value cannot claim an utterance."""
+        svc = _make_service()
+        svc.registered_fallbacks = {"skill_a": 50}
+        handlers = {}
+
+        svc.bus.on = lambda event, handler: handlers.update({event: handler})
+        svc.bus.remove = MagicMock()
+
+        def emit(message):
+            handlers["skill_a.fallback.pong"](message.reply(
+                "skill_a.fallback.pong",
+                {"skill_id": "skill_a", "can_handle": "yes"}))
+
+        svc.bus.emit = emit
+        sess = Session("s")
+        message = Message("test", context={"session": sess.serialize()})
+
+        with patch("ovos_core.intent_services.fallback_service.SessionManager.get",
+                   return_value=sess):
+            result = svc._collect_fallback_skills(
+                message, fb_range=FallbackRange(5, 90))
+
+        self.assertEqual(result, [])
+
+    def test_fallback_registry_snapshot_is_isolated_from_mutation(self):
+        """A match keeps a stable registry while skills register or leave."""
+        svc = _make_service()
+        svc.registered_fallbacks = {"skill_a": 50}
+
+        snapshot = svc._fallback_registry_snapshot()
+        svc.handle_register_fallback(Message(
+            "ovos.skills.fallback.register",
+            {"skill_id": "skill_b", "priority": 40},
+        ))
+        svc.handle_deregister_fallback(Message(
+            "ovos.skills.fallback.deregister", {"skill_id": "skill_a"}))
+
+        self.assertEqual(snapshot, {"skill_a": 50})
+        self.assertEqual(svc.registered_fallbacks, {"skill_b": 40})
+
+    def test_concurrent_sessions_do_not_consume_each_others_pongs(self):
+        """Same-topic pongs are correlated by their propagated session."""
+        svc = _make_service()
+        svc.registered_fallbacks = {"skill_a": 50}
+        handlers = []
+        results = {}
+
+        def capture_on(event, handler):
+            if event == "skill_a.fallback.pong":
+                handlers.append(handler)
+
+        svc.bus.on = capture_on
+        svc.bus.remove = MagicMock()
+        svc.bus.emit = MagicMock()
+
+        def run(session_id):
+            session = Session(session_id)
+            message = Message(
+                "test", context={"session": session.serialize()})
+            results[session_id] = svc._collect_fallback_skills(
+                message, fb_range=FallbackRange(5, 90))
+
+        threads = [threading.Thread(target=run, args=(session_id,))
+                   for session_id in ("a", "b")]
+        for thread in threads:
+            thread.start()
+        for _ in range(100):
+            if len(handlers) == 2:
+                break
+            time.sleep(0.01)
+        self.assertEqual(len(handlers), 2)
+
+        pong_a = Message(
+            "skill_a.fallback.pong",
+            {"skill_id": "skill_a", "can_handle": True},
+            {"session": Session("a").serialize()},
+        )
+        for handler in handlers:
+            handler(pong_a)
+        for _ in range(100):
+            if "a" in results:
+                break
+            time.sleep(0.01)
+        self.assertEqual(results.get("a"), ["skill_a"])
+        self.assertNotIn("b", results)
+
+        pong_b = Message(
+            "skill_a.fallback.pong",
+            {"skill_id": "skill_a", "can_handle": True},
+            {"session": Session("b").serialize()},
+        )
+        for handler in handlers:
+            handler(pong_b)
+        for thread in threads:
+            thread.join(timeout=1)
+
+        self.assertEqual(results.get("b"), ["skill_a"])
+
     def test_listener_removed_on_timeout(self):
         """bus.remove must be called even when no skill replies (timeout path)."""
-        svc = _make_service()
+        svc = _make_service(config={"fallback_query_timeout": 0})
         svc.registered_fallbacks = {"slow_skill": 50}
         svc.bus.on = MagicMock()
         svc.bus.remove = MagicMock()
@@ -285,15 +419,12 @@ class TestCollectFallbackSkills(unittest.TestCase):
 
         sess = Session("s")
         with patch("ovos_core.intent_services.fallback_service.SessionManager.get",
-                   return_value=sess), \
-             patch("ovos_core.intent_services.fallback_service.time") as mock_time:
-            # Simulate time jumping forward immediately so loop exits
-            mock_time.time.side_effect = [0, 1.0]
+                   return_value=sess):
             svc._collect_fallback_skills(Message("test"), fb_range=FallbackRange(5, 90))
 
         svc.bus.remove.assert_called_once()
         args = svc.bus.remove.call_args[0]
-        self.assertEqual(args[0], "ovos.skills.fallback.pong")
+        self.assertEqual(args[0], "slow_skill.fallback.pong")
 
     def test_blacklisted_skill_excluded(self):
         """Skills blacklisted by the session are not collected."""
