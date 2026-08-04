@@ -242,8 +242,8 @@ class TestCollectFallbackSkills(unittest.TestCase):
         self.assertEqual(ping.msg_type, "skill_a.fallback.ping")
         self.assertEqual(ping.data, {"utterances": [], "lang": None})
         self.assertNotIn("fallback_request_id", ping.context)
-        self.assertEqual(ping.context["source"], "client")
-        self.assertEqual(ping.context["destination"], "skills")
+        self.assertEqual(ping.context["source"], "skills")
+        self.assertEqual(ping.context["destination"], "client")
 
     def test_skill_responds_can_handle_false_excluded(self):
         """A skill that replies can_handle=False is not included."""

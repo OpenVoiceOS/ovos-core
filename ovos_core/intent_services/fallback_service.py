@@ -217,7 +217,9 @@ class FallbackService(ConfidenceMatcherPipeline):
                 "lang": message.data.get("lang")
             }
             for skill_id in pool:
-                self.bus.emit(message.forward(
+                # FALLBACK-1 section 6.1 defines this as a dotted-addressed
+                # reply derived from the inbound utterance envelope.
+                self.bus.emit(message.reply(
                     f"{skill_id}.fallback.ping", query_data))
 
             try:

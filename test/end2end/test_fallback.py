@@ -95,12 +95,12 @@ class TestFallback(TestCase):
                 minicroft=minicroft,
                 skill_ids=[self.skill_id],
                 eof_msgs=[UTTERANCE_HANDLED],
-                flip_points=[utt_topic],
+                flip_points=[
+                    utt_topic,
+                    f"{self.skill_id}.fallback.pong",
+                ],
                 entry_points=[utt_topic],
                 final_session=final_session,
-                keep_original_src=[
-                    f"{self.skill_id}.fallback.ping",
-                ],
                 ignore_messages=["recognizer_loop:audio_output_start",
                                   "recognizer_loop:audio_output_end"],
                 activation_points=[f"ovos.skills.fallback.{self.skill_id}.request"],
@@ -111,7 +111,8 @@ class TestFallback(TestCase):
                             {"utterances": ["hello world"],
                              "lang": session.lang}),
                     Message(f"{self.skill_id}.fallback.pong",
-                            {"skill_id": self.skill_id, "can_handle": True}),
+                            {"skill_id": self.skill_id, "can_handle": True},
+                            {"source": "A", "destination": "B"}),
                 # PIPELINE-1 §9.2: matched notification precedes the dispatch. The
                 # fallback match_type is the .request topic; it bears no ':' so
                 # skill_id/intent_name resolve to that topic.
