@@ -17,7 +17,7 @@ from collections import defaultdict
 from unittest.mock import MagicMock, patch
 
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import Session, SessionManager
+from ovos_bus_client.session import Session
 from ovos_plugin_manager.templates.pipeline import (
     IntentHandlerMatch,
     ConfidenceMatcherPipeline,
@@ -28,6 +28,11 @@ from ovos_spec_tools import SpecMessage
 from ovos_core.intent_services.service import IntentService
 from ovos_core.intent_services.dispatcher import IntentDispatcher
 from ovos_core.intent_services.manifest import IntentManifest
+from ovos_core._metrics import (
+    INTENT_MATCHING,
+    SKILL_SELECTION,
+    UTTERANCE_DISPATCH,
+)
 
 
 def _make_service(config=None) -> IntentService:
@@ -631,6 +636,44 @@ class TestHandleUtterance(unittest.TestCase):
                    return_value=["en-US"]):
             svc.handle_utterance(msg)
         svc.send_complete_intent_failure.assert_called_once()
+
+    def test_runtime_stages_are_observed(self):
+        """One utterance records dispatch, selection, and matcher latency."""
+        svc = _make_service()
+        svc.send_complete_intent_failure = MagicMock()
+        matcher = MagicMock(return_value=None)
+        svc.get_pipeline = MagicMock(return_value=[("test", matcher)])
+        sess = Session("s")
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["xyz"]}, context={})
+        before = {
+            histogram.name: histogram.snapshot()["count"]
+            for histogram in (
+                UTTERANCE_DISPATCH,
+                INTENT_MATCHING,
+                SKILL_SELECTION,
+            )
+        }
+
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.reset_default_session",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.update"), \
+             patch("ovos_core.intent_services.service.get_message_lang",
+                   return_value="en-US"):
+            svc.handle_utterance(msg)
+
+        matcher.assert_called_once()
+        for histogram in (
+            UTTERANCE_DISPATCH,
+            INTENT_MATCHING,
+            SKILL_SELECTION,
+        ):
+            self.assertEqual(
+                histogram.snapshot()["count"],
+                before[histogram.name] + 1,
+            )
 
 
 # ---------------------------------------------------------------------------

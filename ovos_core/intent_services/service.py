@@ -37,6 +37,12 @@ from ovos_core.intent_services.manifest import IntentManifest
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
 
+from ovos_core._metrics import (
+    INTENT_MATCHING,
+    SKILL_SELECTION,
+    UTTERANCE_DISPATCH,
+)
+
 
 # Module-level constants for pipeline matcher migration and optimization
 _PIPELINE_MIGRATION_MAP = {
@@ -575,6 +581,7 @@ class IntentService:
         self.bus.emit(message.reply(SpecMessage.UTTERANCE_CANCELLED, cancel_data))
         self.bus.emit(message.reply(SpecMessage.UTTERANCE_HANDLED))
 
+    @UTTERANCE_DISPATCH.timed
     def handle_utterance(self, message: Message):
         """Main entrypoint for handling user utterances
 
@@ -623,17 +630,19 @@ class IntentService:
 
         # match
         match = None
-        with stopwatch:
+        with stopwatch, SKILL_SELECTION.measure():
             self._deactivations[sess.session_id] = []
             # Loop through the matching functions until a match is found.
             for pipeline, match_func in self.get_pipeline(session=sess):
                 langs = [lang]
                 if self.config.get("multilingual_matching"):
                     # if multilingual matching is enabled, attempt to match all user languages if main fails
-                    langs += [l for l in get_valid_languages() if l != lang]
+                    langs += [candidate for candidate in get_valid_languages()
+                              if candidate != lang]
                 for intent_lang in langs:
                     try:
-                        match = match_func(utterances, intent_lang, message)
+                        with INTENT_MATCHING.measure():
+                            match = match_func(utterances, intent_lang, message)
                     except Exception:
                         # a misbehaving pipeline matcher (e.g. a malformed .voc
                         # resource) must not abort the whole utterance — log and
