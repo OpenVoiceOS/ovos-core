@@ -4,7 +4,11 @@ from urllib.request import urlopen
 
 import pytest
 
-from ovos_core._metrics import LatencyHistogram
+from ovos_core._metrics import (
+    PIPELINE_MATCHING,
+    LatencyHistogram,
+    pipeline_matching_histogram,
+)
 from ovos_core._prometheus import (
     collect_histograms,
     load_metric_collectors,
@@ -58,6 +62,38 @@ def test_prometheus_renderer_converts_milliseconds_to_seconds():
     assert 'test_stage_seconds_bucket{le="0.25"} 1' in payload
     assert "test_stage_seconds_sum 0.125" in payload
     assert "test_stage_seconds_count 1" in payload
+
+
+def test_prometheus_renderer_supports_counters():
+    payload = render_prometheus({
+        "test_cache_hit_total": {"type": "counter", "value": 7},
+    })
+
+    assert "# TYPE test_cache_hit_total counter" in payload
+    assert "test_cache_hit_total 7" in payload
+
+
+def test_prometheus_renderer_rejects_malformed_counters():
+    with pytest.raises(ValueError, match="must end with '_total'"):
+        render_prometheus({
+            "test_cache_hit": {"type": "counter", "value": 1},
+        })
+
+
+@pytest.mark.parametrize(
+    ("pipeline_id", "family"),
+    (
+        ("ovos-stop-pipeline-plugin-high", "stop"),
+        ("ovos-converse-pipeline-plugin", "converse"),
+        ("ovos-padatious-pipeline-plugin-high", "padatious"),
+        ("ovos-padatious-pipeline-plugin-low", "padatious"),
+        ("ovos-common-query-pipeline-plugin", "common_query"),
+        ("ovos-m2v-pipeline-high", "m2v"),
+        ("third-party-matcher-high", "other"),
+    ),
+)
+def test_pipeline_histogram_uses_fixed_families(pipeline_id, family):
+    assert pipeline_matching_histogram(pipeline_id) is PIPELINE_MATCHING[family]
 
 
 def test_collectors_reject_duplicate_metric_names():

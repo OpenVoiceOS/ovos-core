@@ -23,16 +23,18 @@ network.
 | `ovos_utterance_dispatch_seconds` | Complete synchronous handling of one `recognizer_loop:utterance` message by `IntentService` |
 | `ovos_skill_selection_seconds` | Selection loop across the configured intent pipelines |
 | `ovos_intent_matching_seconds` | One pipeline matcher invocation; an utterance can produce more than one observation |
+| `ovos_intent_matching_{family}_seconds` | One matcher invocation classified into the fixed `stop`, `converse`, `padatious`, `padacioso`, `adapt`, `common_query`, `ocp`, `m2v`, `fallback`, or `other` family |
 
 The boundaries are nested: dispatch contains selection, selection contains one
 or more matcher observations, and plugin-provided handler observations can
 contain further plugin-provided stages. Do not add these durations as if they
 were disjoint stages.
 
-Installed packages can contribute histograms through the
+Installed packages can contribute histograms and cumulative counters through the
 `ovos.performance.metrics` entry-point group. A collector is a zero-argument
-callable returning the same fixed histogram snapshot shape as
-`ovos_core._metrics.performance_histograms`. Collectors are loaded once at
+callable returning fixed metric snapshots. Histograms provide `count`,
+`sum_ms`, and cumulative `buckets`; counters provide `type: counter` and an
+integer `value`, and their names end in `_total`. Collectors are loaded once at
 startup; duplicate or malformed metric names make a scrape fail rather than
 silently publishing misleading data.
 

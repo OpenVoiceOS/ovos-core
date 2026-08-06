@@ -19,20 +19,21 @@ from unittest.mock import MagicMock, patch
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
 from ovos_plugin_manager.templates.pipeline import (
-    IntentHandlerMatch,
     ConfidenceMatcherPipeline,
+    IntentHandlerMatch,
 )
-from ovos_utils.fakebus import FakeBus
 from ovos_spec_tools import SpecMessage
+from ovos_utils.fakebus import FakeBus
 
-from ovos_core.intent_services.service import IntentService
-from ovos_core.intent_services.dispatcher import IntentDispatcher
-from ovos_core.intent_services.manifest import IntentManifest
 from ovos_core._metrics import (
     INTENT_MATCHING,
+    PIPELINE_MATCHING,
     SKILL_SELECTION,
     UTTERANCE_DISPATCH,
 )
+from ovos_core.intent_services.dispatcher import IntentDispatcher
+from ovos_core.intent_services.manifest import IntentManifest
+from ovos_core.intent_services.service import IntentService
 
 
 def _make_service(config=None) -> IntentService:
@@ -642,7 +643,9 @@ class TestHandleUtterance(unittest.TestCase):
         svc = _make_service()
         svc.send_complete_intent_failure = MagicMock()
         matcher = MagicMock(return_value=None)
-        svc.get_pipeline = MagicMock(return_value=[("test", matcher)])
+        svc.get_pipeline = MagicMock(return_value=[
+            ("ovos-padatious-pipeline-plugin-high", matcher),
+        ])
         sess = Session("s")
         msg = Message("recognizer_loop:utterance",
                       data={"utterances": ["xyz"]}, context={})
@@ -652,6 +655,7 @@ class TestHandleUtterance(unittest.TestCase):
                 UTTERANCE_DISPATCH,
                 INTENT_MATCHING,
                 SKILL_SELECTION,
+                PIPELINE_MATCHING["padatious"],
             )
         }
 
@@ -669,6 +673,7 @@ class TestHandleUtterance(unittest.TestCase):
             UTTERANCE_DISPATCH,
             INTENT_MATCHING,
             SKILL_SELECTION,
+            PIPELINE_MATCHING["padatious"],
         ):
             self.assertEqual(
                 histogram.snapshot()["count"],

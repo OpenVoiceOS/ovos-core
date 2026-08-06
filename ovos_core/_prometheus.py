@@ -18,12 +18,12 @@ from ovos_core._metrics import performance_histograms
 
 METRIC_ENTRYPOINT_GROUP = "ovos.performance.metrics"
 _PROMETHEUS_NAME = re.compile(r"[a-zA-Z_:][a-zA-Z0-9_:]*")
-HistogramCollector = Callable[[], Mapping[str, Mapping[str, object]]]
+MetricCollector = Callable[[], Mapping[str, Mapping[str, object]]]
 
 
-def load_metric_collectors() -> tuple[tuple[str, HistogramCollector], ...]:
+def load_metric_collectors() -> tuple[tuple[str, MetricCollector], ...]:
     """Load Core and installed plugin collectors once at process startup."""
-    collectors: list[tuple[str, HistogramCollector]] = [
+    collectors: list[tuple[str, MetricCollector]] = [
         ("core", performance_histograms),
     ]
     discovered = metadata.entry_points()
@@ -46,7 +46,7 @@ def load_metric_collectors() -> tuple[tuple[str, HistogramCollector], ...]:
 
 
 def collect_histograms(
-    collectors: Sequence[tuple[str, HistogramCollector]],
+    collectors: Sequence[tuple[str, MetricCollector]],
 ) -> dict[str, Mapping[str, object]]:
     """Collect a snapshot and reject duplicate or malformed metric names."""
     histograms: dict[str, Mapping[str, object]] = {}
@@ -95,19 +95,36 @@ def _metric_name(metric_name: str) -> str:
 
 
 def render_prometheus(
-    histograms: Mapping[str, Mapping[str, object]],
+    metrics: Mapping[str, Mapping[str, object]],
 ) -> str:
-    """Render cumulative millisecond snapshots as Prometheus histograms."""
+    """Render process-local histogram and counter snapshots."""
     lines: list[str] = []
     exported_names: dict[str, str] = {}
-    for metric_name in sorted(histograms):
-        snapshot = histograms[metric_name]
+    for metric_name in sorted(metrics):
+        snapshot = metrics[metric_name]
         exported = _metric_name(metric_name)
         previous = exported_names.setdefault(exported, metric_name)
         if previous != metric_name:
             raise ValueError(
                 f"metrics {previous!r} and {metric_name!r} both export as "
                 f"{exported!r}"
+            )
+        metric_type = snapshot.get("type", "histogram")
+        if metric_type == "counter":
+            if not exported.endswith("_total"):
+                raise ValueError(
+                    f"counter metric {metric_name!r} must end with '_total'"
+                )
+            value = _count(snapshot.get("value"), "value", metric_name)
+            lines.extend((
+                f"# HELP {exported} Process-local cumulative {metric_name}.",
+                f"# TYPE {exported} counter",
+                f"{exported} {value}",
+            ))
+            continue
+        if metric_type != "histogram":
+            raise ValueError(
+                f"unsupported performance metric type {metric_type!r}"
             )
         buckets = snapshot.get("buckets")
         if not isinstance(buckets, Mapping):
@@ -159,7 +176,7 @@ def render_prometheus(
 
 
 def _handler(
-    collectors: Sequence[tuple[str, HistogramCollector]],
+    collectors: Sequence[tuple[str, MetricCollector]],
 ) -> type[BaseHTTPRequestHandler]:
     class MetricsHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802

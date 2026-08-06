@@ -17,7 +17,7 @@ import json
 import re
 import time
 from collections import defaultdict
-from typing import Optional, Tuple, Callable, List
+from typing import Callable, List, Optional, Tuple
 
 import requests
 from ovos_bus_client.message import Message
@@ -25,24 +25,33 @@ from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
-from ovos_spec_tools import closest_lang, standardize_lang, SpecMessage
+from ovos_plugin_manager.pipeline import OVOSPipelineFactory
+from ovos_plugin_manager.templates.pipeline import (
+    ConfidenceMatcherPipeline,
+    IntentHandlerMatch,
+)
+from ovos_spec_tools import SpecMessage, closest_lang, standardize_lang
 from ovos_utils.log import LOG
 from ovos_utils.metrics import Stopwatch
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
 from ovos_utils.thread_utils import create_daemon
 
-from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService, IntentTransformersService
-from ovos_core.intent_services.dispatcher import IntentDispatcher, DEFAULT_HANDLER_TIMEOUT
-from ovos_core.intent_services.manifest import IntentManifest
-from ovos_plugin_manager.pipeline import OVOSPipelineFactory
-from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
-
 from ovos_core._metrics import (
     INTENT_MATCHING,
     SKILL_SELECTION,
     UTTERANCE_DISPATCH,
+    pipeline_matching_histogram,
 )
-
+from ovos_core.intent_services.dispatcher import (
+    DEFAULT_HANDLER_TIMEOUT,
+    IntentDispatcher,
+)
+from ovos_core.intent_services.manifest import IntentManifest
+from ovos_core.transformers import (
+    IntentTransformersService,
+    MetadataTransformersService,
+    UtteranceTransformersService,
+)
 
 # Module-level constants for pipeline matcher migration and optimization
 _PIPELINE_MIGRATION_MAP = {
@@ -641,7 +650,8 @@ class IntentService:
                               if candidate != lang]
                 for intent_lang in langs:
                     try:
-                        with INTENT_MATCHING.measure():
+                        with (INTENT_MATCHING.measure(),
+                              pipeline_matching_histogram(pipeline).measure()):
                             match = match_func(utterances, intent_lang, message)
                     except Exception:
                         # a misbehaving pipeline matcher (e.g. a malformed .voc
@@ -860,8 +870,8 @@ class IntentService:
 
 def launch_standalone():
     from ovos_bus_client import MessageBusClient
-    from ovos_utils import wait_for_exit_signal
     from ovos_config.locale import setup_locale
+    from ovos_utils import wait_for_exit_signal
     from ovos_utils.log import init_service_logger
 
     LOG.info("Launching IntentService in standalone mode")

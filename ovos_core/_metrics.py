@@ -125,6 +125,41 @@ UTTERANCE_DISPATCH = LatencyHistogram("ovos_utterance_dispatch_ms")
 INTENT_MATCHING = LatencyHistogram("ovos_intent_matching_ms")
 SKILL_SELECTION = LatencyHistogram("ovos_skill_selection_ms")
 
+# Pipeline identifiers are session-selectable, so they must never become raw
+# metric names or labels.  These families cover the built-in matchers while an
+# explicit ``other`` bucket keeps third-party plugins observable without
+# unbounded cardinality.
+_PIPELINE_FAMILIES = (
+    "stop",
+    "converse",
+    "padatious",
+    "padacioso",
+    "adapt",
+    "common_query",
+    "ocp",
+    "m2v",
+    "fallback",
+    "other",
+)
+PIPELINE_MATCHING = {
+    family: LatencyHistogram(f"ovos_intent_matching_{family}_ms")
+    for family in _PIPELINE_FAMILIES
+}
+
+
+def pipeline_matching_histogram(pipeline_id: str) -> LatencyHistogram:
+    """Return the fixed-cardinality histogram for ``pipeline_id``."""
+    normalized = str(pipeline_id).lower().replace("_", "-")
+    if "common-query" in normalized or "common-qa" in normalized:
+        family = "common_query"
+    else:
+        family = next(
+            (candidate for candidate in _PIPELINE_FAMILIES[:-1]
+             if candidate.replace("_", "-") in normalized),
+            "other",
+        )
+    return PIPELINE_MATCHING[family]
+
 
 def performance_histograms() -> Mapping[str, Mapping[str, Any]]:
     """Return the process-local Core runtime histograms."""
@@ -134,5 +169,6 @@ def performance_histograms() -> Mapping[str, Mapping[str, Any]]:
             UTTERANCE_DISPATCH,
             INTENT_MATCHING,
             SKILL_SELECTION,
+            *PIPELINE_MATCHING.values(),
         )
     }
