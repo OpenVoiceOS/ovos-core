@@ -99,9 +99,16 @@ def render_prometheus(
 ) -> str:
     """Render cumulative millisecond snapshots as Prometheus histograms."""
     lines: list[str] = []
+    exported_names: dict[str, str] = {}
     for metric_name in sorted(histograms):
         snapshot = histograms[metric_name]
         exported = _metric_name(metric_name)
+        previous = exported_names.setdefault(exported, metric_name)
+        if previous != metric_name:
+            raise ValueError(
+                f"metrics {previous!r} and {metric_name!r} both export as "
+                f"{exported!r}"
+            )
         buckets = snapshot.get("buckets")
         if not isinstance(buckets, Mapping):
             raise TypeError(f"{metric_name}.buckets must be a mapping")
@@ -145,7 +152,7 @@ def render_prometheus(
             )
         lines.extend((
             f'{exported}_bucket{{le="+Inf"}} {count}',
-            f"{exported}_sum {sum_seconds:g}",
+            f"{exported}_sum {sum_seconds:.17g}",
             f"{exported}_count {count}",
         ))
     return "\n".join(lines) + "\n"

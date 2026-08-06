@@ -6,12 +6,15 @@ binds to loopback unless explicitly configured.
 
 ```text
 OVOS_METRICS_ENABLED=true
-OVOS_METRICS_HOST=0.0.0.0
+OVOS_METRICS_HOST=127.0.0.1
 OVOS_METRICS_PORT=9474
 ```
 
 Scrape `GET /metrics`. Do not expose this operational endpoint through the
-public voice API or WebSocket ingress.
+public voice API or WebSocket ingress. The endpoint has no authentication. For
+remote scraping, place it behind an authenticating reverse proxy or restrict
+access with a network policy. Do not bind it to `0.0.0.0` on an untrusted
+network.
 
 ## Core stages
 
@@ -22,13 +25,12 @@ public voice API or WebSocket ingress.
 | `ovos_intent_matching_seconds` | One pipeline matcher invocation; an utterance can produce more than one observation |
 
 The boundaries are nested: dispatch contains selection, selection contains one
-or more matcher observations, and a Workshop skill-handler observation can
-contain weather-service and dialog-rendering observations. Do not add these
-durations as if they were disjoint stages.
+or more matcher observations, and plugin-provided handler observations can
+contain further plugin-provided stages. Do not add these durations as if they
+were disjoint stages.
 
 Installed packages can contribute histograms through the
-`ovos.performance.metrics` entry-point group. `ovos-workshop`, for example,
-exports skill-handler and dialog-rendering stages. A collector is a zero-argument
+`ovos.performance.metrics` entry-point group. A collector is a zero-argument
 callable returning the same fixed histogram snapshot shape as
 `ovos_core._metrics.performance_histograms`. Collectors are loaded once at
 startup; duplicate or malformed metric names make a scrape fail rather than
@@ -36,13 +38,14 @@ silently publishing misleading data.
 
 ## Aggregating partitions
 
-Prometheus must scrape every runtime process. Aggregate buckets across the 32
-partitions before calculating a percentile:
+Prometheus must scrape every runtime process. Each process publishes its own
+counters. Aggregate buckets across all scraped processes before calculating a
+percentile:
 
 ```promql
 histogram_quantile(
   0.95,
-  sum by (le) (rate(ovos_skill_handler_execution_seconds_bucket[5m]))
+  sum by (le) (rate(ovos_utterance_dispatch_seconds_bucket[5m]))
 )
 ```
 
@@ -53,7 +56,7 @@ second view when checking shard skew:
 ```promql
 histogram_quantile(
   0.95,
-  sum by (pod, le) (rate(ovos_skill_handler_execution_seconds_bucket[5m]))
+  sum by (pod, le) (rate(ovos_utterance_dispatch_seconds_bucket[5m]))
 )
 ```
 

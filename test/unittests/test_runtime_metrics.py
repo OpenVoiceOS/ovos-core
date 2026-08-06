@@ -60,6 +60,32 @@ def test_collectors_reject_duplicate_metric_names():
         collect_histograms((("first", collector), ("second", collector)))
 
 
+def test_renderer_rejects_exported_metric_name_collisions():
+    snapshot = {
+        "count": 0,
+        "sum_ms": 0,
+        "buckets": {"inf": 0},
+    }
+
+    with pytest.raises(ValueError, match="both export as"):
+        render_prometheus({
+            "duplicate_ms": snapshot,
+            "duplicate_seconds": snapshot,
+        })
+
+
+def test_prometheus_renderer_preserves_sum_precision():
+    payload = render_prometheus({
+        "test_stage_ms": {
+            "count": 1,
+            "sum_ms": 1_000_000_000.125,
+            "buckets": {"inf": 1},
+        },
+    })
+
+    assert "test_stage_seconds_sum 1000000.000125" in payload
+
+
 def test_plugin_metric_collectors_are_loaded_in_stable_order(monkeypatch):
     def plugin_collector():
         return {}
