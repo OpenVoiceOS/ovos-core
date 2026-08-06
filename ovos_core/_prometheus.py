@@ -115,11 +115,11 @@ def render_prometheus(
                 raise ValueError(
                     f"counter metric {metric_name!r} must end with '_total'"
                 )
-            value = _count(snapshot.get("value"), "value", metric_name)
+            value = _number(snapshot.get("value"), "value", metric_name)
             lines.extend((
                 f"# HELP {exported} Process-local cumulative {metric_name}.",
                 f"# TYPE {exported} counter",
-                f"{exported} {value}",
+                f"{exported} {value:.17g}",
             ))
             continue
         if metric_type != "histogram":

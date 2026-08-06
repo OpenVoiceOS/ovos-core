@@ -7,6 +7,7 @@ import pytest
 from ovos_core._metrics import (
     PIPELINE_MATCHING,
     LatencyHistogram,
+    performance_histograms,
     pipeline_matching_histogram,
 )
 from ovos_core._prometheus import (
@@ -90,6 +91,7 @@ def test_prometheus_renderer_rejects_malformed_counters():
         ("ovos-common-query-pipeline-plugin", "common_query"),
         ("ovos-m2v-pipeline-high", "m2v"),
         ("third-party-matcher-high", "other"),
+        ("third-party-adapt-wrapper", "other"),
     ),
 )
 def test_pipeline_histogram_uses_fixed_families(pipeline_id, family):
@@ -168,9 +170,24 @@ def test_plugin_metric_collectors_are_loaded_in_stable_order(monkeypatch):
 
 
 def test_opt_in_metrics_endpoint(monkeypatch):
+    def fractional_counter():
+        return {
+            "test_fractional_work_total": {
+                "type": "counter",
+                "value": 1.6,
+            },
+        }
+
     monkeypatch.setenv("OVOS_METRICS_ENABLED", "true")
     monkeypatch.setenv("OVOS_METRICS_HOST", "127.0.0.1")
     monkeypatch.setenv("OVOS_METRICS_PORT", "0")
+    monkeypatch.setattr(
+        "ovos_core._prometheus.load_metric_collectors",
+        lambda: (
+            ("core", performance_histograms),
+            ("fractional", fractional_counter),
+        ),
+    )
     server = start_metrics_server()
     assert server is not None
     try:
@@ -183,5 +200,6 @@ def test_opt_in_metrics_endpoint(monkeypatch):
         assert "ovos_utterance_dispatch_seconds" in payload
         assert "ovos_intent_matching_seconds" in payload
         assert "ovos_skill_selection_seconds" in payload
+        assert "test_fractional_work_total 1.6000000000000001" in payload
     finally:
         stop_metrics_server(server)

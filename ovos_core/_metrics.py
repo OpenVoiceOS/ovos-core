@@ -147,19 +147,27 @@ PIPELINE_MATCHING = {
     family: LatencyHistogram(f"ovos_intent_matching_{family}_ms")
     for family in _PIPELINE_FAMILIES
 }
+_PIPELINE_PREFIXES = (
+    ("ovos-stop-pipeline", "stop"),
+    ("ovos-converse-pipeline", "converse"),
+    ("ovos-padatious-pipeline", "padatious"),
+    ("ovos-padacioso-pipeline", "padacioso"),
+    ("ovos-adapt-pipeline", "adapt"),
+    ("ovos-common-query-pipeline", "common_query"),
+    ("ovos-ocp-pipeline", "ocp"),
+    ("ovos-m2v-pipeline", "m2v"),
+    ("ovos-fallback-pipeline", "fallback"),
+)
 
 
 def pipeline_matching_histogram(pipeline_id: str) -> LatencyHistogram:
     """Return the fixed-cardinality histogram for ``pipeline_id``."""
     normalized = str(pipeline_id).lower().replace("_", "-")
-    if "common-query" in normalized or "common-qa" in normalized:
-        family = "common_query"
-    else:
-        family = next(
-            (candidate for candidate in _PIPELINE_FAMILIES[:-1]
-             if candidate.replace("_", "-") in normalized),
-            "other",
-        )
+    family = next(
+        (family for prefix, family in _PIPELINE_PREFIXES
+         if normalized.startswith(prefix)),
+        "other",
+    )
     return PIPELINE_MATCHING[family]
 
 
