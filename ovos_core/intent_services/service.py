@@ -630,7 +630,7 @@ class IntentService:
 
         # match
         match = None
-        with stopwatch, SKILL_SELECTION.measure():
+        with stopwatch, SKILL_SELECTION.measure() as selection_measurement:
             self._deactivations[sess.session_id] = []
             # Loop through the matching functions until a match is found.
             for pipeline, match_func in self.get_pipeline(session=sess):
@@ -673,10 +673,15 @@ class IntentService:
                                       f"missing required slots {missing} (§6.2)")
                             continue
                         try:
+                            # FakeBus and the in-process WebSocket bus invoke
+                            # skill handlers synchronously from emit(). That is
+                            # dispatch/handler time, not skill-selection time.
+                            selection_measurement.pause()
                             self._dispatch_match(match, message, intent_lang,
                                                      pipeline_id=pipeline)
                             break
                         except Exception:
+                            selection_measurement.resume()
                             LOG.exception(f"{match_func} returned an invalid match")
                 else:
                     LOG.debug(f"no match from {match_func}")
@@ -686,6 +691,7 @@ class IntentService:
                 # Nothing was able to handle the intent
                 # Ask politely for forgiveness for failing in this vital task
                 message.data["lang"] = lang
+                selection_measurement.pause()
                 self.send_complete_intent_failure(message)
 
         LOG.debug(f"intent matching took: {stopwatch.time}")

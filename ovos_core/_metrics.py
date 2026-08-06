@@ -31,6 +31,37 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
+class _LatencyMeasurement:
+    """A pausable, single-observation histogram measurement."""
+
+    def __init__(self, histogram: "LatencyHistogram") -> None:
+        self._histogram = histogram
+        self._started = time.monotonic()
+        self._elapsed_ms = 0.0
+        self._running = True
+        self._finished = False
+
+    def pause(self) -> None:
+        """Exclude subsequent time until :meth:`resume` is called."""
+        if self._running and not self._finished:
+            self._elapsed_ms += (time.monotonic() - self._started) * 1_000
+            self._running = False
+
+    def resume(self) -> None:
+        """Resume measuring after a pause."""
+        if not self._running and not self._finished:
+            self._started = time.monotonic()
+            self._running = True
+
+    def finish(self) -> None:
+        """Observe accumulated active time exactly once."""
+        if self._finished:
+            return
+        self.pause()
+        self._finished = True
+        self._histogram.observe_ms(self._elapsed_ms)
+
+
 class LatencyHistogram:
     """Thread-safe cumulative latency histogram with fixed buckets."""
 
@@ -57,13 +88,13 @@ class LatencyHistogram:
                     self._buckets[index] += 1
 
     @contextmanager
-    def measure(self) -> Iterator[None]:
-        """Observe the enclosed block, including exceptional exits."""
-        started = time.monotonic()
+    def measure(self) -> Iterator[_LatencyMeasurement]:
+        """Observe active enclosed time, including exceptional exits."""
+        measurement = _LatencyMeasurement(self)
         try:
-            yield
+            yield measurement
         finally:
-            self.observe_ms((time.monotonic() - started) * 1_000)
+            measurement.finish()
 
     def timed(self, function: Callable[P, R]) -> Callable[P, R]:
         """Decorate a synchronous function with this histogram."""

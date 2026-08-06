@@ -25,6 +25,19 @@ def test_histogram_observes_exceptional_blocks():
     assert snapshot["buckets"]["inf"] == 1
 
 
+def test_histogram_measurement_can_exclude_nested_work(monkeypatch):
+    clock = iter((10.0, 10.1))
+    monkeypatch.setattr("ovos_core._metrics.time.monotonic", lambda: next(clock))
+    histogram = LatencyHistogram("test_stage_ms")
+
+    with histogram.measure() as measurement:
+        measurement.pause()
+
+    snapshot = histogram.snapshot()
+    assert snapshot["count"] == 1
+    assert snapshot["sum_ms"] == pytest.approx(100.0)
+
+
 def test_histogram_rejects_non_finite_observations():
     histogram = LatencyHistogram("test_stage_ms")
 

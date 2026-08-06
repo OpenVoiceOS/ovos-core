@@ -675,6 +675,37 @@ class TestHandleUtterance(unittest.TestCase):
                 before[histogram.name] + 1,
             )
 
+    def test_selection_timer_pauses_before_synchronous_dispatch(self):
+        """Skill handler execution is not counted as skill selection."""
+        svc = _make_service()
+        match = _make_match()
+        svc.get_pipeline = MagicMock(return_value=[("test", MagicMock(
+            return_value=match))])
+        selection = MagicMock()
+        measurement = MagicMock()
+        measurement.__enter__.return_value = selection
+        sess = Session("s")
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["hello"]}, context={})
+
+        def assert_selection_paused(*args, **kwargs):
+            selection.pause.assert_called_once_with()
+
+        svc._dispatch_match = MagicMock(side_effect=assert_selection_paused)
+        with patch.object(SKILL_SELECTION, "measure",
+                          return_value=measurement), \
+             patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.reset_default_session",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.update"), \
+             patch("ovos_core.intent_services.service.get_message_lang",
+                   return_value="en-US"):
+            svc.handle_utterance(msg)
+
+        svc._dispatch_match.assert_called_once()
+        selection.resume.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # handle_get_intent
