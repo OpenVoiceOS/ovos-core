@@ -29,3 +29,19 @@ def test_distinct_vocabulary_names_do_not_share_entries(load_vocabulary):
         "cancel everything"
     ]
     assert load_vocabulary.call_count == 2
+
+
+@patch("ovos_core.intent_services.stop_service.LocaleResources.load_vocabulary")
+def test_cache_is_instance_scoped_and_clearable(load_vocabulary):
+    load_vocabulary.return_value = ["stop"]
+    first = _CachedStopResources(skill_locale="/unused")
+    second = _CachedStopResources(skill_locale="/unused")
+
+    first.load_vocabulary("stop", "en-US")
+    first.load_vocabulary("stop", "en-US")
+    second.load_vocabulary("stop", "en-US")
+    assert load_vocabulary.call_count == 2
+
+    first.clear_cache()
+    first.load_vocabulary("stop", "en-US")
+    assert load_vocabulary.call_count == 3

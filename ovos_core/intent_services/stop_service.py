@@ -18,7 +18,7 @@ from ovos_utils.parse import match_one
 
 
 class _CachedStopResources(LocaleResources):
-    """Cache packaged stop vocabulary expansion for the process lifetime.
+    """Cache packaged stop vocabulary expansion for the service lifetime.
 
     StopService locale files are installed with ovos-core and cannot change
     without replacing the running process. LocaleResources intentionally
@@ -27,10 +27,21 @@ class _CachedStopResources(LocaleResources):
     utterance.
     """
 
-    @lru_cache(maxsize=32)
+    CACHE_SIZE = 32
+
+    def __init__(self, skill_locale: str) -> None:
+        super().__init__(skill_locale=skill_locale)
+        self._load_vocabulary = lru_cache(maxsize=self.CACHE_SIZE)(
+            super().load_vocabulary
+        )
+
     def load_vocabulary(self, base_name: str, lang: str) -> List[str]:
         """Load each stop vocabulary/language pair at most once."""
-        return super().load_vocabulary(base_name, lang)
+        return self._load_vocabulary(base_name, lang)
+
+    def clear_cache(self) -> None:
+        """Release cached resources when the owning service shuts down."""
+        self._load_vocabulary.cache_clear()
 
 
 class StopService(ConfidenceMatcherPipeline):
@@ -332,5 +343,6 @@ class StopService(ConfidenceMatcherPipeline):
 
     def shutdown(self) -> None:
         """Remove bus listeners registered by this service."""
+        self._locale.clear_cache()
         self.bus.remove("stop:global", self.handle_global_stop)
         self.bus.remove("stop:skill", self.handle_skill_stop)
