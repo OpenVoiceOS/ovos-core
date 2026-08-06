@@ -110,7 +110,9 @@ class LatencyHistogram:
         with self._lock:
             buckets = {
                 f"le_{bound:g}": count
-                for bound, count in zip(self._bounds, self._buckets)
+                for bound, count in zip(
+                    self._bounds, self._buckets, strict=True
+                )
             }
             buckets["inf"] = self._count
             return {
