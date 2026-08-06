@@ -1,3 +1,4 @@
+from functools import lru_cache
 from os.path import dirname, join
 from threading import Event
 from typing import Optional, Dict, List, Union
@@ -16,6 +17,22 @@ from ovos_utils.log import LOG
 from ovos_utils.parse import match_one
 
 
+class _CachedStopResources(LocaleResources):
+    """Cache packaged stop vocabulary expansion for the process lifetime.
+
+    StopService locale files are installed with ovos-core and cannot change
+    without replacing the running process. LocaleResources intentionally
+    provides uncached general-purpose reads, but using it directly in the
+    first pipeline stage repeats file IO and template expansion for every
+    utterance.
+    """
+
+    @lru_cache(maxsize=32)
+    def load_vocabulary(self, base_name: str, lang: str) -> List[str]:
+        """Load each stop vocabulary/language pair at most once."""
+        return super().load_vocabulary(base_name, lang)
+
+
 class StopService(ConfidenceMatcherPipeline):
     """Intent Service that handles stopping skills."""
 
@@ -24,7 +41,9 @@ class StopService(ConfidenceMatcherPipeline):
         config = config if config is not None else Configuration().get("skills", {}).get("stop") or {}
         bus = bus or FakeBus()
         ConfidenceMatcherPipeline.__init__(self, config=config, bus=bus)
-        self._locale = LocaleResources(skill_locale=join(dirname(__file__), "locale"))
+        self._locale = _CachedStopResources(
+            skill_locale=join(dirname(__file__), "locale")
+        )
         self.bus.on("stop:global", self.handle_global_stop)
         self.bus.on("stop:skill", self.handle_skill_stop)
 
