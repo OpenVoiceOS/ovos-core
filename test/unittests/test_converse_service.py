@@ -18,8 +18,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import Session, SessionManager, UtteranceState
-from ovos_spec_tools import SpecMessage
+from ovos_bus_client.session import Session, UtteranceState
 from ovos_utils.fakebus import FakeBus
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
 
@@ -509,6 +508,46 @@ class TestConverseAllowed(unittest.TestCase):
 
 class TestMatch(unittest.TestCase):
     """Tests for the top-level match() pipeline method."""
+
+    def test_message_session_is_folded_once_and_reused(self):
+        """One matcher call must operate on one live session snapshot."""
+        svc = _make_service()
+        sess = Session("s")
+        message = Message("test", context={})
+
+        with patch(
+            "ovos_core.intent_services.converse_service.SessionManager.get",
+            return_value=sess,
+        ) as get_session, patch.object(
+            svc, "_check_converse_timeout"
+        ) as check_timeout, patch.object(
+            svc, "_collect_converse_skills", return_value=[]
+        ) as collect_skills:
+            result = svc.match(["hello"], "en-US", message)
+
+        self.assertIsNone(result)
+        get_session.assert_called_once_with(message)
+        check_timeout.assert_called_once_with(message, sess)
+        collect_skills.assert_called_once_with(message, sess)
+
+    def test_expired_skill_is_not_refolded_before_poll(self):
+        """Timeout filtering survives until converse candidates are polled."""
+        svc = _make_service()
+        sess = Session("s")
+        sess.active_skills = [("expired", time.time() - 400)]
+        svc.bus.emit = MagicMock()
+        message = Message("test", context={})
+
+        with patch(
+            "ovos_core.intent_services.converse_service.SessionManager.get",
+            return_value=sess,
+        ) as get_session:
+            result = svc.match(["hello"], "en-US", message)
+
+        self.assertIsNone(result)
+        self.assertEqual(sess.active_skills, [])
+        get_session.assert_called_once_with(message)
+        svc.bus.emit.assert_not_called()
 
     def test_skill_in_response_state_captured_by_get_response(self):
         """A skill in RESPONSE state is matched as get_response, not converse."""

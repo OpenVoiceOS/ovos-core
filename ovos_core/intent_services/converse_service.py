@@ -272,16 +272,27 @@ class ConverseService(PipelinePlugin):
             return False
         return True
 
-    def _collect_converse_skills(self, message: Message) -> List[str]:
+    def _collect_converse_skills(
+        self,
+        message: Message,
+        session: Optional[Session] = None,
+    ) -> List[str]:
         """use the messagebus api to determine which skills want to converse
 
         Individual skills respond to this request via the `can_converse` method"""
         skill_ids = []
         want_converse = []
-        session = SessionManager.get(message)
+        if session is None:
+            session = SessionManager.get(message)
+            active_skill_ids = self.get_active_skills(message)
+        else:
+            # ``match`` already folded this message snapshot into the live
+            # session. Reusing it avoids rebuilding and refolding the same
+            # snapshot while preserving direct callers of this helper.
+            active_skill_ids = [skill[0] for skill in session.active_skills]
 
         # note: this is sorted by priority already
-        active_skills = [skill_id for skill_id in self.get_active_skills(message)
+        active_skills = [skill_id for skill_id in active_skill_ids
                      if session.utterance_states.get(skill_id, UtteranceState.INTENT) == UtteranceState.INTENT]
         if not active_skills:
             return want_converse
@@ -319,11 +330,16 @@ class ConverseService(PipelinePlugin):
             self.bus.remove("skill.converse.pong", handle_ack)
         return want_converse
 
-    def _check_converse_timeout(self, message: Message):
+    def _check_converse_timeout(
+        self,
+        message: Message,
+        session: Optional[Session] = None,
+    ) -> None:
         """ filter active skill list based on timestamps """
         timeouts = self.config.get("skill_timeouts") or {}
         def_timeout = self.config.get("timeout", 300)
-        session = SessionManager.get(message)
+        if session is None:
+            session = SessionManager.get(message)
         session.active_skills = [
             skill for skill in session.active_skills
             if time.time() - skill[1] <= timeouts.get(skill[0], def_timeout)]
@@ -360,7 +376,7 @@ class ConverseService(PipelinePlugin):
         utterances = flatten_list(utterances)
 
         # note: this is sorted by priority already
-        gr_skills = [skill_id for skill_id in self.get_active_skills(message)
+        gr_skills = [skill_id for skill_id, _ in session.active_skills
                      if session.utterance_states.get(skill_id, UtteranceState.INTENT) == UtteranceState.RESPONSE]
 
         # check if any skill wants to capture utterance for self.get_response method
@@ -378,10 +394,10 @@ class ConverseService(PipelinePlugin):
             )
 
         # filter allowed skills
-        self._check_converse_timeout(message)
+        self._check_converse_timeout(message, session)
 
         # check if any skill wants to converse
-        for skill_id in self._collect_converse_skills(message):
+        for skill_id in self._collect_converse_skills(message, session):
             if skill_id in (session.blacklisted_skills or []):
                 LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{session.session_id}'")
                 continue
