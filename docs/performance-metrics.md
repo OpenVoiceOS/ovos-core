@@ -21,13 +21,20 @@ network.
 | Metric | Boundary |
 |---|---|
 | `ovos_utterance_dispatch_seconds` | Complete synchronous handling of one `recognizer_loop:utterance` message by `IntentService` |
+| `ovos_utterance_preprocess_seconds` | Utterance and metadata transforms, language selection, and session validation before matching |
 | `ovos_skill_selection_seconds` | Selection loop across the configured intent pipelines |
+| `ovos_intent_pipeline_build_seconds` | Resolve the session's configured matcher functions before invoking them |
 | `ovos_intent_matching_seconds` | One pipeline matcher invocation; an utterance can produce more than one observation |
 | `ovos_intent_matching_{family}_seconds` | One matcher invocation classified into the fixed `stop`, `converse`, `padatious`, `padacioso`, `adapt`, `common_query`, `ocp`, `m2v`, `fallback`, or `other` family |
+| `ovos_intent_dispatch_seconds` | Post-match transformation, activation, lifecycle emission, and handler scheduling for a matched utterance |
+| `ovos_intent_handler_schedule_seconds` | Register the in-flight lifecycle and emit handler-start plus the selected skill dispatch |
+| `ovos_utterance_finalize_seconds` | Session synchronization and per-utterance deactivation cleanup after selection |
 
-The boundaries are nested: dispatch contains selection, selection contains one
-or more matcher observations, and plugin-provided handler observations can
-contain further plugin-provided stages. Do not add these durations as if they
+The boundaries are nested: utterance dispatch contains preprocessing,
+selection, matched-intent dispatch, and finalization; selection contains
+pipeline construction and one or more matcher observations; matched-intent
+dispatch contains handler scheduling. Plugin-provided handler observations can
+contain further plugin-provided stages. Do not add nested durations as if they
 were disjoint stages.
 
 Installed packages can contribute histograms and cumulative counters through the

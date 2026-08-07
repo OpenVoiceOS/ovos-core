@@ -26,10 +26,15 @@ from ovos_spec_tools import SpecMessage
 from ovos_utils.fakebus import FakeBus
 
 from ovos_core._metrics import (
+    INTENT_DISPATCH,
+    INTENT_HANDLER_SCHEDULE,
     INTENT_MATCHING,
+    INTENT_PIPELINE_BUILD,
     PIPELINE_MATCHING,
     SKILL_SELECTION,
     UTTERANCE_DISPATCH,
+    UTTERANCE_FINALIZE,
+    UTTERANCE_PREPROCESS,
 )
 from ovos_core.intent_services.dispatcher import IntentDispatcher
 from ovos_core.intent_services.manifest import IntentManifest
@@ -653,9 +658,12 @@ class TestHandleUtterance(unittest.TestCase):
             histogram.name: histogram.snapshot()["count"]
             for histogram in (
                 UTTERANCE_DISPATCH,
+                UTTERANCE_PREPROCESS,
                 INTENT_MATCHING,
+                INTENT_PIPELINE_BUILD,
                 SKILL_SELECTION,
                 PIPELINE_MATCHING["padatious"],
+                UTTERANCE_FINALIZE,
             )
         }
 
@@ -671,9 +679,12 @@ class TestHandleUtterance(unittest.TestCase):
         matcher.assert_called_once()
         for histogram in (
             UTTERANCE_DISPATCH,
+            UTTERANCE_PREPROCESS,
             INTENT_MATCHING,
+            INTENT_PIPELINE_BUILD,
             SKILL_SELECTION,
             PIPELINE_MATCHING["padatious"],
+            UTTERANCE_FINALIZE,
         ):
             self.assertEqual(
                 histogram.snapshot()["count"],
@@ -710,6 +721,40 @@ class TestHandleUtterance(unittest.TestCase):
 
         svc._dispatch_match.assert_called_once()
         selection.resume.assert_not_called()
+
+    def test_matched_utterance_observes_dispatch_stages(self):
+        """Matched utterances record orchestration and handler scheduling."""
+        svc = _make_service()
+        match = _make_match()
+        svc.get_pipeline = MagicMock(return_value=[
+            ("ovos-padatious-pipeline-plugin-high", MagicMock(
+                return_value=match)),
+        ])
+        sess = Session("s")
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["hello"]}, context={})
+        before = {
+            histogram.name: histogram.snapshot()["count"]
+            for histogram in (INTENT_DISPATCH, INTENT_HANDLER_SCHEDULE)
+        }
+
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.reset_default_session",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.update"), \
+             patch("ovos_core.intent_services.service.get_message_lang",
+                   return_value="en-US"):
+            svc.handle_utterance(msg)
+
+        self.assertEqual(
+            INTENT_DISPATCH.snapshot()["count"],
+            before[INTENT_DISPATCH.name] + 1,
+        )
+        self.assertEqual(
+            INTENT_HANDLER_SCHEDULE.snapshot()["count"],
+            before[INTENT_HANDLER_SCHEDULE.name] + 1,
+        )
 
 
 # ---------------------------------------------------------------------------

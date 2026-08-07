@@ -37,9 +37,14 @@ from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
 from ovos_utils.thread_utils import create_daemon
 
 from ovos_core._metrics import (
+    INTENT_DISPATCH,
+    INTENT_HANDLER_SCHEDULE,
     INTENT_MATCHING,
+    INTENT_PIPELINE_BUILD,
     SKILL_SELECTION,
     UTTERANCE_DISPATCH,
+    UTTERANCE_FINALIZE,
+    UTTERANCE_PREPROCESS,
     pipeline_matching_histogram,
 )
 from ovos_core.intent_services.dispatcher import (
@@ -514,7 +519,8 @@ class IntentService:
             }))
 
             intent_name = reply.msg_type.split(":", 1)[-1]
-            self.intent_dispatcher.dispatch(reply, skill_id, intent_name)
+            with INTENT_HANDLER_SCHEDULE.measure():
+                self.intent_dispatcher.dispatch(reply, skill_id, intent_name)
 
         else:  # upload intent metrics if enabled
             if self.config.get("open_data", {}).get("intent_urls"):
@@ -618,31 +624,34 @@ class IntentService:
         Args:
             message (Message): The messagebus data
         """
-        # Get utterance utterance_plugins additional context
-        message = self._handle_transformers(message)
+        with UTTERANCE_PREPROCESS.measure():
+            # Get utterance utterance_plugins additional context
+            message = self._handle_transformers(message)
 
-        if message.context.get("canceled"):
-            self.send_cancel_event(message)
-            return
+            if message.context.get("canceled"):
+                self.send_cancel_event(message)
+                return
 
-        # tag language of this utterance
-        lang = self.disambiguate_lang(message)
+            # tag language of this utterance
+            lang = self.disambiguate_lang(message)
 
-        utterances = message.data.get('utterances', [])
-        LOG.info(f"Parsing utterance: {utterances}")
+            utterances = message.data.get('utterances', [])
+            LOG.info(f"Parsing utterance: {utterances}")
 
-        stopwatch = Stopwatch()
+            stopwatch = Stopwatch()
 
-        # get session
-        sess = self._validate_session(message, lang)
-        message.context["session"] = sess.serialize()
+            # get session
+            sess = self._validate_session(message, lang)
+            message.context["session"] = sess.serialize()
 
         # match
         match = None
         with stopwatch, SKILL_SELECTION.measure() as selection_measurement:
             self._deactivations[sess.session_id] = []
             # Loop through the matching functions until a match is found.
-            for pipeline, match_func in self.get_pipeline(session=sess):
+            with INTENT_PIPELINE_BUILD.measure():
+                pipeline_matchers = self.get_pipeline(session=sess)
+            for pipeline, match_func in pipeline_matchers:
                 langs = [lang]
                 if self.config.get("multilingual_matching"):
                     # if multilingual matching is enabled, attempt to match all user languages if main fails
@@ -687,8 +696,13 @@ class IntentService:
                             # skill handlers synchronously from emit(). That is
                             # dispatch/handler time, not skill-selection time.
                             selection_measurement.pause()
-                            self._dispatch_match(match, message, intent_lang,
-                                                     pipeline_id=pipeline)
+                            with INTENT_DISPATCH.measure():
+                                self._dispatch_match(
+                                    match,
+                                    message,
+                                    intent_lang,
+                                    pipeline_id=pipeline,
+                                )
                             break
                         except Exception:
                             selection_measurement.resume()
@@ -706,11 +720,13 @@ class IntentService:
 
         LOG.debug(f"intent matching took: {stopwatch.time}")
 
-        # sync any changes made to the default session, eg by ConverseService
-        if sess.session_id == "default":
-            SessionManager.sync(message)
-        elif sess.session_id in self._deactivations:
-            self._deactivations.pop(sess.session_id)
+        with UTTERANCE_FINALIZE.measure():
+            # sync any changes made to the default session, eg by
+            # ConverseService
+            if sess.session_id == "default":
+                SessionManager.sync(message)
+            elif sess.session_id in self._deactivations:
+                self._deactivations.pop(sess.session_id)
         return match, message.context, stopwatch
 
     def send_complete_intent_failure(self, message):

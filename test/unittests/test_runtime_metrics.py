@@ -198,8 +198,13 @@ def test_opt_in_metrics_endpoint(monkeypatch):
             payload = response.read().decode()
         assert response.status == 200
         assert "ovos_utterance_dispatch_seconds" in payload
+        assert "ovos_utterance_preprocess_seconds" in payload
         assert "ovos_intent_matching_seconds" in payload
+        assert "ovos_intent_pipeline_build_seconds" in payload
         assert "ovos_skill_selection_seconds" in payload
+        assert "ovos_intent_dispatch_seconds" in payload
+        assert "ovos_intent_handler_schedule_seconds" in payload
+        assert "ovos_utterance_finalize_seconds" in payload
         assert "test_fractional_work_total 1.6000000000000001" in payload
     finally:
         stop_metrics_server(server)

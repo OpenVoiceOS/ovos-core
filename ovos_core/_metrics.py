@@ -124,8 +124,15 @@ class LatencyHistogram:
 
 
 UTTERANCE_DISPATCH = LatencyHistogram("ovos_utterance_dispatch_ms")
+UTTERANCE_PREPROCESS = LatencyHistogram("ovos_utterance_preprocess_ms")
 INTENT_MATCHING = LatencyHistogram("ovos_intent_matching_ms")
+INTENT_PIPELINE_BUILD = LatencyHistogram("ovos_intent_pipeline_build_ms")
 SKILL_SELECTION = LatencyHistogram("ovos_skill_selection_ms")
+INTENT_DISPATCH = LatencyHistogram("ovos_intent_dispatch_ms")
+INTENT_HANDLER_SCHEDULE = LatencyHistogram(
+    "ovos_intent_handler_schedule_ms"
+)
+UTTERANCE_FINALIZE = LatencyHistogram("ovos_utterance_finalize_ms")
 
 # Pipeline identifiers are session-selectable, so they must never become raw
 # metric names or labels.  These families cover the built-in matchers while an
@@ -177,8 +184,13 @@ def performance_histograms() -> Mapping[str, Mapping[str, Any]]:
         histogram.name: histogram.snapshot()
         for histogram in (
             UTTERANCE_DISPATCH,
+            UTTERANCE_PREPROCESS,
             INTENT_MATCHING,
+            INTENT_PIPELINE_BUILD,
             SKILL_SELECTION,
+            INTENT_DISPATCH,
+            INTENT_HANDLER_SCHEDULE,
+            UTTERANCE_FINALIZE,
             *PIPELINE_MATCHING.values(),
         )
     }
