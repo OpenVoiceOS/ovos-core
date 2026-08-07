@@ -29,6 +29,9 @@ network.
 | `ovos_intent_dispatch_seconds` | Post-match transformation, activation, lifecycle emission, and handler scheduling for a matched utterance |
 | `ovos_intent_handler_schedule_seconds` | Register the in-flight lifecycle and emit handler-start plus the selected skill dispatch |
 | `ovos_utterance_finalize_seconds` | Session synchronization and per-utterance deactivation cleanup after selection |
+| `ovos_converse_prepare_seconds` | Normalize the language and inspect session response-mode candidates inside the converse matcher |
+| `ovos_converse_poll_seconds` | Prune stale converse owners and collect their bounded capability replies |
+| `ovos_converse_policy_seconds` | Apply blacklist and converse policy checks to the owners that accepted a poll |
 
 The boundaries are nested: utterance dispatch contains preprocessing,
 selection, matched-intent dispatch, and finalization; selection contains

@@ -15,6 +15,12 @@ from ovos_utils.log import LOG
 from ovos_plugin_manager.templates.pipeline import PipelinePlugin, IntentHandlerMatch
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
 
+from ovos_core._metrics import (
+    CONVERSE_POLICY,
+    CONVERSE_POLL,
+    CONVERSE_PREPARE,
+)
+
 #: upper bound, seconds, on how long core waits for a skill's
 #: ``skill.converse.response`` before the dispatch lifecycle is declared a
 #: timeout (``mycroft.skill.handler.error``). Generous: converse handlers may
@@ -353,47 +359,70 @@ class ConverseService(PipelinePlugin):
             - Checks for skill conversation timeouts
             - Attempts conversation with each eligible skill
         """
-        lang = standardize_lang(lang)
-        session = SessionManager.get(message)
+        with CONVERSE_PREPARE.measure():
+            lang = standardize_lang(lang)
+            session = SessionManager.get(message)
 
-        # we call flatten in case someone is sending the old style list of tuples
-        utterances = flatten_list(utterances)
+            # we call flatten in case someone is sending the old style list of
+            # tuples
+            utterances = flatten_list(utterances)
 
-        # note: this is sorted by priority already
-        gr_skills = [skill_id for skill_id in self.get_active_skills(message)
-                     if session.utterance_states.get(skill_id, UtteranceState.INTENT) == UtteranceState.RESPONSE]
+            # note: this is sorted by priority already
+            gr_skills = [
+                skill_id for skill_id in self.get_active_skills(message)
+                if session.utterance_states.get(
+                    skill_id, UtteranceState.INTENT
+                ) == UtteranceState.RESPONSE
+            ]
 
-        # check if any skill wants to capture utterance for self.get_response method
-        for skill_id in gr_skills:
-            if skill_id in (session.blacklisted_skills or []):
-                LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{session.session_id}'")
-                continue
-            LOG.debug(f"utterance captured by skill.get_response method: {skill_id}")
-            return IntentHandlerMatch(
-                match_type=f"{skill_id}.converse.get_response",
-                match_data={"utterances": utterances, "lang": lang},
-                skill_id=skill_id,
-                utterance=utterances[0],
-                updated_session=session
-            )
-
-        # filter allowed skills
-        self._check_converse_timeout(message)
-
-        # check if any skill wants to converse
-        for skill_id in self._collect_converse_skills(message):
-            if skill_id in (session.blacklisted_skills or []):
-                LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{session.session_id}'")
-                continue
-            LOG.debug(f"Attempting to converse with skill: {skill_id}")
-            if self._converse_allowed(skill_id):
+            # check if any skill wants to capture utterance for
+            # self.get_response method
+            for skill_id in gr_skills:
+                if skill_id in (session.blacklisted_skills or []):
+                    LOG.debug(
+                        "ignoring match, skill_id '%s' blacklisted by "
+                        "Session '%s'", skill_id, session.session_id
+                    )
+                    continue
+                LOG.debug(
+                    "utterance captured by skill.get_response method: %s",
+                    skill_id,
+                )
                 return IntentHandlerMatch(
-                    match_type="converse:skill",
-                    match_data={"utterances": utterances, "lang": lang, "skill_id": skill_id},
+                    match_type=f"{skill_id}.converse.get_response",
+                    match_data={"utterances": utterances, "lang": lang},
                     skill_id=skill_id,
                     utterance=utterances[0],
-                    updated_session=session
+                    updated_session=session,
                 )
+
+        with CONVERSE_POLL.measure():
+            # filter allowed skills, then ask the remaining active skills if
+            # they want to converse
+            self._check_converse_timeout(message)
+            converse_skills = self._collect_converse_skills(message)
+
+        with CONVERSE_POLICY.measure():
+            for skill_id in converse_skills:
+                if skill_id in (session.blacklisted_skills or []):
+                    LOG.debug(
+                        "ignoring match, skill_id '%s' blacklisted by "
+                        "Session '%s'", skill_id, session.session_id
+                    )
+                    continue
+                LOG.debug("Attempting to converse with skill: %s", skill_id)
+                if self._converse_allowed(skill_id):
+                    return IntentHandlerMatch(
+                        match_type="converse:skill",
+                        match_data={
+                            "utterances": utterances,
+                            "lang": lang,
+                            "skill_id": skill_id,
+                        },
+                        skill_id=skill_id,
+                        utterance=utterances[0],
+                        updated_session=session,
+                    )
 
         return None
 

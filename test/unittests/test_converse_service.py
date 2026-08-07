@@ -18,11 +18,15 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import Session, SessionManager, UtteranceState
-from ovos_spec_tools import SpecMessage
+from ovos_bus_client.session import Session, UtteranceState
 from ovos_utils.fakebus import FakeBus
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
 
+from ovos_core._metrics import (
+    CONVERSE_POLICY,
+    CONVERSE_POLL,
+    CONVERSE_PREPARE,
+)
 from ovos_core.intent_services.converse_service import ConverseService
 
 
@@ -581,6 +585,14 @@ class TestMatch(unittest.TestCase):
         """When no skill wants to converse, match returns None."""
         svc = _make_service()
         sess = Session("s")
+        before = {
+            histogram.name: histogram.snapshot()["count"]
+            for histogram in (
+                CONVERSE_PREPARE,
+                CONVERSE_POLL,
+                CONVERSE_POLICY,
+            )
+        }
 
         with patch.object(ConverseService, "get_active_skills", return_value=[]), \
              patch("ovos_core.intent_services.converse_service.SessionManager.get",
@@ -590,6 +602,14 @@ class TestMatch(unittest.TestCase):
             result = svc.match(["hello"], "en-US", Message("test", context={}))
 
         self.assertIsNone(result)
+        for histogram in (
+                CONVERSE_PREPARE,
+                CONVERSE_POLL,
+                CONVERSE_POLICY):
+            self.assertEqual(
+                histogram.snapshot()["count"],
+                before[histogram.name] + 1,
+            )
 
     def test_converse_blacklisted_skill_skipped(self):
         """A skill blocked by _converse_allowed is skipped even if it wants to converse."""

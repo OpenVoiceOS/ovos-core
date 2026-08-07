@@ -205,6 +205,9 @@ def test_opt_in_metrics_endpoint(monkeypatch):
         assert "ovos_intent_dispatch_seconds" in payload
         assert "ovos_intent_handler_schedule_seconds" in payload
         assert "ovos_utterance_finalize_seconds" in payload
+        assert "ovos_converse_prepare_seconds" in payload
+        assert "ovos_converse_poll_seconds" in payload
+        assert "ovos_converse_policy_seconds" in payload
         assert "test_fractional_work_total 1.6000000000000001" in payload
     finally:
         stop_metrics_server(server)

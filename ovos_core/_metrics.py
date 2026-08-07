@@ -133,6 +133,9 @@ INTENT_HANDLER_SCHEDULE = LatencyHistogram(
     "ovos_intent_handler_schedule_ms"
 )
 UTTERANCE_FINALIZE = LatencyHistogram("ovos_utterance_finalize_ms")
+CONVERSE_PREPARE = LatencyHistogram("ovos_converse_prepare_ms")
+CONVERSE_POLL = LatencyHistogram("ovos_converse_poll_ms")
+CONVERSE_POLICY = LatencyHistogram("ovos_converse_policy_ms")
 
 # Pipeline identifiers are session-selectable, so they must never become raw
 # metric names or labels.  These families cover the built-in matchers while an
@@ -191,6 +194,9 @@ def performance_histograms() -> Mapping[str, Mapping[str, Any]]:
             INTENT_DISPATCH,
             INTENT_HANDLER_SCHEDULE,
             UTTERANCE_FINALIZE,
+            CONVERSE_PREPARE,
+            CONVERSE_POLL,
+            CONVERSE_POLICY,
             *PIPELINE_MATCHING.values(),
         )
     }
