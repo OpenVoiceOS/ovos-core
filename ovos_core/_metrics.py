@@ -125,13 +125,23 @@ class LatencyHistogram:
 
 UTTERANCE_DISPATCH = LatencyHistogram("ovos_utterance_dispatch_ms")
 UTTERANCE_PREPROCESS = LatencyHistogram("ovos_utterance_preprocess_ms")
+UTTERANCE_TRANSFORM = LatencyHistogram("ovos_utterance_transform_ms")
+LANGUAGE_RESOLUTION = LatencyHistogram("ovos_language_resolution_ms")
+SESSION_VALIDATION = LatencyHistogram("ovos_session_validation_ms")
+SESSION_STAMP = LatencyHistogram("ovos_session_stamp_ms")
 INTENT_MATCHING = LatencyHistogram("ovos_intent_matching_ms")
 INTENT_PIPELINE_BUILD = LatencyHistogram("ovos_intent_pipeline_build_ms")
 SKILL_SELECTION = LatencyHistogram("ovos_skill_selection_ms")
 INTENT_DISPATCH = LatencyHistogram("ovos_intent_dispatch_ms")
+INTENT_TRANSFORM = LatencyHistogram("ovos_intent_transform_ms")
+INTENT_ACTIVATION = LatencyHistogram("ovos_intent_activation_ms")
+INTENT_MATCHED_EMIT = LatencyHistogram("ovos_intent_matched_emit_ms")
 INTENT_HANDLER_SCHEDULE = LatencyHistogram(
     "ovos_intent_handler_schedule_ms"
 )
+HANDLER_TIMEOUT_ARM = LatencyHistogram("ovos_handler_timeout_arm_ms")
+HANDLER_START_EMIT = LatencyHistogram("ovos_handler_start_emit_ms")
+HANDLER_DISPATCH_EMIT = LatencyHistogram("ovos_handler_dispatch_emit_ms")
 UTTERANCE_FINALIZE = LatencyHistogram("ovos_utterance_finalize_ms")
 CONVERSE_PREPARE = LatencyHistogram("ovos_converse_prepare_ms")
 CONVERSE_POLL = LatencyHistogram("ovos_converse_poll_ms")
@@ -188,11 +198,21 @@ def performance_histograms() -> Mapping[str, Mapping[str, Any]]:
         for histogram in (
             UTTERANCE_DISPATCH,
             UTTERANCE_PREPROCESS,
+            UTTERANCE_TRANSFORM,
+            LANGUAGE_RESOLUTION,
+            SESSION_VALIDATION,
+            SESSION_STAMP,
             INTENT_MATCHING,
             INTENT_PIPELINE_BUILD,
             SKILL_SELECTION,
             INTENT_DISPATCH,
+            INTENT_TRANSFORM,
+            INTENT_ACTIVATION,
+            INTENT_MATCHED_EMIT,
             INTENT_HANDLER_SCHEDULE,
+            HANDLER_TIMEOUT_ARM,
+            HANDLER_START_EMIT,
+            HANDLER_DISPATCH_EMIT,
             UTTERANCE_FINALIZE,
             CONVERSE_PREPARE,
             CONVERSE_POLL,

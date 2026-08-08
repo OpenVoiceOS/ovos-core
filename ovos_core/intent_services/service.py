@@ -37,14 +37,21 @@ from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
 from ovos_utils.thread_utils import create_daemon
 
 from ovos_core._metrics import (
+    INTENT_ACTIVATION,
     INTENT_DISPATCH,
     INTENT_HANDLER_SCHEDULE,
+    INTENT_MATCHED_EMIT,
     INTENT_MATCHING,
     INTENT_PIPELINE_BUILD,
+    INTENT_TRANSFORM,
+    LANGUAGE_RESOLUTION,
+    SESSION_STAMP,
+    SESSION_VALIDATION,
     SKILL_SELECTION,
     UTTERANCE_DISPATCH,
     UTTERANCE_FINALIZE,
     UTTERANCE_PREPROCESS,
+    UTTERANCE_TRANSFORM,
     pipeline_matching_histogram,
 )
 from ovos_core.intent_services.dispatcher import (
@@ -453,10 +460,11 @@ class IntentService:
         Returns:
             None
         """
-        try:
-            match = self.intent_plugins.transform(match)
-        except Exception:
-            LOG.exception("_dispatch_match failed")
+        with INTENT_TRANSFORM.measure():
+            try:
+                match = self.intent_plugins.transform(match)
+            except Exception:
+                LOG.exception("_dispatch_match failed")
 
         reply = None
         sess = match.updated_session or SessionManager.get(message)
@@ -481,23 +489,28 @@ class IntentService:
             reply.data["lang"] = lang
 
             # update active skill list
-            if match.skill_id:
-                # ensure skill_id is present in message.context
-                reply.context["skill_id"] = match.skill_id
+            with INTENT_ACTIVATION.measure():
+                if match.skill_id:
+                    # ensure skill_id is present in message.context
+                    reply.context["skill_id"] = match.skill_id
 
-                was_deactivated = match.skill_id in self._deactivations[sess.session_id]
-                if not was_deactivated:
-                    # OVOS-PIPELINE-1 §7.1 pushes the skill onto the session's
-                    # active-handler recency list. §7.3 SUPPRESSES that push for
-                    # reserved intent_name dispatches (converse/response/stop/
-                    # fallback/common_query): a reserved name is a continuation
-                    # or termination of an already-active skill's participation,
-                    # not a fresh activation. `activate_skill` is a back-compat
-                    # shim over `add_active_handler` (§7.1) in current bus-client.
-                    if not _produces_reserved_name(pipeline_id):
-                        sess.activate_skill(match.skill_id)
-                    # emit event for skills callback -> self.handle_activate
-                    self.bus.emit(reply.forward(f"{match.skill_id}.activate"))
+                    was_deactivated = (
+                        match.skill_id in self._deactivations[sess.session_id]
+                    )
+                    if not was_deactivated:
+                        # OVOS-PIPELINE-1 §7.1 pushes the skill onto the
+                        # session's active-handler recency list. §7.3
+                        # SUPPRESSES that push for reserved intent_name
+                        # dispatches (converse/response/stop/fallback/
+                        # common_query): a reserved name is a continuation or
+                        # termination of an already-active skill's
+                        # participation, not a fresh activation.
+                        if not _produces_reserved_name(pipeline_id):
+                            sess.activate_skill(match.skill_id)
+                        # emit event for skills callback -> self.handle_activate
+                        self.bus.emit(
+                            reply.forward(f"{match.skill_id}.activate")
+                        )
 
             # update Session if modified by pipeline
             reply.context["session"] = sess.serialize()
@@ -509,14 +522,15 @@ class IntentService:
             skill_id = (match.skill_id
                         or (match.match_data or {}).get("skill_id")
                         or reply.msg_type.split(":", 1)[0])
-            self.bus.emit(reply.forward(SpecMessage.INTENT_MATCHED, {
-                "skill_id": skill_id,
-                "intent_name": match.match_type,
-                "lang": lang,
-                "utterance": match.utterance,
-                "slots": dict(match.match_data or {}),
-                "pipeline_id": reply.context.get("pipeline_id"),
-            }))
+            with INTENT_MATCHED_EMIT.measure():
+                self.bus.emit(reply.forward(SpecMessage.INTENT_MATCHED, {
+                    "skill_id": skill_id,
+                    "intent_name": match.match_type,
+                    "lang": lang,
+                    "utterance": match.utterance,
+                    "slots": dict(match.match_data or {}),
+                    "pipeline_id": reply.context.get("pipeline_id"),
+                }))
 
             intent_name = reply.msg_type.split(":", 1)[-1]
             with INTENT_HANDLER_SCHEDULE.measure():
@@ -626,14 +640,16 @@ class IntentService:
         """
         with UTTERANCE_PREPROCESS.measure():
             # Get utterance utterance_plugins additional context
-            message = self._handle_transformers(message)
+            with UTTERANCE_TRANSFORM.measure():
+                message = self._handle_transformers(message)
 
             if message.context.get("canceled"):
                 self.send_cancel_event(message)
                 return
 
             # tag language of this utterance
-            lang = self.disambiguate_lang(message)
+            with LANGUAGE_RESOLUTION.measure():
+                lang = self.disambiguate_lang(message)
 
             utterances = message.data.get('utterances', [])
             LOG.info(f"Parsing utterance: {utterances}")
@@ -641,8 +657,10 @@ class IntentService:
             stopwatch = Stopwatch()
 
             # get session
-            sess = self._validate_session(message, lang)
-            message.context["session"] = sess.serialize()
+            with SESSION_VALIDATION.measure():
+                sess = self._validate_session(message, lang)
+            with SESSION_STAMP.measure():
+                message.context["session"] = sess.serialize()
 
         # match
         match = None

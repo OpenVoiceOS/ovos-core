@@ -22,12 +22,22 @@ network.
 |---|---|
 | `ovos_utterance_dispatch_seconds` | Complete synchronous handling of one `recognizer_loop:utterance` message by `IntentService` |
 | `ovos_utterance_preprocess_seconds` | Utterance and metadata transforms, language selection, and session validation before matching |
+| `ovos_utterance_transform_seconds` | Utterance and metadata transformer plugin chains |
+| `ovos_language_resolution_seconds` | Resolve the request language against the enabled language set |
+| `ovos_session_validation_seconds` | Fold and validate the message session before matching |
+| `ovos_session_stamp_seconds` | Serialize the validated session back onto the in-process message |
 | `ovos_skill_selection_seconds` | Selection loop across the configured intent pipelines |
 | `ovos_intent_pipeline_build_seconds` | Resolve the session's configured matcher functions before invoking them |
 | `ovos_intent_matching_seconds` | One pipeline matcher invocation; an utterance can produce more than one observation |
 | `ovos_intent_matching_{family}_seconds` | One matcher invocation classified into the fixed `stop`, `converse`, `padatious`, `padacioso`, `adapt`, `common_query`, `ocp`, `m2v`, `fallback`, or `other` family |
 | `ovos_intent_dispatch_seconds` | Post-match transformation, activation, lifecycle emission, and handler scheduling for a matched utterance |
+| `ovos_intent_transform_seconds` | Intent transformer plugin chain after a successful match |
+| `ovos_intent_activation_seconds` | Update active-handler state and emit the selected skill activation event |
+| `ovos_intent_matched_emit_seconds` | Build and emit the public intent-matched notification |
 | `ovos_intent_handler_schedule_seconds` | Register the in-flight lifecycle and emit handler-start plus the selected skill dispatch |
+| `ovos_handler_timeout_arm_seconds` | Register the in-flight dispatch and arm its bounded timeout |
+| `ovos_handler_start_emit_seconds` | Emit the handler-start lifecycle event |
+| `ovos_handler_dispatch_emit_seconds` | Emit the selected skill dispatch message |
 | `ovos_utterance_finalize_seconds` | Session synchronization and per-utterance deactivation cleanup after selection |
 | `ovos_converse_prepare_seconds` | Normalize the language and inspect session response-mode candidates inside the converse matcher |
 | `ovos_converse_poll_seconds` | Prune stale converse owners and collect their bounded capability replies |

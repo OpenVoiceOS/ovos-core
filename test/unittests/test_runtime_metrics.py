@@ -199,11 +199,21 @@ def test_opt_in_metrics_endpoint(monkeypatch):
         assert response.status == 200
         assert "ovos_utterance_dispatch_seconds" in payload
         assert "ovos_utterance_preprocess_seconds" in payload
+        assert "ovos_utterance_transform_seconds" in payload
+        assert "ovos_language_resolution_seconds" in payload
+        assert "ovos_session_validation_seconds" in payload
+        assert "ovos_session_stamp_seconds" in payload
         assert "ovos_intent_matching_seconds" in payload
         assert "ovos_intent_pipeline_build_seconds" in payload
         assert "ovos_skill_selection_seconds" in payload
         assert "ovos_intent_dispatch_seconds" in payload
+        assert "ovos_intent_transform_seconds" in payload
+        assert "ovos_intent_activation_seconds" in payload
+        assert "ovos_intent_matched_emit_seconds" in payload
         assert "ovos_intent_handler_schedule_seconds" in payload
+        assert "ovos_handler_timeout_arm_seconds" in payload
+        assert "ovos_handler_start_emit_seconds" in payload
+        assert "ovos_handler_dispatch_emit_seconds" in payload
         assert "ovos_utterance_finalize_seconds" in payload
         assert "ovos_converse_prepare_seconds" in payload
         assert "ovos_converse_poll_seconds" in payload
