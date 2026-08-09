@@ -54,7 +54,7 @@ Installed packages can contribute histograms and cumulative counters through the
 `ovos.performance.metrics` entry-point group. A collector is a zero-argument
 callable returning fixed metric snapshots. Histograms provide `count`,
 `sum_ms`, and cumulative `buckets`; counters provide `type: counter` and an
-integer `value`, and their names end in `_total`. Collectors are loaded once at
+numeric `value`, and their names end in `_total`. Collectors are loaded once at
 startup; duplicate or malformed metric names make a scrape fail rather than
 silently publishing misleading data.
 
