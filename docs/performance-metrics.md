@@ -85,17 +85,3 @@ histogram_quantile(
 These histograms are cumulative and reset when the process restarts. They use
 no session, client, utterance, or skill labels, avoiding unbounded cardinality
 and user-content leakage.
-
-## Request-correlated benchmark traces
-
-Set `OVOS_PERFORMANCE_TRACE=true` only for a controlled benchmark to emit an
-opaque request ID and a wall-clock nanosecond timestamp when the intent service
-receives an utterance. The structured log record is prefixed with
-`performance_trace` and uses the stage `runtime_receive`.
-
-Request IDs are intentionally absent from the Prometheus endpoint. The trace
-contains no utterance, skill, client, credential, or session payload and does
-not change the message or public bus contract. Join this opt-in event with the
-matching Workshop `skill_reply_emit`, listener stages, and client-receipt
-timestamp outside the runtime. Cluster nodes must have synchronized clocks
-before interpreting cross-process intervals.

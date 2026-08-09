@@ -54,7 +54,6 @@ from ovos_core._metrics import (
     UTTERANCE_TRANSFORM,
     pipeline_matching_histogram,
 )
-from ovos_core._performance_trace import trace_performance_stage
 from ovos_core.intent_services.dispatcher import (
     DEFAULT_HANDLER_TIMEOUT,
     IntentDispatcher,
@@ -639,7 +638,6 @@ class IntentService:
         Args:
             message (Message): The messagebus data
         """
-        trace_performance_stage("runtime_receive", message=message)
         with UTTERANCE_PREPROCESS.measure():
             # Get utterance utterance_plugins additional context
             with UTTERANCE_TRANSFORM.measure():
