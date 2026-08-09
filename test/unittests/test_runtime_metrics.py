@@ -10,6 +10,11 @@ from ovos_core._metrics import (
     performance_histograms,
     pipeline_matching_histogram,
 )
+from ovos_core._performance_trace import (
+    message_request_id,
+    trace_performance_stage,
+)
+from ovos_bus_client.message import Message
 from ovos_core._prometheus import (
     collect_histograms,
     load_metric_collectors,
@@ -48,6 +53,39 @@ def test_histogram_rejects_non_finite_observations():
 
     with pytest.raises(ValueError, match="must be finite"):
         histogram.observe_ms(float("nan"))
+
+
+def test_trace_extracts_nested_metadata_request_id():
+    message = Message(
+        "recognizer_loop:utterance",
+        {},
+        {"metadata": {"qa_query_id": "request-runtime"}},
+    )
+
+    assert message_request_id(message) == "request-runtime"
+
+
+def test_correlated_trace_is_opt_in(monkeypatch, caplog):
+    message = Message(
+        "recognizer_loop:utterance",
+        {},
+        {"query_id": "request-runtime"},
+    )
+    caplog.set_level("INFO", logger="ovos.performance.trace")
+    monkeypatch.delenv("OVOS_PERFORMANCE_TRACE", raising=False)
+
+    trace_performance_stage("runtime_receive", message=message)
+
+    assert "request-runtime" not in caplog.text
+    monkeypatch.setenv("OVOS_PERFORMANCE_TRACE", "true")
+    monkeypatch.setattr(
+        "ovos_core._performance_trace.time.time_ns",
+        lambda: 456_000_000,
+    )
+    trace_performance_stage("runtime_receive", message=message)
+    assert '"stage":"runtime_receive"' in caplog.text
+    assert '"request_id":"request-runtime"' in caplog.text
+    assert '"at_unix_ns":456000000' in caplog.text
 
 
 def test_prometheus_renderer_converts_milliseconds_to_seconds():
