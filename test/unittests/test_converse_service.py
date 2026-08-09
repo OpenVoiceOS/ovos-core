@@ -272,6 +272,51 @@ class TestCheckConverseTimeout(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# active_skills compatibility property
+# ---------------------------------------------------------------------------
+
+class TestActiveSkillsCompatibility(unittest.TestCase):
+    """The legacy property remains a lossless view of canonical handlers."""
+
+    def test_getter_preserves_tuple_shape_order_and_timestamps(self):
+        svc = _make_service()
+        sess = Session("s")
+        sess.active_handlers = [
+            {"skill_id": "skill_a", "activated_at": 12.5},
+            {"skill_id": "skill_b", "activated_at": 7.25},
+        ]
+
+        with patch(
+            "ovos_core.intent_services.converse_service.SessionManager.get",
+            return_value=sess,
+        ):
+            active_skills = svc.active_skills
+
+        self.assertEqual(active_skills, [("skill_a", 12.5), ("skill_b", 7.25)])
+        self.assertTrue(all(isinstance(item, tuple) for item in active_skills))
+
+    def test_setter_preserves_order_and_original_timestamps(self):
+        svc = _make_service()
+        sess = Session("s")
+        legacy_skills = [("skill_a", 12.5), ("skill_b", 7.25)]
+
+        with patch(
+            "ovos_core.intent_services.converse_service.SessionManager.get",
+            return_value=sess,
+        ), patch.object(sess, "activate_skill") as activate_skill:
+            svc.active_skills = legacy_skills
+
+        activate_skill.assert_not_called()
+        self.assertEqual(
+            sess.active_handlers,
+            [
+                {"skill_id": "skill_a", "activated_at": 12.5},
+                {"skill_id": "skill_b", "activated_at": 7.25},
+            ],
+        )
+
+
+# ---------------------------------------------------------------------------
 # _activate_allowed / activate_skill
 # ---------------------------------------------------------------------------
 
@@ -544,19 +589,23 @@ class TestMatch(unittest.TestCase):
         sess.active_handlers = [
             {"skill_id": "expired", "activated_at": time.time() - 400}
         ]
-        svc.bus.emit = MagicMock()
-        message = Message("test", context={})
+        message = Message("test", context={"session": sess.serialize()})
 
         with patch(
             "ovos_core.intent_services.converse_service.SessionManager.get",
             return_value=sess,
-        ) as get_session:
+        ) as get_session, patch.object(
+            svc, "_collect_converse_skills", return_value=[]
+        ) as collect_skills:
             result = svc.match(["hello"], "en-US", message)
 
         self.assertIsNone(result)
         self.assertEqual(sess.active_handlers, [])
+        self.assertEqual(
+            message.context["session"].get("active_handlers", []), []
+        )
         get_session.assert_called_once_with(message)
-        svc.bus.emit.assert_not_called()
+        collect_skills.assert_called_once_with(message, sess)
 
     def test_skill_in_response_state_captured_by_get_response(self):
         """A skill in RESPONSE state is matched as get_response, not converse."""

@@ -98,16 +98,17 @@ class ConverseService(PipelinePlugin):
     def active_skills(self):
         session = SessionManager.get()
         return [
-            [handler["skill_id"], handler["activated_at"]]
+            (handler["skill_id"], handler["activated_at"])
             for handler in session.active_handlers
         ]
 
     @active_skills.setter
     def active_skills(self, val):
         session = SessionManager.get()
-        session.active_handlers = []
-        for skill_id, _ in val:
-            session.activate_skill(skill_id)
+        session.active_handlers = [
+            {"skill_id": skill_id, "activated_at": activated_at}
+            for skill_id, activated_at in val
+        ]
 
     @staticmethod
     def get_active_skills(message: Optional[Message] = None) -> List[str]:
@@ -406,6 +407,10 @@ class ConverseService(PipelinePlugin):
 
         # filter allowed skills
         self._check_converse_timeout(message, session)
+        # Keep the message snapshot aligned with the filtered live session.
+        # Converse pings are derived from this message, so a stale snapshot
+        # must not be able to restore handlers that just expired.
+        message.context["session"] = session.serialize()
 
         # check if any skill wants to converse
         for skill_id in self._collect_converse_skills(message, session):
