@@ -224,27 +224,31 @@ class TestCheckConverseTimeout(unittest.TestCase):
         svc = _make_service()
         sess = Session("s")
         now = time.time()
-        sess.active_skills = [("skill_a", now - 10)]  # 10 s ago — within 300 s default
+        sess.active_handlers = [
+            {"skill_id": "skill_a", "activated_at": now - 10}
+        ]  # 10 s ago — within 300 s default
 
         with patch("ovos_core.intent_services.converse_service.SessionManager.get",
                    return_value=sess):
             svc._check_converse_timeout(Message("test"))
 
-        self.assertEqual(len(sess.active_skills), 1)
-        self.assertEqual(sess.active_skills[0][0], "skill_a")
+        self.assertEqual(len(sess.active_handlers), 1)
+        self.assertEqual(sess.active_handlers[0]["skill_id"], "skill_a")
 
     def test_skills_past_default_timeout_removed(self):
         """Skills older than the default timeout (300 s) are removed."""
         svc = _make_service()
         sess = Session("s")
         now = time.time()
-        sess.active_skills = [("old_skill", now - 400)]  # 400 s ago — beyond default
+        sess.active_handlers = [
+            {"skill_id": "old_skill", "activated_at": now - 400}
+        ]  # 400 s ago — beyond default
 
         with patch("ovos_core.intent_services.converse_service.SessionManager.get",
                    return_value=sess):
             svc._check_converse_timeout(Message("test"))
 
-        self.assertEqual(sess.active_skills, [])
+        self.assertEqual(sess.active_handlers, [])
 
     def test_per_skill_timeout_override_respected(self):
         """A per-skill timeout override takes precedence over the default."""
@@ -253,13 +257,16 @@ class TestCheckConverseTimeout(unittest.TestCase):
         sess = Session("s")
         now = time.time()
         # short_skill has a 5-second timeout; 10 seconds old → should be removed
-        sess.active_skills = [("short_skill", now - 10), ("long_skill", now - 10)]
+        sess.active_handlers = [
+            {"skill_id": "short_skill", "activated_at": now - 10},
+            {"skill_id": "long_skill", "activated_at": now - 10},
+        ]
 
         with patch("ovos_core.intent_services.converse_service.SessionManager.get",
                    return_value=sess):
             svc._check_converse_timeout(Message("test"))
 
-        remaining = [s[0] for s in sess.active_skills]
+        remaining = [handler["skill_id"] for handler in sess.active_handlers]
         self.assertNotIn("short_skill", remaining)
         self.assertIn("long_skill", remaining)
 
@@ -534,7 +541,9 @@ class TestMatch(unittest.TestCase):
         """Timeout filtering survives until converse candidates are polled."""
         svc = _make_service()
         sess = Session("s")
-        sess.active_skills = [("expired", time.time() - 400)]
+        sess.active_handlers = [
+            {"skill_id": "expired", "activated_at": time.time() - 400}
+        ]
         svc.bus.emit = MagicMock()
         message = Message("test", context={})
 
@@ -545,7 +554,7 @@ class TestMatch(unittest.TestCase):
             result = svc.match(["hello"], "en-US", message)
 
         self.assertIsNone(result)
-        self.assertEqual(sess.active_skills, [])
+        self.assertEqual(sess.active_handlers, [])
         get_session.assert_called_once_with(message)
         svc.bus.emit.assert_not_called()
 

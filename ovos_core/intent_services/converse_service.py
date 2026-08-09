@@ -97,13 +97,16 @@ class ConverseService(PipelinePlugin):
     @property
     def active_skills(self):
         session = SessionManager.get()
-        return session.active_skills
+        return [
+            [handler["skill_id"], handler["activated_at"]]
+            for handler in session.active_handlers
+        ]
 
     @active_skills.setter
     def active_skills(self, val):
         session = SessionManager.get()
-        session.active_skills = []
-        for skill_id, ts in val:
+        session.active_handlers = []
+        for skill_id, _ in val:
             session.activate_skill(skill_id)
 
     @staticmethod
@@ -115,7 +118,7 @@ class ConverseService(PipelinePlugin):
             active_skills (list): ordered list of skill_ids
         """
         session = SessionManager.get(message)
-        return [skill[0] for skill in session.active_skills]
+        return [handler["skill_id"] for handler in session.active_handlers]
 
     def deactivate_skill(self, skill_id: str, source_skill: Optional[str] = None,
                          message: Optional[Message] = None) -> None:
@@ -289,7 +292,9 @@ class ConverseService(PipelinePlugin):
             # ``match`` already folded this message snapshot into the live
             # session. Reusing it avoids rebuilding and refolding the same
             # snapshot while preserving direct callers of this helper.
-            active_skill_ids = [skill[0] for skill in session.active_skills]
+            active_skill_ids = [
+                handler["skill_id"] for handler in session.active_handlers
+            ]
 
         # note: this is sorted by priority already
         active_skills = [skill_id for skill_id in active_skill_ids
@@ -340,9 +345,11 @@ class ConverseService(PipelinePlugin):
         def_timeout = self.config.get("timeout", 300)
         if session is None:
             session = SessionManager.get(message)
-        session.active_skills = [
-            skill for skill in session.active_skills
-            if time.time() - skill[1] <= timeouts.get(skill[0], def_timeout)]
+        session.active_handlers = [
+            handler for handler in session.active_handlers
+            if time.time() - handler["activated_at"]
+            <= timeouts.get(handler["skill_id"], def_timeout)
+        ]
 
     def match(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """
@@ -376,8 +383,12 @@ class ConverseService(PipelinePlugin):
         utterances = flatten_list(utterances)
 
         # note: this is sorted by priority already
-        gr_skills = [skill_id for skill_id, _ in session.active_skills
-                     if session.utterance_states.get(skill_id, UtteranceState.INTENT) == UtteranceState.RESPONSE]
+        gr_skills = [
+            handler["skill_id"] for handler in session.active_handlers
+            if session.utterance_states.get(
+                handler["skill_id"], UtteranceState.INTENT
+            ) == UtteranceState.RESPONSE
+        ]
 
         # check if any skill wants to capture utterance for self.get_response method
         for skill_id in gr_skills:
