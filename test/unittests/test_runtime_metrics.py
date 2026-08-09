@@ -65,27 +65,31 @@ def test_trace_extracts_nested_metadata_request_id():
     assert message_request_id(message) == "request-runtime"
 
 
-def test_correlated_trace_is_opt_in(monkeypatch, caplog):
+def test_correlated_trace_is_opt_in(monkeypatch):
     message = Message(
         "recognizer_loop:utterance",
         {},
         {"query_id": "request-runtime"},
     )
-    caplog.set_level("INFO", logger="ovos.performance.trace")
+    logged = []
+    monkeypatch.setattr(
+        "ovos_core._performance_trace._LOG.info",
+        lambda template, payload: logged.append(template % payload),
+    )
     monkeypatch.delenv("OVOS_PERFORMANCE_TRACE", raising=False)
 
     trace_performance_stage("runtime_receive", message=message)
 
-    assert "request-runtime" not in caplog.text
+    assert logged == []
     monkeypatch.setenv("OVOS_PERFORMANCE_TRACE", "true")
     monkeypatch.setattr(
         "ovos_core._performance_trace.time.time_ns",
         lambda: 456_000_000,
     )
     trace_performance_stage("runtime_receive", message=message)
-    assert '"stage":"runtime_receive"' in caplog.text
-    assert '"request_id":"request-runtime"' in caplog.text
-    assert '"at_unix_ns":456000000' in caplog.text
+    assert '"stage":"runtime_receive"' in logged[0]
+    assert '"request_id":"request-runtime"' in logged[0]
+    assert '"at_unix_ns":456000000' in logged[0]
 
 
 def test_prometheus_renderer_converts_milliseconds_to_seconds():
