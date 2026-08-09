@@ -15,7 +15,7 @@ from typing import Any
 
 from ovos_utils.log import LOG
 
-_LOG = LOG
+_LOG = LOG.create_logger("ovos.performance.trace")
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 _DIRECT_ID_KEYS = ("query_id", "request_id", "qa_query_id")
 _NESTED_KEYS = ("context", "data", "metadata", "payload")
