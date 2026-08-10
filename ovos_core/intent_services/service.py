@@ -252,9 +252,11 @@ class IntentService:
         for k in lang_keys:
             if k in message.context:
                 v = standardize_lang(message.context[k])
-                # closest_lang already applies the "distance below 10" threshold
-                # and returns None when no candidate is close enough
-                best_lang = closest_lang(v, valid_langs, max_distance=10)
+                # closest_lang applies the language-distance threshold and
+                # returns None when no candidate is close enough. The bound is
+                # inclusive, so a member language still matches its
+                # macrolanguage (distance 10, eg. "arz" against "ar")
+                best_lang = closest_lang(v, valid_langs)
                 if best_lang is None:
                     LOG.warning(f"ignoring {k}, {v} is not in enabled languages: {valid_langs}")
                     continue
