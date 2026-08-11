@@ -1,3 +1,4 @@
+from functools import lru_cache
 from os.path import dirname, join
 from threading import Event
 from typing import Optional, Dict, List, Union
@@ -16,6 +17,33 @@ from ovos_utils.log import LOG
 from ovos_utils.parse import match_one
 
 
+class _CachedStopResources(LocaleResources):
+    """Cache packaged stop vocabulary expansion for the service lifetime.
+
+    StopService locale files are installed with ovos-core and cannot change
+    without replacing the running process. LocaleResources intentionally
+    provides uncached general-purpose reads, but using it directly in the
+    first pipeline stage repeats file IO and template expansion for every
+    utterance.
+    """
+
+    CACHE_SIZE = 32
+
+    def __init__(self, skill_locale: str) -> None:
+        super().__init__(skill_locale=skill_locale)
+        self._load_vocabulary = lru_cache(maxsize=self.CACHE_SIZE)(
+            super().load_vocabulary
+        )
+
+    def load_vocabulary(self, base_name: str, lang: str) -> List[str]:
+        """Load each stop vocabulary/language pair at most once."""
+        return self._load_vocabulary(base_name, lang)
+
+    def clear_cache(self) -> None:
+        """Release cached resources when the owning service shuts down."""
+        self._load_vocabulary.cache_clear()
+
+
 class StopService(ConfidenceMatcherPipeline):
     """Intent Service that handles stopping skills."""
 
@@ -24,7 +52,9 @@ class StopService(ConfidenceMatcherPipeline):
         config = config if config is not None else Configuration().get("skills", {}).get("stop") or {}
         bus = bus or FakeBus()
         ConfidenceMatcherPipeline.__init__(self, config=config, bus=bus)
-        self._locale = LocaleResources(skill_locale=join(dirname(__file__), "locale"))
+        self._locale = _CachedStopResources(
+            skill_locale=join(dirname(__file__), "locale")
+        )
         self.bus.on("stop:global", self.handle_global_stop)
         self.bus.on("stop:skill", self.handle_skill_stop)
 
@@ -313,5 +343,6 @@ class StopService(ConfidenceMatcherPipeline):
 
     def shutdown(self) -> None:
         """Remove bus listeners registered by this service."""
+        self._locale.clear_cache()
         self.bus.remove("stop:global", self.handle_global_stop)
         self.bus.remove("stop:skill", self.handle_skill_stop)
