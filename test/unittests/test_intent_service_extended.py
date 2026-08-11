@@ -164,6 +164,44 @@ class TestDisambiguateLang(unittest.TestCase):
             result = IntentService.disambiguate_lang(msg)
         self.assertEqual(result, "en-US")
 
+    def test_macrolanguage_member_resolves_to_its_macrolanguage(self):
+        """A tag at the language-distance threshold resolves (arz -> ar)."""
+        for tag in ("arz", "wuu"):
+            macro = "ar" if tag == "arz" else "zh"
+            with self.subTest(tag=tag):
+                msg = Message("test", data={}, context={"stt_lang": tag})
+                with patch("ovos_core.intent_services.service.get_message_lang",
+                           return_value="en-US"), \
+                     patch("ovos_core.intent_services.service.get_valid_languages",
+                           return_value=["en-US", macro]):
+                    result = IntentService.disambiguate_lang(msg)
+                self.assertEqual(result, tag)
+
+    def test_regional_variant_resolves(self):
+        """Regional variants stay inside the threshold."""
+        for tag, supported in (("ar-SA", "ar"), ("en-AU", "en-GB"), ("pt-BR", "pt-PT")):
+            with self.subTest(tag=tag):
+                msg = Message("test", data={}, context={"stt_lang": tag})
+                with patch("ovos_core.intent_services.service.get_message_lang",
+                           return_value="en-US"), \
+                     patch("ovos_core.intent_services.service.get_valid_languages",
+                           return_value=["en-US", supported]):
+                    result = IntentService.disambiguate_lang(msg)
+                self.assertEqual(result, tag)
+
+    def test_unrelated_language_is_ignored(self):
+        """Distant languages stay outside the threshold and fall through."""
+        for tag, supported in (("zh", "en"), ("fr", "es"),
+                               ("de-CH", "fr-CH"), ("nl", "af")):
+            with self.subTest(tag=tag):
+                msg = Message("test", data={}, context={"stt_lang": tag})
+                with patch("ovos_core.intent_services.service.get_message_lang",
+                           return_value="en-US"), \
+                     patch("ovos_core.intent_services.service.get_valid_languages",
+                           return_value=[supported]):
+                    result = IntentService.disambiguate_lang(msg)
+                self.assertEqual(result, "en-US")
+
 
 # ---------------------------------------------------------------------------
 # get_pipeline_matcher
