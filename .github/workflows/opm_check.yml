@@ -12,6 +12,6 @@ jobs:
     secrets: inherit
     with:
       system_deps: 'swig libssl-dev portaudio19-dev libpulse-dev'
-      install_extras: 'mycroft,plugins,skills-essential,padatious,test'
+      install_extras: 'mycroft,plugins,skills-essential,test'
       python_version: '3.11'
       plugin_type: 'pipeline'
