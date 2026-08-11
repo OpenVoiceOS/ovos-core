@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.6.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.2a1) (2026-08-11)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.1a1...2.6.2a1)
+
+**Merged pull requests:**
+
+- fix: padatious belongs in the plugins extra, not its own [\#850](https://github.com/OpenVoiceOS/ovos-core/pull/850) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.6.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.1a1) (2026-08-11)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.0a1...2.6.1a1)
@@ -331,10 +339,6 @@
 ## [2.0.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.6a1) (2025-10-20)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.5a2...2.0.6a1)
-
-**Merged pull requests:**
-
-- Release 2.0.6a1 [\#731](https://github.com/OpenVoiceOS/ovos-core/pull/731) ([github-actions[bot]](https://github.com/apps/github-actions))
 
 ## [2.0.5a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.5a2) (2025-10-08)
 
