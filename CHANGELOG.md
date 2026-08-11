@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.6.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.3a1) (2026-08-11)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.2a1...2.6.3a1)
+
+**Merged pull requests:**
+
+- fix: let language disambiguation use the shared distance threshold [\#847](https://github.com/OpenVoiceOS/ovos-core/pull/847) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.6.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.2a1) (2026-08-11)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.1a1...2.6.2a1)
@@ -327,10 +335,6 @@
 ## [2.1.0](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.0) (2025-10-20)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.0a1...2.1.0)
-
-**Merged pull requests:**
-
-- Release 2.1.0a1 [\#732](https://github.com/OpenVoiceOS/ovos-core/pull/732) ([github-actions[bot]](https://github.com/apps/github-actions))
 
 ## [2.1.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.0a1) (2025-10-20)
 
