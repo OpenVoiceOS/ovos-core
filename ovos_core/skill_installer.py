@@ -32,10 +32,17 @@ class SkillsStore:
     def __init__(self, bus, config=None):
         self.config = config or Configuration().get("skills", {}).get("installer", {})
         self.bus = bus
+        # service name used for targeted pip install/uninstall routing,
+        # matching ovos_utils.skill_installer.ServiceInstaller's convention
+        self.service_name = "ovos_core"
         self.bus.on("ovos.skills.install", self.handle_install_skill)
         self.bus.on("ovos.skills.uninstall", self.handle_uninstall_skill)
         self.bus.on("ovos.pip.install", self.handle_install_python)
         self.bus.on("ovos.pip.uninstall", self.handle_uninstall_python)
+        # targeted topics, so ovos-core can be addressed specifically
+        # (eg. skills / solvers / personas / utterance transformers)
+        self.bus.on(f"ovos.pip.install.{self.service_name}", self.handle_install_python)
+        self.bus.on(f"ovos.pip.uninstall.{self.service_name}", self.handle_uninstall_python)
 
     def shutdown(self) -> None:
         """Unregister all message bus event handlers."""
@@ -43,6 +50,8 @@ class SkillsStore:
         self.bus.remove("ovos.skills.uninstall", self.handle_uninstall_skill)
         self.bus.remove("ovos.pip.install", self.handle_install_python)
         self.bus.remove("ovos.pip.uninstall", self.handle_uninstall_python)
+        self.bus.remove(f"ovos.pip.install.{self.service_name}", self.handle_install_python)
+        self.bus.remove(f"ovos.pip.uninstall.{self.service_name}", self.handle_uninstall_python)
 
     def play_error_sound(self) -> None:
         """Emit a message to play the configured error sound."""

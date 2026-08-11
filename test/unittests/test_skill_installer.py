@@ -350,5 +350,37 @@ def test_handle_uninstall_python_success(skills_store):
     assert skills_store.bus.message_data[-1] == {}
 
 
+def test_targeted_pip_topics_registered(skills_store):
+    """The targeted ovos.pip.install.ovos_core / .uninstall.ovos_core topics
+    must be registered alongside the broadcast topics."""
+    assert "ovos.pip.install.ovos_core" in skills_store.bus.event_handlers
+    assert "ovos.pip.uninstall.ovos_core" in skills_store.bus.event_handlers
+
+
+def test_shutdown_removes_targeted_pip_topics(skills_store):
+    """shutdown() must unregister the targeted topics too."""
+    skills_store.shutdown()
+    assert "ovos.pip.install.ovos_core" not in skills_store.bus.event_handlers
+    assert "ovos.pip.uninstall.ovos_core" not in skills_store.bus.event_handlers
+
+
+@pytest.mark.parametrize('skills_store', [{"allow_pip": True}], indirect=True)
+def test_handle_install_python_targeted_topic_replies_on_base_topic(skills_store):
+    """A message received on the targeted ovos.pip.install.ovos_core topic
+    still replies on the base ovos.pip.install.complete topic, since
+    message.reply() derives the reply type from the literal string passed
+    to it, not from the incoming message's msg_type. This is what the
+    web-ui plugin browser expects."""
+    skills_store.play_error_sound = Mock()
+    skills_store.pip_install = Mock(return_value=True)
+    packages = ["requests"]
+    skills_store.handle_install_python(
+        Message(msg_type="ovos.pip.install.ovos_core", data={"packages": packages}))
+    skills_store.play_error_sound.assert_not_called()
+    skills_store.pip_install.assert_called_once_with(packages)
+    assert skills_store.bus.message_types[-1] == "ovos.pip.install.complete"
+    assert skills_store.bus.message_data[-1] == {}
+
+
 if __name__ == "__main__":
     pytest.main()
