@@ -166,7 +166,7 @@ Qwen Code (Qwen 3.5)
 ### Actions Taken
 - **Created `.github/workflows/ovoscope.yml`**: New workflow for end-to-end skill testing using ovoscope framework with bus coverage tracking.
   - Uses `OpenVoiceOS/gh-automations/.github/workflows/ovoscope.yml@dev` reusable workflow
-  - Installs ovos-core with `[mycroft,plugins,skills-essential,lgpl,test]` extras
+  - Installs ovos-core with `[mycroft,plugins,skills-essential,padatious,test]` extras
   - Runs tests from `test/end2end/` directory
   - Enables bus coverage reporting (`bus_coverage: true`)
   - Posts `🔌 Skill Tests (ovoscope)` and `🚌 Bus Coverage` sections to PR comments
