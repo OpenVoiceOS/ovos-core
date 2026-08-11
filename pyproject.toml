@@ -58,7 +58,10 @@ mycroft = [
     "ovos-dinkum-listener[extras]>=0.8.2a2,<1.0.0",
 ]
 padatious = [
-    "ovos_padatious>=2.0.1a1,<3.0.0",
+    # 2.0.0a1 is the first release without fann2 — before it, padatious pulled
+    # in the libfann C extension and its LGPL obligation. Never relax this
+    # floor below 2.x or the build toolchain comes back with it.
+    "ovos_padatious>=2.0.1a2,<3.0.0",
 ]
 # Deprecated alias. Padatious was ported from libfann to pure numpy and is
 # Apache-2.0 with no reservations, so the name no longer describes anything.
