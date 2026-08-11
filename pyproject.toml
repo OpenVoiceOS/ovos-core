@@ -57,13 +57,6 @@ mycroft = [
     "ovos-messagebus>=0.2.1a1,<1.0.0",
     "ovos-dinkum-listener[extras]>=0.8.2a2,<1.0.0",
 ]
-# Deprecated alias. This extra existed only to isolate an LGPL dependency.
-# Padatious is Apache-2.0 pure numpy now, so it ships in `plugins` with every
-# other pipeline plugin and there is nothing left to isolate. Kept so existing
-# installs of `ovos-core[lgpl]` keep resolving.
-lgpl = [
-    "ovos-core[plugins]",
-]
 plugins = [
     "ovos-utterance-corrections-plugin>=0.1.3a5, <1.0.0",
     "ovos-utterance-plugin-cancel>=0.3.3a1, <1.0.0",
