@@ -12,6 +12,6 @@ jobs:
   license_tests:
     uses: OpenVoiceOS/gh-automations/.github/workflows/license-check.yml@dev
     with:
-      install_extras: '[mycroft,lgpl,skills-essential]'
-      system_deps: 'swig libfann-dev portaudio19-dev libpulse-dev'
-      exclude_packages: '^(precise-runner|fann2|ovos-adapt-parser|ovos-padatious|tqdm|bs4|sonopy|caldav|recurring-ical-events|x-wr-timezone|zeroconf|mutagen|attrs|phoonnx).*'
+      install_extras: '[mycroft,padatious,skills-essential]'
+      system_deps: 'portaudio19-dev libpulse-dev'
+      exclude_packages: '^(precise-runner|ovos-adapt-parser|tqdm|bs4|sonopy|caldav|recurring-ical-events|x-wr-timezone|zeroconf|mutagen|attrs|phoonnx).*'

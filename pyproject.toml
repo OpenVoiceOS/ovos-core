@@ -57,9 +57,14 @@ mycroft = [
     "ovos-messagebus>=0.2.1a1,<1.0.0",
     "ovos-dinkum-listener[extras]>=0.8.2a2,<1.0.0",
 ]
-lgpl = [
+padatious = [
     "ovos_padatious>=2.0.1a1,<3.0.0",
-    "fann2>=1.0.7,<1.1.0",
+]
+# Deprecated alias. Padatious was ported from libfann to pure numpy and is
+# Apache-2.0 with no reservations, so the name no longer describes anything.
+# Kept so existing installs of `ovos-core[lgpl]` keep resolving.
+lgpl = [
+    "ovos-core[padatious]",
 ]
 plugins = [
     "ovos-utterance-corrections-plugin>=0.1.3a5, <1.0.0",
