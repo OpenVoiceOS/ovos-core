@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.6.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.1a1) (2026-08-11)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.0a1...2.6.1a1)
+
+**Merged pull requests:**
+
+- fix: padatious is Apache-2.0, drop the lgpl framing and fann2 [\#848](https://github.com/OpenVoiceOS/ovos-core/pull/848) ([JarbasAl](https://github.com/JarbasAl))
+- feat: add skills.installer.upgrade config option to SkillsStore.pip\_install [\#843](https://github.com/OpenVoiceOS/ovos-core/pull/843) ([andlo](https://github.com/andlo))
+
 ## [2.6.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.0a1) (2026-08-02)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.10a1...2.6.0a1)
@@ -330,11 +339,6 @@
 ## [2.0.5a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.5a2) (2025-10-08)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.5a1...2.0.5a2)
-
-**Merged pull requests:**
-
-- Release 2.0.5a2 [\#730](https://github.com/OpenVoiceOS/ovos-core/pull/730) ([github-actions[bot]](https://github.com/apps/github-actions))
-- translated ovos core [\#729](https://github.com/OpenVoiceOS/ovos-core/pull/729) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
 
 ## [2.0.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.5a1) (2025-09-05)
 
