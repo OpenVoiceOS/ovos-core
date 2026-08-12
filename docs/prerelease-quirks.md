@@ -22,6 +22,18 @@ separable legacy bridge, `_LegacyStopBridge`
 compat shim, not a permanent feature: it is slated for removal at the next
 major version.
 
+## #854 (alpha of 2026-08-14)
+
+`session.blacklisted_pipelines` matched blacklist entries and `session.pipeline`
+matcher ids as literal strings, so a legacy short id (`adapt_high`) never
+matched the canonical suffixed matcher it maps to (`ovos-adapt-pipeline-plugin-high`),
+and a confidence-suffixed entry (either spelling) only denied that one tier,
+leaving the plugin's other tiers invokable. Per OVOS-PIPELINE-1 §3/§5.2 a
+blacklist entry names the plugin, not a matcher variant of it: denying it
+denies every confidence tier, whichever spelling — legacy or canonical,
+suffixed or bare — the entry uses. Both the blacklist and the matcher id are
+now normalized to a bare plugin id before comparison.
+
 ## #868 (alpha of 2026-08-14)
 
 `handle_add_context`/`handle_remove_context`/`handle_clear_context` did a
