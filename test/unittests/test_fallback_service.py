@@ -238,12 +238,17 @@ class TestCollectFallbackSkills(unittest.TestCase):
             svc.shutdown()
 
         self.assertIn("skill_a", result_holder[0])
-        ping = svc.bus.emit.call_args[0][0]
-        self.assertEqual(ping.msg_type, "skill_a.fallback.ping")
+        emitted = [call.args[0] for call in svc.bus.emit.call_args_list]
+        # DEPRECATION WINDOW: both the skill-addressed ping and the legacy
+        # broadcast ping are emitted per poll round (kill-switch #837
+        # conventions) -- see fallback_service._collect_fallback_skills.
+        ping = next(m for m in emitted if m.msg_type == "skill_a.fallback.ping")
+        broadcast_ping = next(m for m in emitted if m.msg_type == "ovos.skills.fallback.ping")
         self.assertEqual(ping.data, {"utterances": [], "lang": None})
         self.assertNotIn("fallback_request_id", ping.context)
         self.assertEqual(ping.context["source"], "skills")
         self.assertEqual(ping.context["destination"], "client")
+        self.assertEqual(broadcast_ping.data, {"utterances": [], "lang": None})
 
     def test_skill_responds_can_handle_false_excluded(self):
         """A skill that replies can_handle=False is not included."""
@@ -357,7 +362,13 @@ class TestCollectFallbackSkills(unittest.TestCase):
         self.assertEqual(svc.registered_fallbacks, {"skill_b": 40})
 
     def test_concurrent_sessions_do_not_consume_each_others_pongs(self):
-        """Same-topic pongs are correlated by their propagated session."""
+        """Same-topic pongs from DIFFERENT sessions are correlated by their
+        propagated session id and never cross-consumed. This exercises the
+        session-id filter in the pong handler, NOT the same-session
+        serialization lock -- see
+        test_same_session_polls_are_serialized_by_lock for that. A generous
+        explicit fallback_query_timeout keeps this from flaking under CI
+        load (CodeRabbit-flagged)."""
         svc = _make_service(config={"fallback_query_timeout": 30})
         svc.registered_fallbacks = {"skill_a": 50}
         handlers = []
@@ -414,6 +425,140 @@ class TestCollectFallbackSkills(unittest.TestCase):
 
         self.assertEqual(results.get("b"), ["skill_a"])
 
+    def test_dedup_pong_across_both_ping_families_counts_once(self):
+        """DEPRECATION WINDOW: a skill running fixed ovos-workshop (#465)
+        answers BOTH the skill-addressed pong and the legacy broadcast pong
+        for the same poll round. It must be counted exactly once in the
+        returned pool, keyed by skill_id, with the first answer winning."""
+        svc = _make_service(config={"fallback_query_timeout": 2})
+        svc.registered_fallbacks = {"skill_a": 50}
+        sess = Session("dedup-session")
+        message = Message("test", context={"session": sess.serialize()})
+
+        addressed_handler = {}
+        broadcast_handler = {}
+        orig_on = svc.bus.on
+
+        def capture_on(event, handler):
+            if event == "skill_a.fallback.pong":
+                addressed_handler["h"] = handler
+            elif event == "ovos.skills.fallback.pong":
+                broadcast_handler["h"] = handler
+            return orig_on(event, handler)
+
+        svc.bus.on = capture_on
+
+        def fake_emit(msg):
+            if msg.msg_type == "skill_a.fallback.ping":
+                # a dual-bound skill answers the addressed ping on BOTH pong
+                # topics: the addressed one wins (first answer), the
+                # broadcast one must be ignored as a dup.
+                addressed_handler["h"](Message(
+                    "skill_a.fallback.pong",
+                    {"skill_id": "skill_a", "can_handle": True},
+                    {"session": sess.serialize()}))
+                broadcast_handler["h"](Message(
+                    "ovos.skills.fallback.pong",
+                    {"skill_id": "skill_a", "can_handle": False},
+                    {"session": sess.serialize()}))
+
+        svc.bus.emit = fake_emit
+
+        result = svc._collect_fallback_skills(message, fb_range=FallbackRange(5, 90))
+        # first answer (addressed pong, can_handle=True) wins; the
+        # contradicting broadcast dup (can_handle=False) is ignored, and
+        # skill_a appears exactly once.
+        self.assertEqual(result, ["skill_a"])
+
+    def test_dedup_first_answer_wins_when_broadcast_arrives_first(self):
+        """Symmetric case: broadcast pong arrives first and wins even though
+        the addressed pong (arriving second) disagrees."""
+        svc = _make_service(config={"fallback_query_timeout": 2})
+        svc.registered_fallbacks = {"skill_a": 50}
+        sess = Session("dedup-session-2")
+        message = Message("test", context={"session": sess.serialize()})
+
+        addressed_handler = {}
+        broadcast_handler = {}
+        orig_on = svc.bus.on
+
+        def capture_on(event, handler):
+            if event == "skill_a.fallback.pong":
+                addressed_handler["h"] = handler
+            elif event == "ovos.skills.fallback.pong":
+                broadcast_handler["h"] = handler
+            return orig_on(event, handler)
+
+        svc.bus.on = capture_on
+
+        def fake_emit(msg):
+            if msg.msg_type == "skill_a.fallback.ping":
+                broadcast_handler["h"](Message(
+                    "ovos.skills.fallback.pong",
+                    {"skill_id": "skill_a", "can_handle": False},
+                    {"session": sess.serialize()}))
+                addressed_handler["h"](Message(
+                    "skill_a.fallback.pong",
+                    {"skill_id": "skill_a", "can_handle": True},
+                    {"session": sess.serialize()}))
+
+        svc.bus.emit = fake_emit
+
+        result = svc._collect_fallback_skills(message, fb_range=FallbackRange(5, 90))
+        # broadcast pong (can_handle=False) arrived first and wins, so
+        # skill_a is NOT selected despite the later addressed pong saying True.
+        self.assertEqual(result, [])
+
+    def test_same_session_polls_are_serialized_by_lock(self):
+        """_acquire_fallback_session_lock/_release_fallback_session_lock
+        serialize two concurrent polls for the SAME session id: the second
+        acquirer only proceeds once the first releases -- verified by a
+        strict entry/exit ordering with no interleaving."""
+        svc = _make_service()
+        session_id = "shared-session"
+        order = []
+        holder_acquired = threading.Event()
+        release_signal = threading.Event()
+
+        def holder():
+            lock = svc._acquire_fallback_session_lock(session_id)
+            order.append("holder-acquired")
+            holder_acquired.set()
+            release_signal.wait(timeout=2)
+            order.append("holder-releasing")
+            svc._release_fallback_session_lock(session_id, lock)
+
+        def waiter():
+            self.assertTrue(holder_acquired.wait(timeout=2))
+            # give the holder a head start to guarantee overlap
+            time.sleep(0.05)
+            order.append("waiter-attempting")
+            lock = svc._acquire_fallback_session_lock(session_id)
+            order.append("waiter-acquired")
+            svc._release_fallback_session_lock(session_id, lock)
+
+        t_holder = threading.Thread(target=holder)
+        t_waiter = threading.Thread(target=waiter)
+        t_holder.start()
+        t_waiter.start()
+
+        # give the waiter time to reach and block on acquire()
+        time.sleep(0.3)
+        self.assertIn("waiter-attempting", order)
+        self.assertNotIn("waiter-acquired", order,
+                         "waiter must still be blocked while holder holds the lock")
+
+        release_signal.set()
+        t_holder.join(timeout=2)
+        t_waiter.join(timeout=2)
+
+        self.assertEqual(order, [
+            "holder-acquired",
+            "waiter-attempting",
+            "holder-releasing",
+            "waiter-acquired",
+        ])
+
     def test_listener_removed_on_timeout(self):
         """bus.remove must be called even when no skill replies (timeout path)."""
         svc = _make_service(config={"fallback_query_timeout": 0})
@@ -427,9 +572,12 @@ class TestCollectFallbackSkills(unittest.TestCase):
                    return_value=sess):
             svc._collect_fallback_skills(Message("test"), fb_range=FallbackRange(5, 90))
 
-        svc.bus.remove.assert_called_once()
-        args = svc.bus.remove.call_args[0]
-        self.assertEqual(args[0], "slow_skill.fallback.pong")
+        # DEPRECATION WINDOW: the broadcast pong collector is also bound and
+        # removed alongside the addressed one per poll round.
+        self.assertEqual(svc.bus.remove.call_count, 2)
+        removed_topics = {call.args[0] for call in svc.bus.remove.call_args_list}
+        self.assertEqual(removed_topics,
+                         {"slow_skill.fallback.pong", "ovos.skills.fallback.pong"})
 
     def test_blacklisted_skill_excluded(self):
         """Skills blacklisted by the session are not collected."""

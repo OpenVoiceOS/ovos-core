@@ -44,31 +44,6 @@ class TestFallback(TestCase):
 
     skill_id = "ovos-skill-fallback-unknown.openvoiceos"
 
-    @classmethod
-    def _wire_skill_addressed_probe(cls, minicroft):
-        """Expose the companion Workshop FALLBACK-1 probe in this test.
-
-        The Ovoscope workflow intentionally installs released sibling packages
-        while testing this Core checkout.  Until the coordinated Workshop
-        change is released, adapt only the loaded test skill's capability probe
-        to the skill-addressed FALLBACK-1 topics.  The fallback request itself
-        still runs through the real skill and its normal lifecycle handlers.
-        """
-        skill = minicroft.plugin_skills[cls.skill_id].instance
-        ping_type = f"{cls.skill_id}.fallback.ping"
-        pong_type = f"{cls.skill_id}.fallback.pong"
-
-        def handle_ping(message: Message) -> None:
-            minicroft.bus.emit(message.reply(
-                pong_type,
-                data={"skill_id": cls.skill_id,
-                      "can_handle": skill.can_answer(message)},
-                context={"skill_id": cls.skill_id}
-            ))
-
-        minicroft.bus.on(ping_type, handle_ping)
-        return handle_ping
-
     def setUp(self):
         LOG.set_level("DEBUG")
 
@@ -79,7 +54,6 @@ class TestFallback(TestCase):
         modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
         minicroft = get_minicroft([self.skill_id], modernize=modernize,
                                   emit_legacy=emit_legacy)
-        probe_handler = self._wire_skill_addressed_probe(minicroft)
         try:
 
             session = Session("123")
@@ -97,7 +71,6 @@ class TestFallback(TestCase):
                 eof_msgs=[UTTERANCE_HANDLED],
                 flip_points=[
                     utt_topic,
-                    f"{self.skill_id}.fallback.pong",
                 ],
                 entry_points=[utt_topic],
                 final_session=final_session,
@@ -107,12 +80,20 @@ class TestFallback(TestCase):
                 source_message=message,
                 expected_messages=[
                     message,
+                # DEPRECATION WINDOW (kill-switch #837 conventions): core
+                # still polls both ping families. The released ovos-workshop
+                # installed by this test run (pre-#465, dev floor pin) only
+                # binds the legacy broadcast ping, so the skill-addressed
+                # ping is emitted but goes unanswered here -- it is only
+                # honored once ovos-workshop >=#465 is the floor pin.
                     Message(f"{self.skill_id}.fallback.ping",
                             {"utterances": ["hello world"],
                              "lang": session.lang}),
-                    Message(f"{self.skill_id}.fallback.pong",
-                            {"skill_id": self.skill_id, "can_handle": True},
-                            {"source": "A", "destination": "B"}),
+                    Message("ovos.skills.fallback.ping",
+                            {"utterances": ["hello world"],
+                             "lang": session.lang}),
+                    Message("ovos.skills.fallback.pong",
+                            {"skill_id": self.skill_id, "can_handle": True}),
                 # PIPELINE-1 §9.2: matched notification precedes the dispatch. The
                 # fallback match_type is the .request topic; it bears no ':' so
                 # skill_id/intent_name resolve to that topic.
@@ -158,8 +139,6 @@ class TestFallback(TestCase):
 
             test.execute(timeout=10)
         finally:
-            minicroft.bus.remove(f"{self.skill_id}.fallback.ping",
-                                 probe_handler)
             minicroft.stop()
 
     def test_fallback_match(self):

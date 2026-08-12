@@ -186,6 +186,18 @@ class FallbackService(ConfidenceMatcherPipeline):
         response_lock = threading.Lock()
         handlers: Dict[str, Callable] = {}
 
+        def _record(expected_skill_id: str, can_handle) -> None:
+            """First answer for a skill_id wins, regardless of which pong
+            topic (addressed or broadcast) it arrived on -- a skill running
+            fixed ovos-workshop (#465) answers BOTH ping families during the
+            migration window and must only count once."""
+            valid = isinstance(can_handle, bool)
+            with response_lock:
+                if responses[expected_skill_id] is not None:
+                    return
+                responses[expected_skill_id] = can_handle if valid else False
+            response_event.set()
+
         def make_handler(expected_skill_id: str) -> Callable:
             def handle_ack(msg: Message) -> None:
                 response_session = SessionManager.get(msg)
@@ -194,15 +206,29 @@ class FallbackService(ConfidenceMatcherPipeline):
                     return
                 skill_id = msg.data.get("skill_id")
                 can_handle = msg.data.get("can_handle")
-                valid = skill_id == expected_skill_id and \
-                    isinstance(can_handle, bool)
-                with response_lock:
-                    if responses[expected_skill_id] is not None:
-                        return
-                    responses[expected_skill_id] = can_handle if valid else False
-                response_event.set()
+                if skill_id != expected_skill_id:
+                    _record(expected_skill_id, False)
+                    return
+                _record(expected_skill_id, can_handle)
 
             return handle_ack
+
+        def handle_broadcast_pong(msg: Message) -> None:
+            # DEPRECATION WINDOW (ovos-core kill-switch #837 conventions):
+            # the general `ovos.skills.fallback.pong` collector is kept
+            # alongside the skill-addressed one for one deprecation window,
+            # so that a released ovos-workshop (pre-#465, only answering the
+            # broadcast ping) still gets picked up. Removable once the
+            # ovos-workshop floor pin guarantees dual-binding (#465).
+            response_session = SessionManager.get(msg)
+            if response_session is None or \
+                    response_session.session_id != session_id:
+                return
+            skill_id = msg.data.get("skill_id")
+            can_handle = msg.data.get("can_handle")
+            if skill_id not in responses:
+                return
+            _record(skill_id, can_handle)
 
         try:
             LOG.info("checking for FallbackSkill candidates")
@@ -211,6 +237,13 @@ class FallbackService(ConfidenceMatcherPipeline):
                 handler = make_handler(skill_id)
                 handlers[pong_type] = handler
                 self.bus.on(pong_type, handler)
+
+            # DEPRECATION WINDOW (ovos-core kill-switch #837 conventions):
+            # bind the broadcast pong collector once per poll round, with
+            # the same session filter as the addressed collectors above.
+            broadcast_pong_type = "ovos.skills.fallback.pong"
+            handlers[broadcast_pong_type] = handle_broadcast_pong
+            self.bus.on(broadcast_pong_type, handle_broadcast_pong)
 
             query_data = {
                 "utterances": list(message.data.get("utterances", [])),
@@ -221,6 +254,13 @@ class FallbackService(ConfidenceMatcherPipeline):
                 # reply derived from the inbound utterance envelope.
                 self.bus.emit(message.reply(
                     f"{skill_id}.fallback.ping", query_data))
+            # DEPRECATION WINDOW: also broadcast the legacy general ping once
+            # per poll round, so a released ovos-workshop (pre-#465) that
+            # only binds `ovos.skills.fallback.ping` still answers. Removable
+            # when the ovos-workshop floor pin guarantees dual-binding
+            # (#465) -- see ovos-core kill-switch #837 conventions.
+            self.bus.emit(message.forward(
+                "ovos.skills.fallback.ping", query_data))
 
             try:
                 timeout = max(0.0, float(self.config.get(

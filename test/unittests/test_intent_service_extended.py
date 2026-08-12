@@ -17,7 +17,7 @@ from collections import defaultdict
 from unittest.mock import MagicMock, patch
 
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import Session
+from ovos_bus_client.session import Session, SessionManager
 from ovos_plugin_manager.templates.pipeline import (
     IntentHandlerMatch,
     ConfidenceMatcherPipeline,
@@ -164,6 +164,44 @@ class TestDisambiguateLang(unittest.TestCase):
             result = IntentService.disambiguate_lang(msg)
         self.assertEqual(result, "en-US")
 
+    def test_macrolanguage_member_resolves_to_its_macrolanguage(self):
+        """A tag at the language-distance threshold resolves (arz -> ar)."""
+        for tag in ("arz", "wuu"):
+            macro = "ar" if tag == "arz" else "zh"
+            with self.subTest(tag=tag):
+                msg = Message("test", data={}, context={"stt_lang": tag})
+                with patch("ovos_core.intent_services.service.get_message_lang",
+                           return_value="en-US"), \
+                     patch("ovos_core.intent_services.service.get_valid_languages",
+                           return_value=["en-US", macro]):
+                    result = IntentService.disambiguate_lang(msg)
+                self.assertEqual(result, tag)
+
+    def test_regional_variant_resolves(self):
+        """Regional variants stay inside the threshold."""
+        for tag, supported in (("ar-SA", "ar"), ("en-AU", "en-GB"), ("pt-BR", "pt-PT")):
+            with self.subTest(tag=tag):
+                msg = Message("test", data={}, context={"stt_lang": tag})
+                with patch("ovos_core.intent_services.service.get_message_lang",
+                           return_value="en-US"), \
+                     patch("ovos_core.intent_services.service.get_valid_languages",
+                           return_value=["en-US", supported]):
+                    result = IntentService.disambiguate_lang(msg)
+                self.assertEqual(result, tag)
+
+    def test_unrelated_language_is_ignored(self):
+        """Distant languages stay outside the threshold and fall through."""
+        for tag, supported in (("zh", "en"), ("fr", "es"),
+                               ("de-CH", "fr-CH"), ("nl", "af")):
+            with self.subTest(tag=tag):
+                msg = Message("test", data={}, context={"stt_lang": tag})
+                with patch("ovos_core.intent_services.service.get_message_lang",
+                           return_value="en-US"), \
+                     patch("ovos_core.intent_services.service.get_valid_languages",
+                           return_value=[supported]):
+                    result = IntentService.disambiguate_lang(msg)
+                self.assertEqual(result, "en-US")
+
 
 # ---------------------------------------------------------------------------
 # get_pipeline_matcher
@@ -309,29 +347,6 @@ class TestGetPipelineSessionBlacklist(unittest.TestCase):
         sess.blacklisted_pipelines = ["adapt_high", "fallback_high"]
         result = svc.get_pipeline(session=sess)
         self.assertEqual(result, [])
-
-    def test_plugin_blacklist_skips_all_confidence_matchers_before_lookup(self):
-        """A base plugin policy ID blocks its suffixed matcher variants.
-
-        The deployment blacklist is expressed in installed plugin IDs while a
-        session pipeline contains confidence-suffixed matcher IDs.  Filtering
-        must happen before matcher lookup so an intentionally disabled plugin
-        is neither invoked nor reported as unknown.
-        """
-        svc = self._svc_with_adapt_fallback()
-        sess = Session("s")
-        sess.pipeline = [
-            "ovos-adapt-pipeline-plugin-high",
-            "fallback_high",
-        ]
-        sess.blacklisted_pipelines = ["ovos-adapt-pipeline-plugin"]
-
-        with patch.object(svc, "get_pipeline_matcher",
-                          wraps=svc.get_pipeline_matcher) as get_matcher:
-            result = svc.get_pipeline(session=sess)
-
-        self.assertEqual([matcher[0] for matcher in result], ["fallback_high"])
-        get_matcher.assert_called_once_with("fallback_high")
 
     def test_unknown_blacklisted_id_is_harmless_noop(self):
         """Unknown pipeline_ids in blacklisted_pipelines are ignored without

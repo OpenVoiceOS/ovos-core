@@ -252,9 +252,11 @@ class IntentService:
         for k in lang_keys:
             if k in message.context:
                 v = standardize_lang(message.context[k])
-                # closest_lang already applies the "distance below 10" threshold
-                # and returns None when no candidate is close enough
-                best_lang = closest_lang(v, valid_langs, max_distance=10)
+                # closest_lang applies the language-distance threshold and
+                # returns None when no candidate is close enough. The bound is
+                # inclusive, so a member language still matches its
+                # macrolanguage (distance 10, eg. "arz" against "ar")
+                best_lang = closest_lang(v, valid_langs)
                 if best_lang is None:
                     LOG.warning(f"ignoring {k}, {v} is not in enabled languages: {valid_langs}")
                     continue
@@ -303,19 +305,10 @@ class IntentService:
         # orchestrator-only: no `match` call is made and no bus event is
         # emitted for the skip, it is observable only as a non-invocation.
         # Unknown pipeline_ids in the blacklist are harmless no-ops.
-        blacklisted = {
-            _PIPELINE_MIGRATION_MAP.get(pipeline_id, pipeline_id)
-            for pipeline_id in session.blacklisted_pipelines or []
-        }
-
-        def is_blacklisted(matcher_id: str) -> bool:
-            normalized = _PIPELINE_MIGRATION_MAP.get(matcher_id, matcher_id)
-            plugin_id = _PIPELINE_RE.sub('', normalized)
-            return normalized in blacklisted or plugin_id in blacklisted
-
-        requested = [p for p in session.pipeline if not is_blacklisted(p)]
+        blacklisted = set(session.blacklisted_pipelines or [])
+        requested = [p for p in session.pipeline if p not in blacklisted]
         if blacklisted:
-            skipped = [p for p in session.pipeline if is_blacklisted(p)]
+            skipped = [p for p in session.pipeline if p in blacklisted]
             if skipped:
                 LOG.debug(f"Session '{session.session_id}' blacklisted "
                           f"pipelines skipped: {skipped}")
@@ -639,11 +632,7 @@ class IntentService:
                 langs = [lang]
                 if self.config.get("multilingual_matching"):
                     # if multilingual matching is enabled, attempt to match all user languages if main fails
-                    langs += [
-                        candidate_lang
-                        for candidate_lang in get_valid_languages()
-                        if candidate_lang != lang
-                    ]
+                    langs += [l for l in get_valid_languages() if l != lang]
                 for intent_lang in langs:
                     try:
                         match = match_func(utterances, intent_lang, message)
