@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 
+import copy
 import json
 import re
 import time
@@ -21,7 +22,7 @@ from typing import Optional, Tuple, Callable, List
 
 import requests
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import SessionManager
+from ovos_bus_client.session import SessionManager, _CONTEXT_LOCK
 from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
@@ -42,7 +43,6 @@ from ovos_spec_tools.context import (
     context_supplied_slots,
     prune as prune_intent_context,
     decrement as decrement_intent_context,
-    enforce_cap as enforce_intent_context_cap,
 )
 
 
@@ -99,6 +99,22 @@ def _produces_reserved_name(pipeline_id: Optional[str]) -> bool:
     if not pipeline_id:
         return False
     return _PIPELINE_RE.sub("", pipeline_id) in _RESERVED_NAME_PIPELINES
+
+
+def _replace_intent_context(sess, new_ctx: dict) -> None:
+    """Set a session's ``intent_context`` contents WITHOUT rebinding the dict.
+
+    ``Session.intent_context`` dict identity must be preserved; see the
+    ovos-bus-client ``_CONTEXT_LOCK`` contract (every live view — the adapt
+    frame-stack projection, a mid-round ``ovos.session.sync`` merge — holds
+    the same map object). It also stays a dict, never ``None``: an empty
+    context is an empty dict.
+    """
+    with _CONTEXT_LOCK:
+        if sess.intent_context is None:
+            sess.intent_context = {}
+        sess.intent_context.clear()
+        sess.intent_context.update(new_ctx)
 
 
 def on_started():
@@ -347,7 +363,8 @@ class IntentService:
         self.bus.emit(msg)
 
     def _missing_required_slots(self, match: IntentHandlerMatch,
-                                session_id: str, lang: str) -> List[str]:
+                                session_id: str, lang: str,
+                                intent_context: Optional[dict] = None) -> List[str]:
         """OVOS-PIPELINE-1 §6.2 orchestrator backstop for ``required_slots``.
 
         After a plugin returns a Match, the orchestrator verifies the match's
@@ -365,6 +382,12 @@ class IntentService:
         §4.3). An intent absent from the manifest yields no required slots, so
         the backstop is a no-op and engine-side enforcement remains authoritative.
 
+        OVOS-CONTEXT-1 §7 interaction: a required slot the live
+        ``intent_context`` can fill counts as present. §7 slot fill happens
+        inside the dispatch, i.e. AFTER this backstop, so without consulting
+        the context here a context-fillable slot would kill an otherwise
+        valid match before it ever got the chance to be filled.
+
         Returns:
             List[str]: required slot names absent from the match's slot map.
         """
@@ -376,7 +399,36 @@ class IntentService:
         if not required_slots:
             return []
         match_data = match.match_data or {}
-        return [slot for slot in required_slots if not match_data.get(slot)]
+        from_context = self._context_supplied_slots(
+            match, session_id, lang, intent_context)
+        return [slot for slot in required_slots
+                if not match_data.get(slot) and not from_context.get(slot)]
+
+    def _context_supplied_slots(self, match, session_id: str, lang: str,
+                                intent_context: Optional[dict]) -> dict:
+        """OVOS-CONTEXT-1 §7 — the slots the live ``intent_context`` can fill
+        for ``match``. Shared by the §6.2 missing-required backstop and by the
+        §7 fill applied during dispatch, so both agree on what "filled" means.
+        """
+        if not (isinstance(match, IntentHandlerMatch) and match.skill_id
+                and match.match_type):
+            return {}
+        intent_name = match.match_type.split(":", 1)[-1]
+        requires, _ = self.intent_manifest.get_context_requirements(
+            session_id, match.skill_id, intent_name, lang)
+        slot_names = self.intent_manifest.get_slot_names(
+            session_id, match.skill_id, intent_name, lang)
+        if not requires or not slot_names:
+            return {}
+        # "filled" is judged against match.match_data, not reply.data, which
+        # carries framework/echo fields that could collide with a slot name
+        return context_supplied_slots(
+            intent_context=intent_context or {},
+            requires=requires,
+            slot_names=slot_names,
+            owner_id=match.skill_id,
+            filled_slots=match.match_data or {},
+        )
 
     @staticmethod
     def _apply_post_match_decay(session_id: str, pre_match_entries: dict):
@@ -387,19 +439,35 @@ class IntentService:
 
         Must run before the dispatch reaches the IntentDispatcher / before
         any §9.3/§9.5 terminal is emitted (see ``_dispatch_match``).
+
+        An unregistered ``session_id`` is a no-op: decaying the DEFAULT
+        session with another session's pre-match snapshot would corrupt an
+        unrelated conversation.
+
+        Returns:
+            Optional[Session]: the decayed session, or ``None`` when the id
+                is unknown and nothing was touched.
         """
-        sess = SessionManager.sessions.get(session_id) or SessionManager.get_default_session()
+        default_sess = SessionManager.get_default_session()
+        sess = SessionManager.sessions.get(session_id)
+        if sess is None:
+            if session_id != default_sess.session_id:
+                LOG.warning(f"skipping intent_context decay: session "
+                            f"'{session_id}' is not registered (decaying the "
+                            f"default session here would corrupt it)")
+                return None
+            sess = default_sess
         post_ctx = dict(sess.intent_context or {})
         unchanged_keys = {k for k in pre_match_entries
                           if k in post_ctx and post_ctx[k] == pre_match_entries[k]}
         decrement_intent_context(post_ctx, only_keys=unchanged_keys)
-        sess.intent_context = post_ctx or None
+        _replace_intent_context(sess, post_ctx)
         SessionManager.update(sess)
         return sess
 
     def _dispatch_match(self, match: IntentHandlerMatch, message: Message, lang: str,
                         pipeline_id: str = None,
-                        pre_match_entries: Optional[dict] = None) -> Optional[Message]:
+                        pre_match_entries: Optional[dict] = None) -> None:
         """Orchestrate the OVOS-PIPELINE-1 §6.1 post-match steps, then dispatch.
 
         Runs the intent-transformer chain, skill activation, session update,
@@ -421,10 +489,6 @@ class IntentService:
             pre_match_entries (Optional[dict]): §4.1 pre-match key->entry-value
                 snapshot, used to tell a mid-round sync apart from an
                 untouched entry when deciding what to decrement.
-
-        Returns:
-            Optional[Message]: the dispatch Message, or ``None`` if nothing
-                was dispatched.
         """
         try:
             match = self.intent_plugins.transform(match)
@@ -477,20 +541,18 @@ class IntentService:
                     # emit event for skills callback -> self.handle_activate
                     self.bus.emit(reply.forward(f"{match.skill_id}.activate"))
 
-            # OVOS-CONTEXT-1 §5.1: promote matcher-captured entries onto session
-            promoted = getattr(match, "intent_context", None)
-            if promoted:
-                merged = SessionManager.merge_intent_context(
-                    dict(sess.intent_context or {}), promoted)
-                enforce_intent_context_cap(merged)
-                sess.intent_context = merged or None
-                SessionManager.update(sess)
+            # OVOS-CONTEXT-1 §5.1: matcher-captured entries reach the session
+            # via ``match.updated_session`` + the §5.3 ``ovos.session.sync``
+            # merge — IntentHandlerMatch carries no ``intent_context`` field.
 
             # OVOS-CONTEXT-1 §7: fill unfilled slots from live context
             self._apply_context_slots(match, sess, reply)
 
             # OVOS-CONTEXT-1 §4.2: decrement before dispatch (see docstring)
-            sess = self._apply_post_match_decay(sess.session_id, pre_match_entries or {})
+            decayed = self._apply_post_match_decay(sess.session_id,
+                                                   pre_match_entries or {})
+            if decayed is not None:
+                sess = decayed
 
             # update Session if modified by pipeline
             reply.context["session"] = sess.serialize()
@@ -513,7 +575,6 @@ class IntentService:
 
             intent_name = reply.msg_type.split(":", 1)[-1]
             self.intent_dispatcher.dispatch(reply, skill_id, intent_name)
-            return reply
 
         else:  # upload intent metrics if enabled
             if self.config.get("open_data", {}).get("intent_urls"):
@@ -521,7 +582,6 @@ class IntentService:
                                                         "complete_intent_failure",
                                                         lang,
                                                         match.match_data))
-        return None
 
     @staticmethod
     def _upload_match_data(utterance: str, intent: str, lang: str, match_data: dict):
@@ -632,16 +692,17 @@ class IntentService:
         intent_ctx = dict(sess.intent_context or {})
         prune_intent_context(intent_ctx)
         # §4.1: snapshot entry *value* (not identity, which reply/forward
-        # round-tripping churns) so a mid-dispatch refresh is exempted below
-        pre_match_entries = dict(intent_ctx)
-        sess.intent_context = intent_ctx or None
+        # round-tripping churns) so a mid-dispatch refresh is exempted below.
+        # Deep, so an in-place mutation of a nested entry value later in the
+        # round cannot silently defeat the equality-based exemption check.
+        pre_match_entries = copy.deepcopy(intent_ctx)
+        _replace_intent_context(sess, intent_ctx)
         SessionManager.update(sess)
         message.context["session"] = sess.serialize()
 
         # match
         match = None
         # no_match_lang defers the §9.3/§9.5 emission until after §4.2 decay
-        dispatched_msg = None
         no_match_lang = None
         with stopwatch:
             self._deactivations[sess.session_id] = []
@@ -678,7 +739,8 @@ class IntentService:
                         # any required slot, treat it as if the plugin had
                         # declined and continue iteration; no bus event is emitted.
                         missing = self._missing_required_slots(
-                            match, sess.session_id, intent_lang)
+                            match, sess.session_id, intent_lang,
+                            intent_context=sess.intent_context)
                         if missing:
                             LOG.debug(f"ignoring match '{match.match_type}': "
                                       f"missing required slots {missing} (§6.2)")
@@ -697,7 +759,7 @@ class IntentService:
                                     f"ignoring match, context gate unsatisfied for '{match.match_type}'")
                                 continue
                         try:
-                            dispatched_msg = self._dispatch_match(
+                            self._dispatch_match(
                                 match, message, intent_lang, pipeline_id=pipeline,
                                 pre_match_entries=pre_match_entries)
                             break
@@ -761,24 +823,8 @@ class IntentService:
         @param sess: the session whose intent_context is consulted.
         @param reply: the dispatch Message whose ``data`` slots are filled.
         """
-        if not (isinstance(match, IntentHandlerMatch) and match.skill_id):
-            return
-        intent_name = match.match_type.split(":", 1)[-1]
-        requires, _ = self.intent_manifest.get_context_requirements(
-            sess.session_id, match.skill_id, intent_name, sess.lang)
-        slot_names = self.intent_manifest.get_slot_names(
-            sess.session_id, match.skill_id, intent_name, sess.lang)
-        if not requires or not slot_names:
-            return
-        # "filled" is judged against match.match_data, not reply.data, which
-        # carries framework/echo fields that could collide with a slot name
-        supplied = context_supplied_slots(
-            intent_context=sess.intent_context or {},
-            requires=requires,
-            slot_names=slot_names,
-            owner_id=match.skill_id,
-            filled_slots=match.match_data or {},
-        )
+        supplied = self._context_supplied_slots(
+            match, sess.session_id, sess.lang, sess.intent_context)
         for key, value in supplied.items():
             reply.data[key] = value
         if supplied:
@@ -812,7 +858,7 @@ class IntentService:
         # keyed by the context token and carry its injected value.
         ctx = dict(sess.intent_context or {})
         ctx[context] = {"value": word or context}
-        sess.intent_context = ctx
+        _replace_intent_context(sess, ctx)
 
     @staticmethod
     def handle_remove_context(message: Message):
@@ -829,7 +875,7 @@ class IntentService:
             # `handle_add_context`)
             ctx = dict(sess.intent_context or {})
             ctx.pop(context, None)
-            sess.intent_context = ctx or None
+            _replace_intent_context(sess, ctx)
 
     @staticmethod
     def handle_clear_context(message: Message):
@@ -837,7 +883,7 @@ class IntentService:
         sess = SessionManager.get(message)
         sess.context.clear_context()
         # mirror the clear into the OVOS-CONTEXT-1 map (see `handle_add_context`)
-        sess.intent_context = None
+        _replace_intent_context(sess, {})
 
     def handle_get_intent(self, message):
         """Get intent from either adapt or padatious.

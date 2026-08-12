@@ -14,10 +14,13 @@
 """OVOS-CONTEXT-1 conformance tests: liveness (§2), decay (§4/§4.1), scope
 resolution (§3.1), gating (§6/§6.1), slot fill (§7), plus a live FakeBus
 integration check through the real ``SessionManager``."""
+import copy
 import time
 import unittest
 from collections import defaultdict
 from unittest.mock import MagicMock
+
+import pytest
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session, SessionManager
@@ -33,6 +36,34 @@ from ovos_spec_tools.context import (
     INTENT_CONTEXT_FIELD,
 )
 from ovos_core.intent_services.service import IntentService
+
+
+# OVOS-SESSION-2 §2.7: the session snapshot's PRIMARY carrier is
+# ``Message.data["session"]``; ``Message.context["session"]`` is the legacy
+# carrier, accepted as a fallback. ovos-bus-client#278 teaches
+# ``SessionManager.handle_session_sync`` to read the data carrier (preferring
+# it when both are present); until it ships, the data-carrier path is a
+# no-match on the fallback-only handler in bus-client dev.
+_NEEDS_BUS_CLIENT_278 = (
+    "requires ovos-bus-client#278 (SESSION-2 §2.7 data carrier); XPASS means "
+    "#278 shipped - drop the marker and bump the floor pin")
+
+
+def _sync_msg(snap: dict, carrier: str = "data") -> Message:
+    """Build an ``ovos.session.sync`` carrying ``snap``.
+
+    ``carrier="data"`` is the SESSION-2 §2.7 primary carrier (default);
+    ``carrier="context"`` is the legacy fallback shape; ``carrier="both"``
+    puts a decoy on ``context`` so a reader that honours §2.7 picks ``data``.
+    """
+    if carrier == "context":
+        return Message("ovos.session.sync", context={"session": snap})
+    if carrier == "both":
+        decoy = dict(snap)
+        decoy[INTENT_CONTEXT_FIELD] = {"carrier.probe": {"value": "context"}}
+        return Message("ovos.session.sync", data={"session": snap},
+                       context={"session": decoy})
+    return Message("ovos.session.sync", data={"session": snap})
 
 
 def _make_service(config=None) -> IntentService:
@@ -213,6 +244,7 @@ class TestLiveSessionManagerSync(unittest.TestCase):
         SessionManager.default_session = SessionManager.sessions["default"]
         SessionManager.bus = None
 
+    @pytest.mark.xfail(strict=True, reason=_NEEDS_BUS_CLIENT_278)
     def test_real_sessionmanager_merges_sync(self):
         sess = Session("live-sess")
         sess.intent_context = {"keep": {"value": "k"}}
@@ -224,8 +256,7 @@ class TestLiveSessionManagerSync(unittest.TestCase):
             "tea.skill:confirming_milk": {"value": None, "turns_remaining": 1},
             "keep": None,  # delete
         }
-        SessionManager.handle_session_sync(
-            Message("ovos.session.sync", context={"session": snap}))
+        SessionManager.handle_session_sync(_sync_msg(snap))
 
         merged = SessionManager.sessions["live-sess"].intent_context
         self.assertIn("tea.skill:confirming_milk", merged)
@@ -261,6 +292,7 @@ class TestLiveSessionManagerSync(unittest.TestCase):
             "tea.skill:flag",
             SessionManager.sessions["turn-sess"].intent_context or {})
 
+    @pytest.mark.xfail(strict=True, reason=_NEEDS_BUS_CLIENT_278)
     def test_midispatch_sync_survives_decay(self):
         # §4.1: a mid-dispatch entry is not decremented by the round it arrived in
         sess = Session("mid-sess")
@@ -274,8 +306,7 @@ class TestLiveSessionManagerSync(unittest.TestCase):
         snap = sess.serialize()
         snap[INTENT_CONTEXT_FIELD] = {
             "new.skill:flag": {"value": None, "turns_remaining": 1}}
-        SessionManager.handle_session_sync(
-            Message("ovos.session.sync", context={"session": snap}))
+        SessionManager.handle_session_sync(_sync_msg(snap))
 
         managed = SessionManager.sessions["mid-sess"]
         post_ctx = dict(managed.intent_context or {})
@@ -287,6 +318,7 @@ class TestLiveSessionManagerSync(unittest.TestCase):
         self.assertEqual(ctx["old.skill:flag"]["turns_remaining"], 0)
         self.assertEqual(ctx["new.skill:flag"]["turns_remaining"], 1)
 
+    @pytest.mark.xfail(strict=True, reason=_NEEDS_BUS_CLIENT_278)
     def test_midispatch_sync_refresh_of_existing_key_not_decremented(self):
         # §4.1: a mid-dispatch sync refreshing an existing key must be
         # compared by entry value, not key presence, to avoid decrementing it
@@ -305,8 +337,7 @@ class TestLiveSessionManagerSync(unittest.TestCase):
             snap = SessionManager.sessions["refresh-sess"].serialize()
             snap[INTENT_CONTEXT_FIELD] = {
                 "tea.skill:flag": {"value": "b", "turns_remaining": 5}}
-            SessionManager.handle_session_sync(
-                Message("ovos.session.sync", context={"session": snap}))
+            SessionManager.handle_session_sync(_sync_msg(snap))
             return None  # no match, decay still runs to completion
 
         svc.get_pipeline = lambda session: [("fake", _mid_dispatch_refresh)]
@@ -320,6 +351,100 @@ class TestLiveSessionManagerSync(unittest.TestCase):
         ctx = SessionManager.sessions["refresh-sess"].intent_context
         self.assertEqual(ctx["tea.skill:flag"]["turns_remaining"], 5)
         self.assertEqual(ctx["tea.skill:flag"]["value"], "b")
+
+
+class TestSessionSyncCarrier(unittest.TestCase):
+    """OVOS-SESSION-2 §2.7 — which carrier ``ovos.session.sync`` reads."""
+
+    def setUp(self):
+        SessionManager.sessions = {"default": Session("default")}
+        SessionManager.default_session = SessionManager.sessions["default"]
+        SessionManager.bus = None
+
+    tearDown = setUp
+
+    def _tracked(self, sid):
+        sess = Session(sid)
+        sess.intent_context = {"keep": {"value": "k"}}
+        SessionManager.update(sess)
+        return sess
+
+    def _snap(self, sess, entries):
+        snap = sess.serialize()
+        snap[INTENT_CONTEXT_FIELD] = entries
+        return snap
+
+    def test_legacy_context_carrier_is_still_honoured(self):
+        """§2.7 fallback: the legacy ``context['session']`` shape must keep
+        working for one major. This passes on bus-client dev today."""
+        sess = self._tracked("carrier-ctx")
+        snap = self._snap(sess, {"from.ctx": {"value": "ctx"}})
+        SessionManager.handle_session_sync(_sync_msg(snap, carrier="context"))
+        merged = SessionManager.sessions["carrier-ctx"].intent_context
+        self.assertEqual(merged.get("from.ctx"), {"value": "ctx"})
+
+    @pytest.mark.xfail(strict=True, reason=_NEEDS_BUS_CLIENT_278)
+    def test_data_carrier_is_honoured(self):
+        """§2.7 primary carrier: the snapshot rides ``data['session']``."""
+        sess = self._tracked("carrier-data")
+        snap = self._snap(sess, {"from.data": {"value": "data"}})
+        SessionManager.handle_session_sync(_sync_msg(snap))
+        merged = SessionManager.sessions["carrier-data"].intent_context
+        self.assertEqual(merged.get("from.data"), {"value": "data"})
+
+    @pytest.mark.xfail(strict=True, reason=_NEEDS_BUS_CLIENT_278)
+    def test_data_carrier_wins_over_context_carrier(self):
+        """§2.7: when both carriers are present, ``data`` is authoritative;
+        the ``context`` decoy must not be merged."""
+        sess = self._tracked("carrier-both")
+        snap = self._snap(sess, {"from.data": {"value": "data"}})
+        SessionManager.handle_session_sync(_sync_msg(snap, carrier="both"))
+        merged = SessionManager.sessions["carrier-both"].intent_context
+        self.assertEqual(merged.get("from.data"), {"value": "data"})
+        self.assertNotIn("carrier.probe", merged)
+
+
+class TestDecayIgnoresUnknownSession(unittest.TestCase):
+    """OVOS-CONTEXT-1 §4.2 — decay must never fall back to the DEFAULT
+    session. A pipeline returning an ``updated_session`` with an
+    unregistered ``session_id`` would otherwise decay an unrelated
+    conversation using this round's pre-match snapshot."""
+
+    def setUp(self):
+        SessionManager.sessions = {"default": Session("default")}
+        SessionManager.default_session = SessionManager.sessions["default"]
+        SessionManager.bus = None
+
+    tearDown = setUp
+
+    def test_unregistered_session_id_leaves_default_untouched(self):
+        default = SessionManager.get_default_session()
+        default.intent_context = {"person": {"value": "Bob",
+                                             "turns_remaining": 3}}
+        before = copy.deepcopy(default.intent_context)
+
+        svc = _make_service()
+        # a foreign session's pre-match snapshot, for an id nobody registered
+        result = svc._apply_post_match_decay(
+            "ghost-session", {"person": {"value": "Bob", "turns_remaining": 3}})
+
+        self.assertIsNone(result, "unknown session must be a no-op")
+        self.assertEqual(
+            SessionManager.get_default_session().intent_context, before,
+            "the default session's intent_context must be untouched")
+
+    def test_registered_session_still_decays(self):
+        # guard: the no-op branch must not have disabled decay outright
+        sess = Session("real-session")
+        sess.intent_context = {"person": {"value": "Bob", "turns_remaining": 3}}
+        SessionManager.update(sess)
+        svc = _make_service()
+        svc._apply_post_match_decay(
+            "real-session", {"person": {"value": "Bob", "turns_remaining": 3}})
+        self.assertEqual(
+            SessionManager.sessions["real-session"]
+            .intent_context["person"]["turns_remaining"], 2)
+
 
 
 # ---------------------------------------------------------------------------
@@ -568,6 +693,7 @@ class TestDecayPropagatesToTerminalEmissions(unittest.TestCase):
         self.assertEqual(
             turn2_session[INTENT_CONTEXT_FIELD]["person"]["turns_remaining"], 1)
 
+    @pytest.mark.xfail(strict=True, reason=_NEEDS_BUS_CLIENT_278)
     def test_same_dispatch_exemption_still_holds(self):
         # regression guard (commit eec4ae03): a key synced mid-round must not
         # be decremented by the very round that produced it
@@ -579,8 +705,7 @@ class TestDecayPropagatesToTerminalEmissions(unittest.TestCase):
             snap = SessionManager.sessions["exempt-sess"].serialize()
             snap[INTENT_CONTEXT_FIELD] = {
                 "new.skill:flag": {"value": None, "turns_remaining": 1}}
-            SessionManager.handle_session_sync(
-                Message("ovos.session.sync", context={"session": snap}))
+            SessionManager.handle_session_sync(_sync_msg(snap))
             return None  # this matcher itself does not match
 
         match = IntentHandlerMatch(match_type="lights.skill:on",
@@ -623,3 +748,75 @@ class TestDecayPropagatesToTerminalEmissions(unittest.TestCase):
         ctx = handled_frames[0].context["session"][INTENT_CONTEXT_FIELD]
         self.assertEqual(ctx["person"]["turns_remaining"], 2)
         self.assertEqual(ctx["new.skill:flag"]["turns_remaining"], 1)
+
+
+# ---------------------------------------------------------------------------
+# §6.2 x §7 — the missing-required-slots backstop must consult live context
+# ---------------------------------------------------------------------------
+
+class TestRequiredSlotFilledFromContext(unittest.TestCase):
+    """A required slot that the live ``intent_context`` can fill must not be
+    rejected by the §6.2 backstop, which runs BEFORE the §7 fill."""
+
+    def setUp(self):
+        SessionManager.sessions = {"default": Session("default")}
+        SessionManager.default_session = SessionManager.sessions["default"]
+        SessionManager.bus = None
+
+    tearDown = setUp
+
+    def _service(self):
+        svc = _make_service()
+        svc._handle_transformers = lambda m: m
+        svc.disambiguate_lang = lambda m: "en-US"
+        svc.send_complete_intent_failure = MagicMock()
+        svc.intent_manifest = IntentManifest(svc.bus)
+        svc.intent_manifest._on_register(Message(
+            "ovos.intent.register.keyword",
+            {"skill_id": "weather.skill", "intent_name": "forecast",
+             "lang": "en-US",
+             "required": ["location"],
+             "required_slots": ["location"],
+             "requires_context": [{"key": "location", "scope": "shared"}]}, {}))
+        match = IntentHandlerMatch(match_type="weather.skill:forecast",
+                                   match_data={"conf": 1.0},
+                                   skill_id="weather.skill",
+                                   utterance="what is the forecast")
+        svc.get_pipeline = lambda session: [
+            ("fake-high", lambda utts, lang, msg: match)]
+        return svc
+
+    def _run(self, intent_context):
+        svc = self._service()
+        svc.intent_dispatcher = IntentDispatcher(
+            svc.bus, timeout=0, on_terminal=svc._emit_utterance_handled)
+        sess = Session("slot-sess")
+        sess.lang = "en-US"
+        sess.pipeline = ["fake-high"]
+        sess.intent_context = intent_context
+        SessionManager.update(sess)
+
+        received = []
+        svc.bus.on("weather.skill:forecast", received.append)
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["what is the forecast"]},
+                      context={"session": sess.serialize()})
+        with patch.object(svc, "_validate_session", return_value=sess):
+            svc.handle_utterance(msg)
+        return svc, received
+
+    def test_required_slot_filled_from_context_dispatches(self):
+        svc, received = self._run(
+            {"location": {"value": "Lisbon", "turns_remaining": 3}})
+        self.assertEqual(len(received), 1,
+                         "match with a context-fillable required slot must dispatch")
+        self.assertEqual(received[0].data.get("location"), "Lisbon",
+                         "the slot must be filled from live context (§7)")
+        svc.send_complete_intent_failure.assert_not_called()
+
+    def test_required_slot_absent_everywhere_still_rejected(self):
+        # regression guard: the §6.2 backstop is consulted, not removed
+        svc, received = self._run(None)
+        self.assertEqual(received, [],
+                         "a genuinely missing required slot must still reject")
+        svc.send_complete_intent_failure.assert_called_once()
