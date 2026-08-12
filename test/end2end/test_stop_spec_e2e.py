@@ -62,6 +62,9 @@ _IGNORE = [
     "mycroft.skills.abort_question",
     "ovos.skills.converse.force_timeout",
     "mycroft.audio.speech.stop",
+    SpecMessage.AUDIO_STOP.value,
+    "skill.stop.pong",
+    SpecMessage.STOP_PONG.value,
     "ovos.skills.settings_changed",
 ]
 

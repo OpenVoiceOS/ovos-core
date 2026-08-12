@@ -515,6 +515,60 @@ class TestHandleUtterance(unittest.TestCase):
             svc.handle_utterance(msg)
         svc.send_complete_intent_failure.assert_called_once()
 
+    def test_blacklisted_targeted_stop_discards_match_session_unchanged(self):
+        """CONFIRMED-3 regression: a Match discarded for a blacklisted intent
+        (service.py ~607) must never have applied its session mutation. Before
+        the fix, StopService._targeted_stop drained the LIVE SessionManager
+        session in match() itself, so a discarded stop still left the skill
+        deactivated with nothing dispatched — this test fails on that
+        unfixed behaviour (active_handlers would come back empty)."""
+        from ovos_core.intent_services.stop_service import StopService
+
+        bus = FakeBus()
+        svc = _make_service()
+        svc.bus = bus
+        svc.send_complete_intent_failure = MagicMock()
+
+        stop_svc = StopService.__new__(StopService)
+        stop_svc.bus = bus
+        stop_svc.config = {}
+        stop_svc.suppress_activation = True
+        stop_svc._locale = MagicMock()
+        stop_svc._locale.voc_match.side_effect = (
+            lambda utt, voc, lang, exact=False: voc == "stop")
+        stop_svc._legacy = MagicMock()
+        stop_svc._was_active_pre_drain = {}
+
+        sess = Session("s")
+        sess.activate_skill("skill_a")
+        sess.pipeline = ["ovos-stop-pipeline-plugin-high"]
+        sess.blacklisted_intents = ["skill_a:stop"]
+        before = list(sess.active_handlers)
+
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["stop"]},
+                      context={})
+
+        with patch.object(svc, "get_pipeline",
+                          return_value=[("ovos-stop-pipeline-plugin", stop_svc.match_high)]), \
+             patch.object(stop_svc, "_collect_stop_skills", return_value=["skill_a"]), \
+             patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.reset_default_session",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.update"), \
+             patch("ovos_core.intent_services.service.SessionManager.sync"), \
+             patch("ovos_core.intent_services.service.get_message_lang",
+                   return_value="en-US"), \
+             patch("ovos_core.intent_services.service.get_valid_languages",
+                   return_value=["en-US"]):
+            svc.handle_utterance(msg)
+
+        # the match was discarded (blacklisted) — no dispatch, and the live
+        # session's active_handlers must be exactly as before.
+        self.assertEqual(sess.active_handlers, before)
+        svc.send_complete_intent_failure.assert_called_once()
+
 
 # ---------------------------------------------------------------------------
 # handle_get_intent

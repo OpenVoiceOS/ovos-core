@@ -23,16 +23,30 @@ class _LegacyStopBridge:
     """Backward-compatibility shim reproducing the pre-OVOS-STOP-1 dispatch surface.
 
     STOP-1 dispatches a targeted stop on ``<skill_id>:stop`` and a global stop
-    on ``<pipeline_id>:global_stop``. The ovos-spec-tools namespace translator
-    bridges ``<skill_id>:stop`` to the legacy ``<skill_id>.stop`` a skill still
-    honours; deployments that additionally observe the pre-spec ``stop:global``
-    / ``stop:skill`` dispatch topics, or that run without the translator active,
-    keep working through this shim.
+    on ``<pipeline_id>:global_stop``. When the bus's ovos-spec-tools namespace
+    translator is active (``modernize``/``emit_legacy``, default ``True`` on
+    both ``MessageBusClient`` and ``FakeBus``) it ALREADY bridges both,
+    receive-side, onto the legacy topics a skill still honours: ``ovos.stop``
+    mirrors onto ``mycroft.stop`` and ``<skill_id>:stop`` mirrors onto
+    ``<skill_id>.stop`` — confirmed via
+    ``NamespaceTranslator().counterpart_topics(...)``. In that case this bridge
+    must NOT ALSO re-emit those two topics: doing so double-delivers to every
+    legacy skill's ``stop()`` (executed proof: a handler bound to both
+    ``mycroft.stop`` and ``<skill_id>.stop`` saw
+    ``['mycroft.stop', 'mycroft.stop']`` for one global stop before this fix).
+    When the translator is inactive or absent (deployments still running
+    without it), the mirroring above does not happen at all, so this shim's
+    own ``mycroft.stop`` / ``<skill_id>.stop`` re-emission is the ONLY thing
+    providing that compatibility surface and must still fire —
+    :meth:`_legacy_topics_already_bridged` decides which regime applies, once,
+    at construction.
 
     It is fully self-contained and holds no place in the spec path: it observes
-    the OVOS-PIPELINE-1 §9.2 ``ovos.intent.matched`` notification, re-emits the
-    legacy dispatch, and owns the legacy ``stop:global`` / ``stop:skill``
-    handlers that fan out to ``mycroft.stop`` and ``<skill_id>.stop``.
+    the OVOS-PIPELINE-1 §9.2 ``ovos.intent.matched`` notification and
+    unconditionally re-emits the pre-spec ``stop:global`` / ``stop:skill``
+    core-internal observer topics — spellings the translator never maps
+    (``NamespaceTranslator().is_migrated("stop:global")`` is ``False``, tested
+    against the installed ovos-spec-tools), so they always need this shim.
     """
 
     #: Identity the pre-spec dispatch reported for the stop plugin itself.
@@ -42,9 +56,35 @@ class _LegacyStopBridge:
         self.service = service
         self.bus = service.bus
         self._warned = False
+        #: whether the bus's NamespaceTranslator already mirrors mycroft.stop /
+        #: <skill_id>.stop for us — decided once, at construction, since the
+        #: translator's config does not change over the bridge's lifetime.
+        self._legacy_topics_already_bridged = self._detect_translator_bridging()
         self.bus.on(SpecMessage.INTENT_MATCHED.value, self._on_intent_matched)
         self.bus.on("stop:global", self.handle_global_stop)
         self.bus.on("stop:skill", self.handle_skill_stop)
+
+    def _detect_translator_bridging(self) -> bool:
+        """Whether ``self.bus`` already mirrors ``mycroft.stop`` for us.
+
+        ``is_migrated`` is a *structural* check (does this topic pair exist at
+        all) and stays True regardless of the ``modernize``/``emit_legacy``
+        flags, so it cannot answer this. ``counterpart_topics`` IS flag-aware:
+        emitting the spec ``ovos.stop`` only mirrors onto legacy
+        ``mycroft.stop`` when ``emit_legacy`` is set — exactly the direction
+        this bridge cares about (StopService emits the spec topic; the
+        question is whether the translator alone gets it to legacy
+        subscribers). Reads the ``NamespaceTranslator`` both
+        ``MessageBusClient`` and ``FakeBus`` carry as ``_translator``.
+        Defensive: a bus without one (unknown bus implementation) is treated
+        as NOT bridging, so this shim falls back to its own re-emission rather
+        than silently dropping legacy compatibility.
+        """
+        translator = getattr(self.bus, "_translator", None)
+        counterpart_topics = getattr(translator, "counterpart_topics", None)
+        if counterpart_topics is None:
+            return False
+        return "mycroft.stop" in counterpart_topics(SpecMessage.STOP.value)
 
     def _forward_legacy(self, message: Message, msg_type: str,
                         data: Optional[Dict] = None) -> Message:
@@ -74,19 +114,26 @@ class _LegacyStopBridge:
             self.bus.emit(self._forward_legacy(message, "stop:skill", {"skill_id": skill_id}))
 
     def handle_global_stop(self, message: Message) -> None:
-        """Legacy ``stop:global`` handler — emit the pre-spec ``mycroft.stop``."""
+        """Legacy ``stop:global`` handler — re-emits ``mycroft.stop`` ONLY when
+        the translator is not already doing it (see class docstring)."""
         with HandlerLifecycle(self.bus, message,
                               skill_id=self.LEGACY_SKILL_ID,
                               data={"name": "StopService.handle_global_stop"}):
-            self.bus.emit(message.forward("mycroft.stop"))
+            if not self._legacy_topics_already_bridged:
+                self.bus.emit(message.forward("mycroft.stop"))
 
     def handle_skill_stop(self, message: Message) -> None:
-        """Legacy ``stop:skill`` handler — re-emit the skill-directed ``<skill_id>.stop``."""
-        skill_id = message.data["skill_id"]
+        """Legacy ``stop:skill`` handler — re-emits ``<skill_id>.stop`` ONLY
+        when the translator is not already doing it (see class docstring)."""
+        skill_id = message.data.get("skill_id")
+        if not skill_id:
+            LOG.warning("stop:skill received without a skill_id; dropping")
+            return
         with HandlerLifecycle(self.bus, message,
                               skill_id=self.LEGACY_SKILL_ID,
                               data={"name": "StopService.handle_skill_stop"}):
-            self.bus.emit(message.reply(f"{skill_id}.stop"))
+            if not self._legacy_topics_already_bridged:
+                self.bus.emit(message.reply(f"{skill_id}.stop"))
 
     def shutdown(self) -> None:
         """Remove the legacy bus listeners registered by this shim."""
