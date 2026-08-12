@@ -17,17 +17,28 @@ from collections import defaultdict
 from unittest.mock import MagicMock, patch
 
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import Session, SessionManager
+from ovos_bus_client.session import Session
 from ovos_plugin_manager.templates.pipeline import (
-    IntentHandlerMatch,
     ConfidenceMatcherPipeline,
+    IntentHandlerMatch,
 )
-from ovos_utils.fakebus import FakeBus
 from ovos_spec_tools import SpecMessage
+from ovos_utils.fakebus import FakeBus
 
-from ovos_core.intent_services.service import IntentService
+from ovos_core._metrics import (
+    INTENT_DISPATCH,
+    INTENT_HANDLER_SCHEDULE,
+    INTENT_MATCHING,
+    INTENT_PIPELINE_BUILD,
+    PIPELINE_MATCHING,
+    SKILL_SELECTION,
+    UTTERANCE_DISPATCH,
+    UTTERANCE_FINALIZE,
+    UTTERANCE_PREPROCESS,
+)
 from ovos_core.intent_services.dispatcher import IntentDispatcher
 from ovos_core.intent_services.manifest import IntentManifest
+from ovos_core.intent_services.service import IntentService
 
 
 def _make_service(config=None) -> IntentService:
@@ -669,6 +680,119 @@ class TestHandleUtterance(unittest.TestCase):
                    return_value=["en-US"]):
             svc.handle_utterance(msg)
         svc.send_complete_intent_failure.assert_called_once()
+
+    def test_runtime_stages_are_observed(self):
+        """One utterance records dispatch, selection, and matcher latency."""
+        svc = _make_service()
+        svc.send_complete_intent_failure = MagicMock()
+        matcher = MagicMock(return_value=None)
+        svc.get_pipeline = MagicMock(return_value=[
+            ("ovos-padatious-pipeline-plugin-high", matcher),
+        ])
+        sess = Session("s")
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["xyz"]}, context={})
+        before = {
+            histogram.name: histogram.snapshot()["count"]
+            for histogram in (
+                UTTERANCE_DISPATCH,
+                UTTERANCE_PREPROCESS,
+                INTENT_MATCHING,
+                INTENT_PIPELINE_BUILD,
+                SKILL_SELECTION,
+                PIPELINE_MATCHING["padatious"],
+                UTTERANCE_FINALIZE,
+            )
+        }
+
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.reset_default_session",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.update"), \
+             patch("ovos_core.intent_services.service.get_message_lang",
+                   return_value="en-US"):
+            svc.handle_utterance(msg)
+
+        matcher.assert_called_once()
+        for histogram in (
+            UTTERANCE_DISPATCH,
+            UTTERANCE_PREPROCESS,
+            INTENT_MATCHING,
+            INTENT_PIPELINE_BUILD,
+            SKILL_SELECTION,
+            PIPELINE_MATCHING["padatious"],
+            UTTERANCE_FINALIZE,
+        ):
+            self.assertEqual(
+                histogram.snapshot()["count"],
+                before[histogram.name] + 1,
+            )
+
+    def test_selection_timer_pauses_before_synchronous_dispatch(self):
+        """Skill handler execution is not counted as skill selection."""
+        svc = _make_service()
+        match = _make_match()
+        svc.get_pipeline = MagicMock(return_value=[("test", MagicMock(
+            return_value=match))])
+        selection = MagicMock()
+        measurement = MagicMock()
+        measurement.__enter__.return_value = selection
+        sess = Session("s")
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["hello"]}, context={})
+
+        def assert_selection_paused(*args, **kwargs):
+            selection.pause.assert_called_once_with()
+
+        svc._dispatch_match = MagicMock(side_effect=assert_selection_paused)
+        with patch.object(SKILL_SELECTION, "measure",
+                          return_value=measurement), \
+             patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.reset_default_session",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.update"), \
+             patch("ovos_core.intent_services.service.get_message_lang",
+                   return_value="en-US"):
+            svc.handle_utterance(msg)
+
+        svc._dispatch_match.assert_called_once()
+        selection.resume.assert_not_called()
+
+    def test_matched_utterance_observes_dispatch_stages(self):
+        """Matched utterances record orchestration and handler scheduling."""
+        svc = _make_service()
+        match = _make_match()
+        svc.get_pipeline = MagicMock(return_value=[
+            ("ovos-padatious-pipeline-plugin-high", MagicMock(
+                return_value=match)),
+        ])
+        sess = Session("s")
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["hello"]}, context={})
+        before = {
+            histogram.name: histogram.snapshot()["count"]
+            for histogram in (INTENT_DISPATCH, INTENT_HANDLER_SCHEDULE)
+        }
+
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.reset_default_session",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.update"), \
+             patch("ovos_core.intent_services.service.get_message_lang",
+                   return_value="en-US"):
+            svc.handle_utterance(msg)
+
+        self.assertEqual(
+            INTENT_DISPATCH.snapshot()["count"],
+            before[INTENT_DISPATCH.name] + 1,
+        )
+        self.assertEqual(
+            INTENT_HANDLER_SCHEDULE.snapshot()["count"],
+            before[INTENT_HANDLER_SCHEDULE.name] + 1,
+        )
 
 
 # ---------------------------------------------------------------------------

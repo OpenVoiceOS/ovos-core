@@ -23,6 +23,7 @@ from ovos_config.locale import setup_locale
 from ovos_utils import wait_for_exit_signal
 from ovos_utils.log import LOG, init_service_logger
 
+from ovos_core._prometheus import start_metrics_server, stop_metrics_server
 from ovos_core.skill_manager import SkillManager, on_error, on_stopping, on_ready, on_alive, on_started
 
 
@@ -42,28 +43,36 @@ def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
 
     setup_locale()
 
-    # Connect this process to the OpenVoiceOS message bus
-    bus = MessageBusClient()
-    bus.run_in_thread()
-    bus.connected_event.wait()
+    metrics_server = start_metrics_server()
+    skill_manager = None
+    try:
+        # Connect this process to the OpenVoiceOS message bus
+        bus = MessageBusClient()
+        bus.run_in_thread()
+        bus.connected_event.wait()
 
-    skill_manager = SkillManager(bus, watchdog,
-                                 enable_file_watcher=enable_file_watcher,
-                                 enable_skill_api=enable_skill_api,
-                                 enable_intent_service=enable_intent_service,
-                                 enable_installer=enable_installer,
-                                 enable_event_scheduler=enable_event_scheduler,
-                                 alive_hook=alive_hook,
-                                 started_hook=started_hook,
-                                 stopping_hook=stopping_hook,
-                                 ready_hook=ready_hook,
-                                 error_hook=error_hook)
-
-    skill_manager.start()
-
-    wait_for_exit_signal()
-
-    skill_manager.shutdown()
+        skill_manager = SkillManager(
+            bus,
+            watchdog,
+            enable_file_watcher=enable_file_watcher,
+            enable_skill_api=enable_skill_api,
+            enable_intent_service=enable_intent_service,
+            enable_installer=enable_installer,
+            enable_event_scheduler=enable_event_scheduler,
+            alive_hook=alive_hook,
+            started_hook=started_hook,
+            stopping_hook=stopping_hook,
+            ready_hook=ready_hook,
+            error_hook=error_hook,
+        )
+        skill_manager.start()
+        wait_for_exit_signal()
+    finally:
+        try:
+            if skill_manager is not None:
+                skill_manager.shutdown()
+        finally:
+            stop_metrics_server(metrics_server)
 
     LOG.info('Skills service shutdown complete!')
 
