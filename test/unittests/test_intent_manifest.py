@@ -221,3 +221,56 @@ class TestIntentDescribeQuery(unittest.TestCase):
     def test_describe_missing_fields_returns_error(self):
         resp = self._query(skill_id="skill.a")
         self.assertFalse(resp["ok"])
+
+
+def _reg_ctx(skill_id, intent_name, requires=None, excludes=None, slots=None,
+             lang="en-US", method="keyword", session_id="default"):
+    data = {"skill_id": skill_id, "intent_name": intent_name, "lang": lang}
+    if requires is not None:
+        data["requires_context"] = requires
+    if excludes is not None:
+        data["excludes_context"] = excludes
+    if slots is not None:
+        data["required"] = slots
+    return Message(f"ovos.intent.register.{method}", data=data,
+                   context={"session": {"session_id": session_id}, "skill_id": skill_id})
+
+
+class TestManifestContextLookups(unittest.TestCase):
+    def setUp(self):
+        self.m = _manifest()
+
+    def test_context_requirements(self):
+        self.m._on_register(_reg_ctx("s.skill", "on", requires=["kitchen"],
+                                     excludes=["modal"]))
+        req, exc = self.m.get_context_requirements("default", "s.skill", "on", "en-US")
+        self.assertEqual(req, ["kitchen"])
+        self.assertEqual(exc, ["modal"])
+
+    def test_context_requirements_empty_when_undeclared(self):
+        self.m._on_register(_reg_ctx("s.skill", "on"))
+        self.assertEqual(self.m.get_context_requirements("default", "s.skill", "on", "en-US"),
+                         ([], []))
+
+    def test_context_requirements_unknown_intent(self):
+        self.assertEqual(self.m.get_context_requirements("default", "x", "y", "en-US"),
+                         ([], []))
+
+    def test_context_requirements_union_across_methods(self):
+        self.m._on_register(_reg_ctx("s.skill", "on", requires=["a"], method="keyword"))
+        self.m._on_register(_reg_ctx("s.skill", "on", requires=["b"], method="template"))
+        req, _ = self.m.get_context_requirements("default", "s.skill", "on", "en-US")
+        self.assertEqual(sorted(req), ["a", "b"])
+
+    def test_slot_names(self):
+        self.m._on_register(_reg_ctx("s.skill", "on", slots=["room", "device"]))
+        self.assertEqual(self.m.get_slot_names("default", "s.skill", "on", "en-US"),
+                         ["room", "device"])
+
+    def test_session_scoped_visible_via_effective_pool(self):
+        self.m._on_register(_reg_ctx("s.skill", "on", requires=["k"], session_id="sat-1"))
+        req, _ = self.m.get_context_requirements("sat-1", "s.skill", "on", "en-US")
+        self.assertEqual(req, ["k"])
+        # a different session does not see the satellite-scoped declaration
+        self.assertEqual(self.m.get_context_requirements("other", "s.skill", "on", "en-US"),
+                         ([], []))

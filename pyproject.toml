@@ -16,12 +16,14 @@ dependencies = [
     "python-dateutil>=2.6, <3.0",
     "combo-lock>=0.2.2, <0.4",
     "ovos-utils>=0.13.9a1,<1.0.0",
+    # OVOS-CONTEXT-1 §5.3: SessionManager intent_context field (bus-client #239)
     "ovos_bus_client>=2.7.1a1,<3.0.0",
     "ovos-plugin-manager>=2.11.1a1,<3.0.0",
     "ovos-config>=2.1.4a5,<3.0.0",
     "ovos-workshop>=9.3.11a1,<10.0.0",
     "rapidfuzz>=3.6,<4.0",
     "ovos-spec-tools[langcodes]>=1.6.1a1,<2.0.0",
+
 ]
 
 [project.urls]
