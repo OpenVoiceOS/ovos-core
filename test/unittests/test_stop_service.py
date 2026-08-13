@@ -393,6 +393,82 @@ class TestStopRoundCorrelation(unittest.TestCase):
         self.assertEqual(result, ["skill_a"])
 
 
+class TestFoldOrderRegistryFirstWrite(unittest.TestCase):
+    """match_high / match_low's disable_response_mode write has no wire
+    echo (see #858's fold-order contract). A `message` shared across
+    pipeline stages this turn can carry a STALE session snapshot relative
+    to an incidental write made elsewhere in the live registry entry for
+    this session (e.g. a blacklist declared after the message was built).
+    Using `registry_session_for_write` instead of a plain
+    `SessionManager.get(message)` fold must not let that stale snapshot
+    wipe the live registry state out from under the write.
+    """
+
+    SESSION_ID = "stale-fold-test-session"
+
+    def setUp(self):
+        # isolate from other tests / any real registry state
+        SessionManager.sessions.pop(self.SESSION_ID, None)
+
+    def tearDown(self):
+        SessionManager.sessions.pop(self.SESSION_ID, None)
+
+    def _live_session_with_incidental_write(self):
+        """Simulate a prior incidental write (no wire echo) landing directly
+        on the live registry entry, as `registry_session_for_write` itself
+        would do."""
+        live = Session(self.SESSION_ID)
+        live.activate_skill("skill_a")
+        # incidental write not reflected in any message's own snapshot
+        live.blacklisted_skills = ["other_skill_incidentally_blacklisted"]
+        SessionManager.sessions[self.SESSION_ID] = live
+        return live
+
+    def _stale_message(self):
+        """A message whose embedded session snapshot predates the
+        incidental write above (blacklisted_skills is empty). Built without
+        touching the live registry entry (unlike `Session.activate_skill`,
+        which has registry side effects) - a plain `Session(...)` + manual
+        field set + serialize is enough to model a stale wire snapshot."""
+        stale = Session(self.SESSION_ID)
+        stale.active_skills = [["skill_a", 0.0]]
+        return Message("test", {}, {"session": stale.serialize()})
+
+    def test_match_high_write_survives_stale_message_snapshot(self):
+        svc = _make_service()
+        self._live_session_with_incidental_write()
+        msg = self._stale_message()
+
+        svc._locale.voc_match = MagicMock(side_effect=lambda utt, voc, lang, exact: voc == 'stop')
+        with patch.object(svc, "_collect_stop_skills", return_value=["skill_a"]), \
+             patch.object(svc, "bus") as mock_bus:
+            mock_bus.once = MagicMock()
+            svc.match_high(["stop"], "en-us", msg)
+
+        self.assertIn("other_skill_incidentally_blacklisted",
+                      SessionManager.sessions[self.SESSION_ID].blacklisted_skills,
+                      "a stale message fold wiped an incidental write made "
+                      "elsewhere in this session's lifecycle")
+
+    def test_match_low_write_survives_stale_message_snapshot(self):
+        svc = _make_service()
+        self._live_session_with_incidental_write()
+        msg = self._stale_message()
+
+        svc._locale.voc_list = MagicMock(return_value=["stop"])
+        with patch("ovos_core.intent_services.stop_service.match_one",
+                   return_value=("stop", 1.0)), \
+             patch.object(svc, "_collect_stop_skills", return_value=["skill_a"]), \
+             patch.object(svc, "bus") as mock_bus:
+            mock_bus.once = MagicMock()
+            svc.match_low(["stop"], "en-us", msg)
+
+        self.assertIn("other_skill_incidentally_blacklisted",
+                      SessionManager.sessions[self.SESSION_ID].blacklisted_skills,
+                      "a stale message fold wiped an incidental write made "
+                      "elsewhere in this session's lifecycle")
+
+
 class TestHandleStopConfirmation(unittest.TestCase):
 
     def test_error_in_data_is_logged(self):

@@ -7,6 +7,8 @@ from ovos_bus_client.handler import HandlerLifecycle
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, UtteranceState, Session
 
+from ovos_core.intent_services._session_fold import registry_session_for_write
+
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import ConfidenceMatcherPipeline, IntentHandlerMatch
 from ovos_spec_tools import LocaleResources
@@ -45,18 +47,31 @@ class StopService(ConfidenceMatcherPipeline):
             self.bus.emit(message.reply(f"{skill_id}.stop"))
 
     @staticmethod
-    def get_active_skills(message: Optional[Message] = None) -> List[str]:
+    def get_active_skills(message: Optional[Message] = None,
+                          session: Optional[Session] = None) -> List[str]:
         """Active skill ids ordered by converse priority.
 
         This represents the order in which stop will be called.
 
+        Args:
+            message: bus message to resolve a session from when ``session``
+                     is not already known (standalone/incidental callers).
+            session: an already-resolved session to read from directly -
+                     pass this when called as part of a chain that already
+                     resolved the session once for this handler invocation
+                     (see the fold-order contract on
+                     ``registry_session_for_write``); re-resolving via
+                     ``message`` here would re-fold and can undo a write an
+                     earlier step in the same chain just made.
+
         Returns:
             active_skills (list): ordered list of skill_ids
         """
-        session = SessionManager.get(message)
+        session = session or SessionManager.get(message)
         return [skill[0] for skill in session.active_skills]
 
-    def _collect_stop_skills(self, message: Message) -> List[str]:
+    def _collect_stop_skills(self, message: Message,
+                             session: Optional[Session] = None) -> List[str]:
         """
         Collect skills that can be stopped based on a ping-pong mechanism.
 
@@ -67,6 +82,13 @@ class StopService(ConfidenceMatcherPipeline):
 
         Parameters:
             message (Message): The original message triggering the stop request.
+            session: an already-resolved session to use instead of re-folding
+                     ``message`` (see ``match_high``/``match_low``, which
+                     resolve once via ``registry_session_for_write`` and
+                     thread the result through this call - see the
+                     fold-order contract there). Falls back to a fresh
+                     ``SessionManager.get(message)`` fold for standalone
+                     callers.
 
         Returns:
             List[str]: A list of skill IDs that can be stopped. If no skills explicitly
@@ -78,12 +100,12 @@ class StopService(ConfidenceMatcherPipeline):
             - Waits up to 0.5 seconds for skills to respond
             - Falls back to all active skills if no explicit stop confirmation is received
         """
-        sess = SessionManager.get(message)
+        sess = session or SessionManager.get(message)
 
         want_stop = []
         skill_ids = []
 
-        active_skills = [s for s in self.get_active_skills(message)
+        active_skills = [s for s in self.get_active_skills(message, session=sess)
                          if s not in (sess.blacklisted_skills or [])]
 
         if not active_skills:
@@ -205,19 +227,24 @@ class StopService(ConfidenceMatcherPipeline):
             - Returns None if no stop action could be performed
             - Returns IntentHandlerMatch with handled=True for successful global or skill-specific stop
         """
-        sess = SessionManager.get(message)
+        # incidental write (disable_response_mode below has no wire echo onto
+        # `message`), reached by a `message` shared across every pipeline
+        # stage this turn — see the fold-order contract on
+        # `registry_session_for_write` (mirrors #858's ConverseService case-3
+        # sites, e.g. handle_get_response_disable).
+        sess = registry_session_for_write(message)
 
         # we call flatten in case someone is sending the old style list of tuples
         utterance = flatten_list(utterances)[0]
 
         is_stop = self._locale.voc_match(utterance, 'stop', lang, exact=True)
         is_global_stop = self._locale.voc_match(utterance, 'global_stop', lang, exact=True) or \
-                         (is_stop and not len(self.get_active_skills(message)))
+                         (is_stop and not len(self.get_active_skills(message, session=sess)))
 
         conf = 1.0
 
         if is_global_stop:
-            LOG.info(f"Emitting global stop, {len(self.get_active_skills(message))} active skills")
+            LOG.info(f"Emitting global stop, {len(self.get_active_skills(message, session=sess))} active skills")
             # emit a global stop, full stop anything OVOS is doing
             return IntentHandlerMatch(
                 match_type="stop:global",
@@ -229,7 +256,7 @@ class StopService(ConfidenceMatcherPipeline):
 
         if is_stop:
             # check if any skill can stop
-            for skill_id in self._collect_stop_skills(message):
+            for skill_id in self._collect_stop_skills(message, session=sess):
                 LOG.debug(f"Telling skill to stop: {skill_id}")
                 sess.disable_response_mode(skill_id)
                 self.bus.once(f"{skill_id}.stop.response", self.handle_stop_confirmation)
@@ -297,7 +324,13 @@ class StopService(ConfidenceMatcherPipeline):
             - Handles language-specific vocabulary matching
             - Configurable minimum confidence threshold for stop intent
         """
-        sess = SessionManager.get(message)
+        # incidental write (disable_response_mode below has no wire echo onto
+        # `message`), reached by a `message` shared across every pipeline
+        # stage this turn — see the fold-order contract on
+        # `registry_session_for_write` (mirrors #858's ConverseService case-3
+        # sites, e.g. handle_get_response_disable). Also reached via
+        # match_medium -> match_low with the same message.
+        sess = registry_session_for_write(message)
         # we call flatten in case someone is sending the old style list of tuples
         utterance = flatten_list(utterances)[0]
 
@@ -306,7 +339,7 @@ class StopService(ConfidenceMatcherPipeline):
             return None
 
         conf = match_one(utterance, stop_vocs)[1]
-        if len(self.get_active_skills(message)) > 0:
+        if len(self.get_active_skills(message, session=sess)) > 0:
             conf += 0.1
         conf = round(min(conf, 1.0), 3)
 
@@ -314,7 +347,7 @@ class StopService(ConfidenceMatcherPipeline):
             return None
 
         # check if any skill can stop
-        for skill_id in self._collect_stop_skills(message):
+        for skill_id in self._collect_stop_skills(message, session=sess):
             LOG.debug(f"Telling skill to stop: {skill_id}")
             sess.disable_response_mode(skill_id)
             self.bus.once(f"{skill_id}.stop.response", self.handle_stop_confirmation)
@@ -327,7 +360,7 @@ class StopService(ConfidenceMatcherPipeline):
             )
 
         # emit a global stop, full stop anything OVOS is doing
-        LOG.debug(f"Emitting global stop signal, {len(self.get_active_skills(message))} active skills")
+        LOG.debug(f"Emitting global stop signal, {len(self.get_active_skills(message, session=sess))} active skills")
         return IntentHandlerMatch(
             match_type="stop:global",
             match_data={"conf": conf},
