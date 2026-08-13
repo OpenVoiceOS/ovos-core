@@ -65,15 +65,28 @@ intent.service.intent.get  {utterance: "...", lang: "..."}
 
 | Event | Effect |
 |---|---|
-| `add_context` | Inject entity into session context |
-| `remove_context` | Remove named context entity |
-| `clear_context` | Clear all context entities |
+| `add_context` | Inject entity into legacy frame-based session context |
+| `remove_context` | Remove named context entity (legacy frames) |
+| `clear_context` | Clear all context entities (legacy frames) |
+| `ovos.session.sync` | OVOS-CONTEXT-1 §5.3 — handled by `SessionManager.handle_session_sync`, which merges `session.intent_context` entry-by-entry. `IntentService` does not subscribe to this event |
+
+### OVOS-CONTEXT-1 intent context
+
+The orchestrator implements the flat, decaying `session.intent_context`
+key/value store defined by **OVOS-CONTEXT-1**. `SessionManager` owns the
+map (carries it on every `Session`, applies the §5.3 `ovos.session.sync`
+merge); `IntentService` applies the §4 decay lifecycle each match round
+and provides the §6/§6.1 gating + §7 slot-fill as an orchestrator backstop
+— matcher plugins are expected to apply these themselves via the shared
+`ovos_spec_tools.context` helpers.
 
 ## Open Data / Metrics Upload
 
 If `open_data.intent_urls` is configured, intent match results (utterance, intent type, lang, match data) are `POST`ed to each URL in a background thread. This is opt-in and has no default server.
 
 ## Bus Events Handled
+
+`IntentService` itself subscribes to:
 
 | Event | Handler |
 |---|---|
@@ -84,6 +97,8 @@ If `open_data.intent_urls` is configured, intent match results (utterance, inten
 | `intent.service.intent.get` | `handle_get_intent` |
 | `intent.service.skills.deactivate` | `_handle_deactivate` |
 | `intent.service.pipelines.reload` | `handle_reload_pipelines` |
+
+`ovos.session.sync` is handled by `SessionManager.handle_session_sync` (bus-client), not by `IntentService` — see [Context Management](#context-management) above.
 
 ---
 
