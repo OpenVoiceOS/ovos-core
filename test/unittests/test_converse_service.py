@@ -179,9 +179,10 @@ class TestCollectConverseSkills(unittest.TestCase):
 
             svc._collect_converse_skills(Message("test"))
 
-        svc.bus.remove.assert_called_once()
-        args = svc.bus.remove.call_args[0]
-        self.assertEqual(args[0], "skill.converse.pong")
+        # both legs of the dual-emit compat window must be unbound
+        removed = [call[0][0] for call in svc.bus.remove.call_args_list]
+        self.assertEqual(sorted(removed),
+                         ["ovos.converse.pong", "skill.converse.pong"])
 
     def test_response_state_skills_excluded_from_active_skills(self):
         """Skills whose utterance_state is RESPONSE are not included in active_skills ping list."""
@@ -1199,3 +1200,319 @@ class TestConverseRoundCorrelation(unittest.TestCase):
             result = self._run_round(svc, round_msg, [pong])
 
         self.assertEqual(result, ["skill_a"])
+
+
+# ---------------------------------------------------------------------------
+# OVOS-CONVERSE-1 §4.1-§4.2 — the broadcast contest
+# ---------------------------------------------------------------------------
+
+class _FakeSkill:
+    """A candidate on a real FakeBus, at a chosen wire vintage.
+
+    ``legacy`` binds the per-skill ping and answers ``skill.converse.pong``
+    with ``can_handle`` — the shape every ovos-workshop vintage up to and
+    including 9.3.12a1 speaks. ``broadcast`` binds the static
+    ``ovos.converse.ping`` and answers ``ovos.converse.pong`` with ``result``
+    — the OVOS-CONVERSE-1 §4.2 shape. A current skill binds both.
+    """
+
+    def __init__(self, bus, skill_id, claims, legacy=True, broadcast=True,
+                 candidates=None):
+        self.bus = bus
+        self.skill_id = skill_id
+        self.claims = claims
+        self.candidates = candidates
+        self.pings_seen = []
+        if legacy:
+            bus.on(f"{skill_id}.converse.ping", self._legacy_ack)
+        if broadcast:
+            bus.on("ovos.converse.ping", self._broadcast_ack)
+
+    def _legacy_ack(self, message):
+        self.pings_seen.append(message.msg_type)
+        self.bus.emit(message.reply(
+            "skill.converse.pong",
+            {"skill_id": self.skill_id, "can_handle": self.claims}))
+
+    def _broadcast_ack(self, message):
+        if self.candidates is not None and self.skill_id not in self.candidates:
+            return  # not named by this round
+        self.pings_seen.append(message.msg_type)
+        self.bus.emit(message.reply(
+            "ovos.converse.pong",
+            {"skill_id": self.skill_id, "result": self.claims}))
+
+
+class TestBroadcastContest(unittest.TestCase):
+    """One broadcast question per round, answered in parallel."""
+
+    def _round(self, svc, sess, active, utterance_id="round-1"):
+        msg = Message("test", {"utterances": ["hello"], "lang": "en-US"},
+                      {"utterance_id": utterance_id,
+                       "session": sess.serialize()})
+        with patch.object(ConverseService, "get_active_skills",
+                          return_value=active), \
+             patch("ovos_core.intent_services.converse_service.SessionManager.get",
+                   return_value=sess):
+            return svc._collect_converse_skills(msg)
+
+    def _session(self, *skill_ids):
+        sess = Session("s")
+        for skill_id in skill_ids:
+            sess.activate_skill(skill_id)
+        return sess
+
+    # -- FEATURE: the broadcast leg -------------------------------------
+
+    def test_one_broadcast_ping_carries_no_candidate_identity(self):
+        """FEATURE (OVOS-CONVERSE-1 §4.2). The round asks one question.
+
+        The broadcast ping's topic is a static string and its payload names
+        no candidate: membership is read from the session the `reply`
+        derivation carries.
+        """
+        svc = _make_service()
+        emitted = []
+        svc.bus.on("ovos.converse.ping", lambda m: emitted.append(m))
+        sess = self._session("skill_a", "skill_b")
+        self._round(svc, sess, ["skill_a", "skill_b"])
+
+        self.assertEqual(len(emitted), 1,
+                         "the round must ask exactly one broadcast question")
+        self.assertNotIn("skill_id", emitted[0].data)
+        self.assertEqual(sorted(emitted[0].data), ["lang", "utterances"])
+
+    def test_new_core_new_skill_converses_over_broadcast_leg(self):
+        """FEATURE. New core + new skill: the broadcast leg carries the claim."""
+        svc = _make_service()
+        sess = self._session("skill_a")
+        skill = _FakeSkill(svc.bus, "skill_a", claims=True,
+                           candidates=["skill_a"])
+        result = self._round(svc, sess, ["skill_a"])
+
+        self.assertEqual(result, ["skill_a"])
+        self.assertIn("ovos.converse.ping", skill.pings_seen)
+
+    def test_new_core_old_skill_converses_over_legacy_leg(self):
+        """V0 COMPAT. New core + a skill that only binds the legacy ping.
+
+        This is every released ovos-workshop up to 9.3.12a1. It never sees
+        the broadcast question, so the dual-emit's legacy leg is the only
+        thing keeping it in the contest.
+        """
+        svc = _make_service()
+        sess = self._session("skill_a")
+        skill = _FakeSkill(svc.bus, "skill_a", claims=True, broadcast=False)
+        result = self._round(svc, sess, ["skill_a"])
+
+        self.assertEqual(result, ["skill_a"],
+                         "a legacy-only skill lost its converse turn")
+        self.assertEqual(skill.pings_seen, ["skill_a.converse.ping"])
+
+    def test_mixed_fleet_both_vintages_counted(self):
+        """V0 COMPAT. Old and new skills contest the same round."""
+        svc = _make_service()
+        sess = self._session("old_skill", "new_skill")
+        _FakeSkill(svc.bus, "new_skill", claims=False,
+                   candidates=["old_skill", "new_skill"])
+        _FakeSkill(svc.bus, "old_skill", claims=True, broadcast=False)
+        # recency: new_skill activated last, so it heads the list
+        result = self._round(svc, sess, ["new_skill", "old_skill"])
+
+        self.assertEqual(result, ["old_skill"])
+
+    # -- DEFECT: a candidate answering twice was counted twice -----------
+
+    def test_dual_answer_counts_the_skill_once_first_pong_wins(self):
+        """DEFECT (red before fix). §4.2 'the first valid pong per candidate wins'.
+
+        A current skill answers the dual-emitted round twice. The two pongs
+        disagree — the broadcast leg declines, the legacy leg claims. Before
+        the fix the collector took the claim from the second pong, so a
+        skill that declined the round still got the converse dispatch.
+        """
+        svc = _make_service()
+        sess = self._session("skill_a")
+
+        def decline_broadcast(message):
+            svc.bus.emit(message.reply(
+                "ovos.converse.pong", {"skill_id": "skill_a", "result": False}))
+
+        def claim_legacy(message):
+            svc.bus.emit(message.reply(
+                "skill.converse.pong", {"skill_id": "skill_a", "can_handle": True}))
+
+        svc.bus.on("ovos.converse.ping", decline_broadcast)
+        svc.bus.on("skill_a.converse.ping", claim_legacy)
+        result = self._round(svc, sess, ["skill_a"])
+
+        self.assertEqual(result, [],
+                         "the second pong overrode the candidate's first answer")
+
+    def test_repeated_claim_yields_one_entry(self):
+        """DEFECT. A skill answering both legs appears once, not twice."""
+        svc = _make_service()
+        sess = self._session("skill_a")
+        _FakeSkill(svc.bus, "skill_a", claims=True, candidates=["skill_a"])
+        result = self._round(svc, sess, ["skill_a"])
+
+        self.assertEqual(result, ["skill_a"])
+
+    # -- DEFECT: selection followed arrival order, not recency -----------
+
+    def test_selection_is_by_recency_not_arrival_order(self):
+        """DEFECT (red before fix). §4.1 step 3: 'Selection is never by
+        response-arrival order.'
+
+        Both candidates claim. The least-recent one answers first — which is
+        exactly what a parallel broadcast round makes likely, since the
+        candidates now race instead of being polled in order. The winner
+        must still be the head of the recency list.
+        """
+        svc = _make_service()
+        sess = self._session("skill_b", "skill_a")  # skill_a is now head
+        pings = []
+
+        def answer_both(message):
+            pings.append(message)
+            # skill_b (the tail) is quicker off the mark
+            for skill_id in ("skill_b", "skill_a"):
+                svc.bus.emit(message.reply(
+                    "ovos.converse.pong", {"skill_id": skill_id, "result": True}))
+
+        svc.bus.on("ovos.converse.ping", answer_both)
+        result = self._round(svc, sess, ["skill_a", "skill_b"])
+
+        self.assertEqual(result, ["skill_a", "skill_b"],
+                         "the round was decided by who answered first")
+
+    # -- FEATURE: early close --------------------------------------------
+
+    def test_round_closes_early_when_every_candidate_answered(self):
+        """FEATURE (§4.2). The window closes as soon as the answer set is complete.
+
+        Three candidates, all declining. The round must not sit out the
+        0.5s collection ceiling once nothing more can arrive.
+        """
+        svc = _make_service()
+        sess = self._session("skill_a", "skill_b", "skill_c")
+        for skill_id in ("skill_a", "skill_b", "skill_c"):
+            _FakeSkill(svc.bus, skill_id, claims=False,
+                       candidates=["skill_a", "skill_b", "skill_c"])
+
+        start = time.monotonic()
+        result = self._round(svc, sess, ["skill_a", "skill_b", "skill_c"])
+        elapsed = time.monotonic() - start
+
+        self.assertEqual(result, [])
+        self.assertLess(elapsed, 0.4,
+                        "the round waited out the ceiling after every "
+                        "candidate had already answered")
+
+    def test_silent_candidate_waits_out_the_single_window(self):
+        """FEATURE (§4.2). The ceiling is one window for the whole round,
+        not n x a per-owner wait: three silent candidates still cost 0.5s
+        once, and a silent candidate is treated as a decline."""
+        svc = _make_service()
+        sess = self._session("skill_a", "skill_b", "skill_c")
+
+        start = time.monotonic()
+        result = self._round(svc, sess, ["skill_a", "skill_b", "skill_c"])
+        elapsed = time.monotonic() - start
+
+        self.assertEqual(result, [])
+        self.assertLess(elapsed, 1.0,
+                        "the round cost more than one collection window")
+
+    # -- pong hygiene -----------------------------------------------------
+
+    def test_foreign_claim_never_wins_the_round(self):
+        """§4.2. A claim from a skill outside the candidate set decides nothing.
+
+        The stranger is the ONLY claimer of the round, so if the candidate-set
+        filter on the returned list stops carrying this, the round hands the
+        utterance to a skill it never asked. Mutation-checked: returning the
+        raw claim set instead of the filtered recency list fails this test.
+        """
+        svc = _make_service()
+        sess = self._session("skill_a")
+
+        def answer_as_stranger(message):
+            svc.bus.emit(message.reply(
+                "ovos.converse.pong", {"skill_id": "stranger", "result": True}))
+
+        svc.bus.on("ovos.converse.ping", answer_as_stranger)
+        result = self._round(svc, sess, ["skill_a"])
+        self.assertEqual(result, [])
+
+    def test_foreign_pong_does_not_close_the_round_early(self):
+        """§4.2. A stranger's answer must not stand in for a candidate's.
+
+        skill_a is the round's only candidate and stays silent. A stranger
+        answers immediately. The round must still wait out its window rather
+        than treat the stranger's pong as the answer set being complete.
+        """
+        svc = _make_service()
+        sess = self._session("skill_a")
+
+        def answer_as_stranger(message):
+            svc.bus.emit(message.reply(
+                "ovos.converse.pong", {"skill_id": "stranger", "result": False}))
+
+        svc.bus.on("ovos.converse.ping", answer_as_stranger)
+        start = time.monotonic()
+        result = self._round(svc, sess, ["skill_a"])
+        elapsed = time.monotonic() - start
+
+        self.assertEqual(result, [])
+        self.assertGreaterEqual(elapsed, 0.4,
+                                "a stranger's pong satisfied the round's "
+                                "answer bookkeeping")
+
+    def test_both_legs_carry_identical_poll_data(self):
+        """DEFECT (red before fix). A skill that binds both legs must decide
+        from the same input whichever ping reaches it first.
+
+        When the broadcast leg carried a trimmed payload and the legacy leg
+        the full inbound data, the same skill answered the same round from
+        different inputs and the verdict became a thread race.
+        """
+        svc = _make_service()
+        sess = self._session("skill_a")
+        seen = {}
+
+        svc.bus.on("ovos.converse.ping",
+                   lambda m: seen.__setitem__("broadcast", dict(m.data)))
+        svc.bus.on("skill_a.converse.ping",
+                   lambda m: seen.__setitem__("legacy", dict(m.data)))
+
+        msg = Message("test",
+                      {"utterances": ["hello"], "lang": "en-US",
+                       "confidence": 0.9},
+                      {"utterance_id": "round-1", "session": sess.serialize()})
+        with patch.object(ConverseService, "get_active_skills",
+                          return_value=["skill_a"]), \
+             patch("ovos_core.intent_services.converse_service.SessionManager.get",
+                   return_value=sess):
+            svc._collect_converse_skills(msg)
+
+        legacy = {k: v for k, v in seen["legacy"].items() if k != "skill_id"}
+        self.assertEqual(seen["broadcast"], legacy,
+                         "the two legs fed can_converse different data")
+        # the round's extra inbound fields must survive onto the broadcast leg
+        self.assertEqual(seen["broadcast"]["confidence"], 0.9)
+        # and the broadcast leg still names no candidate
+        self.assertNotIn("skill_id", seen["broadcast"])
+
+    def test_non_boolean_result_is_a_decline(self):
+        """§4.2. A missing or non-boolean claim value is treated as False."""
+        svc = _make_service()
+        sess = self._session("skill_a")
+
+        def answer_garbage(message):
+            svc.bus.emit(message.reply(
+                "ovos.converse.pong", {"skill_id": "skill_a", "result": "yes"}))
+
+        svc.bus.on("ovos.converse.ping", answer_garbage)
+        result = self._round(svc, sess, ["skill_a"])
+        self.assertEqual(result, [])

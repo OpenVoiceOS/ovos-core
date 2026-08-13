@@ -403,15 +403,15 @@ class ConverseService(PipelinePlugin):
                      fresh ``SessionManager.get(message)`` fold for
                      standalone callers.
         """
-        skill_ids = []
-        want_converse = []
+        answered = []  # candidates whose first valid pong already landed
+        claimed = set()  # candidates whose first valid pong was a claim
         session = session or SessionManager.get(message)
 
         # note: this is sorted by priority already
         active_skills = [skill_id for skill_id in self.get_active_skills(message, session=session)
                      if session.utterance_states.get(skill_id, UtteranceState.INTENT) == UtteranceState.INTENT]
         if not active_skills:
-            return want_converse
+            return []
 
         event = Event()
 
@@ -438,30 +438,66 @@ class ConverseService(PipelinePlugin):
                           f"does not match round {round_uid!r}")
                 return
 
-            # validate the converse pong; default False — a non-responding skill should not converse
-            if all((skill_id not in want_converse,
-                    msg.data.get("can_handle", False),
-                    skill_id in active_skills)):
-                want_converse.append(skill_id)
+            # OVOS-CONVERSE-1 §4.2: "the first valid pong per candidate wins".
+            # During the dual-emit compat window a current skill answers the
+            # round twice — once on the broadcast leg, once on the legacy
+            # per-skill leg — so each candidate MUST be counted exactly once.
+            if skill_id in answered:
+                return
+            answered.append(skill_id)
 
-            if skill_id not in skill_ids:  # track which answer we got
-                skill_ids.append(skill_id)
+            # the claim boolean is `result` in OVOS-CONVERSE-1 §4.2 and
+            # `can_handle` on the legacy per-skill leg. A missing or
+            # non-boolean value is a decline: a skill that does not answer
+            # clearly must not converse.
+            claim = msg.data.get("result", msg.data.get("can_handle"))
+            if claim is True:
+                claimed.add(skill_id)
 
-            if all(s in skill_ids for s in active_skills):
-                # all skills answered the ping!
+            if all(s in answered for s in active_skills):
+                # every candidate named by the round has answered — nothing
+                # more can arrive that the round would wait for
                 event.set()
 
-        self.bus.on("skill.converse.pong", handle_ack)
+        self.bus.on("skill.converse.pong", handle_ack)  # legacy leg
+        self.bus.on("ovos.converse.pong", handle_ack)  # OVOS-CONVERSE-1 §6.2
         try:
-            # ask skills if they want to converse
-            for skill_id in active_skills:
-                self.bus.emit(message.forward(f"{skill_id}.converse.ping", {**message.data, "skill_id": skill_id}))
+            # OVOS-CONVERSE-1 §4.2: ONE broadcast ping for the round. No
+            # candidate identity travels in topic or payload — a skill decides
+            # it is a candidate by testing its own skill_id against
+            # context.session.converse_handlers, which `reply` carries along.
+            #
+            # The payload is the inbound data minus skill_id, so a skill that
+            # binds BOTH legs decides the round from identical input whichever
+            # ping reaches it first. Feeding the two legs different data makes
+            # the verdict depend on which leg won the race.
+            broadcast_data = {k: v for k, v in message.data.items()
+                              if k != "skill_id"}
+            self.bus.emit(message.reply("ovos.converse.ping", broadcast_data))
 
-            # wait for all skills to acknowledge they want to converse
+            # V0 compat: skills older than the broadcast binding only listen on
+            # the per-skill legacy ping. Dual-emit keeps them in the contest;
+            # the collector above counts each skill once whichever leg answers.
+            for skill_id in active_skills:
+                self.bus.emit(message.forward(f"{skill_id}.converse.ping",
+                                              {**message.data, "skill_id": skill_id}))
+
+            # one bounded collection window for the whole round, not n x a
+            # per-owner wait (OVOS-CONVERSE-1 §4.2 stage collection ceiling)
             event.wait(timeout=0.5)
         finally:
             self.bus.remove("skill.converse.pong", handle_ack)
-        return want_converse
+            self.bus.remove("ovos.converse.pong", handle_ack)
+
+        # This is also what keeps a foreign pong out of the round
+        # (OVOS-CONVERSE-1 §4.2): a skill_id absent from the candidate set
+        # cannot appear in the returned list, and it can never satisfy the
+        # early-close check above, which is keyed on `active_skills`.
+        #
+        # OVOS-CONVERSE-1 §4.1 step 3: selection is by recency order — the
+        # order of session.converse_handlers — and is NEVER by response-arrival
+        # order. Under a parallel broadcast round the arrival order is a race.
+        return [skill_id for skill_id in active_skills if skill_id in claimed]
 
     def _check_converse_timeout(self, message: Message):
         """ filter active skill list based on timestamps
