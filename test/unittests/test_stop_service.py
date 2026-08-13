@@ -469,7 +469,73 @@ class TestFoldOrderRegistryFirstWrite(unittest.TestCase):
                       "elsewhere in this session's lifecycle")
 
 
+class TestHandleStopConfirmationFoldOrder(unittest.TestCase):
+    """handle_stop_confirmation fires asynchronously on a `*.stop.response`
+    reply - it has no wire echo and is not lifecycle entry, so its
+    `SessionManager.get(message)` fold must not be allowed to full-replace
+    the live registry entry with a stale snapshot. A stale snapshot can
+    resurrect a skill's RESPONSE utterance_state and undo `disable_response_mode`
+    writes made earlier in the same session's lifecycle (e.g. by
+    match_high/match_low), which previously caused a bogus
+    `mycroft.skills.abort_question` re-emit and clobbered other incidental
+    registry state (blacklist)."""
+
+    SESSION_ID = "stop-confirmation-fold-test-session"
+
+    def setUp(self):
+        SessionManager.sessions.pop(self.SESSION_ID, None)
+
+    def tearDown(self):
+        SessionManager.sessions.pop(self.SESSION_ID, None)
+
+    def test_stale_fold_does_not_clobber_incidental_registry_write(self):
+        live = Session(self.SESSION_ID)
+        live.activate_skill("skill_a")
+        SessionManager.sessions[self.SESSION_ID] = live
+
+        # message snapshot taken EARLY (stale): skill_a still in RESPONSE mode
+        snap = Session(self.SESSION_ID)
+        snap.activate_skill("skill_a")
+        snap.enable_response_mode("skill_a")
+        msg = Message("skill_a.stop.response",
+                      {"skill_id": "skill_a", "result": True},
+                      {"session": snap.serialize(), "utterance_id": "u1"})
+
+        # meanwhile, an incidental registry-first write landed on the live
+        # entry (what match_high/match_low's disable_response_mode does)
+        SessionManager.sessions[self.SESSION_ID].disable_response_mode("skill_a")
+        SessionManager.sessions[self.SESSION_ID].blacklisted_skills = ["skill_z"]
+
+        svc = _make_service()
+        svc.bus.emit = MagicMock()
+        svc.handle_stop_confirmation(msg)
+
+        live_after = SessionManager.sessions[self.SESSION_ID]
+        self.assertEqual(live_after.blacklisted_skills, ["skill_z"],
+                         "a stale stop.response fold clobbered an incidental "
+                         "registry write (blacklist)")
+        self.assertNotEqual(
+            live_after.utterance_states.get("skill_a"), UtteranceState.RESPONSE,
+            "a stale stop.response fold resurrected skill_a's RESPONSE "
+            "utterance_state that was already disabled on the live registry")
+        emitted = [c[0][0].msg_type for c in svc.bus.emit.call_args_list]
+        self.assertNotIn("mycroft.skills.abort_question", emitted,
+                         "abort_question was re-emitted from resurrected "
+                         "RESPONSE state undone by the stale fold")
+
+
 class TestHandleStopConfirmation(unittest.TestCase):
+
+    def setUp(self):
+        # handle_stop_confirmation now resolves via
+        # `registry_session_for_write`, which prefers a live registry entry
+        # over the (possibly mocked-away) `SessionManager.get` fold - so
+        # stray "s" entries left in the registry by other tests must not
+        # bleed in here.
+        SessionManager.sessions.pop("s", None)
+
+    def tearDown(self):
+        SessionManager.sessions.pop("s", None)
 
     def test_error_in_data_is_logged(self):
         svc = _make_service()
@@ -521,6 +587,15 @@ class TestMatchHigh(unittest.TestCase):
 
     def setUp(self):
         self.svc = _make_service()
+        # match_high resolves via `registry_session_for_write`, and
+        # Session.touch() (called by disable_response_mode/activate_skill
+        # etc.) self-registers the session into the live registry as a side
+        # effect - so a stray "s" entry left by another test class must not
+        # bleed in here, and this test must not leak "s" onward either.
+        SessionManager.sessions.pop("s", None)
+
+    def tearDown(self):
+        SessionManager.sessions.pop("s", None)
 
     def test_no_vocab_returns_none(self):
         """If voc_list is empty for the language, match_high returns None."""
@@ -574,6 +649,12 @@ class TestMatchLow(unittest.TestCase):
 
     def setUp(self):
         self.svc = _make_service()
+        # see TestMatchHigh.setUp - registry-first resolution + touch()'s
+        # self-registration side effect means "s" must be isolated per test.
+        SessionManager.sessions.pop("s", None)
+
+    def tearDown(self):
+        SessionManager.sessions.pop("s", None)
 
     def test_no_voc_list_returns_none(self):
         """If voc_list returns empty, match_low returns None."""
@@ -628,6 +709,14 @@ class TestMatchLow(unittest.TestCase):
 
 
 class TestHandleStopConfirmationExtra(unittest.TestCase):
+
+    def setUp(self):
+        # see TestHandleStopConfirmation.setUp - registry-first resolution
+        # means a stray "s" entry from another test must not bleed in here.
+        SessionManager.sessions.pop("s", None)
+
+    def tearDown(self):
+        SessionManager.sessions.pop("s", None)
 
     def test_converse_force_timeout_emitted_when_skill_active(self):
         """When the skill is still in converse (is_active), force converse timeout."""

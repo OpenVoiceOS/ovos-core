@@ -22,6 +22,7 @@ from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.handler import HandlerLifecycle
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager, Session
+from ovos_core.intent_services._session_fold import registry_session_for_write
 from ovos_config import Configuration
 from ovos_plugin_manager.templates.pipeline import ConfidenceMatcherPipeline, IntentHandlerMatch
 from ovos_utils import flatten_list
@@ -134,7 +135,12 @@ class FallbackService(ConfidenceMatcherPipeline):
         skill_ids = []  # skill_ids that already answered to ping
         fallback_skills = []  # skill_ids that want to handle fallback
 
-        sess = SessionManager.get(message)
+        # incidental read of registry state (blacklist/active skills), no
+        # wire echo from this method and not a lifecycle entry - resolve via
+        # `registry_session_for_write` so an earlier registry-first write
+        # this same turn (e.g. stop_service's disable_response_mode) isn't
+        # clobbered by this call's fold (see ``_session_fold.py``).
+        sess = registry_session_for_write(message)
         if sess is None:
             return fallback_skills
         # filter skills outside the fallback_range
@@ -219,6 +225,12 @@ class FallbackService(ConfidenceMatcherPipeline):
         message.data["utterances"] = utterances  # all transcripts
         message.data["lang"] = lang
 
+        # KEEP the plain fold here: this is a genuine wire-echo site (case
+        # 2 of the fold-order contract) - the returned IntentHandlerMatch's
+        # `updated_session=sess` is consumed by
+        # ``IntentService._dispatch_match`` (service.py) and stamped back
+        # onto the outgoing message, so this call must apply the message's
+        # own declared session state, not bypass it.
         sess = SessionManager.get(message)
         if sess is None:
             return None

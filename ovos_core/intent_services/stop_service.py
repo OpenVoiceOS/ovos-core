@@ -191,7 +191,13 @@ class StopService(ConfidenceMatcherPipeline):
             error_msg = message.data['error']
             LOG.error(f"{skill_id}: {error_msg}")
         elif message.data.get('result', False):
-            sess = SessionManager.get(message)
+            # incidental write (deactivate_skill/enable/disable_response_mode
+            # elsewhere), no wire echo from this handler and not a lifecycle
+            # entry - resolve via `registry_session_for_write` (mirrors
+            # match_high/match_low's own bypass) so a stale stop.response
+            # snapshot can't clobber a write already on the live registry
+            # entry (see ``_session_fold.py`` module docstring).
+            sess = registry_session_for_write(message)
             utt_state = sess.utterance_states.get(skill_id, UtteranceState.INTENT)
             if utt_state == UtteranceState.RESPONSE:
                 LOG.debug("Forcing get_response timeout")

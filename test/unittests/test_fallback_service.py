@@ -315,6 +315,52 @@ class TestCollectFallbackSkills(unittest.TestCase):
         self.assertEqual(result, [])
 
 
+class TestCollectFallbackSkillsFoldOrder(unittest.TestCase):
+    """_collect_fallback_skills has no wire echo of its own (it only reads
+    session state and pings skills) and is not lifecycle entry - it can run
+    mid-turn, after an earlier pipeline stage (e.g. stop_service's
+    disable_response_mode, or a client-declared blacklist applied directly
+    to the live registry entry) already wrote to the live registry entry
+    for this session. A plain `SessionManager.get(message)` fold there would
+    full-replace the live entry with the turn's original (now stale)
+    message snapshot, silently undoing that earlier write."""
+
+    SESSION_ID = "collect-fallback-fold-test-session"
+
+    def setUp(self):
+        SessionManager.sessions.pop(self.SESSION_ID, None)
+
+    def tearDown(self):
+        SessionManager.sessions.pop(self.SESSION_ID, None)
+
+    def test_stale_fold_does_not_clobber_earlier_registry_write(self):
+        live = Session(self.SESSION_ID)
+        SessionManager.sessions[self.SESSION_ID] = live
+
+        # message snapshot frozen at turn entry: no blacklist yet
+        msg = Message("recognizer_loop:utterance",
+                      {"utterances": ["hi"], "lang": "en-US"},
+                      {"session": live.serialize(), "utterance_id": "u1"})
+
+        # an earlier pipeline stage this same turn writes directly onto the
+        # live registry entry (registry-first incidental write, #857/#858
+        # pattern), after the message snapshot above was already frozen
+        SessionManager.sessions[self.SESSION_ID].blacklisted_skills = ["skill_evil"]
+
+        svc = _make_service()
+        svc.bus.emit = MagicMock()
+        svc.bus.on = MagicMock()
+        svc.bus.remove = MagicMock()
+
+        svc._collect_fallback_skills(msg, fb_range=FallbackRange(0, 100))
+
+        self.assertEqual(
+            SessionManager.sessions[self.SESSION_ID].blacklisted_skills,
+            ["skill_evil"],
+            "a stale message fold in _collect_fallback_skills clobbered an "
+            "earlier registry-first write made this same turn")
+
+
 class TestFallbackRoundCorrelation(unittest.TestCase):
     """A pong must prove which round it answers, or it decides nothing."""
 
