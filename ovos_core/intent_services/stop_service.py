@@ -263,9 +263,22 @@ class StopService(ConfidenceMatcherPipeline):
                     message.context.get("skill_id") or
                     message.msg_type.split(".stop.response")[0])
         sess_id = (message.context.get("session") or {}).get("session_id", "default")
+        # F2 (round-3 adversarial re-review of 6e8c8163be): the pre-drain
+        # snapshots used to be popped ONLY on the result:True branch below —
+        # every error / result:False / never-actually-dispatched stop left
+        # (session_id, skill_id) in BOTH dicts forever (confirmed: 50 failed
+        # stops -> 50 leaked keys, attack5.py). That also kept the
+        # _resolve_dispatch_lifecycle gate permanently open for that pair,
+        # since the gate is presence-based. Pop both dicts UNCONDITIONALLY,
+        # right here, before either branch runs, and thread the popped
+        # values through — this is now both the memory-leak fix and the
+        # single place the gate (and the RESPONSE/active fallbacks below)
+        # consult.
+        utt_state = self._utt_state_pre_drain.pop((sess_id, skill_id), None)
+        was_active = self._was_active_pre_drain.pop((sess_id, skill_id), None)
+        had_pre_drain_snapshot = utt_state is not None or was_active is not None
         try:
-            if (sess_id, skill_id) in self._was_active_pre_drain or \
-                    (sess_id, skill_id) in self._utt_state_pre_drain:
+            if had_pre_drain_snapshot:
                 self._resolve_dispatch_lifecycle(message, skill_id)
         except Exception:
             LOG.exception(f"failed to resolve dispatch lifecycle for {skill_id}:stop")
@@ -281,9 +294,9 @@ class StopService(ConfidenceMatcherPipeline):
             # UtteranceState.INTENT here and this RESPONSE branch was
             # unreachable dead code (abort_question never fired even though
             # the skill was genuinely blocked in get_response). Consult the
-            # pre-drain snapshot instead, falling back to the live read for
-            # direct-invocation callers that bypass _targeted_stop.
-            utt_state = self._utt_state_pre_drain.pop((sess.session_id, skill_id), None)
+            # pre-drain snapshot (popped above) instead, falling back to the
+            # live read for direct-invocation callers that bypass
+            # _targeted_stop.
             if utt_state is None:
                 utt_state = sess.utterance_states.get(skill_id, UtteranceState.INTENT)
             if utt_state == UtteranceState.RESPONSE:
@@ -296,7 +309,6 @@ class StopService(ConfidenceMatcherPipeline):
             # Fall back to it only when no pre-drain record exists (e.g. a
             # handler invoked directly, bypassing _targeted_stop) so existing
             # direct-invocation callers keep working.
-            was_active = self._was_active_pre_drain.pop((sess.session_id, skill_id), None)
             if was_active is None:
                 was_active = sess.is_active(skill_id)
             if was_active:
@@ -318,11 +330,11 @@ class StopService(ConfidenceMatcherPipeline):
 
         ``IntentDispatcher._on_skill_complete``/``._on_skill_error`` listen for
         exactly these topics and resolve the matching in-flight entry (by
-        session_id + skill_id + ``context["intent_name"]``), cancelling its
+        session_id + skill_id + ``data["intent_name"]``), cancelling its
         §8.3 timeout timer. See ``handle_stop_confirmation``'s docstring for
         why this lives here rather than in ovos-workshop.
 
-        ``context["intent_name"] = "stop"`` is stamped explicitly (rather than
+        ``data["intent_name"] = "stop"`` is stamped explicitly (rather than
         leaving the dispatcher to match on ``skill_id`` alone, as it does for
         the normal single-handler-at-a-time framework signal): the ``.stop``
         dispatch is not the only thing that can be in flight for a skill --
@@ -338,6 +350,19 @@ class StopService(ConfidenceMatcherPipeline):
         ``handle_stop_confirmation`` narrows *when* this fires; this
         intent_name stamp narrows *what* it can resolve once it does.
 
+        DATA, not context: ``message.forward`` deep-copies the ORIGINATING
+        dispatch's context forward (that context is CLIENT-INHERITED --
+        ultimately sourced from the utterance message a client sent). A
+        client that happens to set ``context["intent_name"]`` on its own
+        utterance would have that value survive every ``forward()`` down the
+        dispatch chain and land on a totally unrelated skill's REAL
+        ``mycroft.skill.handler.complete`` too, mismatching this filter and
+        silently breaking that skill's OWN handler-lifecycle resolution
+        (parking it on the 5-minute §8.3 timeout instead). ``data``, by
+        contrast, is passed fresh by ``forward()``'s second argument --
+        never inherited from the client -- so only THIS emission ever
+        carries this key.
+
         §8.2: a ``.stop.response`` carrying ``error`` means the skill's
         ``stop()`` raised -- that must resolve as an ``error`` terminal, not
         ``complete``, so a failed stop is distinguishable from a successful
@@ -346,12 +371,13 @@ class StopService(ConfidenceMatcherPipeline):
         if 'error' in message.data:
             done = message.forward("mycroft.skill.handler.error",
                                    {"name": f"{skill_id}:stop",
-                                    "exception": message.data['error']})
+                                    "exception": message.data['error'],
+                                    "intent_name": "stop"})
         else:
             done = message.forward("mycroft.skill.handler.complete",
-                                   {"name": f"{skill_id}:stop"})
+                                   {"name": f"{skill_id}:stop",
+                                    "intent_name": "stop"})
         done.context["skill_id"] = skill_id
-        done.context["intent_name"] = "stop"
         self.bus.emit(done)
 
     def _targeted_stop(self, skill_id: str, conf: float, utterance: str,

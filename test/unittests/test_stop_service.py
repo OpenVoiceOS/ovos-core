@@ -1024,6 +1024,166 @@ class TestFailedStopYieldsErrorTerminal(unittest.TestCase):
             f"a failed stop() must NOT resolve as a complete terminal, got {seen!r}")
 
 
+class TestIntentNameFilterIsDataNotContext(unittest.TestCase):
+    """F1 regression (round-3 adversarial re-review of 6e8c8163be): the
+    dispatcher's optional intent_name filter used to be read from
+    `message.context["intent_name"]`. Context is CLIENT-INHERITED --
+    `Message.forward` deep-copies the context of the message it is called
+    on, which for a dispatch chain traces back to the ORIGINATING client
+    utterance. Any client that happens to set `context["intent_name"]` on
+    its own utterance would have that value survive every forward() down
+    the dispatch chain and land on the skill's REAL
+    `mycroft.skill.handler.complete` too -- mismatching the stop-only filter
+    and parking a completely unrelated, successfully-completed intent on
+    the dispatcher's 5-minute §8.3 timeout.
+
+    Mirrors the live auditor's attack4.py
+    (test_1_normal_intent_workshop_complete /
+    test_2_client_supplied_context_intent_name_breaks_resolution /
+    test_3_targeted_stop_still_resolves)."""
+
+    def test_client_supplied_context_intent_name_does_not_break_real_completion(self):
+        from ovos_bus_client.handler import HandlerLifecycle
+        from ovos_core.intent_services.dispatcher import IntentDispatcher
+
+        svc = _make_service()
+        bus = svc.bus
+        disp = IntentDispatcher(bus, timeout=300)
+        self.addCleanup(disp.shutdown)
+
+        sess = Session("s2")
+        # a client-declared context key on the ORIGINATING utterance,
+        # propagated verbatim through every forward() down the chain --
+        # nothing StopService controls.
+        msg = Message("skillA:my.intent", {},
+                      {"skill_id": "skillA", "intent_name": "skillA:my.intent",
+                       "session": sess.serialize()})
+        bus.on("skillA:my.intent",
+               lambda m: HandlerLifecycle(bus, m, skill_id="skillA",
+                                          data={"name": "x"}).complete())
+
+        disp.dispatch(msg, "skillA", "my.intent")
+
+        with disp._lock:
+            entries = list(disp._in_flight.get("s2", []))
+        self.assertEqual(
+            entries, [],
+            "a REAL handler.complete for an ordinary intent must resolve "
+            "regardless of what intent_name (if any) the client stamped on "
+            "its own utterance context")
+
+    def test_targeted_stop_still_resolves_via_data_marker(self):
+        """Sanity: moving the marker to `data` must not regress the L1 fix
+        itself -- a genuine targeted stop must still resolve synchronously."""
+        from ovos_core.intent_services.dispatcher import IntentDispatcher
+
+        svc = _make_service()
+        bus = svc.bus
+        disp = IntentDispatcher(bus, timeout=300)
+        self.addCleanup(disp.shutdown)
+
+        sess = Session("s3")
+        sess.activate_skill("skillA")
+        bus.on("skillA:stop",
+               lambda m: bus.emit(m.reply("skillA.stop.response",
+                                          {"skill_id": "skillA", "result": True})))
+
+        match = svc._targeted_stop("skillA", 1.0, "stop", sess)
+        reply = Message(match.match_type, dict(match.match_data),
+                        {"skill_id": "skillA",
+                         "session": match.updated_session.serialize()})
+        disp.dispatch(reply, "skillA", "stop")
+
+        with disp._lock:
+            entries = list(disp._in_flight.get("s3", []))
+        self.assertEqual(entries, [], "targeted stop entry must still resolve")
+
+
+class TestPreDrainSnapshotsDoNotLeakOnFailedStop(unittest.TestCase):
+    """F2 regression (round-3 adversarial re-review of 6e8c8163be): the
+    pre-drain snapshot dicts were popped ONLY inside the `result: True`
+    branch of `handle_stop_confirmation` -- every failed (`error` in data),
+    declined (`result: False`), or never-actually-dispatched stop left
+    `(session_id, skill_id)` in BOTH `_was_active_pre_drain` and
+    `_utt_state_pre_drain` forever: an unbounded memory leak, AND it kept
+    the `_resolve_dispatch_lifecycle` presence-gate permanently open for
+    that pair (any later unrelated `.stop.response` reusing the same
+    (session_id, skill_id) would pass the gate).
+
+    Mirrors the live auditor's attack5.py."""
+
+    def test_fifty_failed_stops_leave_no_leaked_snapshot_keys(self):
+        svc = _make_service()
+        for i in range(50):
+            sess = Session(f"sess{i}")
+            sess.activate_skill("skillA")
+            svc._targeted_stop("skillA", 1.0, "stop", sess)
+            svc.handle_stop_confirmation(Message(
+                "skillA.stop.response",
+                {"skill_id": "skillA", "error": "boom"},
+                {"skill_id": "skillA", "session": sess.serialize()}))
+        self.assertEqual(len(svc._was_active_pre_drain), 0)
+        self.assertEqual(len(svc._utt_state_pre_drain), 0)
+
+    def test_fifty_declined_stops_leave_no_leaked_snapshot_keys(self):
+        svc = _make_service()
+        for i in range(50):
+            sess = Session(f"x{i}")
+            sess.activate_skill("skillA")
+            svc._targeted_stop("skillA", 1.0, "stop", sess)
+            svc.handle_stop_confirmation(Message(
+                "skillA.stop.response",
+                {"skill_id": "skillA", "result": False},
+                {"skill_id": "skillA", "session": sess.serialize()}))
+        self.assertEqual(len(svc._was_active_pre_drain), 0)
+        self.assertEqual(len(svc._utt_state_pre_drain), 0)
+
+    def test_successful_stop_still_clears_snapshot(self):
+        """Regression guard: the success path must keep clearing too."""
+        svc = _make_service()
+        sess = Session("ok")
+        sess.activate_skill("skillA")
+        svc._targeted_stop("skillA", 1.0, "stop", sess)
+        svc.handle_stop_confirmation(Message(
+            "skillA.stop.response",
+            {"skill_id": "skillA", "result": True},
+            {"skill_id": "skillA", "session": sess.serialize()}))
+        self.assertEqual(len(svc._was_active_pre_drain), 0)
+        self.assertEqual(len(svc._utt_state_pre_drain), 0)
+
+
+class TestPreDrainGateBlocksUnknownPair(unittest.TestCase):
+    """F3: the presence-gate mechanism in `handle_stop_confirmation` --
+    "only emit a synthetic handler.complete/.error for a (session_id,
+    skill_id) pair this StopService actually has a pre-drain snapshot
+    for" -- was itself never directly exercised by any test; the suite
+    stayed green even with the gate deleted entirely. Assert it directly:
+    a `.stop.response` for a pair with NO pre-drain snapshot at all (never
+    went through `_targeted_stop`) must emit no
+    `mycroft.skill.handler.complete`/`.error` whatsoever."""
+
+    def test_stop_response_with_no_pre_drain_snapshot_emits_no_handler_signal(self):
+        svc = _make_service()
+        emitted = []
+        svc.bus.emit = lambda m: emitted.append(m.msg_type)
+
+        sess = Session("unknown-sess")
+        # deliberately skip _targeted_stop -- no pre-drain snapshot exists
+        # for ("unknown-sess", "skillA").
+        svc.handle_stop_confirmation(Message(
+            "skillA.stop.response",
+            {"skill_id": "skillA", "result": True},
+            {"skill_id": "skillA", "session": sess.serialize()}))
+
+        handler_signals = [t for t in emitted
+                           if t in ("mycroft.skill.handler.complete",
+                                    "mycroft.skill.handler.error")]
+        self.assertEqual(
+            handler_signals, [],
+            "a .stop.response for a (session, skill) pair with no pre-drain "
+            f"snapshot must never emit a synthetic handler signal, got {emitted!r}")
+
+
 class TestShutdown(unittest.TestCase):
 
     def test_shutdown_removes_listeners(self):

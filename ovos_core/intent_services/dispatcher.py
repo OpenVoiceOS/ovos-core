@@ -161,6 +161,13 @@ class IntentDispatcher:
         synthetic completion raised on behalf of a specific intent) can avoid
         resolving an unrelated in-flight entry for the same skill. Omitted
         (the default), this behaves exactly as before.
+
+        Callers MUST source this from ``message.data``, never
+        ``message.context`` — context is forwarded/deep-copied down the
+        entire dispatch chain from the ORIGINATING client utterance, so a
+        client-supplied ``context["intent_name"]`` would silently mismatch
+        every real handler's own completion signal for that dispatch (see
+        ``_on_skill_complete``/``_on_skill_error``).
         """
         with self._lock:
             stack = self._in_flight.get(sid)
@@ -186,7 +193,7 @@ class IntentDispatcher:
     def _on_skill_complete(self, message: Message):
         """Framework done-signal -> ``complete`` (§8.1)."""
         entry = self._pop(self._session_id(message), message.context.get("skill_id"),
-                          message.context.get("intent_name"))
+                          message.data.get("intent_name"))
         if entry is None:
             return
         try:
@@ -198,7 +205,7 @@ class IntentDispatcher:
     def _on_skill_error(self, message: Message):
         """Framework done-signal -> ``error`` with the exception (§8.2)."""
         entry = self._pop(self._session_id(message), message.context.get("skill_id"),
-                          message.context.get("intent_name"))
+                          message.data.get("intent_name"))
         if entry is None:
             return
         exception = (message.data.get("exception")
