@@ -128,6 +128,34 @@ class TestManifestEnableDisable(unittest.TestCase):
         self.assertTrue(entry["enabled"])
 
 
+class TestDeregisterSessionScope(unittest.TestCase):
+    """§11.1/§11.3 — deregistration MUST key off context.session.session_id,
+    NEVER Message.data.session_id (security-relevant: a forged data.session_id
+    would let one session's producer wipe another session's registrations)."""
+
+    def setUp(self):
+        self.m = _manifest()
+        self.m._on_register(_reg("skill.test", "hello", session_id="A"))
+
+    def test_forged_data_session_id_does_not_wipe_foreign_session(self):
+        # attacker runs under session B (context) but claims data.session_id=A
+        msg = Message("ovos.intent.deregister",
+                      data={"skill_id": "skill.test", "intent_name": "hello", "session_id": "A"},
+                      context={"session": {"session_id": "B"}})
+        self.m._on_deregister(msg)
+        # session A's entry MUST survive; only B (which has no entry) was touched
+        sessions = {e["session_id"] for e in self.m._index.values()}
+        self.assertIn("A", sessions)
+
+    def test_owner_deregister_via_context_removes_entry(self):
+        # the true owner of session A deregisters, context-scoped, no data.session_id
+        msg = Message("ovos.intent.deregister",
+                      data={"skill_id": "skill.test", "intent_name": "hello"},
+                      context={"session": {"session_id": "A"}})
+        self.m._on_deregister(msg)
+        self.assertEqual(len(self.m._index), 0)
+
+
 class TestSkillDeregister(unittest.TestCase):
     def setUp(self):
         self.m = _manifest()
@@ -274,3 +302,34 @@ class TestManifestContextLookups(unittest.TestCase):
         # a different session does not see the satellite-scoped declaration
         self.assertEqual(self.m.get_context_requirements("other", "s.skill", "on", "en-US"),
                          ([], []))
+
+
+class TestIntentDescribeSessionScope(unittest.TestCase):
+    """§10.2 — session_id is an optional query filter: omitted returns
+    definitions from every session_id; each entry self-identifies via
+    session_id."""
+
+    def setUp(self):
+        self.m = _manifest()
+        self.m._on_register(_reg("skill.a", "play", lang="en-US",
+                                 method="keyword", session_id="default"))
+        self.m._on_register(_reg("skill.a", "play", lang="en-US",
+                                 method="keyword", session_id="sat-1"))
+
+    def _query(self, **kwargs):
+        replies = []
+        self.m.bus.on("ovos.intent.describe.response", lambda msg: replies.append(msg))
+        self.m._on_describe(Message("ovos.intent.describe", data=kwargs))
+        return replies[-1].data if replies else None
+
+    def test_omitted_session_id_returns_every_session(self):
+        resp = self._query(skill_id="skill.a", intent_name="play", lang="en-US")
+        self.assertTrue(resp["ok"])
+        sessions = {d["session_id"] for d in resp["definitions"]}
+        self.assertEqual(sessions, {"default", "sat-1"})
+
+    def test_definitions_carry_session_id(self):
+        resp = self._query(skill_id="skill.a", intent_name="play", lang="en-US",
+                           session_id="sat-1")
+        self.assertEqual(len(resp["definitions"]), 1)
+        self.assertEqual(resp["definitions"][0]["session_id"], "sat-1")

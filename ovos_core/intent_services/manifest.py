@@ -73,6 +73,23 @@ class IntentManifest:
                 seen[dedup] = entry
         return list(seen.values())
 
+    @staticmethod
+    def _session_id_of(message: Message) -> str:
+        """Mutation scope per §11.1/§11.3 — always ``context.session.session_id``,
+        NEVER ``Message.data``. A ``data.session_id`` on a mutation is not a
+        scope assertion the producer is entitled to make; a producer could
+        otherwise deregister/disable another session's intents by forging the
+        payload. Any ``data.session_id`` that disagrees with the context is
+        logged and ignored.
+        """
+        ctx_session_id = (message.context.get("session") or {}).get("session_id", "default")
+        data_session_id = message.data.get("session_id")
+        if data_session_id is not None and data_session_id != ctx_session_id:
+            LOG.warning(
+                f"{message.msg_type}: ignoring forged data.session_id={data_session_id!r}; "
+                f"session scope is context.session.session_id={ctx_session_id!r} (§11.1)")
+        return ctx_session_id
+
     def get_required_slots(self, session_id: str, skill_id: str,
                            intent_name: str, lang: str) -> list:
         """OVOS-INTENT-4 §6.1 / §10 — the ``required_slots`` an intent declares.
@@ -132,7 +149,7 @@ class IntentManifest:
         skill_id = message.data.get("skill_id") or message.context.get("skill_id")
         intent_name = message.data.get("intent_name")
         lang = message.data.get("lang")
-        session_id = message.data.get("session_id", "default")
+        session_id = self._session_id_of(message)
         if not (skill_id and intent_name):
             return
         for method in ("keyword", "template"):
@@ -149,7 +166,7 @@ class IntentManifest:
         skill_id = message.data.get("skill_id") or message.context.get("skill_id")
         intent_name = message.data.get("intent_name")
         lang = message.data.get("lang")
-        session_id = message.data.get("session_id", "default")
+        session_id = self._session_id_of(message)
         for key, entry in self._index.items():
             if key[0] != session_id or key[1] != skill_id or key[2] != intent_name:
                 continue
@@ -159,7 +176,7 @@ class IntentManifest:
 
     def _on_skill_deregister(self, message: Message):
         skill_id = message.data.get("skill_id") or message.context.get("skill_id")
-        session_id = message.data.get("session_id", "default")
+        session_id = self._session_id_of(message)
         if not skill_id:
             return
         for key in [k for k in self._index if k[0] == session_id and k[1] == skill_id]:
@@ -193,22 +210,35 @@ class IntentManifest:
         intent_name = message.data.get("intent_name")
         lang = message.data.get("lang")
         method_filter = message.data.get("method")
-        session_id = message.data.get("session_id", "default")
+        # NOTE: unlike mutations (§11.1/§11.3), session_id here is a QUERY
+        # FILTER, not a scope assertion — reading it from data is legitimate
+        # per §10.2. It is an *optional* filter: omitted (None) means every
+        # session_id is returned, not just "default" — this is a straight
+        # exact-match filter over the raw index, NOT the §11.2 effective
+        # pool used by ovos.intent.list (§10.1).
+        session_filter = message.data.get("session_id")
         if not (skill_id and intent_name and lang):
             self.bus.emit(message.reply("ovos.intent.describe.response",
                                         {"ok": False,
                                          "error": "skill_id, intent_name and lang are required"}))
             return
         lang = standardize_lang(lang)
-        pool = self._effective_pool(session_id)
         definitions = []
-        for entry in pool:
+        for entry in self._index.values():
             if entry["skill_id"] != skill_id or entry["intent_name"] != intent_name or entry["lang"] != lang:
                 continue
             if method_filter and entry["method"] != method_filter:
                 continue
-            definitions.append({"method": entry["method"], "definition": entry["definition"]})
-        definitions.sort(key=lambda d: 0 if d["method"] == "keyword" else 1)
+            if session_filter is not None and entry["session_id"] != session_filter:
+                continue
+            definitions.append({"method": entry["method"],
+                                 "session_id": entry["session_id"],
+                                 "definition": entry["definition"]})
+        # §10.2 RECOMMENDED ordering: "default" first, then by session_id,
+        # then by method (keyword, template).
+        definitions.sort(key=lambda d: (0 if d["session_id"] == "default" else 1,
+                                         d["session_id"],
+                                         0 if d["method"] == "keyword" else 1))
         if definitions:
             self.bus.emit(message.reply("ovos.intent.describe.response",
                                         {"ok": True, "definitions": definitions}))
