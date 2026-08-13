@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.6.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.4a1) (2026-08-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.3a2...2.6.4a1)
+
+**Merged pull requests:**
+
+- fix: mirror add\_context under the resolved private key when the producer names it [\#857](https://github.com/OpenVoiceOS/ovos-core/pull/857) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.6.3a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.3a2) (2026-08-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.3a1...2.6.3a2)
@@ -327,10 +335,6 @@
 ## [2.1.1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.1) (2025-11-05)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.1a1...2.1.1)
-
-**Merged pull requests:**
-
-- Release 2.1.1a1 [\#735](https://github.com/OpenVoiceOS/ovos-core/pull/735) ([github-actions[bot]](https://github.com/apps/github-actions))
 
 ## [2.1.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.1a1) (2025-11-05)
 
