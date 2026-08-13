@@ -126,12 +126,12 @@ class _LegacyStopBridge:
         """Legacy ``stop:skill`` handler — re-emits ``<skill_id>.stop`` ONLY
         when the translator is not already doing it (see class docstring)."""
         skill_id = message.data.get("skill_id")
-        if not skill_id:
-            LOG.warning("stop:skill received without a skill_id; dropping")
-            return
         with HandlerLifecycle(self.bus, message,
                               skill_id=self.LEGACY_SKILL_ID,
                               data={"name": "StopService.handle_skill_stop"}):
+            if not skill_id:
+                LOG.warning("stop:skill received without a skill_id; dropping")
+                return
             if not self._legacy_topics_already_bridged:
                 self.bus.emit(message.reply(f"{skill_id}.stop"))
 

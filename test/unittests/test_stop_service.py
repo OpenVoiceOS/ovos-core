@@ -836,5 +836,75 @@ class TestShutdown(unittest.TestCase):
         svc._legacy.shutdown.assert_called_once()
 
 
+class TestPreDrainSnapshotsAreSessionScoped(unittest.TestCase):
+    """Regression: ``_was_active_pre_drain`` / ``_utt_state_pre_drain`` used to
+    be keyed by bare ``skill_id``. Two concurrent targeted stops for the SAME
+    skill_id but DIFFERENT sessions collided: session B's snapshot overwrote
+    session A's, and whichever confirmation was processed second popped the
+    OTHER session's (already-consumed) entry, producing wrong
+    force_timeout/abort_question decisions. Keying by ``(session_id,
+    skill_id)`` fixes this."""
+
+    def test_interleaved_targeted_stops_same_skill_different_sessions(self):
+        svc = _make_service()
+        svc.bus.emit = MagicMock()
+
+        # Session A: skill_a is blocked in get_response (RESPONSE state) ->
+        # its confirmation must trigger abort_question.
+        sess_a = Session("session_a")
+        sess_a.enable_response_mode("skill_a")
+
+        # Session B: skill_a is merely active via converse (INTENT state) ->
+        # its confirmation must trigger converse.force_timeout, NOT
+        # abort_question.
+        sess_b = Session("session_b")
+        sess_b.activate_skill("skill_a")
+
+        # interleave: A's pre-drain snapshot, then B's pre-drain snapshot,
+        # both for the same skill_id, BEFORE either confirmation arrives.
+        match_a = svc._targeted_stop("skill_a", 1.0, "stop", sess_a)
+        match_b = svc._targeted_stop("skill_a", 1.0, "stop", sess_b)
+        drained_a = match_a.updated_session
+        drained_b = match_b.updated_session
+
+        self.assertEqual(
+            len(svc._was_active_pre_drain), 2,
+            "both sessions' snapshots must coexist, keyed independently")
+
+        msg_a = Message("skill_a.stop.response",
+                        data={"skill_id": "skill_a", "result": True},
+                        context={"session": drained_a.serialize()})
+        msg_b = Message("skill_a.stop.response",
+                        data={"skill_id": "skill_a", "result": True},
+                        context={"session": drained_b.serialize()})
+
+        # A's confirmation arrives first, then B's.
+        with patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=drained_a):
+            svc.handle_stop_confirmation(msg_a)
+        emitted_after_a = [c[0][0].msg_type for c in svc.bus.emit.call_args_list]
+        self.assertIn("mycroft.skills.abort_question", emitted_after_a,
+                      "session A's own RESPONSE-state snapshot must drive its "
+                      "confirmation, not session B's")
+        self.assertNotIn("ovos.skills.converse.force_timeout", emitted_after_a,
+                         "session A was never converse-active; only its own "
+                         "snapshot (RESPONSE-state) should be consulted")
+
+        svc.bus.emit.reset_mock()
+        with patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=drained_b):
+            svc.handle_stop_confirmation(msg_b)
+        emitted_after_b = [c[0][0].msg_type for c in svc.bus.emit.call_args_list]
+        self.assertIn("ovos.skills.converse.force_timeout", emitted_after_b,
+                      "session B's own converse-active snapshot must drive "
+                      "its confirmation, not session A's (already-consumed) one")
+        self.assertNotIn("mycroft.skills.abort_question", emitted_after_b,
+                         "session B was never in RESPONSE state; the bug would "
+                         "have it consume session A's leftover/absent snapshot")
+
+        self.assertEqual(len(svc._was_active_pre_drain), 0)
+        self.assertEqual(len(svc._utt_state_pre_drain), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

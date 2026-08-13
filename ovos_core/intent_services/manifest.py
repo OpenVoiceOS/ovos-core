@@ -113,7 +113,8 @@ class IntentManifest:
             LOG.warning(
                 f"skill '{skill_id}' registered an intent literally named 'stop' — "
                 f"this collides with the OVOS-STOP-1 reserved '{skill_id}:stop' "
-                "targeted-dispatch topic and will never be reachable as a normal intent.")
+                "targeted-dispatch topic, so both the registered intent handler "
+                "and the stop machinery will react to messages on that topic.")
         session_id = (message.context.get("session") or {}).get("session_id", "default")
         key = self._key(session_id, skill_id, intent_name, lang, method)
         self._index[key] = {

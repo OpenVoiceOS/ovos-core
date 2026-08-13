@@ -54,20 +54,24 @@ class StopService(ConfidenceMatcherPipeline):
         # §5 global-stop dispatch target; bound once, shared across tiers (§3.1).
         self.bus.on(f"{self.pipeline_id}:global_stop", self.handle_global_stop)
         self._legacy = _LegacyStopBridge(self)
-        #: skill_id -> was the skill active BEFORE match() drained the session
-        #: copy (CONFIRMED-2: the session ``handle_stop_confirmation`` reads
-        #: back off the ``.stop.response`` message context is already drained
-        #: by dispatch time, so ``sess.is_active(skill_id)`` there is always
-        #: False; this records the pre-drain truth match() observed instead).
-        self._was_active_pre_drain: Dict[str, bool] = {}
-        #: skill_id -> its UtteranceState BEFORE match() drained the session
-        #: copy (same drain-ordering class as ``_was_active_pre_drain``:
+        #: (session_id, skill_id) -> was the skill active BEFORE match() drained
+        #: the session copy (CONFIRMED-2: the session ``handle_stop_confirmation``
+        #: reads back off the ``.stop.response`` message context is already
+        #: drained by dispatch time, so ``sess.is_active(skill_id)`` there is
+        #: always False; this records the pre-drain truth match() observed
+        #: instead). Keyed by ``(session_id, skill_id)`` rather than bare
+        #: ``skill_id`` — two concurrent targeted stops for the same skill_id
+        #: in different sessions must not clobber/consume each other's snapshot.
+        self._was_active_pre_drain: Dict[tuple, bool] = {}
+        #: (session_id, skill_id) -> its UtteranceState BEFORE match() drained
+        #: the session copy (same drain-ordering class as
+        #: ``_was_active_pre_drain``, including the same per-session keying —
         #: ``handle_stop_confirmation`` reads ``sess.utterance_states`` off the
         #: ``.stop.response`` message context, which is already drained —
         #: ``disable_response_mode`` runs before dispatch — by the time it
         #: arrives, so the live read is always UtteranceState.INTENT there and
         #: the RESPONSE branch/``abort_question`` emission was unreachable).
-        self._utt_state_pre_drain: Dict[str, UtteranceState] = {}
+        self._utt_state_pre_drain: Dict[tuple, UtteranceState] = {}
 
     def handle_global_stop(self, message: Message) -> None:
         """OVOS-STOP-1 §5.3 — broadcast the universal ``ovos.stop``.
@@ -242,7 +246,7 @@ class StopService(ConfidenceMatcherPipeline):
             # the skill was genuinely blocked in get_response). Consult the
             # pre-drain snapshot instead, falling back to the live read for
             # direct-invocation callers that bypass _targeted_stop.
-            utt_state = self._utt_state_pre_drain.pop(skill_id, None)
+            utt_state = self._utt_state_pre_drain.pop((sess.session_id, skill_id), None)
             if utt_state is None:
                 utt_state = sess.utterance_states.get(skill_id, UtteranceState.INTENT)
             if utt_state == UtteranceState.RESPONSE:
@@ -255,7 +259,7 @@ class StopService(ConfidenceMatcherPipeline):
             # Fall back to it only when no pre-drain record exists (e.g. a
             # handler invoked directly, bypassing _targeted_stop) so existing
             # direct-invocation callers keep working.
-            was_active = self._was_active_pre_drain.pop(skill_id, None)
+            was_active = self._was_active_pre_drain.pop((sess.session_id, skill_id), None)
             if was_active is None:
                 was_active = sess.is_active(skill_id)
             if was_active:
@@ -291,12 +295,12 @@ class StopService(ConfidenceMatcherPipeline):
         # captured before the drain so handle_stop_confirmation's force_timeout
         # check (CONFIRMED-2) can still see the pre-drain truth once the
         # (post-drain) session reaches it via the dispatch round-trip.
-        self._was_active_pre_drain[skill_id] = sess.is_active(skill_id)
+        self._was_active_pre_drain[(sess.session_id, skill_id)] = sess.is_active(skill_id)
         # CONFIRMED-4: same reasoning — snapshot the pre-drain utterance state
         # so handle_stop_confirmation's abort_question check (RESPONSE state)
         # can still see it once the (post-drain) session reaches it via the
         # dispatch round-trip.
-        self._utt_state_pre_drain[skill_id] = sess.utterance_states.get(
+        self._utt_state_pre_drain[(sess.session_id, skill_id)] = sess.utterance_states.get(
             skill_id, UtteranceState.INTENT)
         drained = Session.deserialize(sess.serialize())
         drained.disable_response_mode(skill_id)
