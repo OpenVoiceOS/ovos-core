@@ -43,6 +43,7 @@ from ovos_utils.fakebus import FakeBus
 
 from ovos_core.intent_services.service import IntentService
 from ovos_core.intent_services.dispatcher import IntentDispatcher
+from ovos_core.intent_services.manifest import IntentManifest
 
 START = SpecMessage.INTENT_HANDLER_START.value
 COMPLETE = SpecMessage.INTENT_HANDLER_COMPLETE.value
@@ -245,6 +246,7 @@ class TestDispatchFromMatch(unittest.TestCase):
         it = MagicMock(); it.transform.side_effect = lambda i: i
         svc.intent_plugins = it
         svc.status = MagicMock()
+        svc.intent_manifest = IntentManifest(bus)
         # mirror IntentService.__init__: the dispatcher notifies the orchestrator on
         # each §8 terminal, which emits the §9.5 end-marker
         svc.intent_dispatcher = IntentDispatcher(
