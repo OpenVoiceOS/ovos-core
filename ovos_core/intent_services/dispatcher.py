@@ -147,10 +147,28 @@ class IntentDispatcher:
             self.on_terminal(dispatch_msg)
 
     # -- terminal resolution ---------------------------------------------
-    def _pop(self, sid: str, skill_id: Optional[str]) -> Optional[_InFlightDispatch]:
+    def _pop(self, sid: str, skill_id: Optional[str],
+             intent_name: Optional[str] = None) -> Optional[_InFlightDispatch]:
         """Pop the most-recent unresolved in-flight dispatch for this session
         whose ``skill_id`` matches (when known). LIFO so nested lifecycles
-        resolve innermost-first (§6.5)."""
+        resolve innermost-first (§6.5).
+
+        ``intent_name``, when supplied by the caller, additionally restricts
+        the match to that specific intent — the framework done-signal
+        normally carries only ``skill_id`` (a real skill has at most one
+        handler running, so that alone is unambiguous), but a caller with
+        more precise knowledge of which dispatch it is concluding (e.g. a
+        synthetic completion raised on behalf of a specific intent) can avoid
+        resolving an unrelated in-flight entry for the same skill. Omitted
+        (the default), this behaves exactly as before.
+
+        Callers MUST source this from ``message.data``, never
+        ``message.context`` — context is forwarded/deep-copied down the
+        entire dispatch chain from the ORIGINATING client utterance, so a
+        client-supplied ``context["intent_name"]`` would silently mismatch
+        every real handler's own completion signal for that dispatch (see
+        ``_on_skill_complete``/``_on_skill_error``).
+        """
         with self._lock:
             stack = self._in_flight.get(sid)
             if not stack:
@@ -160,6 +178,8 @@ class IntentDispatcher:
                 if entry.resolved:
                     continue
                 if skill_id and entry.skill_id != skill_id:
+                    continue
+                if intent_name and entry.intent_name != intent_name:
                     continue
                 entry.resolved = True
                 stack.pop(i)
@@ -172,7 +192,8 @@ class IntentDispatcher:
 
     def _on_skill_complete(self, message: Message):
         """Framework done-signal -> ``complete`` (§8.1)."""
-        entry = self._pop(self._session_id(message), message.context.get("skill_id"))
+        entry = self._pop(self._session_id(message), message.context.get("skill_id"),
+                          message.data.get("intent_name"))
         if entry is None:
             return
         try:
@@ -183,7 +204,8 @@ class IntentDispatcher:
 
     def _on_skill_error(self, message: Message):
         """Framework done-signal -> ``error`` with the exception (§8.2)."""
-        entry = self._pop(self._session_id(message), message.context.get("skill_id"))
+        entry = self._pop(self._session_id(message), message.context.get("skill_id"),
+                          message.data.get("intent_name"))
         if entry is None:
             return
         exception = (message.data.get("exception")
