@@ -334,10 +334,19 @@ class IntentService:
         # orchestrator-only: no `match` call is made and no bus event is
         # emitted for the skip, it is observable only as a non-invocation.
         # Unknown pipeline_ids in the blacklist are harmless no-ops.
-        blacklisted = set(session.blacklisted_pipelines or [])
-        requested = [p for p in session.pipeline if p not in blacklisted]
+        blacklisted = {
+            _PIPELINE_MIGRATION_MAP.get(pipeline_id, pipeline_id)
+            for pipeline_id in session.blacklisted_pipelines or []
+        }
+
+        def is_blacklisted(matcher_id: str) -> bool:
+            normalized = _PIPELINE_MIGRATION_MAP.get(matcher_id, matcher_id)
+            plugin_id = _PIPELINE_RE.sub('', normalized)
+            return normalized in blacklisted or plugin_id in blacklisted
+
+        requested = [p for p in session.pipeline if not is_blacklisted(p)]
         if blacklisted:
-            skipped = [p for p in session.pipeline if p in blacklisted]
+            skipped = [p for p in session.pipeline if is_blacklisted(p)]
             if skipped:
                 LOG.debug(f"Session '{session.session_id}' blacklisted "
                           f"pipelines skipped: {skipped}")

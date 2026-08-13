@@ -359,6 +359,29 @@ class TestGetPipelineSessionBlacklist(unittest.TestCase):
         result = svc.get_pipeline(session=sess)
         self.assertEqual([m[0] for m in result], ["adapt_high"])
 
+    def test_plugin_blacklist_skips_all_confidence_matchers_before_lookup(self):
+        """A base plugin policy ID blocks its suffixed matcher variants.
+
+        The deployment blacklist is expressed in installed plugin IDs while a
+        session pipeline contains confidence-suffixed matcher IDs.  Filtering
+        must happen before matcher lookup so an intentionally disabled plugin
+        is neither invoked nor reported as unknown.
+        """
+        svc = self._svc_with_adapt_fallback()
+        sess = Session("s")
+        sess.pipeline = [
+            "ovos-adapt-pipeline-plugin-high",
+            "fallback_high",
+        ]
+        sess.blacklisted_pipelines = ["ovos-adapt-pipeline-plugin"]
+
+        with patch.object(svc, "get_pipeline_matcher",
+                          wraps=svc.get_pipeline_matcher) as get_matcher:
+            result = svc.get_pipeline(session=sess)
+
+        self.assertEqual([matcher[0] for matcher in result], ["fallback_high"])
+        get_matcher.assert_called_once_with("fallback_high")
+
     def test_no_bus_emission_accompanies_skip(self):
         """The skip is orchestrator-only: no `match` call and no bus event
         is emitted for a blacklisted matcher (§5.2)."""
