@@ -699,6 +699,93 @@ class TestContextHandlers(unittest.TestCase):
         self.assertNotIn("my_skillkitchen", sess.intent_context or {})
         self.assertNotIn("my.skill:kitchen", sess.intent_context or {})
 
+    def test_handle_add_context_idempotent_on_repeated_identical_write(self):
+        """CONTEXT-1 §5.0 (architecture#161): `add_context` is a
+        LEGACY-COMPAT input path, not a spec write path - the session is
+        the only one. A modern emitter writes `session.intent_context`
+        directly first; this legacy handler may ALSO be invoked for the
+        exact same key/value (dual-write compat window, or an old-core
+        replay). Re-applying the identical key+value here must be a
+        no-op / identical-value refresh, never a double-decay (stacking
+        turns_remaining) or a double-refresh (accumulating frames/entries)
+        on top of what the direct session write already carried."""
+        sess = Session("s")
+        # simulate the direct session write a modern producer performs
+        # BEFORE the legacy compat message is also processed
+        sess.intent_context = {"my.skill:kitchen": {"value": "kitchen"}}
+        msg = Message("add_context",
+                      data={"context": "my_skillkitchen", "word": "kitchen",
+                            "key": "kitchen"},
+                      context={"session": sess.serialize(),
+                               "skill_id": "my.skill"})
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess):
+            IntentService.handle_add_context(msg)
+        first_entry = dict(sess.intent_context["my.skill:kitchen"])
+        first_frame_count = len(sess.context.frame_stack)
+        first_key_count = len(sess.intent_context)
+
+        # re-apply the SAME message data a second time (e.g. a duplicate
+        # delivery, or a second producer emitting the identical compat
+        # message for the same logical write)
+        msg2 = Message("add_context",
+                       data={"context": "my_skillkitchen", "word": "kitchen",
+                             "key": "kitchen"},
+                       context={"session": sess.serialize(),
+                                "skill_id": "my.skill"})
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess):
+            IntentService.handle_add_context(msg2)
+        second_entry = sess.intent_context["my.skill:kitchen"]
+
+        # value is identical - no double-decay, no drift
+        self.assertEqual(first_entry["value"], second_entry["value"])
+        # a legitimate refresh may advance expires_at forward, never stack
+        # a second independent decay dimension on top
+        self.assertGreaterEqual(second_entry.get("expires_at", 0),
+                                first_entry.get("expires_at", 0))
+        # no duplicate keys and no duplicate legacy frames accumulated -
+        # `sess.context` is a derived projection over `intent_context`
+        # (one frame per live entry), not a persisted stack, so its count
+        # must stay stable across the repeated identical write, whatever
+        # its baseline value is (both the munged and resolved spellings
+        # legitimately coexist as separate entries/frames by design).
+        self.assertEqual(len(sess.intent_context), first_key_count)
+        self.assertEqual(len(sess.context.frame_stack), first_frame_count)
+
+    def test_handle_remove_context_idempotent_on_repeated_identical_removal(self):
+        """Symmetric with the add-context idempotency test: re-applying an
+        identical legacy `remove_context` compat message after the session
+        already carries the tombstone (or after a direct session removal)
+        is a no-op, not an error and not a double-removal artifact."""
+        sess = Session("s")
+        sess.intent_context = {"my_skillkitchen": {"value": "kitchen"},
+                               "my.skill:kitchen": {"value": "kitchen"}}
+        entity = {"confidence": 1.0, "data": [("kitchen", "my_skillkitchen")],
+                  "match": "kitchen", "key": "kitchen", "origin": ""}
+        sess.context.inject_context(entity)
+        msg = Message("remove_context",
+                      data={"context": "my_skillkitchen", "key": "kitchen"},
+                      context={"session": sess.serialize(),
+                               "skill_id": "my.skill"})
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess):
+            IntentService.handle_remove_context(msg)
+        self.assertNotIn("my_skillkitchen", sess.intent_context or {})
+        self.assertNotIn("my.skill:kitchen", sess.intent_context or {})
+
+        # re-apply the identical removal a second time - must not raise
+        # and must leave the (already-clean) state unchanged
+        msg2 = Message("remove_context",
+                       data={"context": "my_skillkitchen", "key": "kitchen"},
+                       context={"session": sess.serialize(),
+                                "skill_id": "my.skill"})
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess):
+            IntentService.handle_remove_context(msg2)
+        self.assertNotIn("my_skillkitchen", sess.intent_context or {})
+        self.assertNotIn("my.skill:kitchen", sess.intent_context or {})
+
     def test_handle_add_context_no_key_stores_only_munged_legacy(self):
         """Back-compat pin: a message with no data['key'] (old-workshop /
         legacy ADAPT-only caller) must store ONLY the munged legacy key -
