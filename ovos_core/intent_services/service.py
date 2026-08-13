@@ -729,8 +729,12 @@ class IntentService:
         session's context can never survive to the terminal event. SESSION-2
         §2.6 is unambiguous: folding a message's session onto the working
         session belongs at lifecycle entry only; incidental messages must never
-        mutate it. Default sessions happen to survive today only because their
-        fold preserves omitted fields, not because the fold is correct.
+        mutate it. This is not a named-session-only defect: ``update_from``
+        round-trips through full serialize/deserialize for every session id,
+        including ``"default"`` - a stale default-session snapshot arriving
+        on an incidental message wipes the device-local default session's
+        context exactly the same way. The registry-first fix below is load-
+        bearing for the default session too, not only named ones.
 
         Fix (this handler's scope only - the general fold-discipline at every
         ``get(message)`` call site is a tracked follow-up): resolve the
@@ -784,20 +788,26 @@ class IntentService:
         # `expires_at` as never-expiring, so `prune()` could never reap
         # these entries. OVOS-CONTEXT-1 sides against that: legacy-sourced
         # entries carry decay; immortality is reserved for deliberate
-        # writers, which the skill API is not. Fixed by reading back
-        # whatever `inject_context()` already stamped and preserving it
-        # (falling back to the same timeout computation only if, for some
-        # reason, nothing was stamped) instead of clobbering.
+        # writers, which the skill API is not.
+        #
+        # Round 5 (C1): a re-set of the same context key is a wholesale
+        # replace, not a merge (OVOS-CONTEXT-1 §5) - there is no read-back
+        # API for consumers to notice a stale expiry (§5.3). Every re-set
+        # must refresh `expires_at` unconditionally, same as
+        # `inject_context()` above does for the munged key. Preserving a
+        # prior stamp here (reading it back off `ctx`) let this key and the
+        # resolved private key below drift out of sync: a skill re-calling
+        # `set_context` kept the adapt entry alive while the resolved entry
+        # kept dying at its original expiry. One decay policy, computed
+        # once, applied to both keys.
         context_cfg = Configuration().get('context', {})
         timeout_s = context_cfg.get('timeout', 2) * 60
         now = time.time()
         ctx = dict(sess.intent_context or {})
         munged_entry = {"value": word or context}
-        munged_expires_at = (ctx.get(context) or {}).get("expires_at")
-        if munged_expires_at is None and timeout_s > 0:
-            munged_expires_at = now + timeout_s
-        if munged_expires_at is not None:
-            munged_entry["expires_at"] = munged_expires_at
+        expires_at = now + timeout_s if timeout_s > 0 else None
+        if expires_at is not None:
+            munged_entry["expires_at"] = expires_at
         ctx[context] = munged_entry
         # Two dialects meet here: legacy ADAPT context is stored under the
         # producer's munged `alphanumeric_skill_id + key` spelling (above),
@@ -820,22 +830,19 @@ class IntentService:
                 # is an internal wire detail of the ADAPT dialect and must
                 # never leak into OVOS-CONTEXT-1 §7 slot injection via this
                 # (declarative-gate) entry.
-                # Round 2 (C4) / Round 3: preserve whatever expires_at OR
-                # turns_remaining a prior write already established for
-                # THIS resolved key (setdefault-style merge) - "value" is
-                # always authoritative from this call, decay fields only
-                # when the entry is fresh. Round 3 adds the default decay
-                # stamp itself (sourced from the same adapt-convention
-                # timeout as the legacy view) so a brand-new resolved entry
-                # is not immortal by omission - only a caller that
-                # deliberately pre-stamped decay fields keeps them
-                # untouched.
-                existing = dict(ctx.get(resolved) or {})
-                existing["value"] = word or key
-                if "expires_at" not in existing and \
-                        "turns_remaining" not in existing and timeout_s > 0:
-                    existing["expires_at"] = now + timeout_s
-                ctx[resolved] = existing
+                # Round 5 (C1): stamp the SAME `expires_at` computed above
+                # for the munged key, unconditionally, on every re-set - no
+                # setdefault-style preservation of a prior write's expiry.
+                # Preserving it here was the bug: it let this resolved key
+                # keep dying at the FIRST write's expiry while the munged
+                # key above kept getting refreshed by `inject_context()`,
+                # so the declarative gate could close while the legacy
+                # adapt context was still alive (or vice versa). One decay
+                # policy, one computed `expires_at`, both keys.
+                resolved_entry = {"value": word or key}
+                if expires_at is not None:
+                    resolved_entry["expires_at"] = expires_at
+                ctx[resolved] = resolved_entry
         sess.intent_context = ctx
 
     @staticmethod

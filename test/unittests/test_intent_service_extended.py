@@ -17,7 +17,7 @@ from collections import defaultdict
 from unittest.mock import MagicMock, patch
 
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import Session, SessionManager
+from ovos_bus_client.session import DEFAULT_SESSION_ID, Session, SessionManager
 from ovos_plugin_manager.templates.pipeline import (
     IntentHandlerMatch,
     ConfidenceMatcherPipeline,
@@ -505,17 +505,16 @@ class TestContextHandlers(unittest.TestCase):
             sess.intent_context["my.skill:kitchen"]["value"],
             "my_skillkitchen")
 
-    def test_handle_add_context_preserves_resolved_expiry_fields(self):
-        """Round 2 (C4) regression: writing the resolved twin must NOT
-        clobber expires_at/turns_remaining a prior write already
-        established for that exact resolved key - only 'value' is
-        authoritative from this call (setdefault-style merge). Round 3
-        supersedes the Round 2 docstring claim that the munged-key entry
-        keeps a full-overwrite behavior forever - see
-        test_handle_add_context_stamps_expiry_on_both_spellings and
-        test_handle_add_context_preserves_custom_munged_expiry below: the
-        munged key is now ALSO merge-preserving, via inject_context()'s own
-        stamp rather than a second setdefault here."""
+    def test_handle_add_context_refreshes_resolved_expiry_on_reset(self):
+        """Round 5 (C1) regression: supersedes Round 2's setdefault-style
+        preservation. OVOS-CONTEXT-1 SECTION 5: a re-set of a key that
+        already exists replaces it wholesale, and SECTION 5.3: there is no
+        read-back API for a caller to notice a stale expiry survived. A
+        re-set of the resolved private key must REFRESH expires_at
+        unconditionally, not keep whatever a prior write established - a
+        stale kept expiry let the resolved key die out of step with the
+        munged legacy key (which inject_context() always refreshes on
+        every call)."""
         sess = Session("s")
         sess.intent_context = {"my.skill:kitchen": {"value": "old",
                                                      "expires_at": 999999999.0,
@@ -530,8 +529,10 @@ class TestContextHandlers(unittest.TestCase):
             IntentService.handle_add_context(msg)
         entry = sess.intent_context["my.skill:kitchen"]
         self.assertEqual(entry["value"], "kitchen")
-        self.assertEqual(entry["expires_at"], 999999999.0)
-        self.assertEqual(entry["turns_remaining"], 3)
+        # refreshed, not preserved: the old immortal-looking 999999999.0
+        # stamp and the stale turns_remaining must both be gone
+        self.assertNotEqual(entry.get("expires_at"), 999999999.0)
+        self.assertNotIn("turns_remaining", entry)
 
     def test_handle_add_context_stamps_expiry_on_both_spellings(self):
         """Round 3 (wave-3 live lead) regression: a FRESH add_context call
@@ -642,6 +643,60 @@ class TestContextHandlers(unittest.TestCase):
         self.assertTrue(gate_satisfied(sess.intent_context, ["kitchen"], [],
                                        owner_id="my.skill"))
 
+    def test_handle_add_context_reset_refreshes_both_keys_in_lockstep(self):
+        """Round 5 (C1) regression: one decay policy for a logical write.
+        A skill re-calling set_context (a second handle_add_context for the
+        SAME context/key, e.g. re-affirming context mid-conversation) must
+        refresh expires_at on BOTH the munged legacy key and the resolved
+        private key together. Before the fix, the munged key was refreshed
+        (inject_context() always stamps fresh) but the resolved key's
+        setdefault-style merge kept the FIRST write's expiry forever - the
+        two keys decayed on different schedules and the declarative gate
+        could close (resolved key expired) while the legacy adapt context
+        was still alive, or the reverse. Must be RED before the fix: the
+        resolved key's expires_at stays pinned to t0 + timeout instead of
+        being refreshed to t0 + 100 + timeout, so prune() at t0+150 reaps
+        the resolved key but not the munged key."""
+        from ovos_spec_tools.context import prune
+
+        sess = Session("s")
+        msg_kwargs = dict(
+            data={"context": "my_skillkitchen", "word": "kitchen",
+                  "key": "kitchen"},
+            context={"session": sess.serialize(), "skill_id": "my.skill"})
+
+        t0 = 1_000_000.0
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.time.time",
+                   return_value=t0):
+            IntentService.handle_add_context(Message("add_context", **msg_kwargs))
+
+        first_munged = sess.intent_context["my_skillkitchen"]["expires_at"]
+        first_resolved = sess.intent_context["my.skill:kitchen"]["expires_at"]
+
+        # re-set the SAME context/key 100s later
+        t1 = t0 + 100.0
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.time.time",
+                   return_value=t1):
+            IntentService.handle_add_context(Message("add_context", **msg_kwargs))
+
+        second_munged = sess.intent_context["my_skillkitchen"]["expires_at"]
+        second_resolved = sess.intent_context["my.skill:kitchen"]["expires_at"]
+
+        # both keys must have refreshed by the same delta - one policy
+        self.assertGreater(second_munged, first_munged)
+        self.assertGreater(second_resolved, first_resolved)
+        self.assertEqual(second_munged, second_resolved)
+
+        # neither key may be reaped by a prune() 150s after the FIRST
+        # write, since BOTH were refreshed by the re-set at t0+100
+        pruned = prune(dict(sess.intent_context), now=t0 + 150.0)
+        self.assertIn("my_skillkitchen", pruned)
+        self.assertIn("my.skill:kitchen", pruned)
+
     def test_handle_remove_context_removes_both_spellings(self):
         """Symmetric with add: removing must drop both the legacy munged
         key and the resolved private-scope key."""
@@ -744,6 +799,31 @@ class TestContextHandlersLiveRegistry(unittest.TestCase):
         live = SessionManager.sessions[sess.session_id]
         self.assertIn("First", live.intent_context)
         self.assertIn("Second", live.intent_context)
+
+    def test_add_context_survives_stale_default_session_snapshot_fold(self):
+        """Round 5 (C3) regression: the registry-first fix is load-bearing
+        for the DEVICE-LOCAL DEFAULT session too, not only named sessions.
+        `Session.update_from` round-trips through full serialize/deserialize
+        for every session id, including "default" - it does not "happen to
+        preserve omitted fields" for the default id, contrary to the old
+        docstring claim. A registry "default" entry's pre-existing context
+        must survive a handle_add_context call driven by a message carrying
+        a STALE default-session snapshot, exactly like the named-session
+        case above."""
+        sess = Session(DEFAULT_SESSION_ID)
+        sess.intent_context = {"Existing": {"value": "existing"}}
+        SessionManager.sessions[DEFAULT_SESSION_ID] = sess
+
+        stale = Session(DEFAULT_SESSION_ID)  # unaware of "Existing"
+        msg = Message("add_context",
+                      data={"context": "New", "word": "newword"},
+                      context={"session": stale.serialize()})
+
+        IntentService.handle_add_context(msg)
+
+        live = SessionManager.sessions[DEFAULT_SESSION_ID]
+        self.assertIn("Existing", live.intent_context)
+        self.assertIn("New", live.intent_context)
 
 
 # ---------------------------------------------------------------------------

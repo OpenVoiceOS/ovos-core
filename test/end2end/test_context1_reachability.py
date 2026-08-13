@@ -33,8 +33,8 @@ fixed, never-folded ``Session`` object, so it could never observe the
 wave-3 defect - "in-lifecycle set_context on a NAMED session never survives
 to the terminal event" - because it never exercised
 ``SessionManager.get(message)``'s real fold at all. That is exactly why the
-defect escaped to wave 3. ``test_named_session_context_survives_in_lifecycle_
-and_terminal_event`` below drives the REAL registered-session two-message
+defect escaped to wave 3. ``test_named_session_context_survives_a_second_
+stale_client_message`` below drives the REAL registered-session two-message
 flow instead: a NAMED session is registered in the real
 ``SessionManager.sessions`` singleton (no mocking); ``set_context`` is
 invoked from inside a simulated utterance-handling frame (so
@@ -136,7 +136,7 @@ class TestContext1EndToEndReachability(TestCase):
         (restored after), so it isolates the ONE thing it is about:
         private-key resolution reachability, not the round-4 fold-discipline
         fix (that is what
-        ``test_named_session_context_survives_in_lifecycle_and_terminal_event``
+        ``test_named_session_context_survives_a_second_stale_client_message``
         below exercises, over an explicit NAMED session)."""
         saved_default = SessionManager.sessions.get(DEFAULT_SESSION_ID)
         self.session.session_id = DEFAULT_SESSION_ID
