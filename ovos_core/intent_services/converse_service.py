@@ -27,6 +27,97 @@ CONVERSE_HANDLER_TIMEOUT = 5 * 60
 class ConverseService(PipelinePlugin):
     """Intent Service handling conversational skills."""
 
+    @staticmethod
+    def _registry_session_for_write(message: Optional[Message]) -> "Session":
+        """Resolve the session object to mutate for an INCIDENTAL converse
+        write path - one that does NOT echo the resulting session back onto
+        the wire (``message.context["session"] = session.serialize()``) and
+        is not part of a chain that already resolved the session once for
+        this lifecycle-entry call.
+
+        FOLD-ORDER CONTRACT (read this before adding a new call site):
+
+        ``SessionManager.get(message)`` is NEVER a pure read. It always
+        folds the incoming message's session snapshot onto the live
+        registry entry (``SessionManager._store`` -> ``Session.update_from``,
+        full serialize/deserialize replace, for every session id including
+        ``"default"``) and returns THAT live object. So every call is a
+        write of the message's declared state onto the registry, whether or
+        not the caller goes on to mutate anything itself.
+
+        That fold is *correct and required* at two kinds of site:
+          1. True lifecycle entry (e.g. ``match()``'s own top-level
+             ``SessionManager.get(message)`` call) - SESSION-2 last-writer-
+             wins: the client's freshly-declared fields (lang, blacklist,
+             client-side (de)activations) must apply here.
+          2. Any site that stamps the resolved session back onto the wire
+             via ``message.context["session"] = session.serialize()``
+             (``activate_skill`` / ``deactivate_skill`` below) - bypassing
+             the fold there would silently discard the client's own
+             declarations from the outgoing message, e.g. resurrecting a
+             skill the client had just blacklisted. These sites MUST use
+             plain ``SessionManager.get(message)``, not this helper.
+
+        The fold is *wrong* (and this helper exists to avoid it) only for
+        an INCIDENTAL write with no wire echo, where a STALE message (one
+        that predates state written to the registry earlier in the same
+        session's lifecycle, e.g. by a prior ``get_response.enable`` call)
+        would otherwise wipe that state via the full-replace fold before
+        this handler's own write lands. ``get_response.enable/disable``
+        below are the load-bearing example: they only ``SessionManager.sync``
+        for the default session, so a named session's write was being
+        wiped on every subsequent fold with no recovery.
+
+        RESIDUAL (not fixed by this helper, tracked as a known gap): a
+        case-2 wire-echo site (``activate_skill`` / ``deactivate_skill``)
+        still full-replaces the registry entry when it folds. So a
+        case-3 write this helper protects (e.g. ``get_response.enable``)
+        only survives until the NEXT stale ``activate_skill`` /
+        ``deactivate_skill`` call for that same session - executed proof:
+        enable get_response for a named session, then drive a stale
+        ``activate_skill`` call for the same session id, and
+        ``utterance_states`` is wiped back to empty. This is pre-existing
+        on ``dev`` (``activate_skill``/``deactivate_skill`` already used
+        plain ``SessionManager.get(message)`` before this PR) and is
+        unchanged by this PR - this helper narrows the window, it does not
+        close it. Fixing it for real needs case-2 sites to fold
+        per-field (client wins only on fields it actually declares) rather
+        than full-replace; out of scope here.
+
+        A THIRD case - repeated folding within a single synchronous call
+        chain sharing one message (``match()`` -> ``_collect_converse_skills``
+        / ``get_active_skills``) - is neither of the above: fold once at
+        the top (case 1) and THREAD that resolved ``session`` object
+        through the rest of the chain via an explicit parameter; do not
+        call ``SessionManager.get(message)``/this helper again per
+        sub-step, each additional call re-folds the same stale message and
+        undoes whatever the previous step in the chain just wrote. Note
+        ``_check_converse_timeout`` does NOT need this treatment: verified
+        by mutation testing, it sits between two folds of the identical
+        message with no intervening write, so re-folding there is
+        idempotent - see its own docstring.
+
+        This mirrors ``IntentService._registry_session_for_context_write``
+        (#857, ``ovos_core/intent_services/service.py``) exactly for case-3
+        incidental writes, but is a deliberately separate copy: the
+        intent-context handlers and these converse write paths are
+        different call sites landing in different PRs. Do not delete this
+        helper assuming #857 covers it - when both PRs are merged, consider
+        consolidating the two into one shared helper, but until then each
+        pairs with its own call sites.
+
+        Resolution: resolve session_id off the message and, if the registry
+        already holds a live entry for it, mutate that object directly - no
+        fold. Fall back to ``SessionManager.get(message)`` (today's
+        behavior) only when no registry entry exists yet, e.g.
+        out-of-registry/test callers or a message with no session context.
+        """
+        session_data = message.context.get("session") if message and message.context else None
+        session_id = session_data.get("session_id") if isinstance(session_data, dict) else None
+        if session_id and session_id in SessionManager.sessions:
+            return SessionManager.sessions[session_id]
+        return SessionManager.get(message)
+
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
                  config: Optional[Dict] = None) -> None:
         config = config or Configuration().get("skills", {}).get("converse", {})
@@ -107,28 +198,49 @@ class ConverseService(PipelinePlugin):
             session.activate_skill(skill_id)
 
     @staticmethod
-    def get_active_skills(message: Optional[Message] = None) -> List[str]:
+    def get_active_skills(message: Optional[Message] = None,
+                          session: Optional[Session] = None) -> List[str]:
         """Active skill ids ordered by converse priority
         this represents the order in which converse will be called
+
+        Args:
+            message: bus message to resolve a session from when ``session``
+                     is not already known (standalone/incidental callers).
+            session: an already-resolved session to read from directly -
+                     pass this when called as part of a chain that already
+                     folded once for this lifecycle entry (see
+                     ``_registry_session_for_write``'s fold-order contract);
+                     re-resolving via ``message`` here would re-fold and can
+                     undo a write an earlier step in the same chain made.
 
         Returns:
             active_skills (list): ordered list of skill_ids
         """
-        session = SessionManager.get(message)
+        session = session or SessionManager.get(message)
         return [skill[0] for skill in session.active_skills]
 
     def deactivate_skill(self, skill_id: str, source_skill: Optional[str] = None,
-                         message: Optional[Message] = None) -> None:
+                         message: Optional[Message] = None) -> Optional[Session]:
         """Remove a skill from being targetable by converse.
 
         Args:
             skill_id (str): skill to remove
             source_skill (str): skill requesting the removal
             message (Message): the bus message that requested deactivation
+
+        Returns:
+            the resolved Session if a deactivation actually happened
+            (callers can reuse it instead of re-resolving via
+            ``SessionManager.get(message)``), else None (blocked or
+            already-inactive no-op - nothing changed, nothing to reuse).
         """
         source_skill = source_skill or skill_id
         if self._deactivate_allowed(skill_id, source_skill):
             message = message or Message("")
+            # this session gets stamped back onto the outgoing wire message
+            # below, so the fold must apply here (see the fold-order
+            # contract on _registry_session_for_write): the client's own
+            # declarations must win, not be silently bypassed.
             session = SessionManager.get(message)
             if session.is_active(skill_id):
                 # update converse session
@@ -142,6 +254,8 @@ class ConverseService(PipelinePlugin):
                                     data={"skill_id": skill_id}))
                 if skill_id in self._consecutive_activations:
                     self._consecutive_activations[skill_id] = 0
+                return session
+        return None
 
     def activate_skill(self, skill_id: str, source_skill: Optional[str] = None,
                        message: Optional[Message] = None) -> Optional[Session]:
@@ -158,7 +272,10 @@ class ConverseService(PipelinePlugin):
         source_skill = source_skill or skill_id
         if self._activate_allowed(skill_id, source_skill):
             message = message or Message("")
-            # update converse session
+            # this session gets stamped back onto the outgoing wire message
+            # below, so the fold must apply here (see the fold-order
+            # contract on _registry_session_for_write): the client's own
+            # declarations must win, not be silently bypassed.
             session = SessionManager.get(message)
             session.activate_skill(skill_id)
 
@@ -272,16 +389,28 @@ class ConverseService(PipelinePlugin):
             return False
         return True
 
-    def _collect_converse_skills(self, message: Message) -> List[str]:
+    def _collect_converse_skills(self, message: Message,
+                                 session: Optional[Session] = None) -> List[str]:
         """use the messagebus api to determine which skills want to converse
 
-        Individual skills respond to this request via the `can_converse` method"""
+        Individual skills respond to this request via the `can_converse` method
+
+        Args:
+            message: the bus message driving this converse attempt.
+            session: an already-resolved session to use instead of
+                     re-folding ``message`` (see ``match()``, which folds
+                     once and threads the result through this whole call
+                     chain - see the fold-order contract on
+                     ``_registry_session_for_write``). Falls back to a
+                     fresh ``SessionManager.get(message)`` fold for
+                     standalone callers.
+        """
         skill_ids = []
         want_converse = []
-        session = SessionManager.get(message)
+        session = session or SessionManager.get(message)
 
         # note: this is sorted by priority already
-        active_skills = [skill_id for skill_id in self.get_active_skills(message)
+        active_skills = [skill_id for skill_id in self.get_active_skills(message, session=session)
                      if session.utterance_states.get(skill_id, UtteranceState.INTENT) == UtteranceState.INTENT]
         if not active_skills:
             return want_converse
@@ -320,7 +449,22 @@ class ConverseService(PipelinePlugin):
         return want_converse
 
     def _check_converse_timeout(self, message: Message):
-        """ filter active skill list based on timestamps """
+        """ filter active skill list based on timestamps
+
+        Note: unlike ``_collect_converse_skills``/``get_active_skills``,
+        this method does NOT accept a threaded ``session`` param. Verified
+        by mutation testing (reverting both the param and a
+        registry-first-helper fallback here left the full converse test
+        suite green): ``match()``'s own top-level ``SessionManager.get(message)``
+        fold and a fresh fold here resolve to the identity-same live
+        registry object with no intervening write between the two calls in
+        this synchronous frame, so re-folding here is idempotent - unlike
+        the fold immediately after this call inside ``_collect_converse_skills``,
+        which WOULD wipe the active_skills filter this method just wrote if
+        it re-folded instead of using the threaded object. Keep this site
+        plain (YAGNI); do not add the param back without a red test proving
+        it does something.
+        """
         timeouts = self.config.get("skill_timeouts") or {}
         def_timeout = self.config.get("timeout", 300)
         session = SessionManager.get(message)
@@ -354,13 +498,20 @@ class ConverseService(PipelinePlugin):
             - Attempts conversation with each eligible skill
         """
         lang = standardize_lang(lang)
+        # this is the lifecycle-entry fold for this pipeline's turn at the
+        # utterance (SESSION-2 last-writer-wins is correct here) - `session`
+        # is threaded through every sub-call in this method instead of each
+        # one re-resolving via `message`, which would re-fold the same
+        # message repeatedly and undo whatever the previous sub-call just
+        # wrote (see the fold-order contract on
+        # `_registry_session_for_write`).
         session = SessionManager.get(message)
 
         # we call flatten in case someone is sending the old style list of tuples
         utterances = flatten_list(utterances)
 
         # note: this is sorted by priority already
-        gr_skills = [skill_id for skill_id in self.get_active_skills(message)
+        gr_skills = [skill_id for skill_id in self.get_active_skills(message, session=session)
                      if session.utterance_states.get(skill_id, UtteranceState.INTENT) == UtteranceState.RESPONSE]
 
         # check if any skill wants to capture utterance for self.get_response method
@@ -381,7 +532,7 @@ class ConverseService(PipelinePlugin):
         self._check_converse_timeout(message)
 
         # check if any skill wants to converse
-        for skill_id in self._collect_converse_skills(message):
+        for skill_id in self._collect_converse_skills(message, session=session):
             if skill_id in (session.blacklisted_skills or []):
                 LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{session.session_id}'")
                 continue
@@ -400,7 +551,7 @@ class ConverseService(PipelinePlugin):
     @staticmethod
     def handle_get_response_enable(message: Message):
         skill_id = message.data["skill_id"]
-        session = SessionManager.get(message)
+        session = ConverseService._registry_session_for_write(message)
         session.enable_response_mode(skill_id)
         if session.session_id == "default":
             SessionManager.sync(message)
@@ -408,7 +559,7 @@ class ConverseService(PipelinePlugin):
     @staticmethod
     def handle_get_response_disable(message: Message):
         skill_id = message.data["skill_id"]
-        session = SessionManager.get(message)
+        session = ConverseService._registry_session_for_write(message)
         session.disable_response_mode(skill_id)
         if session.session_id == "default":
             SessionManager.sync(message)
@@ -420,9 +571,12 @@ class ConverseService(PipelinePlugin):
         # this doesnt happen accidentally at very least
         skill_id = message.data['skill_id']
         source_skill = message.context.get("skill_id")
-        self.activate_skill(skill_id, source_skill, message)
-        sess = SessionManager.get(message)
-        if sess.session_id == "default":
+        # reuse the already-resolved live session `activate_skill` folded
+        # and wrote to - a second `SessionManager.get(message)` here would
+        # re-fold the SAME stale message and, on the reject/no-op path
+        # (`activate_skill` returns None), there is nothing to sync at all.
+        sess = self.activate_skill(skill_id, source_skill, message)
+        if sess is not None and sess.session_id == "default":
             SessionManager.sync(message)
 
     def handle_deactivate_skill_request(self, message: Message):
@@ -432,9 +586,12 @@ class ConverseService(PipelinePlugin):
         # this doesnt happen accidentally
         skill_id = message.data['skill_id']
         source_skill = message.context.get("skill_id") or skill_id
-        self.deactivate_skill(skill_id, source_skill, message)
-        sess = SessionManager.get(message)
-        if sess.session_id == "default":
+        # reuse the already-resolved live session `deactivate_skill` folded
+        # and wrote to - a second `SessionManager.get(message)` here would
+        # re-fold the SAME stale message and, on the reject/no-op path
+        # (`deactivate_skill` returns None), there is nothing to sync at all.
+        sess = self.deactivate_skill(skill_id, source_skill, message)
+        if sess is not None and sess.session_id == "default":
             SessionManager.sync(message)
 
     def handle_get_active_skills(self, message: Message):
