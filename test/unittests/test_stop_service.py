@@ -924,6 +924,106 @@ class TestDispatcherLifecycleResolvedByStopRoundTrip(unittest.TestCase):
             "parked on the 5-minute §8.3 timeout")
 
 
+class TestStaleStopOnceDoesNotResolveUnrelatedEntry(unittest.TestCase):
+    """C1 regression (adversarial re-review of the L1 fix): `_targeted_stop`
+    registers `bus.once(f"{skill_id}.stop.response", handle_stop_confirmation)`
+    at MATCH-BUILD time -- a side effect that survives even when the
+    orchestrator later DISCARDS the Match (blacklisted intent, missing
+    slots, etc: see service.py's blacklist check) and never actually
+    dispatches it. Before this fix, if that skill later emits ANY
+    `.stop.response` for an unrelated reason (e.g. a global stop's own
+    ping-pong round trip), the stale listener fires `handle_stop_confirmation`,
+    whose synthetic `mycroft.skill.handler.complete` popped the dispatcher's
+    in-flight entry for that skill_id regardless of which intent it actually
+    belonged to -- a still-running, unrelated intent handler got a premature
+    `ovos.utterance.handled` end-marker.
+
+    Mirrors the live auditor's attack.py::test_B_stale_once_pops_wrong_entry.
+    """
+
+    def test_stale_once_does_not_resolve_unrelated_running_intent(self):
+        from ovos_core.intent_services.dispatcher import IntentDispatcher
+
+        svc = _make_service()
+        bus = svc.bus
+        disp = IntentDispatcher(bus, timeout=300)
+        self.addCleanup(disp.shutdown)
+
+        sess = Session("sessB")
+        sess.activate_skill("skillA")
+
+        # 1) a stop match is built (registers the bus.once side effect) but
+        #    is DISCARDED -- never handed to disp.dispatch().
+        svc._targeted_stop("skillA", 1.0, "stop", sess)
+
+        # 2) an ordinary, unrelated intent for the SAME skill is genuinely
+        #    in flight.
+        intent_msg = Message("skillA:my.intent", {},
+                             {"skill_id": "skillA", "session": sess.serialize()})
+        disp.dispatch(intent_msg, "skillA", "my.intent")
+
+        # 3) later, skillA answers .stop.response for an unrelated reason
+        #    (e.g. a global stop's ping-pong) -- this fires the stale
+        #    bus.once() listener from step 1.
+        bus.emit(Message("skillA.stop.response",
+                         {"skill_id": "skillA", "result": True},
+                         {"skill_id": "skillA", "session": sess.serialize()}))
+
+        with disp._lock:
+            entries = list(disp._in_flight.get("sessB", []))
+        self.assertEqual(
+            [(e.skill_id, e.intent_name) for e in entries],
+            [("skillA", "my.intent")],
+            "the still-running, unrelated intent's dispatcher entry must "
+            "survive a stale/foreign .stop.response for the same skill_id")
+
+
+class TestFailedStopYieldsErrorTerminal(unittest.TestCase):
+    """C2 regression (adversarial re-review of the L1 fix): a `.stop.response`
+    carrying `error` (the skill's `stop()` raised) was still resolved via
+    `_resolve_dispatch_lifecycle` as a `complete` terminal -- §8.2 requires an
+    `error` terminal so a failed stop is distinguishable from a successful
+    one on the handler-lifecycle trio.
+
+    Mirrors the live auditor's attack3.py::test_stop_error_yields_complete_terminal.
+    """
+
+    def test_stop_response_with_error_yields_error_not_complete_terminal(self):
+        from ovos_core.intent_services.dispatcher import IntentDispatcher
+
+        svc = _make_service()
+        bus = svc.bus
+        disp = IntentDispatcher(bus, timeout=300)
+        self.addCleanup(disp.shutdown)
+
+        seen = []
+        for topic in (SpecMessage.INTENT_HANDLER_COMPLETE.value,
+                     SpecMessage.INTENT_HANDLER_ERROR.value):
+            bus.on(topic, lambda m, topic=topic: seen.append((topic, m.data)))
+
+        sess = Session("sE")
+        sess.activate_skill("skillA")
+
+        # fake skill: its stop() handler raised -- reports an error, not a result.
+        bus.on("skillA:stop",
+               lambda m: bus.emit(m.reply("skillA.stop.response",
+                                          {"skill_id": "skillA",
+                                           "error": "stop() raised ValueError"})))
+
+        match = svc._targeted_stop("skillA", 1.0, "stop", sess)
+        reply = Message(match.match_type, dict(match.match_data),
+                        {"skill_id": "skillA",
+                         "session": match.updated_session.serialize()})
+        disp.dispatch(reply, "skillA", "stop")
+
+        self.assertTrue(
+            any(topic.endswith("error") for topic, _ in seen),
+            f"a failed stop() must resolve as an error terminal, got {seen!r}")
+        self.assertFalse(
+            any(topic.endswith("complete") for topic, _ in seen),
+            f"a failed stop() must NOT resolve as a complete terminal, got {seen!r}")
+
+
 class TestShutdown(unittest.TestCase):
 
     def test_shutdown_removes_listeners(self):

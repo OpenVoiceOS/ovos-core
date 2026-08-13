@@ -262,8 +262,11 @@ class StopService(ConfidenceMatcherPipeline):
         skill_id = (message.data.get("skill_id") or
                     message.context.get("skill_id") or
                     message.msg_type.split(".stop.response")[0])
+        sess_id = (message.context.get("session") or {}).get("session_id", "default")
         try:
-            self._resolve_dispatch_lifecycle(message, skill_id)
+            if (sess_id, skill_id) in self._was_active_pre_drain or \
+                    (sess_id, skill_id) in self._utt_state_pre_drain:
+                self._resolve_dispatch_lifecycle(message, skill_id)
         except Exception:
             LOG.exception(f"failed to resolve dispatch lifecycle for {skill_id}:stop")
         if 'error' in message.data:
@@ -310,18 +313,46 @@ class StopService(ConfidenceMatcherPipeline):
                 self.bus.emit(message.forward(SpecMessage.AUDIO_STOP.value, {"skill_id": skill_id}))
 
     def _resolve_dispatch_lifecycle(self, message: Message, skill_id: str) -> None:
-        """Emit the framework done-signal (``mycroft.skill.handler.complete``)
-        for the ``<skill_id>:stop`` dispatch this ``.stop.response`` concludes.
+        """Emit the framework done-signal for the ``<skill_id>:stop`` dispatch
+        this ``.stop.response`` concludes.
 
-        ``IntentDispatcher._on_skill_complete`` listens for exactly this topic
-        and resolves the matching in-flight entry (by session_id + skill_id),
-        cancelling its §8.3 timeout timer. See ``handle_stop_confirmation``'s
-        docstring for why this lives here rather than in ovos-workshop.
+        ``IntentDispatcher._on_skill_complete``/``._on_skill_error`` listen for
+        exactly these topics and resolve the matching in-flight entry (by
+        session_id + skill_id + ``context["intent_name"]``), cancelling its
+        §8.3 timeout timer. See ``handle_stop_confirmation``'s docstring for
+        why this lives here rather than in ovos-workshop.
+
+        ``context["intent_name"] = "stop"`` is stamped explicitly (rather than
+        leaving the dispatcher to match on ``skill_id`` alone, as it does for
+        the normal single-handler-at-a-time framework signal): the ``.stop``
+        dispatch is not the only thing that can be in flight for a skill --
+        an ordinary intent handler can legitimately be running concurrently.
+        Without this, a leaked/stale ``.stop.response`` (e.g. reaching
+        ``handle_stop_confirmation`` for a match that was never actually
+        dispatched -- see the ``bus.once`` registered eagerly in
+        ``_targeted_stop`` at match-build time) would resolve whichever
+        in-flight entry for that skill happens to be on top of the LIFO
+        stack, which may be a completely unrelated, still-running intent --
+        a premature/wrong ``ovos.utterance.handled`` end-marker. The
+        (session_id, skill_id) pre-drain-presence gate in
+        ``handle_stop_confirmation`` narrows *when* this fires; this
+        intent_name stamp narrows *what* it can resolve once it does.
+
+        §8.2: a ``.stop.response`` carrying ``error`` means the skill's
+        ``stop()`` raised -- that must resolve as an ``error`` terminal, not
+        ``complete``, so a failed stop is distinguishable from a successful
+        one on the §8 trio.
         """
-        complete = message.forward("mycroft.skill.handler.complete",
+        if 'error' in message.data:
+            done = message.forward("mycroft.skill.handler.error",
+                                   {"name": f"{skill_id}:stop",
+                                    "exception": message.data['error']})
+        else:
+            done = message.forward("mycroft.skill.handler.complete",
                                    {"name": f"{skill_id}:stop"})
-        complete.context["skill_id"] = skill_id
-        self.bus.emit(complete)
+        done.context["skill_id"] = skill_id
+        done.context["intent_name"] = "stop"
+        self.bus.emit(done)
 
     def _targeted_stop(self, skill_id: str, conf: float, utterance: str,
                        sess: Session) -> IntentHandlerMatch:
