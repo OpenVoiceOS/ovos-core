@@ -23,6 +23,8 @@ from unittest.mock import Mock, patch
 from ovos_bus_client.message import Message
 from ovos_config import Configuration
 from ovos_config import LocalConf, DEFAULT_CONFIG
+from ovos_bus_client.session import SessionManager
+from ovos_spec_tools import SpecMessage
 from ovos_core.skill_manager import SkillManager
 from ovos_workshop.skill_launcher import SkillLoader
 
@@ -69,10 +71,16 @@ class TestSkillManager(TestCase):
     def setUp(self):
         temp_dir = tempfile.mkdtemp()
         self.temp_dir = Path(temp_dir)
+        SessionManager.bus = None
         self.message_bus_mock = MessageBusMock()
         self._mock_log()
         self.skill_manager = SkillManager(self.message_bus_mock)
         self._mock_skill_loader_instance()
+        # SkillManager.__init__ now wires SessionManager.connect_to_bus(),
+        # which emits an "ovos.session.update_default" broadcast; drop that
+        # setup noise so tests only see messages emitted by the code under test
+        self.message_bus_mock.message_types = []
+        self.message_bus_mock.message_data = []
 
     def _mock_log(self):
         log_patch = patch(self.mock_package + 'LOG')
@@ -81,6 +89,7 @@ class TestSkillManager(TestCase):
 
     def tearDown(self):
         rmtree(str(self.temp_dir))
+        SessionManager.bus = None
 
     def _mock_skill_loader_instance(self):
         self.skill_dir = self.temp_dir.joinpath('test_skill')
@@ -99,6 +108,7 @@ class TestSkillManager(TestCase):
         # Ensure deferred_loading is explicitly False to isolate from other tests
         config = mock_config()
         config['skills']['use_deferred_loading'] = False
+        SessionManager.bus = None
         with patch.dict(Configuration._Configuration__patch, config):
             bus_mock = MessageBusMock()
             skill_manager = SkillManager(bus_mock)
@@ -111,10 +121,19 @@ class TestSkillManager(TestCase):
                 #'mycroft.skills.initialized',
                 'mycroft.skills.is_alive',
                 'mycroft.skills.is_ready',
-                'mycroft.skills.all_loaded'
+                'mycroft.skills.all_loaded',
+                # SessionManager.connect_to_bus() handlers - wired
+                # unconditionally so skills-only processes (no intent
+                # service) still get SessionManager.bus set
+                'recognizer_loop:record_begin',
+                'recognizer_loop:record_end',
+                'recognizer_loop:audio_output_start',
+                'recognizer_loop:audio_output_end',
+                SpecMessage.SESSION_SYNC,
             ]
 
             self.assertListEqual(expected_result, bus_mock.event_handlers)
+        SessionManager.bus = None
 
 
     def test_send_skill_list(self):
@@ -432,8 +451,12 @@ class TestDeferredLoadingConfigFlag(TestCase):
     mock_package = 'ovos_core.skill_manager.'
 
     def setUp(self):
+        SessionManager.bus = None
         self.message_bus_mock = MessageBusMock()
         self._mock_log()
+
+    def tearDown(self):
+        SessionManager.bus = None
 
     def _mock_log(self):
         log_patch = patch(self.mock_package + 'LOG')
@@ -471,7 +494,12 @@ class TestDeferredLoadingConfigFlag(TestCase):
                 'skillmanager.activate',
                 'mycroft.skills.is_alive',
                 'mycroft.skills.is_ready',
-                'mycroft.skills.all_loaded'
+                'mycroft.skills.all_loaded',
+                'recognizer_loop:record_begin',
+                'recognizer_loop:record_end',
+                'recognizer_loop:audio_output_start',
+                'recognizer_loop:audio_output_end',
+                SpecMessage.SESSION_SYNC,
             ]
 
             self.assertListEqual(expected_handlers, self.message_bus_mock.event_handlers)
@@ -501,7 +529,12 @@ class TestDeferredLoadingConfigFlag(TestCase):
             'mycroft.gui.unavailable',
             'mycroft.skills.is_alive',
             'mycroft.skills.is_ready',
-            'mycroft.skills.all_loaded'
+            'mycroft.skills.all_loaded',
+            'recognizer_loop:record_begin',
+            'recognizer_loop:record_end',
+            'recognizer_loop:audio_output_start',
+            'recognizer_loop:audio_output_end',
+            SpecMessage.SESSION_SYNC,
         ]
 
         self.assertListEqual(expected_handlers, self.message_bus_mock.event_handlers)
@@ -614,3 +647,55 @@ class TestDeferredLoadingConfigFlag(TestCase):
             skill_manager._mark_startup_complete_and_consume_deferred.assert_called()
             # Verify _load_new_skills is NOT called in deferred startup path (only in loop)
             skill_manager._load_new_skills.assert_not_called()
+
+
+@patch.dict(Configuration._Configuration__patch, mock_config())
+class TestSkillManagerSessionManagerBus(TestCase):
+    """
+    Regression test: SkillManager must wire SessionManager.connect_to_bus()
+    even when the intent service is disabled in this process (the default,
+    and the documented --disable-intent-service CLI path). Without this,
+    SessionManager.bus stays None in skills-only processes and
+    speak(wait=True)/SessionManager.wait_while_speaking silently no-op.
+    Mirrors the sibling fix/test in ovos-workshop#526 (SkillContainer).
+    """
+
+    def setUp(self):
+        SessionManager.bus = None
+
+    def tearDown(self):
+        SessionManager.bus = None
+
+    def test_connect_to_bus_with_intent_service_disabled(self):
+        bus = MessageBusMock()
+        SkillManager(bus, enable_intent_service=False)
+        self.assertIsNotNone(SessionManager.bus)
+        self.assertIs(SessionManager.bus, bus)
+
+    def test_connect_to_bus_exactly_once_with_intent_service_enabled(self):
+        """
+        Regression test: in the monolith (enable_intent_service=True),
+        SkillManager.__init__ connects SessionManager to the bus before
+        constructing IntentService, and IntentService.__init__ used to call
+        SessionManager.connect_to_bus() unconditionally. Same bus object on
+        both call sites means every standard monolith boot registered all
+        five SessionManager bus handlers twice. Assert exactly one handler
+        per topic is registered, regardless of which subsystem connects
+        first.
+        """
+        bus = MessageBusMock()
+        SkillManager(bus, enable_intent_service=True, enable_file_watcher=False)
+        self.assertIsNotNone(SessionManager.bus)
+        self.assertIs(SessionManager.bus, bus)
+        for topic in (
+            "recognizer_loop:record_begin",
+            "recognizer_loop:record_end",
+            "recognizer_loop:audio_output_start",
+            "recognizer_loop:audio_output_end",
+            SpecMessage.SESSION_SYNC,
+        ):
+            self.assertEqual(
+                bus.event_handlers.count(topic), 1,
+                f"expected exactly one handler for {topic}, got "
+                f"{bus.event_handlers.count(topic)}"
+            )

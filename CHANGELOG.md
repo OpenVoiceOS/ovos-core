@@ -1,5 +1,34 @@
 # Changelog
 
+## [3.0.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.0a1) (2026-08-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.4a1...3.0.0a1)
+
+**Breaking changes:**
+
+- feat!: OVOS-STOP-1 reserved-intent\_name dispatch + separable legacy bridge [\#802](https://github.com/OpenVoiceOS/ovos-core/pull/802) ([JarbasAl](https://github.com/JarbasAl))
+
+**Merged pull requests:**
+
+- fix: connect SessionManager to the bus in the skills process regardless of intent-service [\#855](https://github.com/OpenVoiceOS/ovos-core/pull/855) ([JarbasAl](https://github.com/JarbasAl))
+- feat: OVOS-CONTEXT-1 orchestrator-resident intent context \(decay, session.sync merge, slot-fill\) [\#786](https://github.com/OpenVoiceOS/ovos-core/pull/786) ([JarbasAl](https://github.com/JarbasAl))
+
+## [2.6.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.4a1) (2026-08-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.3a2...2.6.4a1)
+
+**Merged pull requests:**
+
+- fix: mirror add\_context under the resolved private key when the producer names it [\#857](https://github.com/OpenVoiceOS/ovos-core/pull/857) ([JarbasAl](https://github.com/JarbasAl))
+
+## [2.6.3a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.3a2) (2026-08-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.3a1...2.6.3a2)
+
+**Merged pull requests:**
+
+- spike: context.utterance\_id — lifecycle identifier + converse round guard \(PIPELINE-1 §9.1.1\) [\#859](https://github.com/OpenVoiceOS/ovos-core/pull/859) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.6.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.3a1) (2026-08-11)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.2a1...2.6.3a1)
@@ -304,33 +333,17 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.2a1...2.1.2a2)
 
-**Merged pull requests:**
-
-- gl-es/translate [\#739](https://github.com/OpenVoiceOS/ovos-core/pull/739) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
-
 ## [2.1.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.2a1) (2025-11-10)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.1...2.1.2a1)
-
-**Merged pull requests:**
-
-- Update ovos-workshop requirement from \<8.0.0,\>=7.0.6 to \>=7.0.6,\<9.0.0 in /requirements [\#736](https://github.com/OpenVoiceOS/ovos-core/pull/736) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [2.1.1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.1) (2025-11-05)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.1a1...2.1.1)
 
-**Merged pull requests:**
-
-- Release 2.1.1a1 [\#735](https://github.com/OpenVoiceOS/ovos-core/pull/735) ([github-actions[bot]](https://github.com/apps/github-actions))
-
 ## [2.1.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.1a1) (2025-11-05)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.0...2.1.1a1)
-
-**Merged pull requests:**
-
-- Update ovos-plugin-manager version range [\#734](https://github.com/OpenVoiceOS/ovos-core/pull/734) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.1.0](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.0) (2025-10-20)
 

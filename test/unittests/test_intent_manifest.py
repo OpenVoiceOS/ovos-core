@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import unittest
+from unittest.mock import patch
 
 from ovos_bus_client.message import Message
 from ovos_utils.fakebus import FakeBus
@@ -64,6 +65,23 @@ class TestManifestRegister(unittest.TestCase):
         self.m._on_register(_reg("skill.test", "hello", session_id="sat-1"))
         key = list(self.m._index.keys())[0]
         self.assertEqual(key[0], "sat-1")
+
+    def test_reserved_stop_intent_name_warns(self):
+        """CONFIRMED-5: a skill registering a real intent literally named
+        'stop' binds the same '<skill_id>:stop' topic OVOS-STOP-1 reserves for
+        the targeted-stop dispatch — the manifest must warn about the
+        collision, the natural point where core observes registration."""
+        with patch("ovos_core.intent_services.manifest.LOG") as mock_log:
+            self.m._on_register(_reg("skill.test", "stop"))
+        mock_log.warning.assert_called_once()
+        self.assertIn("reserved", str(mock_log.warning.call_args))
+        # registration itself still proceeds (warn, don't reject)
+        self.assertEqual(len(self.m._index), 1)
+
+    def test_non_reserved_intent_name_does_not_warn(self):
+        with patch("ovos_core.intent_services.manifest.LOG") as mock_log:
+            self.m._on_register(_reg("skill.test", "hello"))
+        mock_log.warning.assert_not_called()
 
 
 class TestManifestDeregister(unittest.TestCase):
@@ -262,3 +280,56 @@ class TestIntentDescribeSessionScope(unittest.TestCase):
                            session_id="sat-1")
         self.assertEqual(len(resp["definitions"]), 1)
         self.assertEqual(resp["definitions"][0]["session_id"], "sat-1")
+
+
+def _reg_ctx(skill_id, intent_name, requires=None, excludes=None, slots=None,
+             lang="en-US", method="keyword", session_id="default"):
+    data = {"skill_id": skill_id, "intent_name": intent_name, "lang": lang}
+    if requires is not None:
+        data["requires_context"] = requires
+    if excludes is not None:
+        data["excludes_context"] = excludes
+    if slots is not None:
+        data["required"] = slots
+    return Message(f"ovos.intent.register.{method}", data=data,
+                   context={"session": {"session_id": session_id}, "skill_id": skill_id})
+
+
+class TestManifestContextLookups(unittest.TestCase):
+    def setUp(self):
+        self.m = _manifest()
+
+    def test_context_requirements(self):
+        self.m._on_register(_reg_ctx("s.skill", "on", requires=["kitchen"],
+                                     excludes=["modal"]))
+        req, exc = self.m.get_context_requirements("default", "s.skill", "on", "en-US")
+        self.assertEqual(req, ["kitchen"])
+        self.assertEqual(exc, ["modal"])
+
+    def test_context_requirements_empty_when_undeclared(self):
+        self.m._on_register(_reg_ctx("s.skill", "on"))
+        self.assertEqual(self.m.get_context_requirements("default", "s.skill", "on", "en-US"),
+                         ([], []))
+
+    def test_context_requirements_unknown_intent(self):
+        self.assertEqual(self.m.get_context_requirements("default", "x", "y", "en-US"),
+                         ([], []))
+
+    def test_context_requirements_union_across_methods(self):
+        self.m._on_register(_reg_ctx("s.skill", "on", requires=["a"], method="keyword"))
+        self.m._on_register(_reg_ctx("s.skill", "on", requires=["b"], method="template"))
+        req, _ = self.m.get_context_requirements("default", "s.skill", "on", "en-US")
+        self.assertEqual(sorted(req), ["a", "b"])
+
+    def test_slot_names(self):
+        self.m._on_register(_reg_ctx("s.skill", "on", slots=["room", "device"]))
+        self.assertEqual(self.m.get_slot_names("default", "s.skill", "on", "en-US"),
+                         ["room", "device"])
+
+    def test_session_scoped_visible_via_effective_pool(self):
+        self.m._on_register(_reg_ctx("s.skill", "on", requires=["k"], session_id="sat-1"))
+        req, _ = self.m.get_context_requirements("sat-1", "s.skill", "on", "en-US")
+        self.assertEqual(req, ["k"])
+        # a different session does not see the satellite-scoped declaration
+        self.assertEqual(self.m.get_context_requirements("other", "s.skill", "on", "en-US"),
+                         ([], []))

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Optional
+
 from ovos_bus_client.message import Message
 from ovos_spec_tools import standardize_lang
 from ovos_utils.log import LOG
@@ -122,6 +124,16 @@ class IntentManifest:
         if not (skill_id and intent_name and lang):
             LOG.warning(f"malformed intent registration from {skill_id!r}: missing required fields")
             return
+        if intent_name == "stop":
+            # OVOS-STOP-1 reserves "<skill_id>:stop" for the pipeline's own
+            # targeted-stop dispatch (stop_service.py _targeted_stop); a real
+            # intent registered under the same name binds the identical topic
+            # and is shadowed by / collides with the reserved dispatch.
+            LOG.warning(
+                f"skill '{skill_id}' registered an intent literally named 'stop' — "
+                f"this collides with the OVOS-STOP-1 reserved '{skill_id}:stop' "
+                "targeted-dispatch topic, so both the registered intent handler "
+                "and the stop machinery will react to messages on that topic.")
         session_id = (message.context.get("session") or {}).get("session_id", "default")
         key = self._key(session_id, skill_id, intent_name, lang, method)
         self._index[key] = {
@@ -235,3 +247,48 @@ class IntentManifest:
             self.bus.emit(message.reply("ovos.intent.describe.response",
                                         {"ok": False,
                                          "error": f"unknown intent {skill_id}:{intent_name}:{lang}"}))
+
+    # OVOS-CONTEXT-1: orchestrator lookups for declared context gates / slots
+
+    def _matching_definitions(self, session_id: str, skill_id: str,
+                              intent_name: str, lang: Optional[str]) -> list:
+        lang = standardize_lang(lang) if lang else None
+        out = []
+        for entry in self._effective_pool(session_id):
+            if entry["skill_id"] != skill_id or entry["intent_name"] != intent_name:
+                continue
+            if lang and entry["lang"] != lang:
+                continue
+            out.append(entry.get("definition") or {})
+        return out
+
+    def get_context_requirements(self, session_id: str, skill_id: str,
+                                 intent_name: str, lang: Optional[str] = None):
+        """OVOS-CONTEXT-1 §6/§6.1 — declared ``requires_context`` /
+        ``excludes_context``, unioned across registration definitions.
+
+        @return: ``(requires, excludes)`` tuple of declaration lists; empty
+            when the intent declares no gates or is unknown.
+        """
+        requires, excludes = [], []
+        for d in self._matching_definitions(session_id, skill_id, intent_name, lang):
+            for r in (d.get("requires_context") or []):
+                if r not in requires:
+                    requires.append(r)
+            for e in (d.get("excludes_context") or []):
+                if e not in excludes:
+                    excludes.append(e)
+        return requires, excludes
+
+    def get_slot_names(self, session_id: str, skill_id: str,
+                       intent_name: str, lang: Optional[str] = None) -> list:
+        """The intent's declared slot / keyword names (``required``/
+        ``optional``/``one_of``/``slots``), unioned across registration
+        definitions. Used by the §7 context-supplied slot rule."""
+        names = []
+        for d in self._matching_definitions(session_id, skill_id, intent_name, lang):
+            for field in ("required", "optional", "one_of", "slots"):
+                for name in (d.get(field) or []):
+                    if name not in names:
+                        names.append(name)
+        return names
