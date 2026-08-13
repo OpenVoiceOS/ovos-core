@@ -225,13 +225,47 @@ class StopService(ConfidenceMatcherPipeline):
             event.wait(timeout=0.5)
         finally:
             self.bus.remove(SpecMessage.STOP_PONG.value, handle_ack)
-        return want_stop or active_skills
+
+        if not want_stop:
+            return active_skills
+        # §4.1 selection must be deterministic: `want_stop` is built in PONG
+        # ARRIVAL order (parallel broadcast — the pings all go out together, so
+        # whichever skill answers fastest lands first), not recency order. The
+        # docstring/contract says the response_mode holder (or more generally
+        # the most-recent candidate) ranks first; re-sort by the candidate-list
+        # (recency) order that `active_skills` already encodes before picking,
+        # so the winner is always the most-recent stoppable candidate
+        # regardless of which one's pong happened to arrive first.
+        return sorted(want_stop, key=active_skills.index)
 
     def handle_stop_confirmation(self, message: Message) -> None:
-        """Handle a skill's stop.response and force-terminate any in-flight interactions."""
+        """Handle a skill's stop.response and force-terminate any in-flight interactions.
+
+        Also resolves the ``IntentDispatcher``'s §8 handler-lifecycle entry for
+        this ``<skill_id>:stop`` dispatch (root cause: the dispatch goes out on
+        the spec colon-topic ``<skill_id>:stop``, which ovos-workshop has no
+        direct listener for — only ``_LegacyStopBridge`` mirrors it onto the
+        dot-topic ``<skill_id>.stop`` skills actually bind, via ``add_event``
+        with ``handler_info=None``, which deliberately disables that dot-topic
+        handler's own ``HandlerLifecycle``/``mycroft.skill.handler.complete``
+        emission. Since workshop is a separate repo/release, that emission
+        cannot be added there for this fix. The stop round-trip's real
+        completion signal IS this ``.stop.response`` — it only fires once the
+        skill has actually finished ``stop()`` — so this is the correct,
+        already-synchronous point to resolve the dispatch, instead of leaving
+        it parked on the dispatcher's 5-minute §8.3 timeout). Emitting the
+        framework done-signal here (rather than reaching into
+        ``IntentDispatcher`` directly) keeps ``StopService`` decoupled from the
+        dispatcher's internals and mirrors exactly what a normal handler
+        completion looks like on the bus.
+        """
         skill_id = (message.data.get("skill_id") or
                     message.context.get("skill_id") or
                     message.msg_type.split(".stop.response")[0])
+        try:
+            self._resolve_dispatch_lifecycle(message, skill_id)
+        except Exception:
+            LOG.exception(f"failed to resolve dispatch lifecycle for {skill_id}:stop")
         if 'error' in message.data:
             error_msg = message.data['error']
             LOG.error(f"{skill_id}: {error_msg}")
@@ -274,6 +308,20 @@ class StopService(ConfidenceMatcherPipeline):
                 # translator's MIGRATION_MAP mirrors it onto the legacy
                 # "mycroft.audio.speech.stop" ovos-audio still listens on.
                 self.bus.emit(message.forward(SpecMessage.AUDIO_STOP.value, {"skill_id": skill_id}))
+
+    def _resolve_dispatch_lifecycle(self, message: Message, skill_id: str) -> None:
+        """Emit the framework done-signal (``mycroft.skill.handler.complete``)
+        for the ``<skill_id>:stop`` dispatch this ``.stop.response`` concludes.
+
+        ``IntentDispatcher._on_skill_complete`` listens for exactly this topic
+        and resolves the matching in-flight entry (by session_id + skill_id),
+        cancelling its §8.3 timeout timer. See ``handle_stop_confirmation``'s
+        docstring for why this lives here rather than in ovos-workshop.
+        """
+        complete = message.forward("mycroft.skill.handler.complete",
+                                   {"name": f"{skill_id}:stop"})
+        complete.context["skill_id"] = skill_id
+        self.bus.emit(complete)
 
     def _targeted_stop(self, skill_id: str, conf: float, utterance: str,
                        sess: Session) -> IntentHandlerMatch:

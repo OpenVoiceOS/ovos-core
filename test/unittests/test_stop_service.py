@@ -824,6 +824,106 @@ class TestResponseModeHolderCandidate(unittest.TestCase):
                         emitted_types.index(SpecMessage.STOP.value))
 
 
+class TestStopSelectionDeterministic(unittest.TestCase):
+    """L2 regression: `_stop_candidates` puts the response_mode holder (or
+    more generally the most-recent candidate) first, but `_collect_stop_skills`
+    used to return `want_stop` in PONG ARRIVAL order — a race, not the
+    documented recency guarantee. An older/less-recent skill that happens to
+    answer faster must NOT win over a more-recent candidate that answers
+    slower."""
+
+    def test_selection_deterministic_by_recency_not_arrival_order(self):
+        svc = _make_service()
+
+        ack_handler = None
+
+        def capture_on(event, handler):
+            nonlocal ack_handler
+            if event == SpecMessage.STOP_PONG.value:
+                ack_handler = handler
+
+        svc.bus.on = capture_on
+        svc.bus.remove = MagicMock()
+        svc.bus.emit = MagicMock()
+
+        # holder_skill is the recency-first candidate (e.g. the response_mode
+        # holder); older_skill is a less-recent active_handlers entry.
+        with patch.object(svc, "_stop_candidates",
+                          return_value=["holder_skill", "older_skill"]):
+            import threading
+            import time
+            result_holder = []
+
+            def run():
+                result_holder.append(svc._collect_stop_skills(Message("test")))
+
+            t = threading.Thread(target=run)
+            t.start()
+            time.sleep(0.05)  # let the thread register the handler
+
+            # inverted arrival order: the OLDER (less-recent) skill answers
+            # FIRST -- this is exactly the race the live auditor reproduced
+            # (2/7 runs picked the older skill).
+            ack_handler(Message(SpecMessage.STOP_PONG.value,
+                                {"skill_id": "older_skill", "can_handle": True}))
+            ack_handler(Message(SpecMessage.STOP_PONG.value,
+                                {"skill_id": "holder_skill", "can_handle": True}))
+            t.join(timeout=1)
+
+        self.assertEqual(
+            result_holder[0][0], "holder_skill",
+            "the recency-first candidate must always be selected "
+            "deterministically regardless of which skill's pong arrives "
+            f"first; got order {result_holder[0]!r}")
+
+
+class TestDispatcherLifecycleResolvedByStopRoundTrip(unittest.TestCase):
+    """L1 regression: the IntentDispatcher's §8 handler-lifecycle entry for a
+    `<skill_id>:stop` dispatch was never resolved by
+    `mycroft.skill.handler.complete`/`.error` -- the colon-topic has no direct
+    ovos-workshop listener (only the legacy bridge mirrors it onto the
+    dot-topic, bound with `handler_info=None`, which disables that emission).
+    Left unresolved, every stop parks its dispatch entry on the dispatcher's
+    5-minute §8.3 timeout instead of resolving synchronously when the stop
+    round-trip (`.stop.response`) actually completes."""
+
+    def test_stop_round_trip_resolves_dispatcher_entry_synchronously(self):
+        from ovos_core.intent_services.dispatcher import IntentDispatcher
+
+        svc = _make_service()
+        bus = svc.bus
+        # a real (long) timeout: if the fix regresses, this test would only
+        # catch it via the entry still being present -- it must NEVER need to
+        # actually fire for this test to pass.
+        disp = IntentDispatcher(bus, timeout=300)
+        self.addCleanup(disp.shutdown)
+
+        skill_id = "fake_skill"
+        sess = Session("sess1")
+        sess.activate_skill(skill_id)
+
+        # fake skill: answers the dispatched colon-topic directly with its
+        # .stop.response, exactly as a real stop() round-trip concludes.
+        bus.on(f"{skill_id}:stop",
+               lambda m: bus.emit(m.reply(f"{skill_id}.stop.response",
+                                          {"skill_id": skill_id, "result": True})))
+
+        match = svc._targeted_stop(skill_id, 1.0, "stop", sess)
+        reply = Message(match.match_type, dict(match.match_data),
+                        {"skill_id": skill_id,
+                         "session": match.updated_session.serialize()})
+
+        disp.dispatch(reply, skill_id, "stop")
+
+        with disp._lock:
+            entries = list(disp._in_flight.get(match.updated_session.session_id, []))
+        self.assertEqual(
+            entries, [],
+            "the dispatcher's in-flight entry for the <skill_id>:stop dispatch "
+            "must be resolved synchronously by the stop round-trip, not left "
+            "parked on the 5-minute §8.3 timeout")
+
+
 class TestShutdown(unittest.TestCase):
 
     def test_shutdown_removes_listeners(self):
