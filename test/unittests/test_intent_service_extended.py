@@ -469,6 +469,106 @@ class TestContextHandlers(unittest.TestCase):
             IntentService.handle_add_context(msg)
         self.assertGreater(len(sess.context.frame_stack), 0)
 
+    def test_handle_add_context_mirrors_resolved_private_key(self):
+        """OVOS-CONTEXT-1: when the producer (ovos-workshop's set_context)
+        names the original unmunged key via data['key'] and the message
+        carries a skill_id, handle_add_context must ALSO write the entry
+        under resolve_key(key, 'private', skill_id) so the declarative
+        gate - which resolves independently of the legacy munged spelling
+        - can see it. Both spellings must coexist."""
+        sess = Session("s")
+        msg = Message("add_context",
+                      data={"context": "my_skillkitchen", "word": "kitchen",
+                            "key": "kitchen"},
+                      context={"session": sess.serialize(),
+                               "skill_id": "my.skill"})
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess):
+            IntentService.handle_add_context(msg)
+        self.assertIn("my_skillkitchen", sess.intent_context)
+        self.assertIn("my.skill:kitchen", sess.intent_context)
+
+    def test_handle_add_context_resolved_value_falls_back_to_original_key(self):
+        """Round 2 (C3) regression: when no word is given, the resolved
+        twin's fallback 'value' MUST be the original unmunged key, never
+        the munged legacy context string - the munged spelling is an
+        internal ADAPT wire detail and must not leak into OVOS-CONTEXT-1
+        §7 slot injection via the resolved entry. Munged context and
+        original key are deliberately made to differ so a wrong fallback
+        is caught."""
+        sess = Session("s")
+        msg = Message("add_context",
+                      data={"context": "my_skillkitchen", "key": "kitchen"},
+                      context={"session": sess.serialize(),
+                               "skill_id": "my.skill"})
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess):
+            IntentService.handle_add_context(msg)
+        self.assertEqual(sess.intent_context["my.skill:kitchen"]["value"],
+                         "kitchen")
+        self.assertNotEqual(
+            sess.intent_context["my.skill:kitchen"]["value"],
+            "my_skillkitchen")
+
+    def test_handle_add_context_preserves_resolved_expiry_fields(self):
+        """Round 2 (C4) regression: writing the resolved twin must NOT
+        clobber expires_at/turns_remaining a prior write already
+        established for that exact resolved key - only 'value' is
+        authoritative from this call (setdefault-style merge). The
+        legacy munged-key entry keeps today's dev behavior (full
+        overwrite) unchanged; this asymmetry is deliberate, see PR body."""
+        sess = Session("s")
+        sess.intent_context = {"my.skill:kitchen": {"value": "old",
+                                                     "expires_at": 999999999.0,
+                                                     "turns_remaining": 3}}
+        msg = Message("add_context",
+                      data={"context": "my_skillkitchen", "word": "kitchen",
+                            "key": "kitchen"},
+                      context={"session": sess.serialize(),
+                               "skill_id": "my.skill"})
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess):
+            IntentService.handle_add_context(msg)
+        entry = sess.intent_context["my.skill:kitchen"]
+        self.assertEqual(entry["value"], "kitchen")
+        self.assertEqual(entry["expires_at"], 999999999.0)
+        self.assertEqual(entry["turns_remaining"], 3)
+
+    def test_handle_remove_context_removes_both_spellings(self):
+        """Symmetric with add: removing must drop both the legacy munged
+        key and the resolved private-scope key."""
+        sess = Session("s")
+        sess.intent_context = {"my_skillkitchen": {"value": "kitchen"},
+                               "my.skill:kitchen": {"value": "kitchen"}}
+        entity = {"confidence": 1.0, "data": [("kitchen", "my_skillkitchen")],
+                  "match": "kitchen", "key": "kitchen", "origin": ""}
+        sess.context.inject_context(entity)
+        msg = Message("remove_context",
+                      data={"context": "my_skillkitchen", "key": "kitchen"},
+                      context={"session": sess.serialize(),
+                               "skill_id": "my.skill"})
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess):
+            IntentService.handle_remove_context(msg)
+        self.assertNotIn("my_skillkitchen", sess.intent_context or {})
+        self.assertNotIn("my.skill:kitchen", sess.intent_context or {})
+
+    def test_handle_add_context_no_key_stores_only_munged_legacy(self):
+        """Back-compat pin: a message with no data['key'] (old-workshop /
+        legacy ADAPT-only caller) must store ONLY the munged legacy key -
+        no regression in the no-key path."""
+        sess = Session("s")
+        msg = Message("add_context",
+                      data={"context": "my_skillkitchen", "word": "kitchen"},
+                      context={"session": sess.serialize(),
+                               "skill_id": "my.skill"})
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess):
+            IntentService.handle_add_context(msg)
+        self.assertIn("my_skillkitchen", sess.intent_context)
+        self.assertNotIn("my.skill:kitchen", sess.intent_context)
+        self.assertEqual(len(sess.intent_context), 1)
+
 
 # ---------------------------------------------------------------------------
 # send_complete_intent_failure
