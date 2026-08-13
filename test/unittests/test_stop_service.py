@@ -18,9 +18,13 @@ from threading import Event
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session, SessionManager, UtteranceState
+from ovos_spec_tools import SpecMessage
 from ovos_utils.fakebus import FakeBus
 
 from ovos_core.intent_services.stop_service import StopService
+from ovos_core.intent_services.stop_service_legacy import _LegacyStopBridge
+
+GLOBAL_STOP = f"{StopService.pipeline_id}:global_stop"
 
 
 def _make_service() -> StopService:
@@ -33,9 +37,13 @@ def _make_service() -> StopService:
         svc = StopService.__new__(StopService)
         svc.bus = bus
         svc.config = {}
+        svc.suppress_activation = True
         # vocabulary matching is delegated to ovos-spec-tools LocaleResources;
         # tests patch svc._locale.voc_match / voc_list.
         svc._locale = MagicMock()
+        svc._legacy = MagicMock()
+        svc._was_active_pre_drain = {}
+        svc._utt_state_pre_drain = {}
     return svc
 
 
@@ -69,7 +77,7 @@ class TestCollectStopSkills(unittest.TestCase):
 
         def capture_on(event, handler):
             nonlocal ack_handler
-            if event == "skill.stop.pong":
+            if event == SpecMessage.STOP_PONG.value:
                 ack_handler = handler
 
         svc.bus.on = capture_on
@@ -93,15 +101,15 @@ class TestCollectStopSkills(unittest.TestCase):
             import time
             time.sleep(0.05)  # let the thread register the handler
             if ack_handler:
-                ack_handler(Message("skill.stop.pong",
+                ack_handler(Message(SpecMessage.STOP_PONG.value,
                                     {"skill_id": "skill_a", "can_handle": True}))
-                ack_handler(Message("skill.stop.pong",
+                ack_handler(Message(SpecMessage.STOP_PONG.value,
                                     {"skill_id": "skill_b", "can_handle": True}))
             t.join(timeout=1)
 
         self.assertEqual(set(result_holder[0]), {"skill_a", "skill_b"})
         # listener must be removed
-        svc.bus.remove.assert_called_once_with("skill.stop.pong", ack_handler)
+        svc.bus.remove.assert_called_once_with(SpecMessage.STOP_PONG.value, ack_handler)
 
     def test_skills_that_decline_are_excluded(self):
         """Skills that respond with can_handle=False are not in want_stop,
@@ -113,7 +121,7 @@ class TestCollectStopSkills(unittest.TestCase):
 
         def capture_on(event, handler):
             nonlocal ack_handler
-            if event == "skill.stop.pong":
+            if event == SpecMessage.STOP_PONG.value:
                 ack_handler = handler
 
         svc.bus.on = capture_on
@@ -136,7 +144,7 @@ class TestCollectStopSkills(unittest.TestCase):
             import time
             time.sleep(0.05)
             if ack_handler:
-                ack_handler(Message("skill.stop.pong",
+                ack_handler(Message(SpecMessage.STOP_PONG.value,
                                     {"skill_id": "skill_a", "can_handle": False}))
             t.join(timeout=1)
 
@@ -164,7 +172,7 @@ class TestCollectStopSkills(unittest.TestCase):
         # bus.remove must have been called regardless of timeout
         svc.bus.remove.assert_called_once()
         args = svc.bus.remove.call_args[0]
-        self.assertEqual(args[0], "skill.stop.pong")
+        self.assertEqual(args[0], SpecMessage.STOP_PONG.value)
 
     def test_listener_removed_on_handler_exception(self):
         """Listener must be cleaned up even if handle_ack raises."""
@@ -177,7 +185,7 @@ class TestCollectStopSkills(unittest.TestCase):
 
         def capture_on(event, handler):
             nonlocal ack_handler
-            if event == "skill.stop.pong":
+            if event == SpecMessage.STOP_PONG.value:
                 ack_handler = handler
 
         svc.bus.on = capture_on
@@ -202,7 +210,7 @@ class TestCollectStopSkills(unittest.TestCase):
             time.sleep(0.05)
             # Send a malformed message that triggers the guard (skill_id missing)
             if ack_handler:
-                ack_handler(Message("skill.stop.pong", {}))  # no skill_id → guard fires
+                ack_handler(Message(SpecMessage.STOP_PONG.value, {}))  # no skill_id → guard fires
             t.join(timeout=1)
 
         # Listener must still have been removed
@@ -219,7 +227,7 @@ class TestCollectStopSkills(unittest.TestCase):
 
         def capture_on(event, handler):
             nonlocal ack_handler
-            if event == "skill.stop.pong":
+            if event == SpecMessage.STOP_PONG.value:
                 ack_handler = handler
 
         svc.bus.on = capture_on
@@ -238,8 +246,8 @@ class TestCollectStopSkills(unittest.TestCase):
             t.start()
             time.sleep(0.05)
             if ack_handler:
-                ack_handler(Message("skill.stop.pong", {}))          # bad — no skill_id
-                ack_handler(Message("skill.stop.pong",
+                ack_handler(Message(SpecMessage.STOP_PONG.value, {}))          # bad — no skill_id
+                ack_handler(Message(SpecMessage.STOP_PONG.value,
                                     {"skill_id": "real_skill", "can_handle": True}))  # good
             t.join(timeout=1)
 
@@ -320,6 +328,65 @@ class TestHandleStopConfirmation(unittest.TestCase):
             svc.handle_stop_confirmation(msg)
 
 
+class TestAbortQuestionReachable(unittest.TestCase):
+    """CONFIRMED-4 regression: handle_stop_confirmation's RESPONSE-state
+    check (which emits mycroft.skills.abort_question, the killable-event
+    abort for a blocked get_response) read `sess.utterance_states` off the
+    ALREADY-DRAINED session carried by the dispatched .stop.response message
+    (_targeted_stop's disable_response_mode runs before dispatch) — so it was
+    always UtteranceState.INTENT there and the branch was unreachable."""
+
+    def test_targeted_stop_of_response_mode_skill_emits_abort_question(self):
+        svc = _make_service()
+        svc.bus.emit = MagicMock()
+
+        sess = Session("s")
+        sess.enable_response_mode("skill_a")  # UtteranceState.RESPONSE
+
+        # simulate _targeted_stop's pre-drain snapshot + the dispatch carrying
+        # the POST-drain session forward to the .stop.response handler.
+        match = svc._targeted_stop("skill_a", 1.0, "stop", sess)
+        drained_sess = match.updated_session
+        self.assertFalse(drained_sess.response_mode)  # sanity: already drained
+
+        msg = Message("skill_a.stop.response",
+                      data={"skill_id": "skill_a", "result": True},
+                      context={"session": drained_sess.serialize()})
+
+        with patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=drained_sess):
+            svc.handle_stop_confirmation(msg)
+
+        emitted = [c[0][0].msg_type for c in svc.bus.emit.call_args_list]
+        self.assertIn("mycroft.skills.abort_question", emitted,
+                      "abort_question must fire for a skill genuinely blocked "
+                      "in get_response, even though the session reaching "
+                      "handle_stop_confirmation is already drained")
+
+    def test_force_timeout_still_emitted_for_converse_skill(self):
+        """Regression guard: the CONFIRMED-2 force_timeout fix must stay green."""
+        svc = _make_service()
+        svc.bus.emit = MagicMock()
+
+        sess = Session("s")
+        sess.activate_skill("skill_a")  # active, NOT response-mode
+
+        match = svc._targeted_stop("skill_a", 1.0, "stop", sess)
+        drained_sess = match.updated_session
+
+        msg = Message("skill_a.stop.response",
+                      data={"skill_id": "skill_a", "result": True},
+                      context={"session": drained_sess.serialize()})
+
+        with patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=drained_sess):
+            svc.handle_stop_confirmation(msg)
+
+        emitted = [c[0][0].msg_type for c in svc.bus.emit.call_args_list]
+        self.assertIn("ovos.skills.converse.force_timeout", emitted)
+        self.assertNotIn("mycroft.skills.abort_question", emitted)
+
+
 class TestMatchHigh(unittest.TestCase):
 
     def setUp(self):
@@ -341,7 +408,7 @@ class TestMatchHigh(unittest.TestCase):
             result = self.svc.match_high(["stop"], "en-US", Message("test"))
 
         self.assertIsNotNone(result)
-        self.assertEqual(result.match_type, "stop:global")
+        self.assertEqual(result.match_type, GLOBAL_STOP)
 
     def test_exact_stop_with_active_skills_pings_skills(self):
         """'stop' with active skills → skill stop ping."""
@@ -355,7 +422,9 @@ class TestMatchHigh(unittest.TestCase):
             result = self.svc.match_high(["stop"], "en-US", Message("test"))
 
         self.assertIsNotNone(result)
-        self.assertEqual(result.match_type, "stop:skill")
+        self.assertEqual(result.match_type, "skill_a:stop")
+        self.assertEqual(result.skill_id, "skill_a")
+        self.assertTrue(result.suppress_activation)
         self.assertEqual(result.match_data["skill_id"], "skill_a")
 
     def test_global_stop_voc_triggers_global_stop(self):
@@ -370,7 +439,7 @@ class TestMatchHigh(unittest.TestCase):
             result = self.svc.match_high(["stop everything"], "en-US", Message("test"))
 
         self.assertIsNotNone(result)
-        self.assertEqual(result.match_type, "stop:global")
+        self.assertEqual(result.match_type, GLOBAL_STOP)
 
 
 class TestMatchLow(unittest.TestCase):
@@ -410,7 +479,7 @@ class TestMatchLow(unittest.TestCase):
 
         # 0.45 + 0.1 = 0.55 ≥ 0.5, and no skills to stop → global stop
         self.assertIsNotNone(result)
-        self.assertEqual(result.match_type, "stop:global")
+        self.assertEqual(result.match_type, GLOBAL_STOP)
 
     def test_above_threshold_with_stoppable_skill(self):
         """A confident match with a stoppable skill → skill stop."""
@@ -426,7 +495,9 @@ class TestMatchLow(unittest.TestCase):
             result = self.svc.match_low(["stop"], "en-US", Message("test"))
 
         self.assertIsNotNone(result)
-        self.assertEqual(result.match_type, "stop:skill")
+        self.assertEqual(result.match_type, "skill_a:stop")
+        self.assertEqual(result.skill_id, "skill_a")
+        self.assertTrue(result.suppress_activation)
         self.assertEqual(result.match_data["skill_id"], "skill_a")
 
 
@@ -472,7 +543,7 @@ class TestHandleStopConfirmationExtra(unittest.TestCase):
             svc.handle_stop_confirmation(msg)
 
         emitted = [c[0][0].msg_type for c in svc.bus.emit.call_args_list]
-        self.assertIn("mycroft.audio.speech.stop", emitted)
+        self.assertIn(SpecMessage.AUDIO_STOP.value, emitted)
 
 
 class TestMatchMedium(unittest.TestCase):
@@ -519,29 +590,238 @@ class TestGetActiveSkills(unittest.TestCase):
         self.assertIn("skill_b", result)
 
 
-class TestBusHandlers(unittest.TestCase):
+def _make_bridge(legacy_topics_already_bridged: bool = False) -> _LegacyStopBridge:
+    """Construct a _LegacyStopBridge without registering bus listeners.
+
+    ``legacy_topics_already_bridged=False`` (the default here) models a
+    deployment WITHOUT an active NamespaceTranslator — the scenario where the
+    bridge's own ``mycroft.stop`` / ``<skill_id>.stop`` re-emission is the only
+    thing providing that compatibility surface, matching what these tests
+    assert. Pass ``True`` to model the translator-active regime instead
+    (see ``TestLegacyBridgeSingleDelivery`` for that scenario end-to-end).
+    """
+    bridge = _LegacyStopBridge.__new__(_LegacyStopBridge)
+    service = MagicMock()
+    service.pipeline_id = StopService.pipeline_id
+    bridge.service = service
+    bridge.bus = FakeBus()
+    bridge._warned = False
+    bridge._legacy_topics_already_bridged = legacy_topics_already_bridged
+    return bridge
+
+
+class TestLegacyStopBridge(unittest.TestCase):
+    """The droppable pre-STOP-1 dispatch shim."""
 
     def test_handle_global_stop_emits_mycroft_stop(self):
-        svc = _make_service()
+        bridge = _make_bridge()
         emitted = []
-        svc.bus.emit = lambda m: emitted.append(m)
-        msg = Message("stop:global", {})
-        svc.handle_global_stop(msg)
+        bridge.bus.emit = lambda m: emitted.append(m)
+        bridge.handle_global_stop(Message("stop:global", {}))
         types = [m.msg_type for m in emitted]
         self.assertIn("mycroft.skill.handler.start", types)
         self.assertIn("mycroft.stop", types)
         self.assertIn("mycroft.skill.handler.complete", types)
 
     def test_handle_skill_stop_forwards_to_skill(self):
-        svc = _make_service()
+        bridge = _make_bridge()
         emitted = []
-        svc.bus.emit = lambda m: emitted.append(m)
-        msg = Message("stop:skill", {"skill_id": "my_skill"})
-        svc.handle_skill_stop(msg)
+        bridge.bus.emit = lambda m: emitted.append(m)
+        bridge.handle_skill_stop(Message("stop:skill", {"skill_id": "my_skill"}))
         types = [m.msg_type for m in emitted]
         self.assertIn("mycroft.skill.handler.start", types)
         self.assertIn("my_skill.stop", types)
         self.assertIn("mycroft.skill.handler.complete", types)
+
+    def test_intent_matched_global_reemits_legacy_dispatch(self):
+        bridge = _make_bridge()
+        emitted = []
+        bridge.bus.emit = lambda m: emitted.append(m)
+        bridge._on_intent_matched(Message(
+            "ovos.intent.matched",
+            {"pipeline_id": f"{StopService.pipeline_id}-high",
+             "intent_name": GLOBAL_STOP, "skill_id": StopService.pipeline_id}))
+        types = [m.msg_type for m in emitted]
+        self.assertIn("stop.openvoiceos.activate", types)
+        self.assertIn("stop:global", types)
+
+    def test_intent_matched_targeted_reemits_legacy_dispatch(self):
+        bridge = _make_bridge()
+        emitted = []
+        bridge.bus.emit = lambda m: emitted.append(m)
+        bridge._on_intent_matched(Message(
+            "ovos.intent.matched",
+            {"pipeline_id": f"{StopService.pipeline_id}-high",
+             "intent_name": "my_skill:stop", "skill_id": "my_skill"}))
+        stop_skill = [m for m in emitted if m.msg_type == "stop:skill"]
+        self.assertEqual(len(stop_skill), 1)
+        self.assertEqual(stop_skill[0].data["skill_id"], "my_skill")
+
+    def test_intent_matched_ignores_other_pipelines(self):
+        bridge = _make_bridge()
+        emitted = []
+        bridge.bus.emit = lambda m: emitted.append(m)
+        bridge._on_intent_matched(Message(
+            "ovos.intent.matched",
+            {"pipeline_id": "ovos-adapt-pipeline-plugin-high",
+             "intent_name": "my_skill:hello", "skill_id": "my_skill"}))
+        self.assertEqual(emitted, [])
+
+
+class TestLegacyBridgeSingleDelivery(unittest.TestCase):
+    """CONFIRMED-1 regression (double-stop): with the translator active
+    (default on ``FakeBus``/``MessageBusClient``), a legacy skill's ``stop()``
+    handler — bound the way ovos-workshop actually binds it, on BOTH the
+    shared/skill legacy topic AND left listening while the bridge also fires
+    its own §9.2 observer re-emit — must be invoked exactly once per stop
+    event, not twice.
+
+    Before the fix, ``_LegacyStopBridge.handle_global_stop`` /
+    ``handle_skill_stop`` unconditionally re-emitted ``mycroft.stop`` /
+    ``<skill_id>.stop`` on top of the translator's own receive-side mirror of
+    ``ovos.stop`` / ``<skill_id>:stop``, double-firing any handler bound to the
+    legacy topic (executed proof: ``['mycroft.stop', 'mycroft.stop']``).
+    """
+
+    def _make_real_bridge(self):
+        """A real FakeBus (translator ON by default) + a real _LegacyStopBridge."""
+        bus = FakeBus()
+        service = MagicMock()
+        service.bus = bus
+        service.pipeline_id = StopService.pipeline_id
+        bridge = _LegacyStopBridge(service)
+        self.addCleanup(bridge.shutdown)
+        return bus, bridge
+
+    def test_global_stop_reaches_skill_once(self):
+        bus, bridge = self._make_real_bridge()
+        calls = []
+        bus.on("mycroft.stop", lambda message: calls.append(message.msg_type))
+
+        # 1) the real StopService.handle_global_stop emission: the spec
+        #    broadcast, which the translator mirrors onto mycroft.stop.
+        bus.emit(Message(SpecMessage.STOP.value, {},
+                         {"pipeline_id": StopService.pipeline_id}))
+        # 2) the bridge's own §9.2 observer for the same stop event.
+        bridge._on_intent_matched(Message(
+            "ovos.intent.matched",
+            {"pipeline_id": f"{StopService.pipeline_id}-high",
+             "intent_name": GLOBAL_STOP, "skill_id": StopService.pipeline_id}))
+
+        self.assertEqual(calls, ["mycroft.stop"],
+                         "skill stop() handler must fire exactly once per global stop, "
+                         f"got {calls}")
+
+    def test_targeted_stop_reaches_skill_once(self):
+        bus, bridge = self._make_real_bridge()
+        skill_id = "my_skill"
+        calls = []
+        bus.on(f"{skill_id}.stop", lambda message: calls.append(message.msg_type))
+
+        # 1) the real StopService dispatch: the spec targeted stop, mirrored
+        #    by the translator onto <skill_id>.stop.
+        bus.emit(Message(f"{skill_id}:stop", {}, {"skill_id": skill_id}))
+        # 2) the bridge's own §9.2 observer for the same stop event.
+        bridge._on_intent_matched(Message(
+            "ovos.intent.matched",
+            {"pipeline_id": f"{StopService.pipeline_id}-high",
+             "intent_name": f"{skill_id}:stop", "skill_id": skill_id}))
+
+        self.assertEqual(calls, [f"{skill_id}.stop"],
+                         "skill stop() handler must fire exactly once per targeted stop, "
+                         f"got {calls}")
+
+    def test_bridge_still_bridges_without_translator(self):
+        """Off-translator deployments must keep receiving mycroft.stop /
+        <skill_id>.stop from the bridge itself (no other mechanism provides it)."""
+        bus = FakeBus(modernize=False, emit_legacy=False)
+        service = MagicMock()
+        service.bus = bus
+        service.pipeline_id = StopService.pipeline_id
+        bridge = _LegacyStopBridge(service)
+        self.addCleanup(bridge.shutdown)
+        self.assertFalse(bridge._legacy_topics_already_bridged)
+
+        calls = []
+        bus.on("mycroft.stop", lambda message: calls.append(message.msg_type))
+        bridge._on_intent_matched(Message(
+            "ovos.intent.matched",
+            {"pipeline_id": f"{StopService.pipeline_id}-high",
+             "intent_name": GLOBAL_STOP, "skill_id": StopService.pipeline_id}))
+        self.assertEqual(calls, ["mycroft.stop"])
+
+
+class TestResponseModeHolderCandidate(unittest.TestCase):
+    """Regression: a session whose ONLY activity is an outstanding
+    get_response (ovos-workshop's enable_response_mode does NOT push an
+    active_handlers entry) must still be reachable by a generic "stop" —
+    targeted at the holder, not silently escalated to a global stop the
+    killable-event abort never observes.
+    """
+
+    def setUp(self):
+        self.svc = _make_service()
+
+    def test_empty_active_handlers_with_response_mode_is_targeted_not_global(self):
+        """A bare 'stop' with active_handlers=[] but a response_mode holder
+        must dispatch a TARGETED <skill_id>:stop for that holder, not a
+        global stop."""
+        sess = Session("s")
+        sess.enable_response_mode("skill_x")  # no active_handlers push
+
+        self.svc.bus.once = MagicMock()
+        with patch.object(self.svc._locale, "voc_match",
+                          side_effect=lambda utt, voc, lang, exact: voc == "stop"), \
+             patch.object(StopService, "get_active_skills", return_value=[]), \
+             patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=sess):
+            result = self.svc.match_high(["stop"], "en-US", Message("test"))
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.match_type, "skill_x:stop",
+                         "response_mode holder must be targeted directly, "
+                         f"got {result.match_type!r} (GLOBAL_STOP={GLOBAL_STOP!r})")
+        self.assertEqual(result.skill_id, "skill_x")
+
+    def test_response_mode_holder_ranks_ahead_of_older_active_handler(self):
+        """A response_mode holder is the most recent interaction by
+        definition and must rank FIRST in stop candidates, even ahead of an
+        older active_handlers entry."""
+        sess = Session("s")
+        sess.activate_skill("old_skill")
+        sess.enable_response_mode("holder_skill")
+
+        with patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=sess), \
+             patch.object(StopService, "get_active_skills",
+                          return_value=["old_skill"]):
+            candidates = self.svc._stop_candidates(Message("test"))
+
+        self.assertEqual(candidates[0], "holder_skill")
+        self.assertIn("old_skill", candidates)
+
+    def test_global_stop_still_reaches_response_mode_holder(self):
+        """Even when a stop DOES escalate to global (e.g. explicit 'stop
+        everything' vocabulary), the response_mode holder must still get its
+        targeted <skill_id>.stop so a blocked get_response is released — the
+        broadcast alone is invisible to the killable-event abort."""
+        sess = Session("s")
+        sess.enable_response_mode("blocked_skill")
+
+        match = self.svc._global_stop(1.0, "stop everything", sess)
+        self.assertEqual(match.match_data.get("response_mode_holder"), "blocked_skill")
+
+        self.svc.bus.emit = MagicMock()
+        msg = Message(GLOBAL_STOP, dict(match.match_data),
+                      {"pipeline_id": StopService.pipeline_id})
+        self.svc.handle_global_stop(msg)
+
+        emitted_types = [c[0][0].msg_type for c in self.svc.bus.emit.call_args_list]
+        self.assertIn("blocked_skill.stop", emitted_types)
+        self.assertIn(SpecMessage.STOP.value, emitted_types)
+        # targeted stop must reach the skill BEFORE the broadcast
+        self.assertLess(emitted_types.index("blocked_skill.stop"),
+                        emitted_types.index(SpecMessage.STOP.value))
 
 
 class TestShutdown(unittest.TestCase):
@@ -551,8 +831,9 @@ class TestShutdown(unittest.TestCase):
         svc.bus.remove = MagicMock()
         svc.shutdown()
         calls = {c[0][0] for c in svc.bus.remove.call_args_list}
-        self.assertIn("stop:global", calls)
-        self.assertIn("stop:skill", calls)
+        self.assertIn(GLOBAL_STOP, calls)
+        # the legacy listeners are removed by the (mocked) bridge
+        svc._legacy.shutdown.assert_called_once()
 
 
 if __name__ == "__main__":

@@ -670,6 +670,60 @@ class TestHandleUtterance(unittest.TestCase):
             svc.handle_utterance(msg)
         svc.send_complete_intent_failure.assert_called_once()
 
+    def test_blacklisted_targeted_stop_discards_match_session_unchanged(self):
+        """CONFIRMED-3 regression: a Match discarded for a blacklisted intent
+        (service.py ~607) must never have applied its session mutation. Before
+        the fix, StopService._targeted_stop drained the LIVE SessionManager
+        session in match() itself, so a discarded stop still left the skill
+        deactivated with nothing dispatched — this test fails on that
+        unfixed behaviour (active_handlers would come back empty)."""
+        from ovos_core.intent_services.stop_service import StopService
+
+        bus = FakeBus()
+        svc = _make_service()
+        svc.bus = bus
+        svc.send_complete_intent_failure = MagicMock()
+
+        stop_svc = StopService.__new__(StopService)
+        stop_svc.bus = bus
+        stop_svc.config = {}
+        stop_svc.suppress_activation = True
+        stop_svc._locale = MagicMock()
+        stop_svc._locale.voc_match.side_effect = (
+            lambda utt, voc, lang, exact=False: voc == "stop")
+        stop_svc._legacy = MagicMock()
+        stop_svc._was_active_pre_drain = {}
+
+        sess = Session("s")
+        sess.activate_skill("skill_a")
+        sess.pipeline = ["ovos-stop-pipeline-plugin-high"]
+        sess.blacklisted_intents = ["skill_a:stop"]
+        before = list(sess.active_handlers)
+
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["stop"]},
+                      context={})
+
+        with patch.object(svc, "get_pipeline",
+                          return_value=[("ovos-stop-pipeline-plugin", stop_svc.match_high)]), \
+             patch.object(stop_svc, "_collect_stop_skills", return_value=["skill_a"]), \
+             patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.reset_default_session",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.update"), \
+             patch("ovos_core.intent_services.service.SessionManager.sync"), \
+             patch("ovos_core.intent_services.service.get_message_lang",
+                   return_value="en-US"), \
+             patch("ovos_core.intent_services.service.get_valid_languages",
+                   return_value=["en-US"]):
+            svc.handle_utterance(msg)
+
+        # the match was discarded (blacklisted) — no dispatch, and the live
+        # session's active_handlers must be exactly as before.
+        self.assertEqual(sess.active_handlers, before)
+        svc.send_complete_intent_failure.assert_called_once()
+
 
 # ---------------------------------------------------------------------------
 # handle_get_intent
@@ -816,13 +870,14 @@ class TestRequiredSlotsBackstop(unittest.TestCase):
 
 class TestReservedNameActivation(unittest.TestCase):
 
-    def _dispatch(self, pipeline_id):
+    def _dispatch(self, pipeline_id, suppress_activation=False):
         svc = _make_service()
         sess = Session("s1")
         msg = Message("recognizer_loop:utterance", {"utterances": ["hi"]},
                       {"session": sess.serialize()})
         match = _make_match(match_type="test.skill:intent",
                             skill_id="test.skill", session=sess)
+        match.suppress_activation = suppress_activation
         svc._dispatch_match(match, msg, "en-US", pipeline_id=pipeline_id)
         return sess
 
@@ -833,9 +888,8 @@ class TestReservedNameActivation(unittest.TestCase):
         self.assertIn("test.skill", ids)
 
     def test_reserved_name_pipeline_suppresses_push(self):
-        # §7.3: converse/stop/fallback/common_query dispatches must NOT push
+        # §7.3: converse/fallback/common_query dispatches must NOT push
         for pid in ("ovos-converse-pipeline-plugin",
-                    "ovos-stop-pipeline-plugin-high",
                     "ovos-fallback-pipeline-plugin-medium",
                     "ovos-common-query-pipeline-plugin"):
             sess = self._dispatch(pid)
@@ -843,13 +897,28 @@ class TestReservedNameActivation(unittest.TestCase):
                    for h in sess.active_handlers]
             self.assertNotIn("test.skill", ids, f"{pid} should suppress the push")
 
+    def test_suppress_activation_match_suppresses_push(self):
+        # OVOS-STOP-1 §6.2/§7.3: a Match.suppress_activation dispatch (a stop)
+        # must NOT push onto active_handlers regardless of its pipeline_id.
+        sess = self._dispatch("ovos-adapt-pipeline-plugin-high",
+                              suppress_activation=True)
+        ids = [h.get("skill_id") if isinstance(h, dict) else getattr(h, "skill_id", h)
+               for h in sess.active_handlers]
+        self.assertNotIn("test.skill", ids)
+
 
 class TestProducesReservedName(unittest.TestCase):
 
     def test_reserved_roles_true_with_confidence_suffix(self):
         from ovos_core.intent_services.service import _produces_reserved_name
-        self.assertTrue(_produces_reserved_name("ovos-stop-pipeline-plugin-high"))
         self.assertTrue(_produces_reserved_name("ovos-converse-pipeline-plugin"))
+        self.assertTrue(_produces_reserved_name("ovos-fallback-pipeline-plugin-low"))
+
+    def test_stop_role_not_in_reserved_table(self):
+        # STOP-1 expresses suppression per-Match (suppress_activation), so the
+        # stop pipeline is intentionally absent from the reserved-name table.
+        from ovos_core.intent_services.service import _produces_reserved_name
+        self.assertFalse(_produces_reserved_name("ovos-stop-pipeline-plugin-high"))
 
     def test_regular_role_false(self):
         from ovos_core.intent_services.service import _produces_reserved_name

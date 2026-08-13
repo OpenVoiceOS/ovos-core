@@ -74,12 +74,14 @@ _PIPELINE_RE = re.compile(r'-(high|medium|low)$')
 # suffix (``-high``/``-medium``/``-low``) stripped before lookup.
 #
 #   converse       -> ovos-converse-pipeline-plugin     (CONVERSE-1 §4/§5: converse, response)
-#   stop           -> ovos-stop-pipeline-plugin          (STOP-1 §4: stop)
 #   fallback       -> ovos-fallback-pipeline-plugin      (FALLBACK-1 §6.3: fallback)
 #   common_query   -> ovos-common-query-pipeline-plugin  (COMMON-QUERY-1 §3: common_query)
+#
+# OVOS-STOP-1 dispatches (``stop``/``global_stop``) also suppress the §7.1 push,
+# but express it per-Match via ``IntentHandlerMatch.suppress_activation`` (§6.2)
+# rather than through this pipeline_id table.
 _RESERVED_NAME_PIPELINES = {
     "ovos-converse-pipeline-plugin",
-    "ovos-stop-pipeline-plugin",
     "ovos-fallback-pipeline-plugin",
     "ovos-common-query-pipeline-plugin",
 }
@@ -468,10 +470,14 @@ class IntentService:
                 reply.context["skill_id"] = match.skill_id
 
                 was_deactivated = match.skill_id in self._deactivations[sess.session_id]
-                if not was_deactivated:
+                # ``suppress_activation`` (OVOS-STOP-1 §6.2/§7.3) marks a dispatch
+                # that terminates an already-active skill's participation — a stop —
+                # so it must register no activation at all: neither the §7.1
+                # ``active_handlers`` push nor the ``{skill_id}.activate`` callback.
+                if not was_deactivated and not match.suppress_activation:
                     # OVOS-PIPELINE-1 §7.1 pushes the skill onto the session's
                     # active-handler recency list. §7.3 SUPPRESSES that push for
-                    # reserved intent_name dispatches (converse/response/stop/
+                    # reserved intent_name dispatches (converse/response/
                     # fallback/common_query): a reserved name is a continuation
                     # or termination of an already-active skill's participation,
                     # not a fresh activation. `activate_skill` is a back-compat
