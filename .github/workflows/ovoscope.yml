@@ -14,7 +14,7 @@ jobs:
     with:
       runner: "ubuntu-latest"
       python_version: "3.11"
-      system_deps: "python3-dev swig libssl-dev portaudio19-dev libpulse-dev libfann-dev"
+      system_deps: "python3-dev swig libssl-dev portaudio19-dev libpulse-dev"
       install_extras: "test"
       test_path: "test/end2end/"
       require_adapt: true

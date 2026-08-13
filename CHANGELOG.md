@@ -1,5 +1,62 @@
 # Changelog
 
+## [2.6.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.4a1) (2026-08-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.3a2...2.6.4a1)
+
+**Merged pull requests:**
+
+- fix: mirror add\_context under the resolved private key when the producer names it [\#857](https://github.com/OpenVoiceOS/ovos-core/pull/857) ([JarbasAl](https://github.com/JarbasAl))
+
+## [2.6.3a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.3a2) (2026-08-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.3a1...2.6.3a2)
+
+**Merged pull requests:**
+
+- spike: context.utterance\_id — lifecycle identifier + converse round guard \(PIPELINE-1 §9.1.1\) [\#859](https://github.com/OpenVoiceOS/ovos-core/pull/859) ([JarbasAl](https://github.com/JarbasAl))
+
+## [2.6.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.3a1) (2026-08-11)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.2a1...2.6.3a1)
+
+**Merged pull requests:**
+
+- fix: let language disambiguation use the shared distance threshold [\#847](https://github.com/OpenVoiceOS/ovos-core/pull/847) ([JarbasAl](https://github.com/JarbasAl))
+
+## [2.6.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.2a1) (2026-08-11)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.1a1...2.6.2a1)
+
+**Merged pull requests:**
+
+- fix: padatious belongs in the plugins extra, not its own [\#850](https://github.com/OpenVoiceOS/ovos-core/pull/850) ([JarbasAl](https://github.com/JarbasAl))
+
+## [2.6.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.1a1) (2026-08-11)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.0a1...2.6.1a1)
+
+**Merged pull requests:**
+
+- fix: padatious is Apache-2.0, drop the lgpl framing and fann2 [\#848](https://github.com/OpenVoiceOS/ovos-core/pull/848) ([JarbasAl](https://github.com/JarbasAl))
+- feat: add skills.installer.upgrade config option to SkillsStore.pip\_install [\#843](https://github.com/OpenVoiceOS/ovos-core/pull/843) ([andlo](https://github.com/andlo))
+
+## [2.6.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.0a1) (2026-08-02)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.10a1...2.6.0a1)
+
+**Merged pull requests:**
+
+- feat: blacklist pipeline plugins at load time and per session [\#832](https://github.com/OpenVoiceOS/ovos-core/pull/832) ([JarbasAl](https://github.com/JarbasAl))
+
+## [2.5.10a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.10a1) (2026-08-02)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.9a1...2.5.10a1)
+
+**Merged pull requests:**
+
+- fix: conform transformer chains to OVOS-TRANSFORM-1 [\#785](https://github.com/OpenVoiceOS/ovos-core/pull/785) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.5.9a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.9a1) (2026-08-01)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.8a3...2.5.9a1)
@@ -279,122 +336,53 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.1a1...2.1.1)
 
-**Merged pull requests:**
-
-- Release 2.1.1a1 [\#735](https://github.com/OpenVoiceOS/ovos-core/pull/735) ([github-actions[bot]](https://github.com/apps/github-actions))
-
 ## [2.1.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.1a1) (2025-11-05)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.0...2.1.1a1)
-
-**Merged pull requests:**
-
-- Update ovos-plugin-manager version range [\#734](https://github.com/OpenVoiceOS/ovos-core/pull/734) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.1.0](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.0) (2025-10-20)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.0a1...2.1.0)
 
-**Merged pull requests:**
-
-- Release 2.1.0a1 [\#732](https://github.com/OpenVoiceOS/ovos-core/pull/732) ([github-actions[bot]](https://github.com/apps/github-actions))
-
 ## [2.1.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.0a1) (2025-10-20)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.6a1...2.1.0a1)
-
-**Merged pull requests:**
-
-- feat: send bus message on skill load [\#727](https://github.com/OpenVoiceOS/ovos-core/pull/727) ([mikejgray](https://github.com/mikejgray))
 
 ## [2.0.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.6a1) (2025-10-20)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.5a2...2.0.6a1)
 
-**Closed issues:**
-
-- Fixed a bug where file encoding was not specified. [\#721](https://github.com/OpenVoiceOS/ovos-core/issues/721)
-
-**Merged pull requests:**
-
-- Release 2.0.6a1 [\#731](https://github.com/OpenVoiceOS/ovos-core/pull/731) ([github-actions[bot]](https://github.com/apps/github-actions))
-- fix\(setup\): set utf-8 encoding when opening files [\#728](https://github.com/OpenVoiceOS/ovos-core/pull/728) ([mikejgray](https://github.com/mikejgray))
-
 ## [2.0.5a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.5a2) (2025-10-08)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.5a1...2.0.5a2)
-
-**Closed issues:**
-
-- Does this project support custom AI Agent APIs? [\#726](https://github.com/OpenVoiceOS/ovos-core/issues/726)
-
-**Merged pull requests:**
-
-- Release 2.0.5a2 [\#730](https://github.com/OpenVoiceOS/ovos-core/pull/730) ([github-actions[bot]](https://github.com/apps/github-actions))
-- translated ovos core [\#729](https://github.com/OpenVoiceOS/ovos-core/pull/729) ([gitlocalize-app[bot]](https://github.com/apps/gitlocalize-app))
 
 ## [2.0.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.5a1) (2025-09-05)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.4a5...2.0.5a1)
 
-**Merged pull requests:**
-
-- Release 2.0.5a1 [\#725](https://github.com/OpenVoiceOS/ovos-core/pull/725) ([github-actions[bot]](https://github.com/apps/github-actions))
-- fix: less requirements [\#724](https://github.com/OpenVoiceOS/ovos-core/pull/724) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [2.0.4a5](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.4a5) (2025-09-05)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.4a4...2.0.4a5)
-
-**Closed issues:**
-
-- ovos-core should restart itself when it detects a new skill [\#720](https://github.com/OpenVoiceOS/ovos-core/issues/720)
-
-**Merged pull requests:**
-
-- Release 2.0.4a5 [\#723](https://github.com/OpenVoiceOS/ovos-core/pull/723) ([github-actions[bot]](https://github.com/apps/github-actions))
-- Fix/orjson optional [\#722](https://github.com/OpenVoiceOS/ovos-core/pull/722) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.0.4a4](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.4a4) (2025-06-17)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.4a3...2.0.4a4)
 
-**Merged pull requests:**
-
-- Release 2.0.4a4 [\#719](https://github.com/OpenVoiceOS/ovos-core/pull/719) ([github-actions[bot]](https://github.com/apps/github-actions))
-- active skill end2end tests [\#717](https://github.com/OpenVoiceOS/ovos-core/pull/717) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [2.0.4a3](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.4a3) (2025-06-17)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.4a2...2.0.4a3)
-
-**Merged pull requests:**
-
-- improve skill shutdown [\#716](https://github.com/OpenVoiceOS/ovos-core/pull/716) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.0.4a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.4a2) (2025-06-16)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.4a1...2.0.4a2)
 
-**Merged pull requests:**
-
-- refactor: launcher args [\#714](https://github.com/OpenVoiceOS/ovos-core/pull/714) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [2.0.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.4a1) (2025-06-16)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.3a2...2.0.4a1)
 
-**Merged pull requests:**
-
-- fix: converse\_routing [\#712](https://github.com/OpenVoiceOS/ovos-core/pull/712) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [2.0.3a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.3a2) (2025-06-16)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.0.3a1...2.0.3a2)
-
-**Merged pull requests:**
-
-- tests: test cancel plugin [\#710](https://github.com/OpenVoiceOS/ovos-core/pull/710) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.0.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.0.3a1) (2025-06-16)
 

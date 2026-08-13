@@ -17,6 +17,7 @@ import copy
 import json
 import re
 import time
+from uuid import uuid4
 from collections import defaultdict
 from typing import Optional, Tuple, Callable, List
 
@@ -27,6 +28,7 @@ from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
 from ovos_spec_tools import closest_lang, standardize_lang, SpecMessage
+from ovos_spec_tools.context import resolve_key
 from ovos_utils.log import LOG
 from ovos_utils.metrics import Stopwatch
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
@@ -82,12 +84,14 @@ _PIPELINE_RE = re.compile(r'-(high|medium|low)$')
 # suffix (``-high``/``-medium``/``-low``) stripped before lookup.
 #
 #   converse       -> ovos-converse-pipeline-plugin     (CONVERSE-1 §4/§5: converse, response)
-#   stop           -> ovos-stop-pipeline-plugin          (STOP-1 §4: stop)
 #   fallback       -> ovos-fallback-pipeline-plugin      (FALLBACK-1 §6.3: fallback)
 #   common_query   -> ovos-common-query-pipeline-plugin  (COMMON-QUERY-1 §3: common_query)
+#
+# OVOS-STOP-1 dispatches (``stop``/``global_stop``) also suppress the §7.1 push,
+# but express it per-Match via ``IntentHandlerMatch.suppress_activation`` (§6.2)
+# rather than through this pipeline_id table.
 _RESERVED_NAME_PIPELINES = {
     "ovos-converse-pipeline-plugin",
-    "ovos-stop-pipeline-plugin",
     "ovos-fallback-pipeline-plugin",
     "ovos-common-query-pipeline-plugin",
 }
@@ -211,7 +215,35 @@ class IntentService:
     def handle_reload_pipelines(self, message: Message):
         pipeline_plugins = OVOSPipelineFactory.get_installed_pipeline_ids()
         LOG.debug(f"Installed pipeline plugins: {pipeline_plugins}")
+
+        # `intents.blacklisted_pipelines` lets a deployment opt a plugin out
+        # of ovos-core entirely, so it is never imported/instantiated.
+        # ovos-core still deliberately loads every OTHER installed plugin
+        # regardless of the active `intents.pipeline` selection, because a
+        # remote client/session may select a different pipeline at runtime.
+        # Matching is by exact installed plugin id (as returned by
+        # `OVOSPipelineFactory.get_installed_pipeline_ids`, eg.
+        # "ovos-m2v-pipeline"), NOT by confidence-suffixed matcher id (eg.
+        # "ovos-m2v-pipeline-high"); blacklisting the plugin id covers all of
+        # its matcher variants since they are all produced by the same class.
+        blacklist = set(self.config.get("blacklisted_pipelines", []))
+        active_pipeline = self.config.get("pipeline", [])
+
         for p in pipeline_plugins:
+            if p in blacklist:
+                LOG.info(f"Skipping blacklisted pipeline plugin: '{p}'")
+                # `intents.pipeline` may list legacy matcher ids (eg.
+                # "adapt_high"); normalize through _PIPELINE_MIGRATION_MAP
+                # before comparing against the installed plugin id, or this
+                # warning silently fails to fire for legacy configs.
+                if any(_PIPELINE_MIGRATION_MAP.get(matcher_id, matcher_id) == p or
+                       _PIPELINE_MIGRATION_MAP.get(matcher_id, matcher_id).startswith(f"{p}-")
+                       for matcher_id in active_pipeline):
+                    LOG.warning(f"Pipeline plugin '{p}' is blacklisted in "
+                                f"'intents.blacklisted_pipelines' but also "
+                                f"selected in 'intents.pipeline'; the "
+                                f"blacklist wins and it will stay disabled")
+                continue
             try:
                 self.pipeline_plugins[p] = OVOSPipelineFactory.load_plugin(p, bus=self.bus)
                 LOG.debug(f"Loaded pipeline plugin: '{p}'")
@@ -251,9 +283,11 @@ class IntentService:
         for k in lang_keys:
             if k in message.context:
                 v = standardize_lang(message.context[k])
-                # closest_lang already applies the "distance below 10" threshold
-                # and returns None when no candidate is close enough
-                best_lang = closest_lang(v, valid_langs, max_distance=10)
+                # closest_lang applies the language-distance threshold and
+                # returns None when no candidate is close enough. The bound is
+                # inclusive, so a member language still matches its
+                # macrolanguage (distance 10, eg. "arz" against "ar")
+                best_lang = closest_lang(v, valid_langs)
                 if best_lang is None:
                     LOG.warning(f"ignoring {k}, {v} is not in enabled languages: {valid_langs}")
                     continue
@@ -294,12 +328,28 @@ class IntentService:
         the list can be configured in mycroft.conf under intents.pipeline,
         in the future plugins will be supported for users to define their own pipeline"""
         session = session or SessionManager.get()
-        matchers = [(p, self.get_pipeline_matcher(p)) for p in session.pipeline]
+
+        # OVOS-PIPELINE-1 §5.2/§5.5: `session.blacklisted_pipelines` is the
+        # policy channel and overrides `session.pipeline` preference - a
+        # pipeline_id listed here MUST NOT be invoked for this session even
+        # if it is also present in `session.pipeline`. Filtering here is
+        # orchestrator-only: no `match` call is made and no bus event is
+        # emitted for the skip, it is observable only as a non-invocation.
+        # Unknown pipeline_ids in the blacklist are harmless no-ops.
+        blacklisted = set(session.blacklisted_pipelines or [])
+        requested = [p for p in session.pipeline if p not in blacklisted]
+        if blacklisted:
+            skipped = [p for p in session.pipeline if p in blacklisted]
+            if skipped:
+                LOG.debug(f"Session '{session.session_id}' blacklisted "
+                          f"pipelines skipped: {skipped}")
+
+        matchers = [(p, self.get_pipeline_matcher(p)) for p in requested]
         matchers = [m for m in matchers if m[1] is not None]  # filter any that failed to load
         final_pipeline = [k[0] for k in matchers]
-        if session.pipeline != final_pipeline:
+        if requested != final_pipeline:
             LOG.warning(f"Requested some invalid pipeline components! "
-                        f"filtered: {[k for k in session.pipeline if k not in final_pipeline]}")
+                        f"filtered: {[k for k in requested if k not in final_pipeline]}")
         LOG.debug(f"Session final pipeline: {final_pipeline}")
         return matchers
 
@@ -528,10 +578,14 @@ class IntentService:
                 reply.context["skill_id"] = match.skill_id
 
                 was_deactivated = match.skill_id in self._deactivations[sess.session_id]
-                if not was_deactivated:
+                # ``suppress_activation`` (OVOS-STOP-1 §6.2/§7.3) marks a dispatch
+                # that terminates an already-active skill's participation — a stop —
+                # so it must register no activation at all: neither the §7.1
+                # ``active_handlers`` push nor the ``{skill_id}.activate`` callback.
+                if not was_deactivated and not match.suppress_activation:
                     # OVOS-PIPELINE-1 §7.1 pushes the skill onto the session's
                     # active-handler recency list. §7.3 SUPPRESSES that push for
-                    # reserved intent_name dispatches (converse/response/stop/
+                    # reserved intent_name dispatches (converse/response/
                     # fallback/common_query): a reserved name is a continuation
                     # or termination of an already-active skill's participation,
                     # not a fresh activation. `activate_skill` is a back-compat
@@ -639,8 +693,38 @@ class IntentService:
         # NOTE: message.reply to ensure correct message destination
         self.bus.emit(message.reply('mycroft.audio.play_sound', {"uri": sound}))
         # OVOS-PIPELINE-1 §6.4 cancellation terminal path: cancelled -> handled
-        self.bus.emit(message.reply(SpecMessage.UTTERANCE_CANCELLED))
+        # OVOS-TRANSFORM-1 §8.2: ovos.utterance.cancelled carries the
+        # cancel_reason and the orchestrator-stamped cancel_by from the §8.1
+        # signal that triggered the cancellation.
+        cancel_data = {}
+        if message.context.get("cancel_reason") is not None:
+            cancel_data["cancel_reason"] = message.context["cancel_reason"]
+        if message.context.get("cancel_by") is not None:
+            cancel_data["cancel_by"] = message.context["cancel_by"]
+        self.bus.emit(message.reply(SpecMessage.UTTERANCE_CANCELLED, cancel_data))
         self.bus.emit(message.reply(SpecMessage.UTTERANCE_HANDLED))
+
+    @staticmethod
+    def _stamp_utterance_id(message: Message) -> str:
+        """OVOS-PIPELINE-1 §9.1.1 — name this utterance lifecycle.
+
+        The orchestrator stamps ``context.utterance_id`` once, at lifecycle
+        entry. The value is opaque and unique per lifecycle (a UUID here; no
+        format is normative). Consumers compare it for equality and do nothing
+        else. Every derived Message carries it for free, because
+        ``Message.reply``/``Message.forward`` deep-copy ``context``.
+
+        A value already present is kept: a component that opened the lifecycle
+        out-of-band already sat at entry and stamped under this same rule.
+
+        Returns:
+            str: the lifecycle identifier now on the Message.
+        """
+        uid = message.context.get("utterance_id")
+        if not uid:
+            uid = str(uuid4())
+            message.context["utterance_id"] = uid
+        return uid
 
     def handle_utterance(self, message: Message):
         """Main entrypoint for handling user utterances
@@ -669,8 +753,22 @@ class IntentService:
         Args:
             message (Message): The messagebus data
         """
+        # OVOS-PIPELINE-1 §9.1.1: stamp the lifecycle identifier exactly once,
+        # at lifecycle entry, before anything derives from this Message. A value
+        # already present is never overwritten — regenerating it downstream would
+        # detach every already-derived Message from its lifecycle.
+        uid = self._stamp_utterance_id(message)
+
         # Get utterance utterance_plugins additional context
         message = self._handle_transformers(message)
+
+        # §9.1.1 drop-guard: UtteranceTransformersService/MetadataTransformersService
+        # REPLACE message.context wholesale, so a plugin returning a fresh dict
+        # silently detaches the lifecycle. Re-assert the entry value (same value,
+        # so this is not an overwrite).
+        if message.context.get("utterance_id") != uid:
+            LOG.debug("transformer chain dropped utterance_id; re-asserting")
+            message.context["utterance_id"] = uid
 
         if message.context.get("canceled"):
             self.send_cancel_event(message)
@@ -831,6 +929,40 @@ class IntentService:
             LOG.debug(f"context-supplied slots (§7): {supplied}")
 
     @staticmethod
+    def _registry_session_for_context_write(message: Message) -> "Session":
+        """Resolve the session object to mutate for an in-lifecycle context write.
+
+        Wave-3 CONFIRMED (round 4): ``SessionManager.get(message)`` always folds
+        the incoming message's session onto the live registry entry
+        (``SessionManager._store``), and for NAMED sessions that fold is
+        full-replace (``update_from``). Calling it from a context handler means
+        the fold first wipes the registry entry's ``intent_context`` with the
+        message's stale snapshot, then every subsequent mid-lifecycle frame
+        (skill replies, follow-up handler frames) re-wipes it again - a named
+        session's context can never survive to the terminal event. SESSION-2
+        §2.6 is unambiguous: folding a message's session onto the working
+        session belongs at lifecycle entry only; incidental messages must never
+        mutate it. This is not a named-session-only defect: ``update_from``
+        round-trips through full serialize/deserialize for every session id,
+        including ``"default"`` - a stale default-session snapshot arriving
+        on an incidental message wipes the device-local default session's
+        context exactly the same way. The registry-first fix below is load-
+        bearing for the default session too, not only named ones.
+
+        Fix (this handler's scope only - the general fold-discipline at every
+        ``get(message)`` call site is a tracked follow-up): resolve the
+        session_id off the message and, if the registry already holds a live
+        entry for it, mutate that object directly - no fold. Fall back to
+        ``SessionManager.get(message)`` (today's behavior) only when no
+        registry entry exists yet, e.g. out-of-registry/test callers.
+        """
+        session_data = message.context.get("session") if message and message.context else None
+        session_id = session_data.get("session_id") if isinstance(session_data, dict) else None
+        if session_id and session_id in SessionManager.sessions:
+            return SessionManager.sessions[session_id]
+        return SessionManager.get(message)
+
+    @staticmethod
     def handle_add_context(message: Message):
         """Add context
 
@@ -850,14 +982,80 @@ class IntentService:
         entity['match'] = word
         entity['key'] = word
         entity['origin'] = origin
-        sess = SessionManager.get(message)
+        sess = IntentService._registry_session_for_context_write(message)
         sess.context.inject_context(entity)
         # OVOS-CONTEXT-1 §2/§7: pipelines gate and inject from the canonical
         # `session.intent_context` map, so a keyword added via `set_context`
         # must land there too or it never reaches matching. Entries are
         # keyed by the context token and carry its injected value.
+        #
+        # Round 3 (wave-3 live lead): `sess.context.inject_context()` above
+        # (the legacy `_IntentContextView`, ovos-bus-client) already folded
+        # its own write into `session.intent_context[context]`, stamping
+        # `expires_at = now + timeout` using the adapt `context.timeout`
+        # config convention (`Configuration()["context"]["timeout"]`,
+        # minutes, default 2 -> 120s). The plain-dict overwrite that used to
+        # follow here (`ctx[context] = {"value": ...}`) clobbered that stamp
+        # two lines later - the pre-existing dev "immortal context entries"
+        # bug: `ovos_spec_tools.context.is_live()` treats a missing
+        # `expires_at` as never-expiring, so `prune()` could never reap
+        # these entries. OVOS-CONTEXT-1 sides against that: legacy-sourced
+        # entries carry decay; immortality is reserved for deliberate
+        # writers, which the skill API is not.
+        #
+        # Round 5 (C1): a re-set of the same context key is a wholesale
+        # replace, not a merge (OVOS-CONTEXT-1 §5) - there is no read-back
+        # API for consumers to notice a stale expiry (§5.3). Every re-set
+        # must refresh `expires_at` unconditionally, same as
+        # `inject_context()` above does for the munged key. Preserving a
+        # prior stamp here (reading it back off `ctx`) let this key and the
+        # resolved private key below drift out of sync: a skill re-calling
+        # `set_context` kept the adapt entry alive while the resolved entry
+        # kept dying at its original expiry. One decay policy, computed
+        # once, applied to both keys.
+        context_cfg = Configuration().get('context', {})
+        timeout_s = context_cfg.get('timeout', 2) * 60
+        now = time.time()
         ctx = dict(sess.intent_context or {})
-        ctx[context] = {"value": word or context}
+        munged_entry = {"value": word or context}
+        expires_at = now + timeout_s if timeout_s > 0 else None
+        if expires_at is not None:
+            munged_entry["expires_at"] = expires_at
+        ctx[context] = munged_entry
+        # Two dialects meet here: legacy ADAPT context is stored under the
+        # producer's munged `alphanumeric_skill_id + key` spelling (above),
+        # while the declarative OVOS-CONTEXT-1 gate resolves a private
+        # declaration to `resolve_key(key, "private", skill_id)` (colon
+        # separated, unsanitized) - the two never coincide. When the
+        # producer (ovos-workshop's set_context) names the original,
+        # unmunged key via `data["key"]` and the message carries a
+        # skill_id, also write the resolved private-scope entry so the
+        # gate becomes reachable. The skill API is private-scope by
+        # construction (its stored key is always skill-prefixed); shared-
+        # scope writes are session-sync territory, not this handler's.
+        key = message.data.get('key')
+        skill_id = message.context.get('skill_id') if message.context else None
+        if key and skill_id:
+            resolved = resolve_key(key, "private", skill_id)
+            if resolved:
+                # Round 2 (C3): the fallback value must be the ORIGINAL key,
+                # not the munged legacy context string - the munged spelling
+                # is an internal wire detail of the ADAPT dialect and must
+                # never leak into OVOS-CONTEXT-1 §7 slot injection via this
+                # (declarative-gate) entry.
+                # Round 5 (C1): stamp the SAME `expires_at` computed above
+                # for the munged key, unconditionally, on every re-set - no
+                # setdefault-style preservation of a prior write's expiry.
+                # Preserving it here was the bug: it let this resolved key
+                # keep dying at the FIRST write's expiry while the munged
+                # key above kept getting refreshed by `inject_context()`,
+                # so the declarative gate could close while the legacy
+                # adapt context was still alive (or vice versa). One decay
+                # policy, one computed `expires_at`, both keys.
+                resolved_entry = {"value": word or key}
+                if expires_at is not None:
+                    resolved_entry["expires_at"] = expires_at
+                ctx[resolved] = resolved_entry
         _replace_intent_context(sess, ctx)
 
     @staticmethod
@@ -869,18 +1067,26 @@ class IntentService:
         """
         context = message.data.get('context')
         if context:
-            sess = SessionManager.get(message)
+            sess = IntentService._registry_session_for_context_write(message)
             sess.context.remove_context(context)
             # mirror the removal into the OVOS-CONTEXT-1 map (see
             # `handle_add_context`)
             ctx = dict(sess.intent_context or {})
             ctx.pop(context, None)
+            # mirror-remove the resolved private-scope key too, if the
+            # producer named the original key (see `handle_add_context`)
+            key = message.data.get('key')
+            skill_id = message.context.get('skill_id') if message.context else None
+            if key and skill_id:
+                resolved = resolve_key(key, "private", skill_id)
+                if resolved:
+                    ctx.pop(resolved, None)
             _replace_intent_context(sess, ctx)
 
     @staticmethod
     def handle_clear_context(message: Message):
         """Clears all keywords from context """
-        sess = SessionManager.get(message)
+        sess = IntentService._registry_session_for_context_write(message)
         sess.context.clear_context()
         # mirror the clear into the OVOS-CONTEXT-1 map (see `handle_add_context`)
         _replace_intent_context(sess, {})

@@ -8,7 +8,7 @@
 ovos-core uses **ovoscope** for end-to-end skill testing. Tests live in `test/end2end/` and run via the `ovoscope.yml` GitHub Actions workflow.
 
 The workflow:
-- Installs ovos-core with `[mycroft,plugins,skills-essential,lgpl,test]` extras
+- Installs ovos-core with `[mycroft,plugins,skills-essential,test]` extras
 - Runs all tests in `test/end2end/` using pytest
 - Tests Adapt, Padatious, fallback, converse, and stop pipeline behaviours
 - Posts a `🔌 Skill Tests (ovoscope)` section to PR comments

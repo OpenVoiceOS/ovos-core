@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import unittest
+from unittest.mock import patch
 
 from ovos_bus_client.message import Message
 from ovos_utils.fakebus import FakeBus
@@ -64,6 +65,23 @@ class TestManifestRegister(unittest.TestCase):
         self.m._on_register(_reg("skill.test", "hello", session_id="sat-1"))
         key = list(self.m._index.keys())[0]
         self.assertEqual(key[0], "sat-1")
+
+    def test_reserved_stop_intent_name_warns(self):
+        """CONFIRMED-5: a skill registering a real intent literally named
+        'stop' binds the same '<skill_id>:stop' topic OVOS-STOP-1 reserves for
+        the targeted-stop dispatch — the manifest must warn about the
+        collision, the natural point where core observes registration."""
+        with patch("ovos_core.intent_services.manifest.LOG") as mock_log:
+            self.m._on_register(_reg("skill.test", "stop"))
+        mock_log.warning.assert_called_once()
+        self.assertIn("reserved", str(mock_log.warning.call_args))
+        # registration itself still proceeds (warn, don't reject)
+        self.assertEqual(len(self.m._index), 1)
+
+    def test_non_reserved_intent_name_does_not_warn(self):
+        with patch("ovos_core.intent_services.manifest.LOG") as mock_log:
+            self.m._on_register(_reg("skill.test", "hello"))
+        mock_log.warning.assert_not_called()
 
 
 class TestManifestDeregister(unittest.TestCase):

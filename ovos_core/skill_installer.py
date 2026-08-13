@@ -118,6 +118,8 @@ class SkillsStore:
             pip_args += ["--break-system-packages"]
         if self.config.get("allow_alphas", False):
             pip_args += ["--pre"]
+        if self.config.get("upgrade", False):
+            pip_args += ["--upgrade"]
 
         with SkillsStore.PIP_LOCK:
             """
