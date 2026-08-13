@@ -43,6 +43,7 @@ def _make_service() -> StopService:
         svc._locale = MagicMock()
         svc._legacy = MagicMock()
         svc._was_active_pre_drain = {}
+        svc._utt_state_pre_drain = {}
     return svc
 
 
@@ -325,6 +326,65 @@ class TestHandleStopConfirmation(unittest.TestCase):
                    return_value=sess):
             # Should not raise
             svc.handle_stop_confirmation(msg)
+
+
+class TestAbortQuestionReachable(unittest.TestCase):
+    """CONFIRMED-4 regression: handle_stop_confirmation's RESPONSE-state
+    check (which emits mycroft.skills.abort_question, the killable-event
+    abort for a blocked get_response) read `sess.utterance_states` off the
+    ALREADY-DRAINED session carried by the dispatched .stop.response message
+    (_targeted_stop's disable_response_mode runs before dispatch) — so it was
+    always UtteranceState.INTENT there and the branch was unreachable."""
+
+    def test_targeted_stop_of_response_mode_skill_emits_abort_question(self):
+        svc = _make_service()
+        svc.bus.emit = MagicMock()
+
+        sess = Session("s")
+        sess.enable_response_mode("skill_a")  # UtteranceState.RESPONSE
+
+        # simulate _targeted_stop's pre-drain snapshot + the dispatch carrying
+        # the POST-drain session forward to the .stop.response handler.
+        match = svc._targeted_stop("skill_a", 1.0, "stop", sess)
+        drained_sess = match.updated_session
+        self.assertFalse(drained_sess.response_mode)  # sanity: already drained
+
+        msg = Message("skill_a.stop.response",
+                      data={"skill_id": "skill_a", "result": True},
+                      context={"session": drained_sess.serialize()})
+
+        with patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=drained_sess):
+            svc.handle_stop_confirmation(msg)
+
+        emitted = [c[0][0].msg_type for c in svc.bus.emit.call_args_list]
+        self.assertIn("mycroft.skills.abort_question", emitted,
+                      "abort_question must fire for a skill genuinely blocked "
+                      "in get_response, even though the session reaching "
+                      "handle_stop_confirmation is already drained")
+
+    def test_force_timeout_still_emitted_for_converse_skill(self):
+        """Regression guard: the CONFIRMED-2 force_timeout fix must stay green."""
+        svc = _make_service()
+        svc.bus.emit = MagicMock()
+
+        sess = Session("s")
+        sess.activate_skill("skill_a")  # active, NOT response-mode
+
+        match = svc._targeted_stop("skill_a", 1.0, "stop", sess)
+        drained_sess = match.updated_session
+
+        msg = Message("skill_a.stop.response",
+                      data={"skill_id": "skill_a", "result": True},
+                      context={"session": drained_sess.serialize()})
+
+        with patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=drained_sess):
+            svc.handle_stop_confirmation(msg)
+
+        emitted = [c[0][0].msg_type for c in svc.bus.emit.call_args_list]
+        self.assertIn("ovos.skills.converse.force_timeout", emitted)
+        self.assertNotIn("mycroft.skills.abort_question", emitted)
 
 
 class TestMatchHigh(unittest.TestCase):
@@ -689,6 +749,79 @@ class TestLegacyBridgeSingleDelivery(unittest.TestCase):
             {"pipeline_id": f"{StopService.pipeline_id}-high",
              "intent_name": GLOBAL_STOP, "skill_id": StopService.pipeline_id}))
         self.assertEqual(calls, ["mycroft.stop"])
+
+
+class TestResponseModeHolderCandidate(unittest.TestCase):
+    """Regression: a session whose ONLY activity is an outstanding
+    get_response (ovos-workshop's enable_response_mode does NOT push an
+    active_handlers entry) must still be reachable by a generic "stop" —
+    targeted at the holder, not silently escalated to a global stop the
+    killable-event abort never observes.
+    """
+
+    def setUp(self):
+        self.svc = _make_service()
+
+    def test_empty_active_handlers_with_response_mode_is_targeted_not_global(self):
+        """A bare 'stop' with active_handlers=[] but a response_mode holder
+        must dispatch a TARGETED <skill_id>:stop for that holder, not a
+        global stop."""
+        sess = Session("s")
+        sess.enable_response_mode("skill_x")  # no active_handlers push
+
+        self.svc.bus.once = MagicMock()
+        with patch.object(self.svc._locale, "voc_match",
+                          side_effect=lambda utt, voc, lang, exact: voc == "stop"), \
+             patch.object(StopService, "get_active_skills", return_value=[]), \
+             patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=sess):
+            result = self.svc.match_high(["stop"], "en-US", Message("test"))
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.match_type, "skill_x:stop",
+                         "response_mode holder must be targeted directly, "
+                         f"got {result.match_type!r} (GLOBAL_STOP={GLOBAL_STOP!r})")
+        self.assertEqual(result.skill_id, "skill_x")
+
+    def test_response_mode_holder_ranks_ahead_of_older_active_handler(self):
+        """A response_mode holder is the most recent interaction by
+        definition and must rank FIRST in stop candidates, even ahead of an
+        older active_handlers entry."""
+        sess = Session("s")
+        sess.activate_skill("old_skill")
+        sess.enable_response_mode("holder_skill")
+
+        with patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=sess), \
+             patch.object(StopService, "get_active_skills",
+                          return_value=["old_skill"]):
+            candidates = self.svc._stop_candidates(Message("test"))
+
+        self.assertEqual(candidates[0], "holder_skill")
+        self.assertIn("old_skill", candidates)
+
+    def test_global_stop_still_reaches_response_mode_holder(self):
+        """Even when a stop DOES escalate to global (e.g. explicit 'stop
+        everything' vocabulary), the response_mode holder must still get its
+        targeted <skill_id>.stop so a blocked get_response is released — the
+        broadcast alone is invisible to the killable-event abort."""
+        sess = Session("s")
+        sess.enable_response_mode("blocked_skill")
+
+        match = self.svc._global_stop(1.0, "stop everything", sess)
+        self.assertEqual(match.match_data.get("response_mode_holder"), "blocked_skill")
+
+        self.svc.bus.emit = MagicMock()
+        msg = Message(GLOBAL_STOP, dict(match.match_data),
+                      {"pipeline_id": StopService.pipeline_id})
+        self.svc.handle_global_stop(msg)
+
+        emitted_types = [c[0][0].msg_type for c in self.svc.bus.emit.call_args_list]
+        self.assertIn("blocked_skill.stop", emitted_types)
+        self.assertIn(SpecMessage.STOP.value, emitted_types)
+        # targeted stop must reach the skill BEFORE the broadcast
+        self.assertLess(emitted_types.index("blocked_skill.stop"),
+                        emitted_types.index(SpecMessage.STOP.value))
 
 
 class TestShutdown(unittest.TestCase):

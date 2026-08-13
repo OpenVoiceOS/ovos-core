@@ -60,15 +60,38 @@ class StopService(ConfidenceMatcherPipeline):
         #: by dispatch time, so ``sess.is_active(skill_id)`` there is always
         #: False; this records the pre-drain truth match() observed instead).
         self._was_active_pre_drain: Dict[str, bool] = {}
+        #: skill_id -> its UtteranceState BEFORE match() drained the session
+        #: copy (same drain-ordering class as ``_was_active_pre_drain``:
+        #: ``handle_stop_confirmation`` reads ``sess.utterance_states`` off the
+        #: ``.stop.response`` message context, which is already drained —
+        #: ``disable_response_mode`` runs before dispatch — by the time it
+        #: arrives, so the live read is always UtteranceState.INTENT there and
+        #: the RESPONSE branch/``abort_question`` emission was unreachable).
+        self._utt_state_pre_drain: Dict[str, UtteranceState] = {}
 
     def handle_global_stop(self, message: Message) -> None:
         """OVOS-STOP-1 §5.3 — broadcast the universal ``ovos.stop``.
 
         Bound on ``<pipeline_id>:global_stop`` and wrapped in HandlerLifecycle
-        so the orchestrator observes the §8 terminal for the dispatch."""
+        so the orchestrator observes the §8 terminal for the dispatch.
+
+        A ``response_mode`` holder (OVOS-CONVERSE-1 §2.2 pending get_response
+        window) is carried through ``Match.match_data`` (``_global_stop``) as
+        ``response_mode_holder`` — the global broadcast alone (``ovos.stop`` /
+        legacy ``mycroft.stop``) is never observed by ovos-workshop's
+        killable-event abort, which listens ONLY on the per-skill
+        ``<skill_id>.stop`` topic. Without this, a skill blocked in
+        ``get_response`` survives a global stop until its own timeout. Emit
+        the targeted topic first — the session's response_mode has already
+        been cleared via ``updated_session`` by dispatch time, so this only
+        needs to reach the still-blocked handler.
+        """
         with HandlerLifecycle(self.bus, message,
                               skill_id=self.pipeline_id,
                               data={"name": "StopService.handle_global_stop"}):
+            holder = message.data.get("response_mode_holder")
+            if holder:
+                self.bus.emit(message.forward(f"{holder}.stop"))
             self.bus.emit(message.forward(SpecMessage.STOP.value))
 
     @staticmethod
@@ -83,6 +106,39 @@ class StopService(ConfidenceMatcherPipeline):
         """
         session = SessionManager.get(message)
         return [skill[0] for skill in session.active_skills]
+
+    @staticmethod
+    def get_response_mode_holder(message: Optional[Message] = None) -> Optional[str]:
+        """The skill_id currently holding the session's response_mode window
+        (OVOS-CONVERSE-1 §2.2), if any.
+
+        ovos-workshop's ``enable_response_mode`` (get_response) does NOT push
+        an ``active_handlers`` entry — it only sets this field — so a holder
+        is otherwise invisible to §4.1 candidate selection even though it is,
+        by definition, the most recent interaction in the session.
+        """
+        session = SessionManager.get(message)
+        rm = session.response_mode
+        return rm.get("skill_id") if rm else None
+
+    def _stop_candidates(self, message: Message) -> List[str]:
+        """OVOS-STOP-1 §4.1 recency-ordered stop candidates.
+
+        A response_mode holder ranks FIRST — it is the most recent
+        interaction by definition, even when ``active_handlers`` is empty
+        (see ``get_response_mode_holder``) — followed by the recency-ordered
+        ``active_handlers`` list, minus blacklisted skills and de-duplicated.
+        """
+        sess = SessionManager.get(message)
+        blacklisted = sess.blacklisted_skills or []
+        candidates: List[str] = []
+        holder = self.get_response_mode_holder(message)
+        if holder and holder not in blacklisted:
+            candidates.append(holder)
+        for skill_id in self.get_active_skills(message):
+            if skill_id not in candidates and skill_id not in blacklisted:
+                candidates.append(skill_id)
+        return candidates
 
     def _collect_stop_skills(self, message: Message) -> List[str]:
         """
@@ -106,13 +162,12 @@ class StopService(ConfidenceMatcherPipeline):
             - Waits up to 0.5 seconds for skills to respond (§4.1)
             - Falls back to all active skills if no explicit stop confirmation is received
         """
-        sess = SessionManager.get(message)
-
         want_stop = []
         skill_ids = []
 
-        active_skills = [s for s in self.get_active_skills(message)
-                         if s not in (sess.blacklisted_skills or [])]
+        # §4.1 candidates: response_mode holder first (most recent by
+        # definition), then recency-ordered active_handlers.
+        active_skills = self._stop_candidates(message)
 
         if not active_skills:
             return want_stop
@@ -178,7 +233,18 @@ class StopService(ConfidenceMatcherPipeline):
             LOG.error(f"{skill_id}: {error_msg}")
         elif message.data.get('result', False):
             sess = SessionManager.get(message)
-            utt_state = sess.utterance_states.get(skill_id, UtteranceState.INTENT)
+            # CONFIRMED-4: same drain-ordering class as CONFIRMED-2 below —
+            # by the time this .stop.response arrives, `sess.utterance_states`
+            # is already drained (disable_response_mode runs before dispatch
+            # in _targeted_stop), so the live read is always
+            # UtteranceState.INTENT here and this RESPONSE branch was
+            # unreachable dead code (abort_question never fired even though
+            # the skill was genuinely blocked in get_response). Consult the
+            # pre-drain snapshot instead, falling back to the live read for
+            # direct-invocation callers that bypass _targeted_stop.
+            utt_state = self._utt_state_pre_drain.pop(skill_id, None)
+            if utt_state is None:
+                utt_state = sess.utterance_states.get(skill_id, UtteranceState.INTENT)
             if utt_state == UtteranceState.RESPONSE:
                 LOG.debug("Forcing get_response timeout")
                 # force-kill any ongoing get_response - see @killable_event decorator (ovos-workshop)
@@ -226,6 +292,12 @@ class StopService(ConfidenceMatcherPipeline):
         # check (CONFIRMED-2) can still see the pre-drain truth once the
         # (post-drain) session reaches it via the dispatch round-trip.
         self._was_active_pre_drain[skill_id] = sess.is_active(skill_id)
+        # CONFIRMED-4: same reasoning — snapshot the pre-drain utterance state
+        # so handle_stop_confirmation's abort_question check (RESPONSE state)
+        # can still see it once the (post-drain) session reaches it via the
+        # dispatch round-trip.
+        self._utt_state_pre_drain[skill_id] = sess.utterance_states.get(
+            skill_id, UtteranceState.INTENT)
         drained = Session.deserialize(sess.serialize())
         drained.disable_response_mode(skill_id)
         drained.deactivate_skill(skill_id)
@@ -253,13 +325,22 @@ class StopService(ConfidenceMatcherPipeline):
         untouched.
         """
         LOG.info(f"Emitting global stop, {len(sess.active_skills)} active skills")
+        # read-only: the pre-drain holder, carried through match_data so
+        # handle_global_stop (dispatch time, NOT here) can emit the targeted
+        # `<skill_id>.stop` a killable-event abort actually listens on —
+        # emitting it here would violate the CONFIRMED-3 side-effect-free
+        # match() invariant, since this Match can still be discarded.
+        holder = sess.response_mode.get("skill_id") if sess.response_mode else None
         drained = Session.deserialize(sess.serialize())
         drained.active_handlers = []
         drained.converse_handlers = []
         drained.clear_response_mode()
+        match_data = {"conf": conf}
+        if holder:
+            match_data["response_mode_holder"] = holder
         return IntentHandlerMatch(
             match_type=f"{self.pipeline_id}:global_stop",
-            match_data={"conf": conf},
+            match_data=match_data,
             updated_session=drained,
             utterance=utterance,
             skill_id=self.pipeline_id,
@@ -291,7 +372,7 @@ class StopService(ConfidenceMatcherPipeline):
 
         is_stop = self._locale.voc_match(utterance, 'stop', lang, exact=True)
         is_global_stop = self._locale.voc_match(utterance, 'global_stop', lang, exact=True) or \
-                         (is_stop and not len(self.get_active_skills(message)))
+                         (is_stop and not len(self._stop_candidates(message)))
 
         conf = 1.0
 
@@ -333,7 +414,7 @@ class StopService(ConfidenceMatcherPipeline):
         is_stop = self._locale.voc_match(utterance, 'stop', lang, exact=False)
         if not is_stop:
             is_global_stop = self._locale.voc_match(utterance, 'global_stop', lang, exact=False) or \
-                             (is_stop and not len(self.get_active_skills(message)))
+                             (is_stop and not len(self._stop_candidates(message)))
             if not is_global_stop:
                 return None
 
