@@ -21,7 +21,7 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.handler import HandlerLifecycle
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import SessionManager
+from ovos_bus_client.session import SessionManager, Session
 from ovos_config import Configuration
 from ovos_plugin_manager.templates.pipeline import ConfidenceMatcherPipeline, IntentHandlerMatch
 from ovos_utils import flatten_list
@@ -143,8 +143,34 @@ class FallbackService(ConfidenceMatcherPipeline):
                     and s not in (sess.blacklisted_skills or [])]
         skill_ids += [s for s in self.registered_fallbacks if s not in in_range]
 
+        # OVOS-CONVERSE-1 §4.2 round correlation: the round IS the utterance
+        # lifecycle, named by context.utterance_id (OVOS-PIPELINE-1 §9.1.1).
+        # The ping carries it by `forward` derivation and the pong carries it
+        # back by `reply` derivation — no skill-side action.
+        round_uid = message.context.get("utterance_id")
+        round_session_id = sess.session_id
+
         def handle_ack(msg):
             skill_id = msg.data["skill_id"]
+
+            # A pong that cannot prove which question it answers never decides a
+            # round: discard pongs from an earlier (or foreign) lifecycle, or
+            # from a foreign session. When the round itself is unnamed the
+            # guard stands down, so a V0 caller that never entered through the
+            # orchestrator behaves as before.
+            if round_uid is not None and \
+                    msg.context.get("utterance_id") != round_uid:
+                LOG.debug(f"discarding stale fallback pong from '{skill_id}': "
+                          f"utterance_id {msg.context.get('utterance_id')!r} "
+                          f"does not match round {round_uid!r}")
+                return
+            ack_sess = Session.from_message(msg) if "session" in msg.context else None
+            if ack_sess and ack_sess.session_id != round_session_id:
+                LOG.debug(f"discarding cross-session fallback pong from '{skill_id}': "
+                          f"session {ack_sess.session_id!r} does not match "
+                          f"round session {round_session_id!r}")
+                return
+
             if msg.data.get("can_handle", True):
                 if skill_id in in_range:
                     fallback_skills.append(skill_id)
