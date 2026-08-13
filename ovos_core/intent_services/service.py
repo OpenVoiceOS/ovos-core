@@ -26,6 +26,7 @@ from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
 from ovos_spec_tools import closest_lang, standardize_lang, SpecMessage
+from ovos_spec_tools.context import resolve_key
 from ovos_utils.log import LOG
 from ovos_utils.metrics import Stopwatch
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
@@ -742,6 +743,38 @@ class IntentService:
         # keyed by the context token and carry its injected value.
         ctx = dict(sess.intent_context or {})
         ctx[context] = {"value": word or context}
+        # Two dialects meet here: legacy ADAPT context is stored under the
+        # producer's munged `alphanumeric_skill_id + key` spelling (above),
+        # while the declarative OVOS-CONTEXT-1 gate resolves a private
+        # declaration to `resolve_key(key, "private", skill_id)` (colon
+        # separated, unsanitized) - the two never coincide. When the
+        # producer (ovos-workshop's set_context) names the original,
+        # unmunged key via `data["key"]` and the message carries a
+        # skill_id, also write the resolved private-scope entry so the
+        # gate becomes reachable. The skill API is private-scope by
+        # construction (its stored key is always skill-prefixed); shared-
+        # scope writes are session-sync territory, not this handler's.
+        key = message.data.get('key')
+        skill_id = message.context.get('skill_id') if message.context else None
+        if key and skill_id:
+            resolved = resolve_key(key, "private", skill_id)
+            if resolved:
+                # Round 2 (C3): the fallback value must be the ORIGINAL key,
+                # not the munged legacy context string - the munged spelling
+                # is an internal wire detail of the ADAPT dialect and must
+                # never leak into OVOS-CONTEXT-1 §7 slot injection via this
+                # (declarative-gate) entry.
+                # Round 2 (C4): preserve whatever expires_at/turns_remaining
+                # a prior write already established for THIS resolved key
+                # (setdefault-style merge) - only "value" is authoritative
+                # from this call. The munged-key entry above keeps today's
+                # dev behavior (full overwrite) unchanged; this repo has no
+                # decay-writer for the resolved key yet, but a future one
+                # (e.g. a session-sync path) must not have its expiry
+                # silently reset by a plain set_context call.
+                existing = dict(ctx.get(resolved) or {})
+                existing["value"] = word or key
+                ctx[resolved] = existing
         sess.intent_context = ctx
 
     @staticmethod
@@ -759,6 +792,14 @@ class IntentService:
             # `handle_add_context`)
             ctx = dict(sess.intent_context or {})
             ctx.pop(context, None)
+            # mirror-remove the resolved private-scope key too, if the
+            # producer named the original key (see `handle_add_context`)
+            key = message.data.get('key')
+            skill_id = message.context.get('skill_id') if message.context else None
+            if key and skill_id:
+                resolved = resolve_key(key, "private", skill_id)
+                if resolved:
+                    ctx.pop(resolved, None)
             sess.intent_context = ctx or None
 
     @staticmethod
