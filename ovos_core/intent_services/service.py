@@ -716,6 +716,36 @@ class IntentService:
         self.bus.emit(message.reply(SpecMessage.UTTERANCE_HANDLED))
 
     @staticmethod
+    def _registry_session_for_context_write(message: Message) -> "Session":
+        """Resolve the session object to mutate for an in-lifecycle context write.
+
+        Wave-3 CONFIRMED (round 4): ``SessionManager.get(message)`` always folds
+        the incoming message's session onto the live registry entry
+        (``SessionManager._store``), and for NAMED sessions that fold is
+        full-replace (``update_from``). Calling it from a context handler means
+        the fold first wipes the registry entry's ``intent_context`` with the
+        message's stale snapshot, then every subsequent mid-lifecycle frame
+        (skill replies, follow-up handler frames) re-wipes it again - a named
+        session's context can never survive to the terminal event. SESSION-2
+        §2.6 is unambiguous: folding a message's session onto the working
+        session belongs at lifecycle entry only; incidental messages must never
+        mutate it. Default sessions happen to survive today only because their
+        fold preserves omitted fields, not because the fold is correct.
+
+        Fix (this handler's scope only - the general fold-discipline at every
+        ``get(message)`` call site is a tracked follow-up): resolve the
+        session_id off the message and, if the registry already holds a live
+        entry for it, mutate that object directly - no fold. Fall back to
+        ``SessionManager.get(message)`` (today's behavior) only when no
+        registry entry exists yet, e.g. out-of-registry/test callers.
+        """
+        session_data = message.context.get("session") if message and message.context else None
+        session_id = session_data.get("session_id") if isinstance(session_data, dict) else None
+        if session_id and session_id in SessionManager.sessions:
+            return SessionManager.sessions[session_id]
+        return SessionManager.get(message)
+
+    @staticmethod
     def handle_add_context(message: Message):
         """Add context
 
@@ -735,7 +765,7 @@ class IntentService:
         entity['match'] = word
         entity['key'] = word
         entity['origin'] = origin
-        sess = SessionManager.get(message)
+        sess = IntentService._registry_session_for_context_write(message)
         sess.context.inject_context(entity)
         # OVOS-CONTEXT-1 §2/§7: pipelines gate and inject from the canonical
         # `session.intent_context` map, so a keyword added via `set_context`
@@ -817,7 +847,7 @@ class IntentService:
         """
         context = message.data.get('context')
         if context:
-            sess = SessionManager.get(message)
+            sess = IntentService._registry_session_for_context_write(message)
             sess.context.remove_context(context)
             # mirror the removal into the OVOS-CONTEXT-1 map (see
             # `handle_add_context`)
@@ -836,7 +866,7 @@ class IntentService:
     @staticmethod
     def handle_clear_context(message: Message):
         """Clears all keywords from context """
-        sess = SessionManager.get(message)
+        sess = IntentService._registry_session_for_context_write(message)
         sess.context.clear_context()
         # mirror the clear into the OVOS-CONTEXT-1 map (see `handle_add_context`)
         sess.intent_context = None

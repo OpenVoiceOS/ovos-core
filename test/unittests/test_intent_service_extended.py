@@ -384,6 +384,20 @@ class TestGetPipelineSessionBlacklist(unittest.TestCase):
 class TestContextHandlers(unittest.TestCase):
     """Tests for the context management static methods."""
 
+    def setUp(self):
+        # Round 4: the handlers now resolve registry-first
+        # (_registry_session_for_context_write), so a leftover real
+        # SessionManager.sessions["s"] entry from `Session.touch()`'s
+        # self-registration (triggered internally by intent_context writes)
+        # would otherwise shadow this test's freshly-constructed, mocked-get
+        # `Session("s")` in later tests. Keep the shared singleton clean.
+        self._saved_sessions = dict(SessionManager.sessions)
+        SessionManager.sessions.clear()
+
+    def tearDown(self):
+        SessionManager.sessions.clear()
+        SessionManager.sessions.update(self._saved_sessions)
+
     def test_handle_add_context_injects_entity(self):
         """handle_add_context injects the entity into the session context."""
         sess = Session("s")
@@ -662,6 +676,74 @@ class TestContextHandlers(unittest.TestCase):
         self.assertIn("my_skillkitchen", sess.intent_context)
         self.assertNotIn("my.skill:kitchen", sess.intent_context)
         self.assertEqual(len(sess.intent_context), 1)
+
+
+class TestContextHandlersLiveRegistry(unittest.TestCase):
+    """Round 4 / wave-3 CONFIRMED: SessionManager.get(message) always folds
+    the incoming message's session onto the live registry entry, and for
+    NAMED sessions that fold is full-replace (update_from). Called from a
+    context handler, the fold first wipes the registry entry's
+    intent_context with the message's stale snapshot, then every
+    subsequent mid-lifecycle frame re-wipes it again - a named session's
+    context can never survive to the terminal event. SESSION-2 §2.6:
+    folding a message's session onto the working session belongs at
+    lifecycle entry only; incidental messages must never mutate it.
+
+    These tests exercise the REAL SessionManager.sessions registry (no
+    mocking of SessionManager.get) so they fail against the pre-fix
+    every-call fold, exactly the mechanism that let the bug reach wave 3.
+    """
+
+    def setUp(self):
+        self._saved_sessions = dict(SessionManager.sessions)
+        SessionManager.sessions.clear()
+
+    def tearDown(self):
+        SessionManager.sessions.clear()
+        SessionManager.sessions.update(self._saved_sessions)
+
+    def test_add_context_survives_stale_message_snapshot_fold(self):
+        """A registry entry's pre-existing intent_context must survive a
+        handle_add_context call driven by a message carrying a STALE
+        session snapshot (no knowledge of the pre-existing entry) - the
+        write must land on the LIVE registry object, not a folded copy."""
+        sess = Session("named-r4")
+        sess.intent_context = {"Existing": {"value": "existing"}}
+        SessionManager.sessions[sess.session_id] = sess
+
+        stale = Session(sess.session_id)  # unaware of "Existing"
+        msg = Message("add_context",
+                      data={"context": "New", "word": "newword"},
+                      context={"session": stale.serialize()})
+
+        IntentService.handle_add_context(msg)
+
+        live = SessionManager.sessions[sess.session_id]
+        self.assertIn("Existing", live.intent_context)
+        self.assertIn("New", live.intent_context)
+
+    def test_add_context_accumulates_across_two_stale_calls(self):
+        """Two handle_add_context calls, each driven by a message with its
+        own stale snapshot (mirroring successive mid-lifecycle frames),
+        must both survive on the live registry entry."""
+        sess = Session("named-r4-2")
+        SessionManager.sessions[sess.session_id] = sess
+
+        stale1 = Session(sess.session_id)
+        msg1 = Message("add_context",
+                       data={"context": "First", "word": "one"},
+                       context={"session": stale1.serialize()})
+        IntentService.handle_add_context(msg1)
+
+        stale2 = Session(sess.session_id)
+        msg2 = Message("add_context",
+                       data={"context": "Second", "word": "two"},
+                       context={"session": stale2.serialize()})
+        IntentService.handle_add_context(msg2)
+
+        live = SessionManager.sessions[sess.session_id]
+        self.assertIn("First", live.intent_context)
+        self.assertIn("Second", live.intent_context)
 
 
 # ---------------------------------------------------------------------------
