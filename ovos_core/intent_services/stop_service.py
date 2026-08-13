@@ -5,50 +5,105 @@ from typing import Optional, Dict, List, Union
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.handler import HandlerLifecycle
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import SessionManager, UtteranceState
+from ovos_bus_client.session import Session, SessionManager, UtteranceState
 
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import ConfidenceMatcherPipeline, IntentHandlerMatch
-from ovos_spec_tools import LocaleResources
+from ovos_spec_tools import LocaleResources, SpecMessage
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
 from ovos_utils.parse import match_one
 
+from ovos_core.intent_services.stop_service_legacy import _LegacyStopBridge
+
 
 class StopService(ConfidenceMatcherPipeline):
-    """Intent Service that handles stopping skills."""
+    """Stop pipeline plugin implementing OVOS-STOP-1.
+
+    Matches stop-command utterances and returns Matches under STOP-1 §2:
+
+    - a **targeted** stop dispatched on ``<skill_id>:stop`` (§2, §3.1) when a
+      recency-selected active handler declares itself stoppable via the §4
+      ping-pong cascade;
+    - a **global** stop dispatched on ``<pipeline_id>:global_stop`` (§5)
+      otherwise — explicit "stop everything" vocabulary (§3.2), an empty
+      ``active_handlers`` (§4.1 step 1), or no positive pong responder
+      (§4.1 step 5).
+
+    Both dispatches set ``suppress_activation`` (§6.2/§7.3): a stop terminates
+    an already-active skill's participation, so it registers no fresh
+    activation. The session drain mandated by §5.2/§6 is committed via
+    ``Match.updated_session`` before dispatch.
+    """
+
+    #: OVOS-STOP-1 §3.1 shared identity. Every confidence tier reports the same
+    #: ``pipeline_id`` so the global-stop handler binds a single topic across
+    #: tiers and exactly one ``ovos.stop`` broadcast is emitted per event.
+    pipeline_id = "ovos-stop-pipeline-plugin"
 
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
-                 config: Optional[Dict] = None) -> None:
+                 config: Optional[Dict] = None,
+                 suppress_activation: bool = True) -> None:
         config = config if config is not None else Configuration().get("skills", {}).get("stop") or {}
         bus = bus or FakeBus()
         ConfidenceMatcherPipeline.__init__(self, config=config, bus=bus)
         self._locale = LocaleResources(skill_locale=join(dirname(__file__), "locale"))
-        self.bus.on("stop:global", self.handle_global_stop)
-        self.bus.on("stop:skill", self.handle_skill_stop)
+        #: Stamped onto every Match this plugin returns (§6.2/§7.3).
+        self.suppress_activation = suppress_activation
+        # §5 global-stop dispatch target; bound once, shared across tiers (§3.1).
+        self.bus.on(f"{self.pipeline_id}:global_stop", self.handle_global_stop)
+        self._legacy = _LegacyStopBridge(self)
+        #: (session_id, skill_id) -> was the skill active BEFORE match() drained
+        #: the session copy (CONFIRMED-2: the session ``handle_stop_confirmation``
+        #: reads back off the ``.stop.response`` message context is already
+        #: drained by dispatch time, so ``sess.is_active(skill_id)`` there is
+        #: always False; this records the pre-drain truth match() observed
+        #: instead). Keyed by ``(session_id, skill_id)`` rather than bare
+        #: ``skill_id`` — two concurrent targeted stops for the same skill_id
+        #: in different sessions must not clobber/consume each other's snapshot.
+        self._was_active_pre_drain: Dict[tuple, bool] = {}
+        #: (session_id, skill_id) -> its UtteranceState BEFORE match() drained
+        #: the session copy (same drain-ordering class as
+        #: ``_was_active_pre_drain``, including the same per-session keying —
+        #: ``handle_stop_confirmation`` reads ``sess.utterance_states`` off the
+        #: ``.stop.response`` message context, which is already drained —
+        #: ``disable_response_mode`` runs before dispatch — by the time it
+        #: arrives, so the live read is always UtteranceState.INTENT there and
+        #: the RESPONSE branch/``abort_question`` emission was unreachable).
+        self._utt_state_pre_drain: Dict[tuple, UtteranceState] = {}
 
     def handle_global_stop(self, message: Message) -> None:
-        """Emit a global mycroft.stop; the §9.5 end-marker is the orchestrator's
-        responsibility (``IntentDispatcher._notify_terminal``)."""
-        with HandlerLifecycle(self.bus, message,
-                              skill_id="stop.openvoiceos",
-                              data={"name": "StopService.handle_global_stop"}):
-            self.bus.emit(message.forward("mycroft.stop"))
+        """OVOS-STOP-1 §5.3 — broadcast the universal ``ovos.stop``.
 
-    def handle_skill_stop(self, message: Message) -> None:
-        """Forward a stop request to the specific skill."""
-        skill_id = message.data["skill_id"]
+        Bound on ``<pipeline_id>:global_stop`` and wrapped in HandlerLifecycle
+        so the orchestrator observes the §8 terminal for the dispatch.
+
+        A ``response_mode`` holder (OVOS-CONVERSE-1 §2.2 pending get_response
+        window) is carried through ``Match.match_data`` (``_global_stop``) as
+        ``response_mode_holder`` — the global broadcast alone (``ovos.stop`` /
+        legacy ``mycroft.stop``) is never observed by ovos-workshop's
+        killable-event abort, which listens ONLY on the per-skill
+        ``<skill_id>.stop`` topic. Without this, a skill blocked in
+        ``get_response`` survives a global stop until its own timeout. Emit
+        the targeted topic first — the session's response_mode has already
+        been cleared via ``updated_session`` by dispatch time, so this only
+        needs to reach the still-blocked handler.
+        """
         with HandlerLifecycle(self.bus, message,
-                              skill_id="stop.openvoiceos",
-                              data={"name": "StopService.handle_skill_stop"}):
-            self.bus.emit(message.reply(f"{skill_id}.stop"))
+                              skill_id=self.pipeline_id,
+                              data={"name": "StopService.handle_global_stop"}):
+            holder = message.data.get("response_mode_holder")
+            if holder:
+                self.bus.emit(message.forward(f"{holder}.stop"))
+            self.bus.emit(message.forward(SpecMessage.STOP.value))
 
     @staticmethod
     def get_active_skills(message: Optional[Message] = None) -> List[str]:
         """Active skill ids ordered by converse priority.
 
-        This represents the order in which stop will be called.
+        This is the OVOS-STOP-1 §4.1 recency input (``active_handlers``): the
+        order in which stop is attempted.
 
         Returns:
             active_skills (list): ordered list of skill_ids
@@ -56,9 +111,42 @@ class StopService(ConfidenceMatcherPipeline):
         session = SessionManager.get(message)
         return [skill[0] for skill in session.active_skills]
 
+    @staticmethod
+    def get_response_mode_holder(message: Optional[Message] = None) -> Optional[str]:
+        """The skill_id currently holding the session's response_mode window
+        (OVOS-CONVERSE-1 §2.2), if any.
+
+        ovos-workshop's ``enable_response_mode`` (get_response) does NOT push
+        an ``active_handlers`` entry — it only sets this field — so a holder
+        is otherwise invisible to §4.1 candidate selection even though it is,
+        by definition, the most recent interaction in the session.
+        """
+        session = SessionManager.get(message)
+        rm = session.response_mode
+        return rm.get("skill_id") if rm else None
+
+    def _stop_candidates(self, message: Message) -> List[str]:
+        """OVOS-STOP-1 §4.1 recency-ordered stop candidates.
+
+        A response_mode holder ranks FIRST — it is the most recent
+        interaction by definition, even when ``active_handlers`` is empty
+        (see ``get_response_mode_holder``) — followed by the recency-ordered
+        ``active_handlers`` list, minus blacklisted skills and de-duplicated.
+        """
+        sess = SessionManager.get(message)
+        blacklisted = sess.blacklisted_skills or []
+        candidates: List[str] = []
+        holder = self.get_response_mode_holder(message)
+        if holder and holder not in blacklisted:
+            candidates.append(holder)
+        for skill_id in self.get_active_skills(message):
+            if skill_id not in candidates and skill_id not in blacklisted:
+                candidates.append(skill_id)
+        return candidates
+
     def _collect_stop_skills(self, message: Message) -> List[str]:
         """
-        Collect skills that can be stopped based on a ping-pong mechanism.
+        Collect skills that can be stopped based on a ping-pong mechanism (§4).
 
         This method determines which active skills can handle a stop request by sending
         a stop ping to each active skill and waiting for their acknowledgment.
@@ -73,18 +161,17 @@ class StopService(ConfidenceMatcherPipeline):
                       indicate they can stop, returns all active skills.
 
         Notes:
-            - Excludes skills that are blacklisted in the current session
+            - Excludes skills that are blacklisted in the current session (§6.3)
             - Uses a non-blocking event mechanism to collect skill responses
-            - Waits up to 0.5 seconds for skills to respond
+            - Waits up to 0.5 seconds for skills to respond (§4.1)
             - Falls back to all active skills if no explicit stop confirmation is received
         """
-        sess = SessionManager.get(message)
-
         want_stop = []
         skill_ids = []
 
-        active_skills = [s for s in self.get_active_skills(message)
-                         if s not in (sess.blacklisted_skills or [])]
+        # §4.1 candidates: response_mode holder first (most recent by
+        # definition), then recency-ordered active_handlers.
+        active_skills = self._stop_candidates(message)
 
         if not active_skills:
             return want_stop
@@ -109,7 +196,7 @@ class StopService(ConfidenceMatcherPipeline):
                 return  # guard against malformed pong messages
 
             # validate the stop pong; default False — a non-responding skill
-            # should not be assumed stoppable
+            # should not be assumed stoppable (§4.2)
             if all((skill_id not in want_stop,
                     msg.data.get("can_handle", False),
                     skill_id in active_skills)):
@@ -122,7 +209,12 @@ class StopService(ConfidenceMatcherPipeline):
                 # all skills answered the ping!
                 event.set()
 
-        self.bus.on("skill.stop.pong", handle_ack)
+        # SpecMessage.STOP_PONG.value == "ovos.stop.pong"; the NamespaceTranslator
+        # SPEC_TO_LEGACY entry maps it to the literal "skill.stop.pong" every
+        # skill (ovos-workshop) actually emits, and mirrors it onto this topic
+        # on receipt — so listening on the spec constant still catches the
+        # legacy emission (verified against the installed translator).
+        self.bus.on(SpecMessage.STOP_PONG.value, handle_ack)
         try:
             # ask skills if they can stop
             for skill_id in active_skills:
@@ -132,25 +224,94 @@ class StopService(ConfidenceMatcherPipeline):
             # wait for all skills to acknowledge they can stop
             event.wait(timeout=0.5)
         finally:
-            self.bus.remove("skill.stop.pong", handle_ack)
-        return want_stop or active_skills
+            self.bus.remove(SpecMessage.STOP_PONG.value, handle_ack)
+
+        if not want_stop:
+            return active_skills
+        # §4.1 selection must be deterministic: `want_stop` is built in PONG
+        # ARRIVAL order (parallel broadcast — the pings all go out together, so
+        # whichever skill answers fastest lands first), not recency order. The
+        # docstring/contract says the response_mode holder (or more generally
+        # the most-recent candidate) ranks first; re-sort by the candidate-list
+        # (recency) order that `active_skills` already encodes before picking,
+        # so the winner is always the most-recent stoppable candidate
+        # regardless of which one's pong happened to arrive first.
+        return sorted(want_stop, key=active_skills.index)
 
     def handle_stop_confirmation(self, message: Message) -> None:
-        """Handle a skill's stop.response and force-terminate any in-flight interactions."""
+        """Handle a skill's stop.response and force-terminate any in-flight interactions.
+
+        Also resolves the ``IntentDispatcher``'s §8 handler-lifecycle entry for
+        this ``<skill_id>:stop`` dispatch (root cause: the dispatch goes out on
+        the spec colon-topic ``<skill_id>:stop``, which ovos-workshop has no
+        direct listener for — only ``_LegacyStopBridge`` mirrors it onto the
+        dot-topic ``<skill_id>.stop`` skills actually bind, via ``add_event``
+        with ``handler_info=None``, which deliberately disables that dot-topic
+        handler's own ``HandlerLifecycle``/``mycroft.skill.handler.complete``
+        emission. Since workshop is a separate repo/release, that emission
+        cannot be added there for this fix. The stop round-trip's real
+        completion signal IS this ``.stop.response`` — it only fires once the
+        skill has actually finished ``stop()`` — so this is the correct,
+        already-synchronous point to resolve the dispatch, instead of leaving
+        it parked on the dispatcher's 5-minute §8.3 timeout). Emitting the
+        framework done-signal here (rather than reaching into
+        ``IntentDispatcher`` directly) keeps ``StopService`` decoupled from the
+        dispatcher's internals and mirrors exactly what a normal handler
+        completion looks like on the bus.
+        """
         skill_id = (message.data.get("skill_id") or
                     message.context.get("skill_id") or
                     message.msg_type.split(".stop.response")[0])
+        sess_id = (message.context.get("session") or {}).get("session_id", "default")
+        # F2 (round-3 adversarial re-review of 6e8c8163be): the pre-drain
+        # snapshots used to be popped ONLY on the result:True branch below —
+        # every error / result:False / never-actually-dispatched stop left
+        # (session_id, skill_id) in BOTH dicts forever (confirmed: 50 failed
+        # stops -> 50 leaked keys, attack5.py). That also kept the
+        # _resolve_dispatch_lifecycle gate permanently open for that pair,
+        # since the gate is presence-based. Pop both dicts UNCONDITIONALLY,
+        # right here, before either branch runs, and thread the popped
+        # values through — this is now both the memory-leak fix and the
+        # single place the gate (and the RESPONSE/active fallbacks below)
+        # consult.
+        utt_state = self._utt_state_pre_drain.pop((sess_id, skill_id), None)
+        was_active = self._was_active_pre_drain.pop((sess_id, skill_id), None)
+        had_pre_drain_snapshot = utt_state is not None or was_active is not None
+        try:
+            if had_pre_drain_snapshot:
+                self._resolve_dispatch_lifecycle(message, skill_id)
+        except Exception:
+            LOG.exception(f"failed to resolve dispatch lifecycle for {skill_id}:stop")
         if 'error' in message.data:
             error_msg = message.data['error']
             LOG.error(f"{skill_id}: {error_msg}")
         elif message.data.get('result', False):
             sess = SessionManager.get(message)
-            utt_state = sess.utterance_states.get(skill_id, UtteranceState.INTENT)
+            # CONFIRMED-4: same drain-ordering class as CONFIRMED-2 below —
+            # by the time this .stop.response arrives, `sess.utterance_states`
+            # is already drained (disable_response_mode runs before dispatch
+            # in _targeted_stop), so the live read is always
+            # UtteranceState.INTENT here and this RESPONSE branch was
+            # unreachable dead code (abort_question never fired even though
+            # the skill was genuinely blocked in get_response). Consult the
+            # pre-drain snapshot (popped above) instead, falling back to the
+            # live read for direct-invocation callers that bypass
+            # _targeted_stop.
+            if utt_state is None:
+                utt_state = sess.utterance_states.get(skill_id, UtteranceState.INTENT)
             if utt_state == UtteranceState.RESPONSE:
                 LOG.debug("Forcing get_response timeout")
                 # force-kill any ongoing get_response - see @killable_event decorator (ovos-workshop)
                 self.bus.emit(message.reply("mycroft.skills.abort_question", {"skill_id": skill_id}))
-            if sess.is_active(skill_id):
+            # CONFIRMED-2: by the time this .stop.response arrives, `sess` has
+            # already been drained (the dispatch carried the post-drain session
+            # forward), so `sess.is_active(skill_id)` is always False here.
+            # Fall back to it only when no pre-drain record exists (e.g. a
+            # handler invoked directly, bypassing _targeted_stop) so existing
+            # direct-invocation callers keep working.
+            if was_active is None:
+                was_active = sess.is_active(skill_id)
+            if was_active:
                 LOG.debug("Forcing converse timeout")
                 # force-kill any ongoing converse - see @killable_event decorator (ovos-workshop)
                 self.bus.emit(message.reply("ovos.skills.converse.force_timeout", {"skill_id": skill_id}))
@@ -158,17 +319,151 @@ class StopService(ConfidenceMatcherPipeline):
             # TODO - track if speech is coming from this skill! not currently tracked (ovos-audio)
             if sess.is_speaking:
                 # force-kill any ongoing TTS
-                self.bus.emit(message.forward("mycroft.audio.speech.stop", {"skill_id": skill_id}))
+                # SpecMessage.AUDIO_STOP.value == "ovos.audio.stop"; the
+                # translator's MIGRATION_MAP mirrors it onto the legacy
+                # "mycroft.audio.speech.stop" ovos-audio still listens on.
+                self.bus.emit(message.forward(SpecMessage.AUDIO_STOP.value, {"skill_id": skill_id}))
+
+    def _resolve_dispatch_lifecycle(self, message: Message, skill_id: str) -> None:
+        """Emit the framework done-signal for the ``<skill_id>:stop`` dispatch
+        this ``.stop.response`` concludes.
+
+        ``IntentDispatcher._on_skill_complete``/``._on_skill_error`` listen for
+        exactly these topics and resolve the matching in-flight entry (by
+        session_id + skill_id + ``data["intent_name"]``), cancelling its
+        §8.3 timeout timer. See ``handle_stop_confirmation``'s docstring for
+        why this lives here rather than in ovos-workshop.
+
+        ``data["intent_name"] = "stop"`` is stamped explicitly (rather than
+        leaving the dispatcher to match on ``skill_id`` alone, as it does for
+        the normal single-handler-at-a-time framework signal): the ``.stop``
+        dispatch is not the only thing that can be in flight for a skill --
+        an ordinary intent handler can legitimately be running concurrently.
+        Without this, a leaked/stale ``.stop.response`` (e.g. reaching
+        ``handle_stop_confirmation`` for a match that was never actually
+        dispatched -- see the ``bus.once`` registered eagerly in
+        ``_targeted_stop`` at match-build time) would resolve whichever
+        in-flight entry for that skill happens to be on top of the LIFO
+        stack, which may be a completely unrelated, still-running intent --
+        a premature/wrong ``ovos.utterance.handled`` end-marker. The
+        (session_id, skill_id) pre-drain-presence gate in
+        ``handle_stop_confirmation`` narrows *when* this fires; this
+        intent_name stamp narrows *what* it can resolve once it does.
+
+        DATA, not context: ``message.forward`` deep-copies the ORIGINATING
+        dispatch's context forward (that context is CLIENT-INHERITED --
+        ultimately sourced from the utterance message a client sent). A
+        client that happens to set ``context["intent_name"]`` on its own
+        utterance would have that value survive every ``forward()`` down the
+        dispatch chain and land on a totally unrelated skill's REAL
+        ``mycroft.skill.handler.complete`` too, mismatching this filter and
+        silently breaking that skill's OWN handler-lifecycle resolution
+        (parking it on the 5-minute §8.3 timeout instead). ``data``, by
+        contrast, is passed fresh by ``forward()``'s second argument --
+        never inherited from the client -- so only THIS emission ever
+        carries this key.
+
+        §8.2: a ``.stop.response`` carrying ``error`` means the skill's
+        ``stop()`` raised -- that must resolve as an ``error`` terminal, not
+        ``complete``, so a failed stop is distinguishable from a successful
+        one on the §8 trio.
+        """
+        if 'error' in message.data:
+            done = message.forward("mycroft.skill.handler.error",
+                                   {"name": f"{skill_id}:stop",
+                                    "exception": message.data['error'],
+                                    "intent_name": "stop"})
+        else:
+            done = message.forward("mycroft.skill.handler.complete",
+                                   {"name": f"{skill_id}:stop",
+                                    "intent_name": "stop"})
+        done.context["skill_id"] = skill_id
+        self.bus.emit(done)
+
+    def _targeted_stop(self, skill_id: str, conf: float, utterance: str,
+                       sess: Session) -> IntentHandlerMatch:
+        """Build the OVOS-STOP-1 §2 targeted ``<skill_id>:stop`` Match.
+
+        Drains the dispatch target from ``active_handlers`` and clears its
+        ``response_mode`` entry (§6.1/§6.2) via ``Match.updated_session``. The
+        §7.1 stamping push is suppressed (``suppress_activation``, §7.3), so the
+        removal is the final state.
+
+        CONFIRMED-3: match() must be side-effect-free — the orchestrator may
+        still discard this Match (blacklisted intent, missing required slots, a
+        dispatch exception) without ever consuming ``updated_session``, so the
+        drain is carried on a COPY and only lands on the live SessionManager
+        session if/when ``_dispatch_match`` actually commits it. The live
+        ``sess`` passed in is read but never mutated here.
+        """
+        LOG.debug(f"Telling skill to stop: {skill_id}")
+        # captured before the drain so handle_stop_confirmation's force_timeout
+        # check (CONFIRMED-2) can still see the pre-drain truth once the
+        # (post-drain) session reaches it via the dispatch round-trip.
+        self._was_active_pre_drain[(sess.session_id, skill_id)] = sess.is_active(skill_id)
+        # CONFIRMED-4: same reasoning — snapshot the pre-drain utterance state
+        # so handle_stop_confirmation's abort_question check (RESPONSE state)
+        # can still see it once the (post-drain) session reaches it via the
+        # dispatch round-trip.
+        self._utt_state_pre_drain[(sess.session_id, skill_id)] = sess.utterance_states.get(
+            skill_id, UtteranceState.INTENT)
+        drained = Session.deserialize(sess.serialize())
+        drained.disable_response_mode(skill_id)
+        drained.deactivate_skill(skill_id)
+        self.bus.once(f"{skill_id}.stop.response", self.handle_stop_confirmation)
+        return IntentHandlerMatch(
+            match_type=f"{skill_id}:stop",
+            match_data={"conf": conf, "skill_id": skill_id},
+            updated_session=drained,
+            utterance=utterance,
+            skill_id=skill_id,
+            suppress_activation=self.suppress_activation,
+        )
+
+    def _global_stop(self, conf: float, utterance: str,
+                     sess: Session) -> IntentHandlerMatch:
+        """Build the OVOS-STOP-1 §5 global ``<pipeline_id>:global_stop`` Match.
+
+        Carries a fully-cleaned ``updated_session`` (§5.2): ``active_handlers``
+        and ``converse_handlers`` emptied and ``response_mode`` removed, all
+        committed before dispatch.
+
+        CONFIRMED-3: side-effect-free like ``_targeted_stop`` — the clear is
+        carried on a COPY, never the live ``sess``, so a discarded Match
+        (blacklist/missing-slots/dispatch-exception) leaves the live session
+        untouched.
+        """
+        LOG.info(f"Emitting global stop, {len(sess.active_skills)} active skills")
+        # read-only: the pre-drain holder, carried through match_data so
+        # handle_global_stop (dispatch time, NOT here) can emit the targeted
+        # `<skill_id>.stop` a killable-event abort actually listens on —
+        # emitting it here would violate the CONFIRMED-3 side-effect-free
+        # match() invariant, since this Match can still be discarded.
+        holder = sess.response_mode.get("skill_id") if sess.response_mode else None
+        drained = Session.deserialize(sess.serialize())
+        drained.active_handlers = []
+        drained.converse_handlers = []
+        drained.clear_response_mode()
+        match_data = {"conf": conf}
+        if holder:
+            match_data["response_mode_holder"] = holder
+        return IntentHandlerMatch(
+            match_type=f"{self.pipeline_id}:global_stop",
+            match_data=match_data,
+            updated_session=drained,
+            utterance=utterance,
+            skill_id=self.pipeline_id,
+            suppress_activation=self.suppress_activation,
+        )
 
     def match_high(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """
-        Handles high-confidence stop requests by matching exact stop vocabulary and managing skill stopping.
+        Handle high-confidence stop requests by matching exact stop vocabulary (§4/§5).
 
-        Attempts to stop skills when an exact "stop" or "global_stop" command is detected. Performs the following actions:
-        - Checks for global stop command when no active skills exist
-        - Emits a global stop message if applicable
-        - Attempts to stop individual skills if a stop command is detected
-        - Disables response mode for stopped skills
+        - explicit ``global_stop`` vocabulary (or bare ``stop`` with no active
+          skills) yields a §5 global stop;
+        - a bare ``stop`` with active skills runs the §4 cascade and yields a
+          targeted ``<skill_id>:stop`` for the recency-selected stoppable skill.
 
         Parameters:
             utterances (List[str]): List of user utterances to match against stop vocabulary
@@ -176,9 +471,8 @@ class StopService(ConfidenceMatcherPipeline):
             message (Message): Message context for generating appropriate responses
 
         Returns:
-            Optional[IntentHandlerMatch]: Match result indicating whether stop was handled, with optional skill and session information
-            - Returns None if no stop action could be performed
-            - Returns IntentHandlerMatch with handled=True for successful global or skill-specific stop
+            Optional[IntentHandlerMatch]: the stop Match, or None if no stop
+            vocabulary matched.
         """
         sess = SessionManager.get(message)
 
@@ -187,34 +481,17 @@ class StopService(ConfidenceMatcherPipeline):
 
         is_stop = self._locale.voc_match(utterance, 'stop', lang, exact=True)
         is_global_stop = self._locale.voc_match(utterance, 'global_stop', lang, exact=True) or \
-                         (is_stop and not len(self.get_active_skills(message)))
+                         (is_stop and not len(self._stop_candidates(message)))
 
         conf = 1.0
 
         if is_global_stop:
-            LOG.info(f"Emitting global stop, {len(self.get_active_skills(message))} active skills")
-            # emit a global stop, full stop anything OVOS is doing
-            return IntentHandlerMatch(
-                match_type="stop:global",
-                match_data={"conf": conf},
-                updated_session=sess,
-                utterance=utterance,
-                skill_id="stop.openvoiceos"
-            )
+            return self._global_stop(conf, utterance, sess)
 
         if is_stop:
-            # check if any skill can stop
+            # check if any skill can stop (§4 cascade)
             for skill_id in self._collect_stop_skills(message):
-                LOG.debug(f"Telling skill to stop: {skill_id}")
-                sess.disable_response_mode(skill_id)
-                self.bus.once(f"{skill_id}.stop.response", self.handle_stop_confirmation)
-                return IntentHandlerMatch(
-                    match_type="stop:skill",
-                    match_data={"conf": conf, "skill_id": skill_id},
-                    updated_session=sess,
-                    utterance=utterance,
-                    skill_id="stop.openvoiceos"
-                )
+                return self._targeted_stop(skill_id, conf, utterance, sess)
 
         return None
 
@@ -246,7 +523,7 @@ class StopService(ConfidenceMatcherPipeline):
         is_stop = self._locale.voc_match(utterance, 'stop', lang, exact=False)
         if not is_stop:
             is_global_stop = self._locale.voc_match(utterance, 'global_stop', lang, exact=False) or \
-                             (is_stop and not len(self.get_active_skills(message)))
+                             (is_stop and not len(self._stop_candidates(message)))
             if not is_global_stop:
                 return None
 
@@ -288,30 +565,14 @@ class StopService(ConfidenceMatcherPipeline):
         if conf < self.config.get("min_conf", 0.5):
             return None
 
-        # check if any skill can stop
+        # check if any skill can stop (§4 cascade)
         for skill_id in self._collect_stop_skills(message):
-            LOG.debug(f"Telling skill to stop: {skill_id}")
-            sess.disable_response_mode(skill_id)
-            self.bus.once(f"{skill_id}.stop.response", self.handle_stop_confirmation)
-            return IntentHandlerMatch(
-                match_type="stop:skill",
-                match_data={"conf": conf, "skill_id": skill_id},
-                updated_session=sess,
-                utterance=utterance,
-                skill_id="stop.openvoiceos"
-            )
+            return self._targeted_stop(skill_id, conf, utterance, sess)
 
-        # emit a global stop, full stop anything OVOS is doing
-        LOG.debug(f"Emitting global stop signal, {len(self.get_active_skills(message))} active skills")
-        return IntentHandlerMatch(
-            match_type="stop:global",
-            match_data={"conf": conf},
-            updated_session=sess,
-            utterance=utterance,
-            skill_id="stop.openvoiceos"
-        )
+        # no positive pong responder -> escalate to a §5 global stop
+        return self._global_stop(conf, utterance, sess)
 
     def shutdown(self) -> None:
         """Remove bus listeners registered by this service."""
-        self.bus.remove("stop:global", self.handle_global_stop)
-        self.bus.remove("stop:skill", self.handle_skill_stop)
+        self.bus.remove(f"{self.pipeline_id}:global_stop", self.handle_global_stop)
+        self._legacy.shutdown()

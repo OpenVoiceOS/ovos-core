@@ -105,6 +105,16 @@ class IntentManifest:
         if not (skill_id and intent_name and lang):
             LOG.warning(f"malformed intent registration from {skill_id!r}: missing required fields")
             return
+        if intent_name == "stop":
+            # OVOS-STOP-1 reserves "<skill_id>:stop" for the pipeline's own
+            # targeted-stop dispatch (stop_service.py _targeted_stop); a real
+            # intent registered under the same name binds the identical topic
+            # and is shadowed by / collides with the reserved dispatch.
+            LOG.warning(
+                f"skill '{skill_id}' registered an intent literally named 'stop' — "
+                f"this collides with the OVOS-STOP-1 reserved '{skill_id}:stop' "
+                "targeted-dispatch topic, so both the registered intent handler "
+                "and the stop machinery will react to messages on that topic.")
         session_id = (message.context.get("session") or {}).get("session_id", "default")
         key = self._key(session_id, skill_id, intent_name, lang, method)
         self._index[key] = {
