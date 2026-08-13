@@ -201,6 +201,11 @@ class TestDeactivate(TestCase):
             ],
             expected_messages=[
                 message,
+                # OVOS-CONVERSE-1 §4.2: one broadcast poll per round, emitted
+                # before the legacy per-skill pings (dual-emit compat window).
+                Message("ovos.converse.ping",
+                        data={"utterances": ["deactivate skill from within converse"], "lang": session.lang},
+                        context={}),
                 Message(f"{self.skill_id}.converse.ping",
                         data={"utterances": ["deactivate skill from within converse"], "skill_id": self.skill_id},
                         context={}),

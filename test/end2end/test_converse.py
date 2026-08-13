@@ -115,6 +115,11 @@ class TestConverse(TestCase):
             ]
             expected2 = [
                 message2,
+                # OVOS-CONVERSE-1 §4.2: one broadcast poll per round, emitted
+                # before the legacy per-skill pings (dual-emit compat window).
+                Message("ovos.converse.ping",
+                        data={"utterances": ["echo test"], "lang": session.lang},
+                        context={}),
                 Message(f"{self.skill_id}.converse.ping",
                         data={"utterances": ["echo test"], "skill_id": self.skill_id},
                         context={}),
@@ -159,6 +164,9 @@ class TestConverse(TestCase):
             ]
             expected3 = [
                 message3,
+                Message("ovos.converse.ping",
+                        data={"utterances": ["stop parrot"], "lang": session.lang},
+                        context={}),
                 Message(f"{self.skill_id}.converse.ping",
                         data={"utterances": ["stop parrot"], "skill_id": self.skill_id},
                         context={}),
@@ -203,6 +211,9 @@ class TestConverse(TestCase):
             ]
             expected4 = [
                 message4,
+                Message("ovos.converse.ping",
+                        data={"utterances": ["echo test"], "lang": session.lang},
+                        context={}),
                 Message(f"{self.skill_id}.converse.ping",
                         data={"utterances": ["echo test"], "skill_id": self.skill_id},
                         context={}),
