@@ -396,9 +396,13 @@ class TestContextHandlers(unittest.TestCase):
         # The frame_stack should have an entry
         self.assertGreater(len(sess.context.frame_stack), 0)
         # OVOS-CONTEXT-1: the token is mirrored into the intent_context map,
-        # keyed by the context token and carrying its injected value
-        self.assertEqual(sess.intent_context.get("MyContext"),
-                         {"value": "myword"})
+        # keyed by the context token and carrying its injected value.
+        # Round 3: also carries an expires_at decay stamp (see
+        # test_handle_add_context_stamps_expiry_on_both_spellings) - only
+        # "value" is pinned exactly here, expires_at just needs to be present.
+        entry = sess.intent_context.get("MyContext")
+        self.assertEqual(entry.get("value"), "myword")
+        self.assertIn("expires_at", entry)
 
     def test_handle_remove_context_removes_entity(self):
         """handle_remove_context removes the specified context."""
@@ -491,9 +495,13 @@ class TestContextHandlers(unittest.TestCase):
         """Round 2 (C4) regression: writing the resolved twin must NOT
         clobber expires_at/turns_remaining a prior write already
         established for that exact resolved key - only 'value' is
-        authoritative from this call (setdefault-style merge). The
-        legacy munged-key entry keeps today's dev behavior (full
-        overwrite) unchanged; this asymmetry is deliberate, see PR body."""
+        authoritative from this call (setdefault-style merge). Round 3
+        supersedes the Round 2 docstring claim that the munged-key entry
+        keeps a full-overwrite behavior forever - see
+        test_handle_add_context_stamps_expiry_on_both_spellings and
+        test_handle_add_context_preserves_custom_munged_expiry below: the
+        munged key is now ALSO merge-preserving, via inject_context()'s own
+        stamp rather than a second setdefault here."""
         sess = Session("s")
         sess.intent_context = {"my.skill:kitchen": {"value": "old",
                                                      "expires_at": 999999999.0,
@@ -510,6 +518,115 @@ class TestContextHandlers(unittest.TestCase):
         self.assertEqual(entry["value"], "kitchen")
         self.assertEqual(entry["expires_at"], 999999999.0)
         self.assertEqual(entry["turns_remaining"], 3)
+
+    def test_handle_add_context_stamps_expiry_on_both_spellings(self):
+        """Round 3 (wave-3 live lead) regression: a FRESH add_context call
+        must stamp expires_at on BOTH the munged legacy key and the
+        resolved private key, sourced from the same adapt `context.timeout`
+        config convention ovos-bus-client's `_IntentContextView` uses
+        (`Configuration()['context']['timeout']`, minutes -> seconds,
+        default 2min). Without a decay field, OVOS-CONTEXT-1's `is_live()`
+        treats an entry as immortal and `prune()` can never reap it - the
+        pre-existing dev "immortal context entries" bug, which the spec
+        sides against for legacy-sourced entries."""
+        import time
+        from ovos_config.config import Configuration
+        sess = Session("s")
+        msg = Message("add_context",
+                      data={"context": "my_skillkitchen", "word": "kitchen",
+                            "key": "kitchen"},
+                      context={"session": sess.serialize(),
+                               "skill_id": "my.skill"})
+        before = time.time()
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess):
+            IntentService.handle_add_context(msg)
+        after = time.time()
+        timeout_s = Configuration().get('context', {}).get('timeout', 2) * 60
+
+        munged = sess.intent_context["my_skillkitchen"]
+        resolved = sess.intent_context["my.skill:kitchen"]
+        for entry in (munged, resolved):
+            self.assertIn("expires_at", entry)
+            self.assertGreaterEqual(entry["expires_at"], before + timeout_s)
+            self.assertLessEqual(entry["expires_at"], after + timeout_s)
+
+    def test_handle_add_context_prune_removes_both_spellings_after_expiry(self):
+        """Round 3 regression: ovos_spec_tools.context.prune() must be able
+        to reap BOTH dialect keys once their stamped expires_at is in the
+        past - proving the decay stamp is real (§4 pre-match pruning), not
+        just present."""
+        from ovos_spec_tools.context import prune
+        sess = Session("s")
+        msg = Message("add_context",
+                      data={"context": "my_skillkitchen", "word": "kitchen",
+                            "key": "kitchen"},
+                      context={"session": sess.serialize(),
+                               "skill_id": "my.skill"})
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess):
+            IntentService.handle_add_context(msg)
+        self.assertIn("my_skillkitchen", sess.intent_context)
+        self.assertIn("my.skill:kitchen", sess.intent_context)
+
+        # simulate expiry: prune() at a "now" far past both stamps
+        far_future = 99999999999.0
+        pruned = prune(dict(sess.intent_context), now=far_future)
+        self.assertNotIn("my_skillkitchen", pruned)
+        self.assertNotIn("my.skill:kitchen", pruned)
+
+    def test_handle_add_context_does_not_double_clobber_injected_expiry(self):
+        """Round 3 regression, precise claim: `sess.context.inject_context()`
+        (ovos-bus-client's legacy `_IntentContextView`) ALWAYS stamps a
+        FRESH `expires_at` on every call - it has no memory of a prior
+        custom value, so a pre-existing custom stamp on the munged key
+        cannot survive a re-`inject_context()` regardless of this handler
+        (that unconditional-fresh-stamp behavior lives in the vendored
+        dependency, out of this fix's scope). What THIS handler must not
+        do is throw the freshly-injected stamp away a second time with its
+        own bare-dict overwrite - which the pre-Round-3 code did. Assert
+        the handler's own write preserves exactly what inject_context()
+        just wrote for the munged key (no extra clobber), by checking the
+        handler's output for that key equals `sess.context`'s own
+        (post-inject) view before the handler's second write would have
+        run."""
+        sess = Session("s")
+        entity = {"confidence": 1.0, "data": [("kitchen", "my_skillkitchen")],
+                  "match": "kitchen", "key": "kitchen", "origin": ""}
+        sess.context.inject_context(entity)
+        injected_entry = dict(sess.intent_context["my_skillkitchen"])
+        self.assertIn("expires_at", injected_entry)  # sanity: inject_context did stamp
+
+        msg = Message("add_context",
+                      data={"context": "my_skillkitchen", "word": "kitchen"},
+                      context={"session": sess.serialize(),
+                               "skill_id": "my.skill"})
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess):
+            IntentService.handle_add_context(msg)
+        entry = sess.intent_context["my_skillkitchen"]
+        self.assertEqual(entry["value"], "kitchen")
+        # the handler's own write must not have moved expires_at backwards
+        # or dropped it - it must be >= what was already stamped
+        self.assertIn("expires_at", entry)
+        self.assertGreaterEqual(entry["expires_at"], injected_entry["expires_at"])
+
+    def test_handle_add_context_e2e_reachability_unaffected_by_decay_stamp(self):
+        """Round 3 regression: the decay stamp must not break IMMEDIATE
+        gating - a freshly-opened OVOS-CONTEXT-1 gate must still be
+        satisfied right after set_context, decay or no decay."""
+        from ovos_spec_tools.context import gate_satisfied
+        sess = Session("s")
+        msg = Message("add_context",
+                      data={"context": "my_skillkitchen", "word": "kitchen",
+                            "key": "kitchen"},
+                      context={"session": sess.serialize(),
+                               "skill_id": "my.skill"})
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess):
+            IntentService.handle_add_context(msg)
+        self.assertTrue(gate_satisfied(sess.intent_context, ["kitchen"], [],
+                                       owner_id="my.skill"))
 
     def test_handle_remove_context_removes_both_spellings(self):
         """Symmetric with add: removing must drop both the legacy munged

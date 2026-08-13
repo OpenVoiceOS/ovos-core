@@ -741,8 +741,34 @@ class IntentService:
         # `session.intent_context` map, so a keyword added via `set_context`
         # must land there too or it never reaches matching. Entries are
         # keyed by the context token and carry its injected value.
+        #
+        # Round 3 (wave-3 live lead): `sess.context.inject_context()` above
+        # (the legacy `_IntentContextView`, ovos-bus-client) already folded
+        # its own write into `session.intent_context[context]`, stamping
+        # `expires_at = now + timeout` using the adapt `context.timeout`
+        # config convention (`Configuration()["context"]["timeout"]`,
+        # minutes, default 2 -> 120s). The plain-dict overwrite that used to
+        # follow here (`ctx[context] = {"value": ...}`) clobbered that stamp
+        # two lines later - the pre-existing dev "immortal context entries"
+        # bug: `ovos_spec_tools.context.is_live()` treats a missing
+        # `expires_at` as never-expiring, so `prune()` could never reap
+        # these entries. OVOS-CONTEXT-1 sides against that: legacy-sourced
+        # entries carry decay; immortality is reserved for deliberate
+        # writers, which the skill API is not. Fixed by reading back
+        # whatever `inject_context()` already stamped and preserving it
+        # (falling back to the same timeout computation only if, for some
+        # reason, nothing was stamped) instead of clobbering.
+        context_cfg = Configuration().get('context', {})
+        timeout_s = context_cfg.get('timeout', 2) * 60
+        now = time.time()
         ctx = dict(sess.intent_context or {})
-        ctx[context] = {"value": word or context}
+        munged_entry = {"value": word or context}
+        munged_expires_at = (ctx.get(context) or {}).get("expires_at")
+        if munged_expires_at is None and timeout_s > 0:
+            munged_expires_at = now + timeout_s
+        if munged_expires_at is not None:
+            munged_entry["expires_at"] = munged_expires_at
+        ctx[context] = munged_entry
         # Two dialects meet here: legacy ADAPT context is stored under the
         # producer's munged `alphanumeric_skill_id + key` spelling (above),
         # while the declarative OVOS-CONTEXT-1 gate resolves a private
@@ -764,16 +790,21 @@ class IntentService:
                 # is an internal wire detail of the ADAPT dialect and must
                 # never leak into OVOS-CONTEXT-1 §7 slot injection via this
                 # (declarative-gate) entry.
-                # Round 2 (C4): preserve whatever expires_at/turns_remaining
-                # a prior write already established for THIS resolved key
-                # (setdefault-style merge) - only "value" is authoritative
-                # from this call. The munged-key entry above keeps today's
-                # dev behavior (full overwrite) unchanged; this repo has no
-                # decay-writer for the resolved key yet, but a future one
-                # (e.g. a session-sync path) must not have its expiry
-                # silently reset by a plain set_context call.
+                # Round 2 (C4) / Round 3: preserve whatever expires_at OR
+                # turns_remaining a prior write already established for
+                # THIS resolved key (setdefault-style merge) - "value" is
+                # always authoritative from this call, decay fields only
+                # when the entry is fresh. Round 3 adds the default decay
+                # stamp itself (sourced from the same adapt-convention
+                # timeout as the legacy view) so a brand-new resolved entry
+                # is not immortal by omission - only a caller that
+                # deliberately pre-stamped decay fields keeps them
+                # untouched.
                 existing = dict(ctx.get(resolved) or {})
                 existing["value"] = word or key
+                if "expires_at" not in existing and \
+                        "turns_remaining" not in existing and timeout_s > 0:
+                    existing["expires_at"] = now + timeout_s
                 ctx[resolved] = existing
         sess.intent_context = ctx
 
