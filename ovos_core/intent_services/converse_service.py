@@ -288,11 +288,28 @@ class ConverseService(PipelinePlugin):
 
         event = Event()
 
+        # OVOS-CONVERSE-1 §4.2 round correlation: the round IS the utterance
+        # lifecycle, named by context.utterance_id (OVOS-PIPELINE-1 §9.1.1).
+        # The ping carries it by `forward` derivation and the pong carries it
+        # back by `reply` derivation — no skill-side action.
+        round_uid = message.context.get("utterance_id")
+
         def handle_ack(msg: Message) -> None:
             nonlocal event
             skill_id = msg.data.get("skill_id")
             if not skill_id:
                 return  # guard against malformed pong messages
+
+            # A pong that cannot prove which question it answers never decides a
+            # round: discard pongs from an earlier (or foreign) lifecycle. When
+            # the round itself is unnamed the guard stands down, so a V0 caller
+            # that never entered through the orchestrator behaves as before.
+            if round_uid is not None and \
+                    msg.context.get("utterance_id") != round_uid:
+                LOG.debug(f"discarding stale converse pong from '{skill_id}': "
+                          f"utterance_id {msg.context.get('utterance_id')!r} "
+                          f"does not match round {round_uid!r}")
+                return
 
             # validate the converse pong; default False — a non-responding skill should not converse
             if all((skill_id not in want_converse,
