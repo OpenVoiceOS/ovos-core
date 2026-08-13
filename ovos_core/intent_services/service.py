@@ -27,6 +27,7 @@ from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
 from ovos_spec_tools import closest_lang, standardize_lang, SpecMessage
+from ovos_spec_tools.context import resolve_key
 from ovos_utils.log import LOG
 from ovos_utils.metrics import Stopwatch
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
@@ -752,6 +753,40 @@ class IntentService:
         self.bus.emit(message.reply(SpecMessage.UTTERANCE_HANDLED))
 
     @staticmethod
+    def _registry_session_for_context_write(message: Message) -> "Session":
+        """Resolve the session object to mutate for an in-lifecycle context write.
+
+        Wave-3 CONFIRMED (round 4): ``SessionManager.get(message)`` always folds
+        the incoming message's session onto the live registry entry
+        (``SessionManager._store``), and for NAMED sessions that fold is
+        full-replace (``update_from``). Calling it from a context handler means
+        the fold first wipes the registry entry's ``intent_context`` with the
+        message's stale snapshot, then every subsequent mid-lifecycle frame
+        (skill replies, follow-up handler frames) re-wipes it again - a named
+        session's context can never survive to the terminal event. SESSION-2
+        §2.6 is unambiguous: folding a message's session onto the working
+        session belongs at lifecycle entry only; incidental messages must never
+        mutate it. This is not a named-session-only defect: ``update_from``
+        round-trips through full serialize/deserialize for every session id,
+        including ``"default"`` - a stale default-session snapshot arriving
+        on an incidental message wipes the device-local default session's
+        context exactly the same way. The registry-first fix below is load-
+        bearing for the default session too, not only named ones.
+
+        Fix (this handler's scope only - the general fold-discipline at every
+        ``get(message)`` call site is a tracked follow-up): resolve the
+        session_id off the message and, if the registry already holds a live
+        entry for it, mutate that object directly - no fold. Fall back to
+        ``SessionManager.get(message)`` (today's behavior) only when no
+        registry entry exists yet, e.g. out-of-registry/test callers.
+        """
+        session_data = message.context.get("session") if message and message.context else None
+        session_id = session_data.get("session_id") if isinstance(session_data, dict) else None
+        if session_id and session_id in SessionManager.sessions:
+            return SessionManager.sessions[session_id]
+        return SessionManager.get(message)
+
+    @staticmethod
     def handle_add_context(message: Message):
         """Add context
 
@@ -771,14 +806,80 @@ class IntentService:
         entity['match'] = word
         entity['key'] = word
         entity['origin'] = origin
-        sess = SessionManager.get(message)
+        sess = IntentService._registry_session_for_context_write(message)
         sess.context.inject_context(entity)
         # OVOS-CONTEXT-1 §2/§7: pipelines gate and inject from the canonical
         # `session.intent_context` map, so a keyword added via `set_context`
         # must land there too or it never reaches matching. Entries are
         # keyed by the context token and carry its injected value.
+        #
+        # Round 3 (wave-3 live lead): `sess.context.inject_context()` above
+        # (the legacy `_IntentContextView`, ovos-bus-client) already folded
+        # its own write into `session.intent_context[context]`, stamping
+        # `expires_at = now + timeout` using the adapt `context.timeout`
+        # config convention (`Configuration()["context"]["timeout"]`,
+        # minutes, default 2 -> 120s). The plain-dict overwrite that used to
+        # follow here (`ctx[context] = {"value": ...}`) clobbered that stamp
+        # two lines later - the pre-existing dev "immortal context entries"
+        # bug: `ovos_spec_tools.context.is_live()` treats a missing
+        # `expires_at` as never-expiring, so `prune()` could never reap
+        # these entries. OVOS-CONTEXT-1 sides against that: legacy-sourced
+        # entries carry decay; immortality is reserved for deliberate
+        # writers, which the skill API is not.
+        #
+        # Round 5 (C1): a re-set of the same context key is a wholesale
+        # replace, not a merge (OVOS-CONTEXT-1 §5) - there is no read-back
+        # API for consumers to notice a stale expiry (§5.3). Every re-set
+        # must refresh `expires_at` unconditionally, same as
+        # `inject_context()` above does for the munged key. Preserving a
+        # prior stamp here (reading it back off `ctx`) let this key and the
+        # resolved private key below drift out of sync: a skill re-calling
+        # `set_context` kept the adapt entry alive while the resolved entry
+        # kept dying at its original expiry. One decay policy, computed
+        # once, applied to both keys.
+        context_cfg = Configuration().get('context', {})
+        timeout_s = context_cfg.get('timeout', 2) * 60
+        now = time.time()
         ctx = dict(sess.intent_context or {})
-        ctx[context] = {"value": word or context}
+        munged_entry = {"value": word or context}
+        expires_at = now + timeout_s if timeout_s > 0 else None
+        if expires_at is not None:
+            munged_entry["expires_at"] = expires_at
+        ctx[context] = munged_entry
+        # Two dialects meet here: legacy ADAPT context is stored under the
+        # producer's munged `alphanumeric_skill_id + key` spelling (above),
+        # while the declarative OVOS-CONTEXT-1 gate resolves a private
+        # declaration to `resolve_key(key, "private", skill_id)` (colon
+        # separated, unsanitized) - the two never coincide. When the
+        # producer (ovos-workshop's set_context) names the original,
+        # unmunged key via `data["key"]` and the message carries a
+        # skill_id, also write the resolved private-scope entry so the
+        # gate becomes reachable. The skill API is private-scope by
+        # construction (its stored key is always skill-prefixed); shared-
+        # scope writes are session-sync territory, not this handler's.
+        key = message.data.get('key')
+        skill_id = message.context.get('skill_id') if message.context else None
+        if key and skill_id:
+            resolved = resolve_key(key, "private", skill_id)
+            if resolved:
+                # Round 2 (C3): the fallback value must be the ORIGINAL key,
+                # not the munged legacy context string - the munged spelling
+                # is an internal wire detail of the ADAPT dialect and must
+                # never leak into OVOS-CONTEXT-1 §7 slot injection via this
+                # (declarative-gate) entry.
+                # Round 5 (C1): stamp the SAME `expires_at` computed above
+                # for the munged key, unconditionally, on every re-set - no
+                # setdefault-style preservation of a prior write's expiry.
+                # Preserving it here was the bug: it let this resolved key
+                # keep dying at the FIRST write's expiry while the munged
+                # key above kept getting refreshed by `inject_context()`,
+                # so the declarative gate could close while the legacy
+                # adapt context was still alive (or vice versa). One decay
+                # policy, one computed `expires_at`, both keys.
+                resolved_entry = {"value": word or key}
+                if expires_at is not None:
+                    resolved_entry["expires_at"] = expires_at
+                ctx[resolved] = resolved_entry
         sess.intent_context = ctx
 
     @staticmethod
@@ -790,18 +891,26 @@ class IntentService:
         """
         context = message.data.get('context')
         if context:
-            sess = SessionManager.get(message)
+            sess = IntentService._registry_session_for_context_write(message)
             sess.context.remove_context(context)
             # mirror the removal into the OVOS-CONTEXT-1 map (see
             # `handle_add_context`)
             ctx = dict(sess.intent_context or {})
             ctx.pop(context, None)
+            # mirror-remove the resolved private-scope key too, if the
+            # producer named the original key (see `handle_add_context`)
+            key = message.data.get('key')
+            skill_id = message.context.get('skill_id') if message.context else None
+            if key and skill_id:
+                resolved = resolve_key(key, "private", skill_id)
+                if resolved:
+                    ctx.pop(resolved, None)
             sess.intent_context = ctx or None
 
     @staticmethod
     def handle_clear_context(message: Message):
         """Clears all keywords from context """
-        sess = SessionManager.get(message)
+        sess = IntentService._registry_session_for_context_write(message)
         sess.context.clear_context()
         # mirror the clear into the OVOS-CONTEXT-1 map (see `handle_add_context`)
         sess.intent_context = None
