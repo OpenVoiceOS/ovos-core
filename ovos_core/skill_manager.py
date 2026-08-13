@@ -21,6 +21,7 @@ from typing import Callable, List, Optional
 
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
+from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util.scheduler import EventScheduler
 from ovos_config.config import Configuration
 from ovos_config.locations import get_xdg_config_save_path
@@ -133,6 +134,16 @@ class SkillManager(Thread):
         self.daemon = True
 
         self.status.bind(self.bus)
+
+        # Connect SessionManager to the bus regardless of whether the intent
+        # service runs in this process: speak(wait=True)/wait_while_speaking
+        # depend on SessionManager.bus being set, and skills-only processes
+        # (enable_intent_service=False, e.g. --disable-intent-service) would
+        # otherwise never get it. Guarded so the monolith path (intent
+        # service enabled in this same process) does not register the five
+        # SessionManager bus handlers twice via IntentService.__init__.
+        if SessionManager.bus is not self.bus:
+            SessionManager.connect_to_bus(self.bus)
 
         # init subsystems
         self.osm = SkillsStore(self.bus) if enable_installer else None

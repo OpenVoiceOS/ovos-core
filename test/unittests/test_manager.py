@@ -3,6 +3,7 @@ from os.path import join, dirname
 from unittest.mock import MagicMock, patch
 
 from ovos_bus_client.message import Message
+from ovos_bus_client.session import SessionManager
 
 from ovos_core.skill_manager import SkillManager
 
@@ -10,8 +11,17 @@ from ovos_core.skill_manager import SkillManager
 class TestSkillManager(unittest.TestCase):
 
     def setUp(self):
+        SessionManager.bus = None
         self.bus = MagicMock()
         self.skill_manager = SkillManager(self.bus)
+        # SkillManager.__init__ now wires SessionManager.connect_to_bus(),
+        # which emits an "ovos.session.update_default" broadcast on
+        # construction; reset the mock so tests only observe emits from the
+        # code under test, not this setup side effect
+        self.bus.reset_mock()
+
+    def tearDown(self):
+        SessionManager.bus = None
 
     def test_blacklist_property(self):
         blacklist = self.skill_manager.blacklist

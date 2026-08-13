@@ -160,9 +160,15 @@ class IntentService:
         # ovos.intent.list / ovos.intent.describe pull-queries.
         self.intent_manifest: IntentManifest = IntentManifest(bus)
 
-        # connection SessionManager to the bus,
-        # this will sync default session across all components
-        SessionManager.connect_to_bus(self.bus)
+        # connect SessionManager to the bus, this will sync default session
+        # across all components. Guarded so the same bus does not get the
+        # five SessionManager handlers registered twice: in the monolith,
+        # SkillManager.__init__ runs first and connects the bus before this
+        # IntentService is constructed; in embedders that construct
+        # IntentService directly (without a SkillManager), this call site
+        # is the first to connect it.
+        if SessionManager.bus is not self.bus:
+            SessionManager.connect_to_bus(self.bus)
 
         self.bus.on(SpecMessage.UTTERANCE, self.handle_utterance)
 
