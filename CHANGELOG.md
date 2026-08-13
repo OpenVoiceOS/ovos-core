@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.6.3a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.3a2) (2026-08-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.3a1...2.6.3a2)
+
+**Merged pull requests:**
+
+- spike: context.utterance\_id — lifecycle identifier + converse round guard \(PIPELINE-1 §9.1.1\) [\#859](https://github.com/OpenVoiceOS/ovos-core/pull/859) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [2.6.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.3a1) (2026-08-11)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.2a1...2.6.3a1)
@@ -327,10 +335,6 @@
 ## [2.1.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.1a1) (2025-11-05)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.0...2.1.1a1)
-
-**Merged pull requests:**
-
-- Update ovos-plugin-manager version range [\#734](https://github.com/OpenVoiceOS/ovos-core/pull/734) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.1.0](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.0) (2025-10-20)
 
