@@ -807,3 +807,105 @@ class TestConverseHandlerLifecycle(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# OVOS-PIPELINE-1 §9.1.1 / OVOS-CONVERSE-1 §4.2 — round correlation
+# ---------------------------------------------------------------------------
+
+class TestConverseRoundCorrelation(unittest.TestCase):
+    """A pong must prove which round it answers, or it decides nothing."""
+
+    def _run_round(self, svc, ping_msg, pongs):
+        """Drive one _collect_converse_skills round, feeding it `pongs`."""
+        ack_handler = None
+
+        def capture_on(event, handler):
+            nonlocal ack_handler
+            if event == "skill.converse.pong":
+                ack_handler = handler
+
+        svc.bus.on = capture_on
+        svc.bus.remove = MagicMock()
+        svc.bus.emit = MagicMock()
+
+        result_holder = []
+
+        def run():
+            result_holder.append(svc._collect_converse_skills(ping_msg))
+
+        t = threading.Thread(target=run)
+        t.start()
+        time.sleep(0.05)
+        for pong in pongs:
+            if ack_handler:
+                ack_handler(pong)
+        t.join(timeout=2)
+        return result_holder[0]
+
+    def test_stale_pong_from_previous_round_is_discarded(self):
+        """The late-answer-wins-wrong-round reproducer.
+
+        Round N-1 asks 'set a timer'; skill_a is slow. Round N asks
+        'what is the weather'; skill_a's answer to the OLD question lands
+        inside the new round's window. Without a correlation key the new
+        round accepts it and hands the weather utterance to skill_a.
+        """
+        svc = _make_service()
+        sess = Session("s")
+        sess.activate_skill("skill_a")
+
+        round_n = Message("test", {"utterances": ["what is the weather"]},
+                          {"utterance_id": "round-N", "session": sess.serialize()})
+        # skill_a's pong derives from the PREVIOUS round's ping, so it carries
+        # that round's utterance_id (Message.reply deep-copies context).
+        stale_pong = Message("skill.converse.pong",
+                             {"skill_id": "skill_a", "can_handle": True},
+                             {"utterance_id": "round-N-minus-1"})
+
+        with patch.object(ConverseService, "get_active_skills",
+                          return_value=["skill_a"]), \
+             patch("ovos_core.intent_services.converse_service.SessionManager.get",
+                   return_value=sess):
+            result = self._run_round(svc, round_n, [stale_pong])
+
+        self.assertEqual(result, [],
+                         "a pong from an earlier lifecycle decided this round")
+
+    def test_matching_pong_is_accepted(self):
+        """The guard does not reject the round's own answer."""
+        svc = _make_service()
+        sess = Session("s")
+        sess.activate_skill("skill_a")
+
+        round_n = Message("test", {"utterances": ["what is the weather"]},
+                          {"utterance_id": "round-N", "session": sess.serialize()})
+        good_pong = round_n.reply("skill.converse.pong",
+                                  {"skill_id": "skill_a", "can_handle": True})
+
+        with patch.object(ConverseService, "get_active_skills",
+                          return_value=["skill_a"]), \
+             patch("ovos_core.intent_services.converse_service.SessionManager.get",
+                   return_value=sess):
+            result = self._run_round(svc, round_n, [good_pong])
+
+        self.assertEqual(result, ["skill_a"])
+
+    def test_unnamed_round_accepts_pongs_as_before(self):
+        """V0 compat: a round with no utterance_id keeps the old behaviour."""
+        svc = _make_service()
+        sess = Session("s")
+        sess.activate_skill("skill_a")
+
+        round_msg = Message("test", {"utterances": ["hello"]},
+                            {"session": sess.serialize()})
+        pong = Message("skill.converse.pong",
+                       {"skill_id": "skill_a", "can_handle": True})
+
+        with patch.object(ConverseService, "get_active_skills",
+                          return_value=["skill_a"]), \
+             patch("ovos_core.intent_services.converse_service.SessionManager.get",
+                   return_value=sess):
+            result = self._run_round(svc, round_msg, [pong])
+
+        self.assertEqual(result, ["skill_a"])

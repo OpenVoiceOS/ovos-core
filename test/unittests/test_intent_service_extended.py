@@ -961,3 +961,73 @@ class TestBlacklistedPipelines(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# OVOS-PIPELINE-1 §9.1.1 — the lifecycle identifier
+# ---------------------------------------------------------------------------
+
+class TestUtteranceIdStamp(unittest.TestCase):
+    """The orchestrator names each utterance lifecycle exactly once."""
+
+    def test_entry_message_gets_an_identifier(self):
+        """A Message arriving without one is stamped with a non-empty value."""
+        msg = Message("test", {"utterances": ["hello"]})
+        uid = IntentService._stamp_utterance_id(msg)
+        self.assertTrue(uid)
+        self.assertIsInstance(uid, str)
+        self.assertEqual(msg.context["utterance_id"], uid)
+
+    def test_two_lifecycles_get_different_identifiers(self):
+        """The value is unique per lifecycle."""
+        a = IntentService._stamp_utterance_id(Message("test"))
+        b = IntentService._stamp_utterance_id(Message("test"))
+        self.assertNotEqual(a, b)
+
+    def test_existing_identifier_is_never_overwritten(self):
+        """A component that opened the lifecycle out of band already stamped."""
+        msg = Message("test", {}, {"utterance_id": "opened-elsewhere"})
+        uid = IntentService._stamp_utterance_id(msg)
+        self.assertEqual(uid, "opened-elsewhere")
+        self.assertEqual(msg.context["utterance_id"], "opened-elsewhere")
+
+    def test_derived_messages_carry_the_identifier(self):
+        """`reply` and `forward` deep-copy context, so propagation is free."""
+        msg = Message("test", {"utterances": ["hello"]})
+        uid = IntentService._stamp_utterance_id(msg)
+        self.assertEqual(msg.reply("x").context["utterance_id"], uid)
+        self.assertEqual(msg.forward("y").context["utterance_id"], uid)
+        self.assertEqual(
+            msg.forward("y").reply("z").context["utterance_id"], uid)
+
+    def test_transformer_chain_cannot_detach_the_lifecycle(self):
+        """The transformer chain REPLACES message.context wholesale.
+
+        A transformer plugin that returns a fresh dict would otherwise strip
+        the identifier and orphan every Message derived after it.
+        """
+        svc = _make_service()
+        svc.send_complete_intent_failure = MagicMock()
+        sess = Session("s")
+        sess.pipeline = []
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["hello"]}, context={})
+
+        def nuke_context(m):
+            m.context = {"lang": "en-US"}  # fresh dict, identifier gone
+            return m
+
+        with patch.object(svc, "_handle_transformers", side_effect=nuke_context), \
+             patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.reset_default_session",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.update"), \
+             patch("ovos_core.intent_services.service.SessionManager.sync"), \
+             patch("ovos_core.intent_services.service.get_message_lang",
+                   return_value="en-US"), \
+             patch("ovos_core.intent_services.service.get_valid_languages",
+                   return_value=["en-US"]):
+            svc.handle_utterance(msg)
+
+        self.assertTrue(msg.context.get("utterance_id"))

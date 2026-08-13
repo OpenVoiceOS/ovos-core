@@ -16,6 +16,7 @@
 import json
 import re
 import time
+from uuid import uuid4
 from collections import defaultdict
 from typing import Optional, Tuple, Callable, List
 
@@ -577,6 +578,28 @@ class IntentService:
         self.bus.emit(message.reply(SpecMessage.UTTERANCE_CANCELLED, cancel_data))
         self.bus.emit(message.reply(SpecMessage.UTTERANCE_HANDLED))
 
+    @staticmethod
+    def _stamp_utterance_id(message: Message) -> str:
+        """OVOS-PIPELINE-1 §9.1.1 — name this utterance lifecycle.
+
+        The orchestrator stamps ``context.utterance_id`` once, at lifecycle
+        entry. The value is opaque and unique per lifecycle (a UUID here; no
+        format is normative). Consumers compare it for equality and do nothing
+        else. Every derived Message carries it for free, because
+        ``Message.reply``/``Message.forward`` deep-copy ``context``.
+
+        A value already present is kept: a component that opened the lifecycle
+        out-of-band already sat at entry and stamped under this same rule.
+
+        Returns:
+            str: the lifecycle identifier now on the Message.
+        """
+        uid = message.context.get("utterance_id")
+        if not uid:
+            uid = str(uuid4())
+            message.context["utterance_id"] = uid
+        return uid
+
     def handle_utterance(self, message: Message):
         """Main entrypoint for handling user utterances
 
@@ -604,8 +627,22 @@ class IntentService:
         Args:
             message (Message): The messagebus data
         """
+        # OVOS-PIPELINE-1 §9.1.1: stamp the lifecycle identifier exactly once,
+        # at lifecycle entry, before anything derives from this Message. A value
+        # already present is never overwritten — regenerating it downstream would
+        # detach every already-derived Message from its lifecycle.
+        uid = self._stamp_utterance_id(message)
+
         # Get utterance utterance_plugins additional context
         message = self._handle_transformers(message)
+
+        # §9.1.1 drop-guard: UtteranceTransformersService/MetadataTransformersService
+        # REPLACE message.context wholesale, so a plugin returning a fresh dict
+        # silently detaches the lifecycle. Re-assert the entry value (same value,
+        # so this is not an overwrite).
+        if message.context.get("utterance_id") != uid:
+            LOG.debug("transformer chain dropped utterance_id; re-asserting")
+            message.context["utterance_id"] = uid
 
         if message.context.get("canceled"):
             self.send_cancel_event(message)
