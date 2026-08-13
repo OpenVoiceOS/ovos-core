@@ -973,44 +973,57 @@ class IntentService:
         entity['key'] = word
         entity['origin'] = origin
         sess = IntentService._registry_session_for_context_write(message)
-        sess.context.inject_context(entity)
-        # Two dialects meet here: ADAPT's munged `skillidkey` spelling and
-        # CONTEXT-1's `skill.id:key` resolved spelling (OVOS-CONTEXT-1 §2/§7)
-        # never coincide, so both entries are written to `session.intent_context`
-        # below. One decay policy, one computed `expires_at`, applied to both
-        # keys (§5): a missing `expires_at` never expires (`is_live()`), so
-        # every entry - including the munged one `inject_context()` already
-        # wrote above - must carry a fresh stamp. A re-set replaces wholesale
-        # and refreshes expiry for both keys; there is no read-back API for a
-        # consumer to notice a stale one (§5.3).
-        context_cfg = Configuration().get('context', {})
-        timeout_s = context_cfg.get('timeout', 2) * 60
-        now = time.time()
-        ctx = dict(sess.intent_context or {})
-        munged_entry = {"value": word or context}
-        expires_at = now + timeout_s if timeout_s > 0 else None
-        if expires_at is not None:
-            munged_entry["expires_at"] = expires_at
-        ctx[context] = munged_entry
-        # The declarative gate resolves a private declaration via
-        # `resolve_key(key, "private", skill_id)` (colon-separated,
-        # unsanitized) - a different spelling than the munged key above.
-        # Write it too, when the producer (ovos-workshop's set_context) names
-        # the original key and a skill_id. Private-scope only: the skill API's
-        # stored key is always skill-prefixed; shared-scope writes are
-        # session-sync territory, not this handler's.
-        key = message.data.get('key')
-        skill_id = message.context.get('skill_id') if message.context else None
-        if key and skill_id:
-            resolved = resolve_key(key, "private", skill_id)
-            if resolved:
-                # Value falls back to the ORIGINAL key, never the munged ADAPT
-                # spelling, which must not leak into §7 slot injection here.
-                resolved_entry = {"value": word or key}
-                if expires_at is not None:
-                    resolved_entry["expires_at"] = expires_at
-                ctx[resolved] = resolved_entry
-        _replace_intent_context(sess, ctx)
+        # Finding 30a: `sess.context.inject_context()` folds its own write
+        # into `intent_context` under `ovos_bus_client.session._CONTEXT_LOCK`
+        # (the same lock guarding `Session.set_intent_context` /
+        # `remove_intent_context`, which a skill's `set_context`/
+        # `remove_context` call reaches concurrently). The copy-modify-assign
+        # below must run in the SAME critical section as that fold, or a
+        # concurrent skill-side write landing between the read and the
+        # reassign is silently clobbered when the stale snapshot is written
+        # back. Holding `_CONTEXT_LOCK` (an `RLock`) across the whole
+        # sequence - including the nested `inject_context()` call and
+        # `_replace_intent_context()`, both of which reacquire it - makes the
+        # read-modify-write atomic with every other locked mutator.
+        with _CONTEXT_LOCK:
+            sess.context.inject_context(entity)
+            # Two dialects meet here: ADAPT's munged `skillidkey` spelling and
+            # CONTEXT-1's `skill.id:key` resolved spelling (OVOS-CONTEXT-1 §2/§7)
+            # never coincide, so both entries are written to `session.intent_context`
+            # below. One decay policy, one computed `expires_at`, applied to both
+            # keys (§5): a missing `expires_at` never expires (`is_live()`), so
+            # every entry - including the munged one `inject_context()` already
+            # wrote above - must carry a fresh stamp. A re-set replaces wholesale
+            # and refreshes expiry for both keys; there is no read-back API for a
+            # consumer to notice a stale one (§5.3).
+            context_cfg = Configuration().get('context', {})
+            timeout_s = context_cfg.get('timeout', 2) * 60
+            now = time.time()
+            ctx = dict(sess.intent_context or {})
+            munged_entry = {"value": word or context}
+            expires_at = now + timeout_s if timeout_s > 0 else None
+            if expires_at is not None:
+                munged_entry["expires_at"] = expires_at
+            ctx[context] = munged_entry
+            # The declarative gate resolves a private declaration via
+            # `resolve_key(key, "private", skill_id)` (colon-separated,
+            # unsanitized) - a different spelling than the munged key above.
+            # Write it too, when the producer (ovos-workshop's set_context) names
+            # the original key and a skill_id. Private-scope only: the skill API's
+            # stored key is always skill-prefixed; shared-scope writes are
+            # session-sync territory, not this handler's.
+            key = message.data.get('key')
+            skill_id = message.context.get('skill_id') if message.context else None
+            if key and skill_id:
+                resolved = resolve_key(key, "private", skill_id)
+                if resolved:
+                    # Value falls back to the ORIGINAL key, never the munged ADAPT
+                    # spelling, which must not leak into §7 slot injection here.
+                    resolved_entry = {"value": word or key}
+                    if expires_at is not None:
+                        resolved_entry["expires_at"] = expires_at
+                    ctx[resolved] = resolved_entry
+            _replace_intent_context(sess, ctx)
 
     @staticmethod
     def handle_remove_context(message: Message):
@@ -1022,28 +1035,36 @@ class IntentService:
         context = message.data.get('context')
         if context:
             sess = IntentService._registry_session_for_context_write(message)
-            sess.context.remove_context(context)
-            # mirror the removal into the OVOS-CONTEXT-1 map (see
-            # `handle_add_context`)
-            ctx = dict(sess.intent_context or {})
-            ctx.pop(context, None)
-            # mirror-remove the resolved private-scope key too, if the
-            # producer named the original key (see `handle_add_context`)
-            key = message.data.get('key')
-            skill_id = message.context.get('skill_id') if message.context else None
-            if key and skill_id:
-                resolved = resolve_key(key, "private", skill_id)
-                if resolved:
-                    ctx.pop(resolved, None)
-            _replace_intent_context(sess, ctx)
+            # Finding 30a: same atomicity requirement as `handle_add_context`
+            # - hold `_CONTEXT_LOCK` across the `remove_context`-style fold
+            # AND the copy-modify-assign below, so a concurrent skill-side
+            # `set_intent_context`/`remove_intent_context` call can't land
+            # between the read and the reassign and get silently clobbered.
+            with _CONTEXT_LOCK:
+                sess.context.remove_context(context)
+                # mirror the removal into the OVOS-CONTEXT-1 map (see
+                # `handle_add_context`)
+                ctx = dict(sess.intent_context or {})
+                ctx.pop(context, None)
+                # mirror-remove the resolved private-scope key too, if the
+                # producer named the original key (see `handle_add_context`)
+                key = message.data.get('key')
+                skill_id = message.context.get('skill_id') if message.context else None
+                if key and skill_id:
+                    resolved = resolve_key(key, "private", skill_id)
+                    if resolved:
+                        ctx.pop(resolved, None)
+                _replace_intent_context(sess, ctx)
 
     @staticmethod
     def handle_clear_context(message: Message):
         """Clears all keywords from context """
         sess = IntentService._registry_session_for_context_write(message)
-        sess.context.clear_context()
-        # mirror the clear into the OVOS-CONTEXT-1 map (see `handle_add_context`)
-        _replace_intent_context(sess, {})
+        # Finding 30a: same atomicity requirement as `handle_add_context`.
+        with _CONTEXT_LOCK:
+            sess.context.clear_context()
+            # mirror the clear into the OVOS-CONTEXT-1 map (see `handle_add_context`)
+            _replace_intent_context(sess, {})
 
     def handle_get_intent(self, message):
         """Get intent from either adapt or padatious.
