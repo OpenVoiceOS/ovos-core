@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.0.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.2a1) (2026-08-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.1a1...3.0.2a1)
+
+**Merged pull requests:**
+
+- fix: manifest mutations read the context session; describe spans sessions and self-identifies entries [\#856](https://github.com/OpenVoiceOS/ovos-core/pull/856) ([JarbasAl](https://github.com/JarbasAl))
+
+## [3.0.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.1a1) (2026-08-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.0a1...3.0.1a1)
+
 ## [3.0.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.0a1) (2026-08-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.4a1...3.0.0a1)
@@ -324,10 +336,6 @@
 ## [2.1.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.3a1) (2026-03-04)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.2a2...2.1.3a1)
-
-**Merged pull requests:**
-
-- fix: skill dependencies [\#742](https://github.com/OpenVoiceOS/ovos-core/pull/742) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.1.2a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.2a2) (2026-01-19)
 
