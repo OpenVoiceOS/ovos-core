@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
 import unittest
 from collections import defaultdict
 from unittest.mock import MagicMock, patch
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import DEFAULT_SESSION_ID, Session, SessionManager
+from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import (
     IntentHandlerMatch,
     ConfidenceMatcherPipeline,
@@ -740,10 +742,19 @@ class TestContextHandlers(unittest.TestCase):
 
         # value is identical - no double-decay, no drift
         self.assertEqual(first_entry["value"], second_entry["value"])
-        # a legitimate refresh may advance expires_at forward, never stack
-        # a second independent decay dimension on top
-        self.assertGreaterEqual(second_entry.get("expires_at", 0),
-                                first_entry.get("expires_at", 0))
+        # a legitimate refresh recomputes `now + timeout_s` fresh on every
+        # write; it must NOT stack a second decay on top of the prior
+        # expiry (e.g. `max(prior_expires_at, now) + timeout_s`, which is
+        # `assertGreaterEqual`-compatible with a single refresh but drifts
+        # further from "now" with every repeated identical write). Pin the
+        # second write's expires_at to a tight tolerance window around
+        # `now + timeout_s` computed here, so a compounded/stacked expiry
+        # (which lands measurably later, growing per second) fails.
+        context_cfg = Configuration().get('context', {})
+        timeout_s = context_cfg.get('timeout', 2) * 60
+        expected_expires_at = time.time() + timeout_s
+        self.assertAlmostEqual(second_entry.get("expires_at", 0),
+                                expected_expires_at, delta=2)
         # no duplicate keys and no duplicate legacy frames accumulated -
         # `sess.context` is a derived projection over `intent_context`
         # (one frame per live entry), not a persisted stack, so its count
@@ -773,6 +784,10 @@ class TestContextHandlers(unittest.TestCase):
             IntentService.handle_remove_context(msg)
         self.assertNotIn("my_skillkitchen", sess.intent_context or {})
         self.assertNotIn("my.skill:kitchen", sess.intent_context or {})
+        # both known keys were the entirety of the map - nothing should
+        # remain (leaked/accumulated keys, e.g. an internal bookkeeping
+        # entry, would slip past a two-key-only NotIn check)
+        self.assertFalse(sess.intent_context)
 
         # re-apply the identical removal a second time - must not raise
         # and must leave the (already-clean) state unchanged
@@ -785,6 +800,7 @@ class TestContextHandlers(unittest.TestCase):
             IntentService.handle_remove_context(msg2)
         self.assertNotIn("my_skillkitchen", sess.intent_context or {})
         self.assertNotIn("my.skill:kitchen", sess.intent_context or {})
+        self.assertFalse(sess.intent_context)
 
     def test_handle_add_context_no_key_stores_only_munged_legacy(self):
         """Back-compat pin: a message with no data['key'] (old-workshop /
