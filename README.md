@@ -18,7 +18,7 @@ For Raspberry Pi users, the [RaspOVOS](https://github.com/OpenVoiceOS/RaspOVOS) 
 
 For embedded systems, [ovos-buildroot](https://github.com/OpenVoiceOS/ovos-buildroot) builds a custom Linux distribution for minimal setups.
 
-More detailed documentation is available in the [ovos-technical-manual](https://openvoiceos.github.io/ovos-technical-manual).
+More detailed documentation is available in the [ovos-technical-manual](https://openvoiceos.github.io/ovos-technical-manual) and in [`docs/`](docs/index.md). See [docs/prerelease-quirks.md](docs/prerelease-quirks.md) for what changed since the last stable release.
 
 Developers can install `ovos-core` standalone:
 
