@@ -954,7 +954,25 @@ class IntentService:
 
     @staticmethod
     def handle_add_context(message: Message):
-        """Add context
+        """Add context.
+
+        LEGACY-COMPAT INPUT (CONTEXT-1 §5.0, architecture#161): the
+        `add_context` topic this handles is NOT part of the spec - §5.0
+        states there is no context-mutation topic and the session is the
+        only context write path. This handler exists only so that
+        pre-§5.0 emitters (older ovos-workshop skill processes whose
+        `set_context()` wrapper only knew how to emit this message,
+        never touching the session directly) keep working against a
+        modern core. Modern emitters write `session.intent_context`
+        directly and this handler becomes a redundant, idempotent
+        write-through for them (see `handle_remove_context` for the
+        symmetric case): re-applying the SAME key/value pair through this
+        topic after the session already carries the identical entry from
+        a direct write is safe - it recomputes and stores the exact same
+        `{value, expires_at}` shape, refreshing the decay stamp (by
+        design, per OVOS-CONTEXT-1 §5.3: every re-set refreshes
+        unconditionally) rather than accumulating duplicate frames or
+        entries. Do not build new producers against this topic.
 
         Args:
             message: data contains the 'context' item to add
@@ -1014,7 +1032,14 @@ class IntentService:
 
     @staticmethod
     def handle_remove_context(message: Message):
-        """Remove specific context
+        """Remove specific context.
+
+        LEGACY-COMPAT INPUT (CONTEXT-1 §5.0, architecture#161): symmetric
+        with `handle_add_context` above - `remove_context` is not a spec
+        topic, kept only for pre-§5.0 emitters. A removal already carried
+        by a direct session write (tombstoned, per §5.3) and re-applied
+        here through the legacy topic is a no-op: popping an already-
+        absent key from both spellings' working dicts changes nothing.
 
         Args:
             message: data contains the 'context' item to remove
