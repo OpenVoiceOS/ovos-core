@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.3a1) (2026-08-14)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.2a1...3.0.3a1)
+
+**Merged pull requests:**
+
+- fix: update stale legacy-dispatch e2e golden to the current bridge contract [\#871](https://github.com/OpenVoiceOS/ovos-core/pull/871) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.0.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.2a1) (2026-08-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.1a1...3.0.2a1)
