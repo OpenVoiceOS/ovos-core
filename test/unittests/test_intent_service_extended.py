@@ -385,12 +385,12 @@ class TestContextHandlers(unittest.TestCase):
     """Tests for the context management static methods."""
 
     def setUp(self):
-        # Round 4: the handlers now resolve registry-first
-        # (_registry_session_for_context_write), so a leftover real
-        # SessionManager.sessions["s"] entry from `Session.touch()`'s
-        # self-registration (triggered internally by intent_context writes)
-        # would otherwise shadow this test's freshly-constructed, mocked-get
-        # `Session("s")` in later tests. Keep the shared singleton clean.
+        # The handlers resolve registry-first (_registry_session_for_context_write),
+        # so a leftover real SessionManager.sessions["s"] entry from
+        # `Session.touch()`'s self-registration (triggered internally by
+        # intent_context writes) would otherwise shadow this test's
+        # freshly-constructed, mocked-get `Session("s")` in later tests.
+        # Keep the shared singleton clean.
         self._saved_sessions = dict(SessionManager.sessions)
         SessionManager.sessions.clear()
 
@@ -411,7 +411,7 @@ class TestContextHandlers(unittest.TestCase):
         self.assertGreater(len(sess.context.frame_stack), 0)
         # OVOS-CONTEXT-1: the token is mirrored into the intent_context map,
         # keyed by the context token and carrying its injected value.
-        # Round 3: also carries an expires_at decay stamp (see
+        # Also carries an expires_at decay stamp (see
         # test_handle_add_context_stamps_expiry_on_both_spellings) - only
         # "value" is pinned exactly here, expires_at just needs to be present.
         entry = sess.intent_context.get("MyContext")
@@ -484,13 +484,12 @@ class TestContextHandlers(unittest.TestCase):
         self.assertIn("my.skill:kitchen", sess.intent_context)
 
     def test_handle_add_context_resolved_value_falls_back_to_original_key(self):
-        """Round 2 (C3) regression: when no word is given, the resolved
-        twin's fallback 'value' MUST be the original unmunged key, never
-        the munged legacy context string - the munged spelling is an
-        internal ADAPT wire detail and must not leak into OVOS-CONTEXT-1
-        §7 slot injection via the resolved entry. Munged context and
-        original key are deliberately made to differ so a wrong fallback
-        is caught."""
+        """When no word is given, the resolved twin's fallback 'value' must
+        be the original unmunged key, never the munged legacy context
+        string - the munged spelling is an internal ADAPT wire detail and
+        must not leak into OVOS-CONTEXT-1 §7 slot injection via the
+        resolved entry. Munged context and original key are deliberately
+        made to differ so a wrong fallback is caught."""
         sess = Session("s")
         msg = Message("add_context",
                       data={"context": "my_skillkitchen", "key": "kitchen"},
@@ -506,15 +505,14 @@ class TestContextHandlers(unittest.TestCase):
             "my_skillkitchen")
 
     def test_handle_add_context_refreshes_resolved_expiry_on_reset(self):
-        """Round 5 (C1) regression: supersedes Round 2's setdefault-style
-        preservation. OVOS-CONTEXT-1 SECTION 5: a re-set of a key that
-        already exists replaces it wholesale, and SECTION 5.3: there is no
-        read-back API for a caller to notice a stale expiry survived. A
-        re-set of the resolved private key must REFRESH expires_at
-        unconditionally, not keep whatever a prior write established - a
-        stale kept expiry let the resolved key die out of step with the
-        munged legacy key (which inject_context() always refreshes on
-        every call)."""
+        """OVOS-CONTEXT-1 §5: a re-set of a key that already exists
+        replaces it wholesale, and §5.3: there is no read-back API for a
+        caller to notice a stale expiry survived. A re-set of the resolved
+        private key must refresh expires_at unconditionally, not keep
+        whatever a prior write established, or the resolved key dies out
+        of step with the munged legacy key (which inject_context() always
+        refreshes on every call). Without this, the resolved key's
+        expires_at stays pinned to the first write."""
         sess = Session("s")
         sess.intent_context = {"my.skill:kitchen": {"value": "old",
                                                      "expires_at": 999999999.0,
@@ -535,15 +533,13 @@ class TestContextHandlers(unittest.TestCase):
         self.assertNotIn("turns_remaining", entry)
 
     def test_handle_add_context_stamps_expiry_on_both_spellings(self):
-        """Round 3 (wave-3 live lead) regression: a FRESH add_context call
-        must stamp expires_at on BOTH the munged legacy key and the
-        resolved private key, sourced from the same adapt `context.timeout`
-        config convention ovos-bus-client's `_IntentContextView` uses
-        (`Configuration()['context']['timeout']`, minutes -> seconds,
-        default 2min). Without a decay field, OVOS-CONTEXT-1's `is_live()`
-        treats an entry as immortal and `prune()` can never reap it - the
-        pre-existing dev "immortal context entries" bug, which the spec
-        sides against for legacy-sourced entries."""
+        """A fresh add_context call must stamp expires_at on BOTH the
+        munged legacy key and the resolved private key, sourced from the
+        same adapt `context.timeout` config convention ovos-bus-client's
+        `_IntentContextView` uses (`Configuration()['context']['timeout']`,
+        minutes -> seconds, default 2min). Without a decay field,
+        OVOS-CONTEXT-1's `is_live()` treats an entry as immortal and
+        `prune()` can never reap it."""
         import time
         from ovos_config.config import Configuration
         sess = Session("s")
@@ -567,10 +563,9 @@ class TestContextHandlers(unittest.TestCase):
             self.assertLessEqual(entry["expires_at"], after + timeout_s)
 
     def test_handle_add_context_prune_removes_both_spellings_after_expiry(self):
-        """Round 3 regression: ovos_spec_tools.context.prune() must be able
-        to reap BOTH dialect keys once their stamped expires_at is in the
-        past - proving the decay stamp is real (§4 pre-match pruning), not
-        just present."""
+        """ovos_spec_tools.context.prune() must be able to reap BOTH
+        dialect keys once their stamped expires_at is in the past - proving
+        the decay stamp is real (§4 pre-match pruning), not just present."""
         from ovos_spec_tools.context import prune
         sess = Session("s")
         msg = Message("add_context",
@@ -591,20 +586,13 @@ class TestContextHandlers(unittest.TestCase):
         self.assertNotIn("my.skill:kitchen", pruned)
 
     def test_handle_add_context_does_not_double_clobber_injected_expiry(self):
-        """Round 3 regression, precise claim: `sess.context.inject_context()`
-        (ovos-bus-client's legacy `_IntentContextView`) ALWAYS stamps a
-        FRESH `expires_at` on every call - it has no memory of a prior
-        custom value, so a pre-existing custom stamp on the munged key
-        cannot survive a re-`inject_context()` regardless of this handler
-        (that unconditional-fresh-stamp behavior lives in the vendored
-        dependency, out of this fix's scope). What THIS handler must not
-        do is throw the freshly-injected stamp away a second time with its
-        own bare-dict overwrite - which the pre-Round-3 code did. Assert
-        the handler's own write preserves exactly what inject_context()
-        just wrote for the munged key (no extra clobber), by checking the
-        handler's output for that key equals `sess.context`'s own
-        (post-inject) view before the handler's second write would have
-        run."""
+        """`sess.context.inject_context()` (ovos-bus-client's legacy
+        `_IntentContextView`) always stamps a fresh `expires_at` on every
+        call, out of this handler's control. What this handler must not do
+        is throw that freshly-injected stamp away a second time with its
+        own bare-dict overwrite. Assert the handler's own write preserves
+        exactly what inject_context() just wrote for the munged key (no
+        extra clobber)."""
         sess = Session("s")
         entity = {"confidence": 1.0, "data": [("kitchen", "my_skillkitchen")],
                   "match": "kitchen", "key": "kitchen", "origin": ""}
@@ -627,9 +615,9 @@ class TestContextHandlers(unittest.TestCase):
         self.assertGreaterEqual(entry["expires_at"], injected_entry["expires_at"])
 
     def test_handle_add_context_e2e_reachability_unaffected_by_decay_stamp(self):
-        """Round 3 regression: the decay stamp must not break IMMEDIATE
-        gating - a freshly-opened OVOS-CONTEXT-1 gate must still be
-        satisfied right after set_context, decay or no decay."""
+        """The decay stamp must not break immediate gating - a
+        freshly-opened OVOS-CONTEXT-1 gate must still be satisfied right
+        after set_context, decay or no decay."""
         from ovos_spec_tools.context import gate_satisfied
         sess = Session("s")
         msg = Message("add_context",
@@ -644,19 +632,14 @@ class TestContextHandlers(unittest.TestCase):
                                        owner_id="my.skill"))
 
     def test_handle_add_context_reset_refreshes_both_keys_in_lockstep(self):
-        """Round 5 (C1) regression: one decay policy for a logical write.
-        A skill re-calling set_context (a second handle_add_context for the
-        SAME context/key, e.g. re-affirming context mid-conversation) must
-        refresh expires_at on BOTH the munged legacy key and the resolved
-        private key together. Before the fix, the munged key was refreshed
-        (inject_context() always stamps fresh) but the resolved key's
-        setdefault-style merge kept the FIRST write's expiry forever - the
-        two keys decayed on different schedules and the declarative gate
-        could close (resolved key expired) while the legacy adapt context
-        was still alive, or the reverse. Must be RED before the fix: the
-        resolved key's expires_at stays pinned to t0 + timeout instead of
-        being refreshed to t0 + 100 + timeout, so prune() at t0+150 reaps
-        the resolved key but not the munged key."""
+        """One decay policy for a logical write. A skill re-calling
+        set_context (a second handle_add_context for the SAME context/key,
+        e.g. re-affirming context mid-conversation) must refresh expires_at
+        on BOTH the munged legacy key and the resolved private key
+        together. Without a unified refresh, the resolved key's expires_at
+        stays pinned to t0 + timeout instead of being refreshed to
+        t0 + 100 + timeout, so this assertion fails because prune() at
+        t0+150 reaps the resolved key but not the munged key."""
         from ovos_spec_tools.context import prune
 
         sess = Session("s")
@@ -734,19 +717,18 @@ class TestContextHandlers(unittest.TestCase):
 
 
 class TestContextHandlersLiveRegistry(unittest.TestCase):
-    """Round 4 / wave-3 CONFIRMED: SessionManager.get(message) always folds
-    the incoming message's session onto the live registry entry, and for
-    NAMED sessions that fold is full-replace (update_from). Called from a
-    context handler, the fold first wipes the registry entry's
-    intent_context with the message's stale snapshot, then every
-    subsequent mid-lifecycle frame re-wipes it again - a named session's
-    context can never survive to the terminal event. SESSION-2 §2.6:
-    folding a message's session onto the working session belongs at
-    lifecycle entry only; incidental messages must never mutate it.
+    """FOLD LAW (see IntentService._registry_session_for_context_write,
+    SESSION-2 §2.6): a message's session snapshot folds onto the live
+    registry session only at lifecycle entry, never on an incidental
+    mid-lifecycle message. `SessionManager.get(message)` folds unconditionally,
+    and for NAMED sessions that fold is full-replace (`update_from`), so an
+    incidental fold wipes the registry entry's intent_context with a stale
+    snapshot - a named session's context can never survive to the terminal
+    event.
 
     These tests exercise the REAL SessionManager.sessions registry (no
-    mocking of SessionManager.get) so they fail against the pre-fix
-    every-call fold, exactly the mechanism that let the bug reach wave 3.
+    mocking of SessionManager.get) so they fail against an unconditional
+    every-call fold.
     """
 
     def setUp(self):
@@ -801,15 +783,14 @@ class TestContextHandlersLiveRegistry(unittest.TestCase):
         self.assertIn("Second", live.intent_context)
 
     def test_add_context_survives_stale_default_session_snapshot_fold(self):
-        """Round 5 (C3) regression: the registry-first fix is load-bearing
-        for the DEVICE-LOCAL DEFAULT session too, not only named sessions.
-        `Session.update_from` round-trips through full serialize/deserialize
-        for every session id, including "default" - it does not "happen to
-        preserve omitted fields" for the default id, contrary to the old
-        docstring claim. A registry "default" entry's pre-existing context
-        must survive a handle_add_context call driven by a message carrying
-        a STALE default-session snapshot, exactly like the named-session
-        case above."""
+        """The registry-first fix is load-bearing for the DEVICE-LOCAL
+        DEFAULT session too, not only named sessions: `Session.update_from`
+        round-trips through full serialize/deserialize for every session
+        id, including "default", so it does not preserve omitted fields for
+        the default id either. A registry "default" entry's pre-existing
+        context must survive a handle_add_context call driven by a message
+        carrying a STALE default-session snapshot, exactly like the
+        named-session case above."""
         sess = Session(DEFAULT_SESSION_ID)
         sess.intent_context = {"Existing": {"value": "existing"}}
         SessionManager.sessions[DEFAULT_SESSION_ID] = sess
@@ -1050,7 +1031,7 @@ class TestHandleUtterance(unittest.TestCase):
         svc.send_complete_intent_failure.assert_called_once()
 
     def test_blacklisted_targeted_stop_discards_match_session_unchanged(self):
-        """CONFIRMED-3 regression: a Match discarded for a blacklisted intent
+        """A Match discarded for a blacklisted intent
         (service.py ~607) must never have applied its session mutation. Before
         the fix, StopService._targeted_stop drained the LIVE SessionManager
         session in match() itself, so a discarded stop still left the skill
@@ -1071,7 +1052,7 @@ class TestHandleUtterance(unittest.TestCase):
         stop_svc._locale.voc_match.side_effect = (
             lambda utt, voc, lang, exact=False: voc == "stop")
         stop_svc._legacy = MagicMock()
-        stop_svc._was_active_pre_drain = {}
+        stop_svc._pre_drain = {}
 
         sess = Session("s")
         sess.activate_skill("skill_a")

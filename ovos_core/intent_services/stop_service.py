@@ -1,6 +1,6 @@
 from os.path import dirname, join
 from threading import Event
-from typing import Optional, Dict, List, Union
+from typing import Optional, Dict, List, NamedTuple, Union
 
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.handler import HandlerLifecycle
@@ -16,6 +16,19 @@ from ovos_utils.log import LOG
 from ovos_utils.parse import match_one
 
 from ovos_core.intent_services.stop_service_legacy import _LegacyStopBridge
+
+
+class PreDrainSnapshot(NamedTuple):
+    """State a targeted stop observed before match() drained the session copy.
+
+    ``match()`` drains ``active_handlers``/``response_mode`` before dispatch,
+    so by the time ``.stop.response`` arrives the live session already lies
+    about both fields. Capture them together at drain time, keyed by
+    ``(session_id, skill_id)``, and pop them together in
+    ``handle_stop_confirmation`` before either result branch runs.
+    """
+    was_active: bool
+    utt_state: UtteranceState
 
 
 class StopService(ConfidenceMatcherPipeline):
@@ -54,24 +67,11 @@ class StopService(ConfidenceMatcherPipeline):
         # §5 global-stop dispatch target; bound once, shared across tiers (§3.1).
         self.bus.on(f"{self.pipeline_id}:global_stop", self.handle_global_stop)
         self._legacy = _LegacyStopBridge(self)
-        #: (session_id, skill_id) -> was the skill active BEFORE match() drained
-        #: the session copy (CONFIRMED-2: the session ``handle_stop_confirmation``
-        #: reads back off the ``.stop.response`` message context is already
-        #: drained by dispatch time, so ``sess.is_active(skill_id)`` there is
-        #: always False; this records the pre-drain truth match() observed
-        #: instead). Keyed by ``(session_id, skill_id)`` rather than bare
-        #: ``skill_id`` — two concurrent targeted stops for the same skill_id
-        #: in different sessions must not clobber/consume each other's snapshot.
-        self._was_active_pre_drain: Dict[tuple, bool] = {}
-        #: (session_id, skill_id) -> its UtteranceState BEFORE match() drained
-        #: the session copy (same drain-ordering class as
-        #: ``_was_active_pre_drain``, including the same per-session keying —
-        #: ``handle_stop_confirmation`` reads ``sess.utterance_states`` off the
-        #: ``.stop.response`` message context, which is already drained —
-        #: ``disable_response_mode`` runs before dispatch — by the time it
-        #: arrives, so the live read is always UtteranceState.INTENT there and
-        #: the RESPONSE branch/``abort_question`` emission was unreachable).
-        self._utt_state_pre_drain: Dict[tuple, UtteranceState] = {}
+        #: (session_id, skill_id) -> PreDrainSnapshot captured by _targeted_stop
+        #: and consumed once by handle_stop_confirmation. Keyed per-session
+        #: (not bare skill_id) so two concurrent targeted stops for the same
+        #: skill_id in different sessions can't clobber each other's snapshot.
+        self._pre_drain: Dict[tuple, PreDrainSnapshot] = {}
 
     def handle_global_stop(self, message: Message) -> None:
         """OVOS-STOP-1 §5.3 — broadcast the universal ``ovos.stop``.
@@ -242,43 +242,26 @@ class StopService(ConfidenceMatcherPipeline):
         """Handle a skill's stop.response and force-terminate any in-flight interactions.
 
         Also resolves the ``IntentDispatcher``'s §8 handler-lifecycle entry for
-        this ``<skill_id>:stop`` dispatch (root cause: the dispatch goes out on
-        the spec colon-topic ``<skill_id>:stop``, which ovos-workshop has no
-        direct listener for — only ``_LegacyStopBridge`` mirrors it onto the
-        dot-topic ``<skill_id>.stop`` skills actually bind, via ``add_event``
-        with ``handler_info=None``, which deliberately disables that dot-topic
-        handler's own ``HandlerLifecycle``/``mycroft.skill.handler.complete``
-        emission. Since workshop is a separate repo/release, that emission
-        cannot be added there for this fix. The stop round-trip's real
-        completion signal IS this ``.stop.response`` — it only fires once the
-        skill has actually finished ``stop()`` — so this is the correct,
-        already-synchronous point to resolve the dispatch, instead of leaving
-        it parked on the dispatcher's 5-minute §8.3 timeout). Emitting the
-        framework done-signal here (rather than reaching into
-        ``IntentDispatcher`` directly) keeps ``StopService`` decoupled from the
-        dispatcher's internals and mirrors exactly what a normal handler
-        completion looks like on the bus.
+        this ``<skill_id>:stop`` dispatch: the dispatch goes out on the spec
+        colon-topic ``<skill_id>:stop``, which ovos-workshop has no direct
+        listener for, so nothing else emits the normal completion signal for
+        it. This ``.stop.response`` is the real completion signal — it only
+        fires once ``stop()`` has actually finished — so it is the correct
+        point to resolve the dispatch, instead of leaving it parked on the
+        dispatcher's 5-minute §8.3 timeout. Emitting the framework done-signal
+        here, rather than reaching into ``IntentDispatcher`` directly, keeps
+        ``StopService`` decoupled from the dispatcher's internals.
         """
         skill_id = (message.data.get("skill_id") or
                     message.context.get("skill_id") or
                     message.msg_type.split(".stop.response")[0])
         sess_id = (message.context.get("session") or {}).get("session_id", "default")
-        # F2 (round-3 adversarial re-review of 6e8c8163be): the pre-drain
-        # snapshots used to be popped ONLY on the result:True branch below —
-        # every error / result:False / never-actually-dispatched stop left
-        # (session_id, skill_id) in BOTH dicts forever (confirmed: 50 failed
-        # stops -> 50 leaked keys, attack5.py). That also kept the
-        # _resolve_dispatch_lifecycle gate permanently open for that pair,
-        # since the gate is presence-based. Pop both dicts UNCONDITIONALLY,
-        # right here, before either branch runs, and thread the popped
-        # values through — this is now both the memory-leak fix and the
-        # single place the gate (and the RESPONSE/active fallbacks below)
-        # consult.
-        utt_state = self._utt_state_pre_drain.pop((sess_id, skill_id), None)
-        was_active = self._was_active_pre_drain.pop((sess_id, skill_id), None)
-        had_pre_drain_snapshot = utt_state is not None or was_active is not None
+        # Pop both snapshots unconditionally before either branch below: the
+        # error/no-dispatch paths must not leak them or hold the
+        # _resolve_dispatch_lifecycle gate open for this (session_id, skill_id).
+        snapshot = self._pre_drain.pop((sess_id, skill_id), None)
         try:
-            if had_pre_drain_snapshot:
+            if snapshot is not None:
                 self._resolve_dispatch_lifecycle(message, skill_id)
         except Exception:
             LOG.exception(f"failed to resolve dispatch lifecycle for {skill_id}:stop")
@@ -287,30 +270,17 @@ class StopService(ConfidenceMatcherPipeline):
             LOG.error(f"{skill_id}: {error_msg}")
         elif message.data.get('result', False):
             sess = SessionManager.get(message)
-            # CONFIRMED-4: same drain-ordering class as CONFIRMED-2 below —
-            # by the time this .stop.response arrives, `sess.utterance_states`
-            # is already drained (disable_response_mode runs before dispatch
-            # in _targeted_stop), so the live read is always
-            # UtteranceState.INTENT here and this RESPONSE branch was
-            # unreachable dead code (abort_question never fired even though
-            # the skill was genuinely blocked in get_response). Consult the
-            # pre-drain snapshot (popped above) instead, falling back to the
-            # live read for direct-invocation callers that bypass
-            # _targeted_stop.
-            if utt_state is None:
-                utt_state = sess.utterance_states.get(skill_id, UtteranceState.INTENT)
+            # The session on this .stop.response is already post-drain, so
+            # live reads of utterance_states/active_handlers lie; consult the
+            # pre-drain snapshot popped above, falling back to the live read
+            # for direct-invocation callers that bypass _targeted_stop.
+            utt_state = snapshot.utt_state if snapshot else sess.utterance_states.get(
+                skill_id, UtteranceState.INTENT)
             if utt_state == UtteranceState.RESPONSE:
                 LOG.debug("Forcing get_response timeout")
                 # force-kill any ongoing get_response - see @killable_event decorator (ovos-workshop)
                 self.bus.emit(message.reply("mycroft.skills.abort_question", {"skill_id": skill_id}))
-            # CONFIRMED-2: by the time this .stop.response arrives, `sess` has
-            # already been drained (the dispatch carried the post-drain session
-            # forward), so `sess.is_active(skill_id)` is always False here.
-            # Fall back to it only when no pre-drain record exists (e.g. a
-            # handler invoked directly, bypassing _targeted_stop) so existing
-            # direct-invocation callers keep working.
-            if was_active is None:
-                was_active = sess.is_active(skill_id)
+            was_active = snapshot.was_active if snapshot else sess.is_active(skill_id)
             if was_active:
                 LOG.debug("Forcing converse timeout")
                 # force-kill any ongoing converse - see @killable_event decorator (ovos-workshop)
@@ -330,43 +300,19 @@ class StopService(ConfidenceMatcherPipeline):
 
         ``IntentDispatcher._on_skill_complete``/``._on_skill_error`` listen for
         exactly these topics and resolve the matching in-flight entry (by
-        session_id + skill_id + ``data["intent_name"]``), cancelling its
-        §8.3 timeout timer. See ``handle_stop_confirmation``'s docstring for
-        why this lives here rather than in ovos-workshop.
+        session_id + skill_id + ``data["intent_name"]``), cancelling its §8.3
+        timeout timer. See ``handle_stop_confirmation``'s docstring for why
+        this lives here rather than in ovos-workshop.
 
-        ``data["intent_name"] = "stop"`` is stamped explicitly (rather than
-        leaving the dispatcher to match on ``skill_id`` alone, as it does for
-        the normal single-handler-at-a-time framework signal): the ``.stop``
-        dispatch is not the only thing that can be in flight for a skill --
-        an ordinary intent handler can legitimately be running concurrently.
-        Without this, a leaked/stale ``.stop.response`` (e.g. reaching
-        ``handle_stop_confirmation`` for a match that was never actually
-        dispatched -- see the ``bus.once`` registered eagerly in
-        ``_targeted_stop`` at match-build time) would resolve whichever
-        in-flight entry for that skill happens to be on top of the LIFO
-        stack, which may be a completely unrelated, still-running intent --
-        a premature/wrong ``ovos.utterance.handled`` end-marker. The
-        (session_id, skill_id) pre-drain-presence gate in
-        ``handle_stop_confirmation`` narrows *when* this fires; this
-        intent_name stamp narrows *what* it can resolve once it does.
+        ``data["intent_name"] = "stop"`` is stamped explicitly, since a
+        skill can have an ordinary intent handler running concurrently with
+        its ``.stop`` — the dispatcher's ``_pop`` needs it to resolve the
+        right in-flight entry rather than whichever is on top of the LIFO
+        stack. It goes on ``data``, not ``context``: see ``_pop``'s docstring
+        in dispatcher.py for why context is client-inherited and unsafe here.
 
-        DATA, not context: ``message.forward`` deep-copies the ORIGINATING
-        dispatch's context forward (that context is CLIENT-INHERITED --
-        ultimately sourced from the utterance message a client sent). A
-        client that happens to set ``context["intent_name"]`` on its own
-        utterance would have that value survive every ``forward()`` down the
-        dispatch chain and land on a totally unrelated skill's REAL
-        ``mycroft.skill.handler.complete`` too, mismatching this filter and
-        silently breaking that skill's OWN handler-lifecycle resolution
-        (parking it on the 5-minute §8.3 timeout instead). ``data``, by
-        contrast, is passed fresh by ``forward()``'s second argument --
-        never inherited from the client -- so only THIS emission ever
-        carries this key.
-
-        §8.2: a ``.stop.response`` carrying ``error`` means the skill's
-        ``stop()`` raised -- that must resolve as an ``error`` terminal, not
-        ``complete``, so a failed stop is distinguishable from a successful
-        one on the §8 trio.
+        §8.2: a ``.stop.response`` carrying ``error`` resolves as an
+        ``error`` terminal, not ``complete``.
         """
         if 'error' in message.data:
             done = message.forward("mycroft.skill.handler.error",
@@ -397,16 +343,13 @@ class StopService(ConfidenceMatcherPipeline):
         ``sess`` passed in is read but never mutated here.
         """
         LOG.debug(f"Telling skill to stop: {skill_id}")
-        # captured before the drain so handle_stop_confirmation's force_timeout
-        # check (CONFIRMED-2) can still see the pre-drain truth once the
-        # (post-drain) session reaches it via the dispatch round-trip.
-        self._was_active_pre_drain[(sess.session_id, skill_id)] = sess.is_active(skill_id)
-        # CONFIRMED-4: same reasoning — snapshot the pre-drain utterance state
-        # so handle_stop_confirmation's abort_question check (RESPONSE state)
-        # can still see it once the (post-drain) session reaches it via the
-        # dispatch round-trip.
-        self._utt_state_pre_drain[(sess.session_id, skill_id)] = sess.utterance_states.get(
-            skill_id, UtteranceState.INTENT)
+        # Captured before the drain: the post-drain session that reaches
+        # handle_stop_confirmation via the dispatch round-trip can no longer
+        # answer either question truthfully.
+        self._pre_drain[(sess.session_id, skill_id)] = PreDrainSnapshot(
+            was_active=sess.is_active(skill_id),
+            utt_state=sess.utterance_states.get(skill_id, UtteranceState.INTENT),
+        )
         drained = Session.deserialize(sess.serialize())
         drained.disable_response_mode(skill_id)
         drained.deactivate_skill(skill_id)
