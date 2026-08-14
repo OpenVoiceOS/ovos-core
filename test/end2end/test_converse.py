@@ -120,6 +120,12 @@ class TestConverse(TestCase):
                 Message("ovos.converse.ping",
                         data={"utterances": ["echo test"], "lang": session.lang},
                         context={}),
+                # OVOS-CONVERSE-1 §4.2 broadcast answer (ovos-workshop#534):
+                # aggregated result of the broadcast poll, one per round,
+                # mirrors the legacy skill.converse.pong's can_handle value.
+                Message("ovos.converse.pong",
+                        data={"skill_id": self.skill_id, "result": True},
+                        context={}),
                 Message(f"{self.skill_id}.converse.ping",
                         data={"utterances": ["echo test"], "skill_id": self.skill_id},
                         context={}),
@@ -166,6 +172,10 @@ class TestConverse(TestCase):
                 message3,
                 Message("ovos.converse.ping",
                         data={"utterances": ["stop parrot"], "lang": session.lang},
+                        context={}),
+                # OVOS-CONVERSE-1 §4.2 broadcast answer (ovos-workshop#534).
+                Message("ovos.converse.pong",
+                        data={"skill_id": self.skill_id, "result": True},
                         context={}),
                 Message(f"{self.skill_id}.converse.ping",
                         data={"utterances": ["stop parrot"], "skill_id": self.skill_id},
@@ -214,6 +224,11 @@ class TestConverse(TestCase):
                 Message("ovos.converse.ping",
                         data={"utterances": ["echo test"], "lang": session.lang},
                         context={}),
+                # OVOS-CONVERSE-1 §4.2 broadcast answer (ovos-workshop#534);
+                # result mirrors the legacy skill.converse.pong can_handle=False below.
+                Message("ovos.converse.pong",
+                        data={"skill_id": self.skill_id, "result": False},
+                        context={}),
                 Message(f"{self.skill_id}.converse.ping",
                         data={"utterances": ["echo test"], "skill_id": self.skill_id},
                         context={}),
@@ -240,8 +255,12 @@ class TestConverse(TestCase):
                 ignore_messages=HANDLER_TRIO,
                 activation_points=[f"{self.skill_id}:start_parrot"],
             # messages internal to ovos-core, i.e. would not be sent to clients such as hivemind
+            # ovos.converse.pong (OVOS-CONVERSE-1 §4.2 broadcast answer, ovos-workshop#534)
+            # is emitted on the same source/destination pair as the entry utterance,
+            # not flipped like the per-round response messages.
                 keep_original_src=[f"{self.skill_id}.converse.ping",
-                                   f"{self.skill_id}.converse.request"
+                                   f"{self.skill_id}.converse.request",
+                                   "ovos.converse.pong"
                                # f"{self.skill_id}.activate",  # TODO
                                    ]
             )
