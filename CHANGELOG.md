@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.4a1) (2026-08-14)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.3a2...3.0.4a1)
+
+**Merged pull requests:**
+
+- fix: registry-first session resolution for converse write paths [\#858](https://github.com/OpenVoiceOS/ovos-core/pull/858) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.0.3a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.3a2) (2026-08-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.3a1...3.0.3a2)
