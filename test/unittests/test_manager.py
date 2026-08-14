@@ -21,6 +21,7 @@ class TestSkillManager(unittest.TestCase):
         self.bus.reset_mock()
 
     def tearDown(self):
+        self.skill_manager.shutdown()
         SessionManager.bus = None
 
     def test_blacklist_property(self):
