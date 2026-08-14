@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.7a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.7a2) (2026-08-14)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.7a1...3.0.7a2)
+
+**Merged pull requests:**
+
+- test: account for ovos.converse.pong broadcast answer in e2e expectations [\#880](https://github.com/OpenVoiceOS/ovos-core/pull/880) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.0.7a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.7a1) (2026-08-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.6a1...3.0.7a1)
