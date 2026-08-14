@@ -1,5 +1,25 @@
 # Changelog
 
+## [3.0.7a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.7a2) (2026-08-14)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.7a1...3.0.7a2)
+
+**Merged pull requests:**
+
+- test: account for ovos.converse.pong broadcast answer in e2e expectations [\#880](https://github.com/OpenVoiceOS/ovos-core/pull/880) ([JarbasAl](https://github.com/JarbasAl))
+
+## [3.0.7a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.7a1) (2026-08-14)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.6a1...3.0.7a1)
+
+**Merged pull requests:**
+
+- fix: shut down test-created SkillManager instances to stop leaked watcher threads [\#882](https://github.com/OpenVoiceOS/ovos-core/pull/882) ([JarbasAl](https://github.com/JarbasAl))
+
+## [3.0.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.6a1) (2026-08-14)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.5a2...3.0.6a1)
+
 ## [3.0.5a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.5a2) (2026-08-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.5a1...3.0.5a2)
@@ -358,10 +378,6 @@
 ## [2.1.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.4a1) (2026-03-12)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.3a2...2.1.4a1)
-
-**Merged pull requests:**
-
-- fix: Make deferred loading opt-in via config flag [\#750](https://github.com/OpenVoiceOS/ovos-core/pull/750) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.1.3a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.3a2) (2026-03-07)
 
