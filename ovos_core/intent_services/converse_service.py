@@ -5,7 +5,7 @@ from typing import Optional, Dict, List, Union
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.handler import HandlerLifecycle
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import SessionManager, UtteranceState, Session
+from ovos_bus_client.session import SessionManager, Session
 from ovos_config.config import Configuration
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
@@ -215,7 +215,7 @@ class ConverseService(PipelinePlugin):
             active_skills (list): ordered list of skill_ids
         """
         session = session or SessionManager.get(message)
-        return [skill[0] for skill in session.active_skills]
+        return [h["skill_id"] for h in session.active_handlers]
 
     def deactivate_skill(self, skill_id: str, source_skill: Optional[str] = None,
                          message: Optional[Message] = None) -> Optional[Session]:
@@ -409,7 +409,7 @@ class ConverseService(PipelinePlugin):
 
         # note: this is sorted by priority already
         active_skills = [skill_id for skill_id in self.get_active_skills(message, session=session)
-                     if session.utterance_states.get(skill_id, UtteranceState.INTENT) == UtteranceState.INTENT]
+                     if not (session.response_mode and session.response_mode.get("skill_id") == skill_id)]
         if not active_skills:
             return []
 
@@ -519,9 +519,9 @@ class ConverseService(PipelinePlugin):
         timeouts = self.config.get("skill_timeouts") or {}
         def_timeout = self.config.get("timeout", 300)
         session = SessionManager.get(message)
-        session.active_skills = [
-            skill for skill in session.active_skills
-            if time.time() - skill[1] <= timeouts.get(skill[0], def_timeout)]
+        session.active_handlers = [
+            h for h in session.active_handlers
+            if time.time() - h["activated_at"] <= timeouts.get(h["skill_id"], def_timeout)]
 
     def match(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """
@@ -563,7 +563,7 @@ class ConverseService(PipelinePlugin):
 
         # note: this is sorted by priority already
         gr_skills = [skill_id for skill_id in self.get_active_skills(message, session=session)
-                     if session.utterance_states.get(skill_id, UtteranceState.INTENT) == UtteranceState.RESPONSE]
+                     if session.response_mode and session.response_mode.get("skill_id") == skill_id]
 
         # check if any skill wants to capture utterance for self.get_response method
         for skill_id in gr_skills:
