@@ -695,8 +695,8 @@ class TestDecayPropagatesToTerminalEmissions(unittest.TestCase):
 
     @pytest.mark.xfail(strict=True, reason=_NEEDS_BUS_CLIENT_278)
     def test_same_dispatch_exemption_still_holds(self):
-        # regression guard (commit eec4ae03): a key synced mid-round must not
-        # be decremented by the very round that produced it
+        # A key synced mid-round must not be decremented by the very round
+        # that produced it.
         sess = Session("exempt-sess")
         sess.intent_context = {"person": {"value": "Bob", "turns_remaining": 3}}
         SessionManager.update(sess)

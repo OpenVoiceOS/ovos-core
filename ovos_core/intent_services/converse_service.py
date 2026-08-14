@@ -63,10 +63,8 @@ class ConverseService(PipelinePlugin):
         def _resolve_complete(msg: Message) -> None:
             if msg.data.get("skill_id") and msg.data.get("skill_id") != skill_id:
                 return  # ack from a different skill, ignore
-            # peek at the ack's session id WITHOUT folding its snapshot onto
-            # the live session — the ack still carries the pre-dispatch
-            # snapshot, and folding it would clobber any change the converse
-            # handler made to the live session (e.g. deactivating itself)
+            # no fold here; see IntentService._registry_session_for_context_write
+            # (SESSION-2 §2.6) — only peek at the ack's session id.
             ack_sess = Session.from_message(msg) if "session" in msg.context else None
             if ack_sess and ack_sess.session_id != session_id:
                 return  # ack from a different session, ignore

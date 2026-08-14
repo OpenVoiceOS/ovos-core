@@ -23,7 +23,6 @@ dependencies = [
     "ovos-workshop>=9.3.11a1,<10.0.0",
     "rapidfuzz>=3.6,<4.0",
     "ovos-spec-tools[langcodes]>=1.6.1a1,<2.0.0",
-
 ]
 
 [project.urls]

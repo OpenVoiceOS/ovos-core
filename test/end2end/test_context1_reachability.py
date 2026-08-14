@@ -1,6 +1,6 @@
 """Cross-repo end-to-end reachability proof for OVOS-CONTEXT-1.
 
-Verified defect (audit-loop wave 1): a skill calling the real
+A skill calling the real
 ``OVOSSkill.set_context`` API (ovos-workshop) could never satisfy the
 declarative ``requires_context`` / ``excludes_context`` gate
 (``ovos_spec_tools.context.gate_satisfied`` / ``resolve_key``), because the
@@ -27,25 +27,23 @@ Only with BOTH halves in place does the gate open after ``set_context`` and
 close again after ``remove_context`` - proving the fix is reachable from the
 real skill API, not just from hand-crafted messages.
 
-Round 4 (wave-3 CONFIRMED / this file's known weakness fixed): the original
-version of this test mocked ``SessionManager.get`` to always hand back one
-fixed, never-folded ``Session`` object, so it could never observe the
-wave-3 defect - "in-lifecycle set_context on a NAMED session never survives
-to the terminal event" - because it never exercised
-``SessionManager.get(message)``'s real fold at all. That is exactly why the
-defect escaped to wave 3. ``test_named_session_context_survives_a_second_
-stale_client_message`` below drives the REAL registered-session two-message
-flow instead: a NAMED session is registered in the real
-``SessionManager.sessions`` singleton (no mocking); ``set_context`` is
-invoked from inside a simulated utterance-handling frame (so
-``dig_for_message`` finds the same in-flight ``message`` a real skill
-handler would see); what would be serialized onto the terminal
-``ovos.utterance.handled`` event is read back directly from
+``test_named_session_context_survives_a_second_stale_client_message`` below
+proves a related invariant: in-lifecycle ``set_context`` on a NAMED session
+must survive to the terminal event, even when a second, stale client message
+arrives in between. It drives the REAL registered-session two-message flow:
+a NAMED session is registered in the real ``SessionManager.sessions``
+singleton (no mocking); ``set_context`` is invoked from inside a simulated
+utterance-handling frame (so ``dig_for_message`` finds the same in-flight
+``message`` a real skill handler would see); what would be serialized onto
+the terminal ``ovos.utterance.handled`` event is read back directly from
 ``SessionManager.sessions[sid]`` (never from a private test-local
 reference); and a second message simulates the conformant client's echo of
-the previously-adopted session (SESSION-2 - the client declares the
-session on every subsequent message) to prove the gate stays satisfied
-across that hand-off too.
+the previously-adopted session (SESSION-2 - the client declares the session
+on every subsequent message) to prove the gate stays satisfied across that
+hand-off too. A test that mocks ``SessionManager.get`` to always hand back
+one fixed, never-folded ``Session`` object cannot observe this class of
+defect, because it never exercises ``SessionManager.get(message)``'s real
+fold at all.
 """
 from threading import Event
 from unittest import TestCase
@@ -65,9 +63,9 @@ SESSION_ID = "ctx1-e2e-r4"
 
 class TestContext1EndToEndReachability(TestCase):
     """Drives the real workshop producer against the real core consumer and
-    asks the real gate whether the declaration is satisfied - the auditor's
-    repro for OVOS-CONTEXT-1 reachability, extended (round 4) into the real
-    two-message NAMED-session flow so it also proves the wave-3 fix."""
+    asks the real gate whether the declaration is satisfied - proving
+    OVOS-CONTEXT-1 reachability end to end, including across a real
+    two-message NAMED-session flow."""
 
     def setUp(self):
         self.bus = FakeBus()
@@ -118,24 +116,25 @@ class TestContext1EndToEndReachability(TestCase):
         self.assertFalse(self._gate_open())
 
     def test_set_context_then_remove_context_round_trip(self):
-        """The auditor's repro: set_context (real workshop API) must open
-        the real gate; remove_context must close it again. This is the
-        assertion that fails with either half of the round-1 fix reverted.
+        """set_context (real workshop API) must open the real gate;
+        remove_context must close it again. Without either half of the fix,
+        this assertion fails: the producer's munged legacy key alone can
+        never satisfy the declarative gate's resolved-key lookup.
 
         The workshop producer's ``set_context``/``remove_context`` build
         their outgoing message via ``dig_for_message() or Message("")`` -
         with no explicit in-flight message supplied by this test, whatever
         ambient ``Message`` the OVOSSkill machinery happens to have left on
         the call stack is used, and it carries the real ``default`` session
-        (round-4: the handlers now resolve registry-first off the message's
-        declared session_id, so a fixed-return ``SessionManager.get`` mock
-        alone no longer controls which session object gets mutated once the
-        message actually names a session that is live in the registry - the
+        (the handlers resolve registry-first off the message's declared
+        session_id, so a fixed-return ``SessionManager.get`` mock alone
+        does not control which session object gets mutated once the message
+        actually names a session that is live in the registry - the
         registry entry wins). This test substitutes the object registered
         under the live ``default`` session_id for the duration of the test
         (restored after), so it isolates the ONE thing it is about:
-        private-key resolution reachability, not the round-4 fold-discipline
-        fix (that is what
+        private-key resolution reachability, not the fold-discipline fix
+        (that is what
         ``test_named_session_context_survives_a_second_stale_client_message``
         below exercises, over an explicit NAMED session)."""
         saved_default = SessionManager.sessions.get(DEFAULT_SESSION_ID)
@@ -174,19 +173,21 @@ class TestContext1EndToEndReachability(TestCase):
                 SessionManager.sessions.pop(DEFAULT_SESSION_ID, None)
 
     def test_named_session_context_survives_a_second_stale_client_message(self):
-        """Wave-3 CONFIRMED (round 4).
+        """Without the registry-first fold discipline, this assertion fails:
+        a stale second message wipes a NAMED session's context before it
+        ever reaches the terminal event.
 
         Step 1 drives the REAL producer (``OVOSSkill.set_context``) over the
         bus, in-handler (so ``dig_for_message`` finds the driving message),
-        exactly like the round-1 repro above, but on an explicit NAMED
-        session registered in the real ``SessionManager.sessions`` registry.
-        This opens the gate and moves the registry forward.
+        exactly like the repro above, but on an explicit NAMED session
+        registered in the real ``SessionManager.sessions`` registry. This
+        opens the gate and moves the registry forward.
 
         ``Message.forward()`` (used internally by the workshop producer)
         self-heals staleness for messages derived *within this same
         process* - ``sync_message_session`` re-stamps a derived message's
         session with the CURRENT live registry state at forward-time, so an
-        in-process round-trip alone can never observe the wave-3 defect.
+        in-process round-trip alone can never observe this defect.
         The defect is specifically about a REMOTE client's message: one that
         arrives over the wire carrying an already-serialized session
         snapshot that no local ``forward()`` gets to refresh. Step 2
@@ -200,11 +201,10 @@ class TestContext1EndToEndReachability(TestCase):
         ``MessageBusClient`` hands a deserialized wire message to the
         registered handler.
 
-        Before the round-4 fix, ``handle_add_context`` called
-        ``SessionManager.get(message)``, which folds this stale snapshot
-        onto the registry entry BEFORE writing - for a NAMED session that
-        fold is full-replace, wiping step 1's entry. This must be RED before
-        the round-4 fix at the ``"kitchen" entry present`` assertion below.
+        Without the fix, ``handle_add_context`` folds this stale snapshot
+        onto the registry entry before writing to it - for a NAMED session
+        that fold is full-replace, wiping step 1's entry - so the
+        ``"kitchen" entry present`` assertion below fails.
         """
         # Step 1: real producer, real consumer, over the bus, in-handler.
         stale_snapshot = self.session.serialize()  # captured BEFORE any write

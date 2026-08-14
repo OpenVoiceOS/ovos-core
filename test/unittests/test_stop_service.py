@@ -42,8 +42,7 @@ def _make_service() -> StopService:
         # tests patch svc._locale.voc_match / voc_list.
         svc._locale = MagicMock()
         svc._legacy = MagicMock()
-        svc._was_active_pre_drain = {}
-        svc._utt_state_pre_drain = {}
+        svc._pre_drain = {}
     return svc
 
 
@@ -329,12 +328,12 @@ class TestHandleStopConfirmation(unittest.TestCase):
 
 
 class TestAbortQuestionReachable(unittest.TestCase):
-    """CONFIRMED-4 regression: handle_stop_confirmation's RESPONSE-state
-    check (which emits mycroft.skills.abort_question, the killable-event
-    abort for a blocked get_response) read `sess.utterance_states` off the
-    ALREADY-DRAINED session carried by the dispatched .stop.response message
-    (_targeted_stop's disable_response_mode runs before dispatch) — so it was
-    always UtteranceState.INTENT there and the branch was unreachable."""
+    """handle_stop_confirmation's RESPONSE-state check (which emits
+    mycroft.skills.abort_question, the killable-event abort for a blocked
+    get_response) must consult the pre-drain snapshot: `sess.utterance_states`
+    off the .stop.response message is already drained
+    (_targeted_stop's disable_response_mode runs before dispatch), so a live
+    read is always UtteranceState.INTENT there."""
 
     def test_targeted_stop_of_response_mode_skill_emits_abort_question(self):
         svc = _make_service()
@@ -364,7 +363,7 @@ class TestAbortQuestionReachable(unittest.TestCase):
                       "handle_stop_confirmation is already drained")
 
     def test_force_timeout_still_emitted_for_converse_skill(self):
-        """Regression guard: the CONFIRMED-2 force_timeout fix must stay green."""
+        """force_timeout must still fire for a converse-active skill."""
         svc = _make_service()
         svc.bus.emit = MagicMock()
 
@@ -669,12 +668,11 @@ class TestLegacyStopBridge(unittest.TestCase):
 
 
 class TestLegacyBridgeSingleDelivery(unittest.TestCase):
-    """CONFIRMED-1 regression (double-stop): with the translator active
-    (default on ``FakeBus``/``MessageBusClient``), a legacy skill's ``stop()``
-    handler — bound the way ovos-workshop actually binds it, on BOTH the
-    shared/skill legacy topic AND left listening while the bridge also fires
-    its own §9.2 observer re-emit — must be invoked exactly once per stop
-    event, not twice.
+    """With the translator active (default on ``FakeBus``/``MessageBusClient``),
+    a legacy skill's ``stop()`` handler — bound the way ovos-workshop
+    actually binds it, on BOTH the shared/skill legacy topic AND left
+    listening while the bridge also fires its own §9.2 observer re-emit —
+    must be invoked exactly once per stop event, not twice.
 
     Before the fix, ``_LegacyStopBridge.handle_global_stop`` /
     ``handle_skill_stop`` unconditionally re-emitted ``mycroft.stop`` /
@@ -878,14 +876,14 @@ class TestStopSelectionDeterministic(unittest.TestCase):
 
 
 class TestDispatcherLifecycleResolvedByStopRoundTrip(unittest.TestCase):
-    """L1 regression: the IntentDispatcher's §8 handler-lifecycle entry for a
-    `<skill_id>:stop` dispatch was never resolved by
-    `mycroft.skill.handler.complete`/`.error` -- the colon-topic has no direct
+    """The IntentDispatcher's §8 handler-lifecycle entry for a
+    `<skill_id>:stop` dispatch must be resolved by
+    `mycroft.skill.handler.complete`/`.error`, not left parked on the
+    dispatcher's 5-minute §8.3 timeout — the colon-topic has no direct
     ovos-workshop listener (only the legacy bridge mirrors it onto the
-    dot-topic, bound with `handler_info=None`, which disables that emission).
-    Left unresolved, every stop parks its dispatch entry on the dispatcher's
-    5-minute §8.3 timeout instead of resolving synchronously when the stop
-    round-trip (`.stop.response`) actually completes."""
+    dot-topic, bound with `handler_info=None`, which disables that
+    emission), so the stop round-trip (`.stop.response`) must resolve it
+    synchronously instead."""
 
     def test_stop_round_trip_resolves_dispatcher_entry_synchronously(self):
         from ovos_core.intent_services.dispatcher import IntentDispatcher
@@ -925,8 +923,8 @@ class TestDispatcherLifecycleResolvedByStopRoundTrip(unittest.TestCase):
 
 
 class TestStaleStopOnceDoesNotResolveUnrelatedEntry(unittest.TestCase):
-    """C1 regression (adversarial re-review of the L1 fix): `_targeted_stop`
-    registers `bus.once(f"{skill_id}.stop.response", handle_stop_confirmation)`
+    """`_targeted_stop` registers
+    `bus.once(f"{skill_id}.stop.response", handle_stop_confirmation)`
     at MATCH-BUILD time -- a side effect that survives even when the
     orchestrator later DISCARDS the Match (blacklisted intent, missing
     slots, etc: see service.py's blacklist check) and never actually
@@ -979,13 +977,10 @@ class TestStaleStopOnceDoesNotResolveUnrelatedEntry(unittest.TestCase):
 
 
 class TestFailedStopYieldsErrorTerminal(unittest.TestCase):
-    """C2 regression (adversarial re-review of the L1 fix): a `.stop.response`
-    carrying `error` (the skill's `stop()` raised) was still resolved via
-    `_resolve_dispatch_lifecycle` as a `complete` terminal -- §8.2 requires an
-    `error` terminal so a failed stop is distinguishable from a successful
-    one on the handler-lifecycle trio.
-
-    Mirrors the live auditor's attack3.py::test_stop_error_yields_complete_terminal.
+    """A `.stop.response` carrying `error` (the skill's `stop()` raised)
+    must resolve via `_resolve_dispatch_lifecycle` as an `error` terminal,
+    not `complete` -- §8.2 requires this so a failed stop is distinguishable
+    from a successful one on the handler-lifecycle trio.
     """
 
     def test_stop_response_with_error_yields_error_not_complete_terminal(self):
@@ -1025,22 +1020,16 @@ class TestFailedStopYieldsErrorTerminal(unittest.TestCase):
 
 
 class TestIntentNameFilterIsDataNotContext(unittest.TestCase):
-    """F1 regression (round-3 adversarial re-review of 6e8c8163be): the
-    dispatcher's optional intent_name filter used to be read from
-    `message.context["intent_name"]`. Context is CLIENT-INHERITED --
-    `Message.forward` deep-copies the context of the message it is called
-    on, which for a dispatch chain traces back to the ORIGINATING client
-    utterance. Any client that happens to set `context["intent_name"]` on
-    its own utterance would have that value survive every forward() down
-    the dispatch chain and land on the skill's REAL
-    `mycroft.skill.handler.complete` too -- mismatching the stop-only filter
-    and parking a completely unrelated, successfully-completed intent on
-    the dispatcher's 5-minute §8.3 timeout.
-
-    Mirrors the live auditor's attack4.py
-    (test_1_normal_intent_workshop_complete /
-    test_2_client_supplied_context_intent_name_breaks_resolution /
-    test_3_targeted_stop_still_resolves)."""
+    """The dispatcher's optional intent_name filter must be read from
+    `message.data["intent_name"]`, never `message.context["intent_name"]`.
+    Context is CLIENT-INHERITED -- `Message.forward` deep-copies the context
+    of the message it is called on, which for a dispatch chain traces back
+    to the ORIGINATING client utterance. A client that sets
+    `context["intent_name"]` on its own utterance would have that value
+    survive every forward() down the dispatch chain and land on the skill's
+    REAL `mycroft.skill.handler.complete` too -- mismatching the stop-only
+    filter and parking a completely unrelated, successfully-completed
+    intent on the dispatcher's 5-minute §8.3 timeout."""
 
     def test_client_supplied_context_intent_name_does_not_break_real_completion(self):
         from ovos_bus_client.handler import HandlerLifecycle
@@ -1100,17 +1089,11 @@ class TestIntentNameFilterIsDataNotContext(unittest.TestCase):
 
 
 class TestPreDrainSnapshotsDoNotLeakOnFailedStop(unittest.TestCase):
-    """F2 regression (round-3 adversarial re-review of 6e8c8163be): the
-    pre-drain snapshot dicts were popped ONLY inside the `result: True`
-    branch of `handle_stop_confirmation` -- every failed (`error` in data),
-    declined (`result: False`), or never-actually-dispatched stop left
-    `(session_id, skill_id)` in BOTH `_was_active_pre_drain` and
-    `_utt_state_pre_drain` forever: an unbounded memory leak, AND it kept
-    the `_resolve_dispatch_lifecycle` presence-gate permanently open for
-    that pair (any later unrelated `.stop.response` reusing the same
-    (session_id, skill_id) would pass the gate).
-
-    Mirrors the live auditor's attack5.py."""
+    """The pre-drain snapshot must be popped for every `.stop.response`,
+    not only a successful one: an error, a decline (`result: False`), or a
+    response for a dispatch that never completed must not leave
+    `(session_id, skill_id)` in `_pre_drain` forever, and must not leave the
+    `_resolve_dispatch_lifecycle` presence-gate open for that pair."""
 
     def test_fifty_failed_stops_leave_no_leaked_snapshot_keys(self):
         svc = _make_service()
@@ -1122,8 +1105,7 @@ class TestPreDrainSnapshotsDoNotLeakOnFailedStop(unittest.TestCase):
                 "skillA.stop.response",
                 {"skill_id": "skillA", "error": "boom"},
                 {"skill_id": "skillA", "session": sess.serialize()}))
-        self.assertEqual(len(svc._was_active_pre_drain), 0)
-        self.assertEqual(len(svc._utt_state_pre_drain), 0)
+        self.assertEqual(len(svc._pre_drain), 0)
 
     def test_fifty_declined_stops_leave_no_leaked_snapshot_keys(self):
         svc = _make_service()
@@ -1135,8 +1117,7 @@ class TestPreDrainSnapshotsDoNotLeakOnFailedStop(unittest.TestCase):
                 "skillA.stop.response",
                 {"skill_id": "skillA", "result": False},
                 {"skill_id": "skillA", "session": sess.serialize()}))
-        self.assertEqual(len(svc._was_active_pre_drain), 0)
-        self.assertEqual(len(svc._utt_state_pre_drain), 0)
+        self.assertEqual(len(svc._pre_drain), 0)
 
     def test_successful_stop_still_clears_snapshot(self):
         """Regression guard: the success path must keep clearing too."""
@@ -1148,19 +1129,15 @@ class TestPreDrainSnapshotsDoNotLeakOnFailedStop(unittest.TestCase):
             "skillA.stop.response",
             {"skill_id": "skillA", "result": True},
             {"skill_id": "skillA", "session": sess.serialize()}))
-        self.assertEqual(len(svc._was_active_pre_drain), 0)
-        self.assertEqual(len(svc._utt_state_pre_drain), 0)
+        self.assertEqual(len(svc._pre_drain), 0)
 
 
 class TestPreDrainGateBlocksUnknownPair(unittest.TestCase):
-    """F3: the presence-gate mechanism in `handle_stop_confirmation` --
-    "only emit a synthetic handler.complete/.error for a (session_id,
-    skill_id) pair this StopService actually has a pre-drain snapshot
-    for" -- was itself never directly exercised by any test; the suite
-    stayed green even with the gate deleted entirely. Assert it directly:
-    a `.stop.response` for a pair with NO pre-drain snapshot at all (never
-    went through `_targeted_stop`) must emit no
-    `mycroft.skill.handler.complete`/`.error` whatsoever."""
+    """`handle_stop_confirmation` must only emit a synthetic
+    handler.complete/.error for a (session_id, skill_id) pair it actually
+    has a pre-drain snapshot for. A `.stop.response` for a pair with NO
+    pre-drain snapshot at all (never went through `_targeted_stop`) must
+    emit no `mycroft.skill.handler.complete`/`.error` whatsoever."""
 
     def test_stop_response_with_no_pre_drain_snapshot_emits_no_handler_signal(self):
         svc = _make_service()
@@ -1197,13 +1174,9 @@ class TestShutdown(unittest.TestCase):
 
 
 class TestPreDrainSnapshotsAreSessionScoped(unittest.TestCase):
-    """Regression: ``_was_active_pre_drain`` / ``_utt_state_pre_drain`` used to
-    be keyed by bare ``skill_id``. Two concurrent targeted stops for the SAME
-    skill_id but DIFFERENT sessions collided: session B's snapshot overwrote
-    session A's, and whichever confirmation was processed second popped the
-    OTHER session's (already-consumed) entry, producing wrong
-    force_timeout/abort_question decisions. Keying by ``(session_id,
-    skill_id)`` fixes this."""
+    """`_pre_drain` is keyed by ``(session_id, skill_id)``, not bare
+    ``skill_id``: two concurrent targeted stops for the same skill_id in
+    different sessions must not collide or consume each other's snapshot."""
 
     def test_interleaved_targeted_stops_same_skill_different_sessions(self):
         svc = _make_service()
@@ -1228,7 +1201,7 @@ class TestPreDrainSnapshotsAreSessionScoped(unittest.TestCase):
         drained_b = match_b.updated_session
 
         self.assertEqual(
-            len(svc._was_active_pre_drain), 2,
+            len(svc._pre_drain), 2,
             "both sessions' snapshots must coexist, keyed independently")
 
         msg_a = Message("skill_a.stop.response",
@@ -1262,8 +1235,7 @@ class TestPreDrainSnapshotsAreSessionScoped(unittest.TestCase):
                          "session B was never in RESPONSE state; the bug would "
                          "have it consume session A's leftover/absent snapshot")
 
-        self.assertEqual(len(svc._was_active_pre_drain), 0)
-        self.assertEqual(len(svc._utt_state_pre_drain), 0)
+        self.assertEqual(len(svc._pre_drain), 0)
 
 
 if __name__ == "__main__":
