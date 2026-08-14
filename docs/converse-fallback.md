@@ -45,6 +45,18 @@ During `skill.get_response`, the skill temporarily holds the converse channel:
 | `skill.converse.get_response.disable` | `handle_get_response_disable` |
 | `converse:skill` | `handle_converse` |
 
+### Broadcast Contest Poll (OVOS-CONVERSE-1 §4.2)
+
+Alongside the sequential per-skill `{skill_id}.converse.request` above,
+`ConverseService` also emits one broadcast `ovos.converse.ping` per round on
+the static spec topic. It carries no candidate identity — the session
+already names the active skills — and every active skill answers on the
+shared pong topic. The legacy per-skill pings still go out alongside it: no
+released `ovos-workshop` vintage binds the broadcast topic yet, so dropping
+the legacy leg would silence every skill in the field. Each poll round is
+correlated by `utterance_id` and session, so a late pong from a stale round
+is discarded instead of winning the wrong round.
+
 ---
 
 ## FallbackService

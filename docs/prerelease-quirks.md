@@ -1,0 +1,129 @@
+# Prerelease quirks
+
+This file lists everything that changed or broke since the last stable
+release, `2.1.1`. It is version-stamped and newest first. If you install an
+alpha of `ovos-core`, read this before you file a bug: the behavior you
+are seeing may be documented here already.
+
+This file resets at the next stable release. At that point its contents
+become upgrade notes for the `2.1.1 -> next-stable` jump, and a new, empty
+quirks log starts.
+
+## 3.0 major (breaking, from #802)
+
+`ovos-core` moved to a 3.0 major version. The stop pipeline's dispatch
+shape changed: `#802` (OVOS-STOP-1) makes the pipeline dispatch a targeted
+stop on `<skill_id>:stop` and a global stop on `<pipeline_id>:global_stop`,
+both suppressing skill activation, instead of the pre-spec
+`stop:global`/`stop:skill` topics. The pre-spec surface is kept alive by a
+separable legacy bridge, `_LegacyStopBridge`
+(`ovos_core/intent_services/stop_service_legacy.py`), which re-emits onto
+`mycroft.stop` / `<skill_id>.stop` for old listeners. This bridge is a
+compat shim, not a permanent feature: it is slated for removal at the next
+major version.
+
+## #868 (alpha of 2026-08-14)
+
+`handle_add_context`/`handle_remove_context`/`handle_clear_context` did a
+copy-modify-assign on `Session.intent_context` outside the context lock
+that `Session.set_intent_context`/`remove_intent_context` use. A concurrent
+skill-side registry write (ovos-workshop's registry-first
+`set_context`/`remove_context`, >= 9.3.13a1) landing between the snapshot
+read and the write-back was silently lost. Fixed by wrapping each handler's
+read-modify-write in the same lock.
+
+## #865 (alpha of 2026-08-14)
+
+`add_context`/`remove_context` are documented and tested as legacy-compat
+paths, with idempotency proven by test.
+
+## #863 (alpha of 2026-08-14)
+
+Converse gained a broadcast contest poll (OVOS-CONVERSE-1 §4.2):
+`ConverseService` emits one `ovos.converse.ping` per round on the static
+spec topic, carrying no candidate identity, alongside the existing
+per-skill pings (kept for compat since no released `ovos-workshop` binds
+the broadcast topic yet). See `docs/converse-fallback.md`.
+
+## #862 (alpha of 2026-08-14)
+
+Extended the utterance_id/session round-correlation guard from #859
+(converse's `handle_ack`) to fallback's `ovos.skills.fallback.pong`
+collector and stop's `skill.stop.pong` collector: a pong whose
+`utterance_id` or session does not match the currently open poll round is
+now discarded, closing a class of bug where a late answer from a stale
+round could win the wrong round. A round with no `utterance_id` still
+stands down (V0 back-compat). `ovos-common-query-pipeline-plugin`'s
+phrase-string correlation is a separate repo and was not touched here.
+
+## #859 (alpha of 2026-08-14)
+
+Stamps `context.utterance_id` at pipeline lifecycle entry
+(PIPELINE-1 §9.1.1), the field #862 later correlates poll rounds against.
+
+## #858 (alpha of 2026-08-14)
+
+`SessionManager.get(message)` always folds the incoming message's session
+snapshot onto the live registry entry before returning it — never a pure
+read. Converse write paths were split: a true lifecycle entry point (and
+any site that stamps the resolved session back onto the wire, like
+`activate_skill`/`deactivate_skill`) keeps the real fold, since SESSION-2
+last-writer-wins needs the client's declared fields to apply. An incidental
+write with no wire echo (`get_response.enable`/`disable`) now bypasses the
+fold, so a stale message arriving after registry state was already written
+cannot wipe it out via full-replace.
+
+**Pending, not yet merged:** #864 mirrors this same registry-first
+resolution fix for the stop pipeline's write paths.
+
+## #857 / #856 / #855 (alpha of 2026-08-14)
+
+Registry-first session-handling cleanup: `add_context` mirrors under the
+resolved private key when the producer names it (#857); manifest mutations
+read the context session and `describe` spans sessions and self-identifies
+entries (#856); `SessionManager` connects to the bus exactly once
+regardless of construction order (#855).
+
+## #786 (alpha of 2026-08-13/14)
+
+Added OVOS-CONTEXT-1: orchestrator-resident intent context with decay,
+session.sync merge, and slot-fill.
+
+## Pending, not yet merged
+
+- **#864** — mirrors #858's registry-first session resolution fix for the
+  stop pipeline's write paths.
+- **#879** — "kill queued deprecation-warning hot-path reads": swaps
+  remaining legacy `Session`-view call sites for their non-warning
+  equivalents. Open, not yet in `dev`.
+
+## Older changes (2.x alphas, since 2.1.1)
+
+- `#845` / `#788` / `#785` — transformer chains now conform to
+  OVOS-TRANSFORM-1 ascending §4 chain ordering; the orchestrator owns the
+  PIPELINE-1 §8 trio and §9 utterance-terminal events.
+- `#832` — pipeline plugins can be blacklisted at load time and per
+  session.
+- `#829` — package names are canonicalized before the protected-package
+  check in the skill installer.
+- `#825` — e2e intent-name expectations updated for the OVOS-INTENT-2
+  lowercase rename.
+- `#822` — dropped the deprecated bus-client `EnclosureAPI` import from
+  `skill_manager`.
+- `#816` — boot no longer blocks on a pipeline training reply.
+- `#810` — malformed intent-service locale templates are repaired instead
+  of failing resource load.
+- `#804` — `set_context` mirrors into OVOS-CONTEXT-1's `intent_context`.
+- `#798` — orchestrator manifest (`IntentManifest`), INTENT-4 §10.
+- `#778` — PIPELINE-1 §6.2 required_slots backstop and §7.3 reserved-name
+  suppression.
+- `#775` / `#767` / `#766` / `#779` — dependency floors widened to
+  `ovos-bus-client` 2.x and `ovos-workshop` 8.x/9.x; single-sourced from
+  `pyproject.toml`.
+- `#773` — `intent.service.intent.get` accepts an `exclude_pipeline`
+  filter.
+- `#763` / `#754` — language matching migrated to `ovos-spec-tools`; bare
+  lang-code locale directories renamed to canonical form.
+- `#750` — deferred skill loading is now opt-in via a config flag.
+- `#744` — duplicate skill loads during rescans are prevented.
+- `#742` — skill-dependency install fix.

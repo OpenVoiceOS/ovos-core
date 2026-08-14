@@ -15,6 +15,7 @@
 | [converse-fallback.md](converse-fallback.md) | `ConverseService` and `FallbackService` |
 | [skill-installer.md](skill-installer.md) | `SkillsStore`: runtime pip install/uninstall via the bus |
 | [bus-events.md](bus-events.md) | MessageBus events reference |
+| [prerelease-quirks.md](prerelease-quirks.md) | What changed since the last stable release |
 
 ## Quick Start
 
