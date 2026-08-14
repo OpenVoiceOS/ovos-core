@@ -81,6 +81,7 @@ class TestSkillManager(TestCase):
         # setup noise so tests only see messages emitted by the code under test
         self.message_bus_mock.message_types = []
         self.message_bus_mock.message_data = []
+        self.addCleanup(self.skill_manager.shutdown)
 
     def _mock_log(self):
         log_patch = patch(self.mock_package + 'LOG')
@@ -112,27 +113,29 @@ class TestSkillManager(TestCase):
         with patch.dict(Configuration._Configuration__patch, config):
             bus_mock = MessageBusMock()
             skill_manager = SkillManager(bus_mock)
+            try:
+                expected_result = [
+                    'skillmanager.list',
+                    'skillmanager.deactivate',
+                    'skillmanager.keep',
+                    'skillmanager.activate',
+                    #'mycroft.skills.initialized',
+                    'mycroft.skills.is_alive',
+                    'mycroft.skills.is_ready',
+                    'mycroft.skills.all_loaded',
+                    # SessionManager.connect_to_bus() handlers - wired
+                    # unconditionally so skills-only processes (no intent
+                    # service) still get SessionManager.bus set
+                    'recognizer_loop:record_begin',
+                    'recognizer_loop:record_end',
+                    'recognizer_loop:audio_output_start',
+                    'recognizer_loop:audio_output_end',
+                    SpecMessage.SESSION_SYNC,
+                ]
 
-            expected_result = [
-                'skillmanager.list',
-                'skillmanager.deactivate',
-                'skillmanager.keep',
-                'skillmanager.activate',
-                #'mycroft.skills.initialized',
-                'mycroft.skills.is_alive',
-                'mycroft.skills.is_ready',
-                'mycroft.skills.all_loaded',
-                # SessionManager.connect_to_bus() handlers - wired
-                # unconditionally so skills-only processes (no intent
-                # service) still get SessionManager.bus set
-                'recognizer_loop:record_begin',
-                'recognizer_loop:record_end',
-                'recognizer_loop:audio_output_start',
-                'recognizer_loop:audio_output_end',
-                SpecMessage.SESSION_SYNC,
-            ]
-
-            self.assertListEqual(expected_result, bus_mock.event_handlers)
+                self.assertListEqual(expected_result, bus_mock.event_handlers)
+            finally:
+                skill_manager.shutdown()
         SessionManager.bus = None
 
 
@@ -469,6 +472,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
         config['skills']['use_deferred_loading'] = False  # Explicitly set to False
         with patch.dict(Configuration._Configuration__patch, config):
             skill_manager = SkillManager(self.message_bus_mock)
+            self.addCleanup(skill_manager.shutdown)
             self.assertFalse(skill_manager._use_deferred_loading)
 
     def test_deferred_loading_enabled_via_config(self):
@@ -477,6 +481,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
         config['skills']['use_deferred_loading'] = True
         with patch.dict(Configuration._Configuration__patch, config):
             skill_manager = SkillManager(self.message_bus_mock)
+            self.addCleanup(skill_manager.shutdown)
             self.assertTrue(skill_manager._use_deferred_loading)
 
     def test_connectivity_handlers_not_registered_when_deferred_loading_disabled(self):
@@ -484,7 +489,8 @@ class TestDeferredLoadingConfigFlag(TestCase):
         config = mock_config()
         config['skills']['use_deferred_loading'] = False  # Explicitly set to False
         with patch.dict(Configuration._Configuration__patch, config):
-            SkillManager(self.message_bus_mock)
+            skill_manager = SkillManager(self.message_bus_mock)
+            self.addCleanup(skill_manager.shutdown)
 
             # When deferred loading is disabled, connectivity handlers should not be registered
             expected_handlers = [
@@ -513,7 +519,8 @@ class TestDeferredLoadingConfigFlag(TestCase):
         config = mock_config()
         config['skills']['use_deferred_loading'] = True
         with patch.dict(Configuration._Configuration__patch, config):
-            SkillManager(self.message_bus_mock)
+            skill_manager = SkillManager(self.message_bus_mock)
+            self.addCleanup(skill_manager.shutdown)
 
         # When deferred loading is enabled, connectivity handlers should be registered
         expected_handlers = [
@@ -546,6 +553,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
         config['skills']['use_deferred_loading'] = False  # Explicitly set to False
         with patch.dict(Configuration._Configuration__patch, config):
             skill_manager = SkillManager(self.message_bus_mock)
+            self.addCleanup(skill_manager.shutdown)
 
             # Mock a skill plugin
             mock_plugin = Mock()
@@ -576,6 +584,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
         config['skills']['use_deferred_loading'] = True
         with patch.dict(Configuration._Configuration__patch, config):
             skill_manager = SkillManager(self.message_bus_mock)
+            self.addCleanup(skill_manager.shutdown)
 
             # Mock a skill plugin with network requirement
             mock_plugin = Mock()
@@ -604,6 +613,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
         config['skills']['use_deferred_loading'] = False  # Explicitly set to False
         with patch.dict(Configuration._Configuration__patch, config):
             skill_manager = SkillManager(self.message_bus_mock)
+            self.addCleanup(skill_manager.shutdown)
 
             # Mock dependencies
             skill_manager.wait_for_intent_service = Mock()
@@ -629,6 +639,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
         config['skills']['use_deferred_loading'] = True
         with patch.dict(Configuration._Configuration__patch, config):
             skill_manager = SkillManager(self.message_bus_mock)
+            self.addCleanup(skill_manager.shutdown)
 
             # Mock dependencies
             skill_manager.wait_for_intent_service = Mock()
@@ -668,7 +679,7 @@ class TestSkillManagerSessionManagerBus(TestCase):
 
     def test_connect_to_bus_with_intent_service_disabled(self):
         bus = MessageBusMock()
-        SkillManager(bus, enable_intent_service=False)
+        SkillManager(bus, enable_intent_service=False, enable_file_watcher=False)
         self.assertIsNotNone(SessionManager.bus)
         self.assertIs(SessionManager.bus, bus)
 
