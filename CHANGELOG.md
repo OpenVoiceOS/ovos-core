@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.7a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.7a3) (2026-08-14)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.7a2...3.0.7a3)
+
+**Merged pull requests:**
+
+- chore: kill queued deprecation-warning hot-path reads [\#879](https://github.com/OpenVoiceOS/ovos-core/pull/879) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.0.7a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.7a2) (2026-08-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.7a1...3.0.7a2)
@@ -370,10 +378,6 @@
 ## [2.1.4a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.4a2) (2026-03-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.4a1...2.1.4a2)
-
-**Merged pull requests:**
-
-- chore: docs tests and misc optimizations [\#752](https://github.com/OpenVoiceOS/ovos-core/pull/752) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.1.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.4a1) (2026-03-12)
 
