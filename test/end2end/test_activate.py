@@ -195,6 +195,10 @@ class TestDeactivate(TestCase):
             keep_original_src=[
                 f"{self.skill_id}.converse.ping",
                 f"{self.skill_id}.converse.request",
+                # ovos.converse.pong (OVOS-CONVERSE-1 §4.2 broadcast answer,
+                # ovos-workshop#534) is emitted on the entry source/destination
+                # pair, not flipped like the per-round response messages.
+                "ovos.converse.pong",
                 #"intent.service.skills.deactivate", # TODO
                 #f"{self.skill_id}.deactivate", # TODO
                 #f"{self.skill_id}.activate", # TODO
@@ -205,6 +209,11 @@ class TestDeactivate(TestCase):
                 # before the legacy per-skill pings (dual-emit compat window).
                 Message("ovos.converse.ping",
                         data={"utterances": ["deactivate skill from within converse"], "lang": session.lang},
+                        context={}),
+                # OVOS-CONVERSE-1 §4.2 broadcast answer (ovos-workshop#534);
+                # result mirrors the legacy skill.converse.pong can_handle=True below.
+                Message("ovos.converse.pong",
+                        data={"skill_id": self.skill_id, "result": True},
                         context={}),
                 Message(f"{self.skill_id}.converse.ping",
                         data={"utterances": ["deactivate skill from within converse"], "skill_id": self.skill_id},
