@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import threading
+import time
 import unittest
 from unittest.mock import MagicMock, patch, call
 from threading import Event
@@ -277,6 +279,125 @@ class TestCollectStopSkills(unittest.TestCase):
         emitted_types = [c[0][0].msg_type for c in svc.bus.emit.call_args_list]
         self.assertTrue(any("ok_skill" in t for t in emitted_types))
         self.assertFalse(any("bad_skill" in t for t in emitted_types))
+
+
+class TestStopRoundCorrelation(unittest.TestCase):
+    """A pong must prove which round it answers, or it decides nothing."""
+
+    def _session_with_skills(self, skill_ids):
+        sess = Session("test-session")
+        for sid in skill_ids:
+            sess.activate_skill(sid)
+        return sess
+
+    def _run_round(self, svc, ping_msg, pongs):
+        ack_handler = None
+
+        def capture_on(event, handler):
+            nonlocal ack_handler
+            if event == SpecMessage.STOP_PONG.value:
+                ack_handler = handler
+
+        svc.bus.on = capture_on
+        svc.bus.remove = MagicMock()
+        svc.bus.emit = MagicMock()
+
+        result_holder = []
+
+        def run():
+            result_holder.append(svc._collect_stop_skills(ping_msg))
+
+        t = threading.Thread(target=run)
+        t.start()
+        time.sleep(0.05)
+        for pong in pongs:
+            if ack_handler:
+                ack_handler(pong)
+        t.join(timeout=2)
+        return result_holder[0]
+
+    def test_stale_pong_from_previous_round_is_discarded(self):
+        """skill_a's stale pong must not count as its answer: skill_b answers
+        validly and is included, skill_a's discarded pong leaves it un-answered
+        (so it is NOT the reason it ends up in the result; want_stop stays
+        non-empty from skill_b alone, proving the fallback-to-all path was not
+        what produced skill_b)."""
+        svc = _make_service()
+        sess = self._session_with_skills(["skill_a", "skill_b"])
+
+        round_n = Message("test", {}, {"utterance_id": "round-N",
+                                       "session": sess.serialize()})
+        stale_pong = Message(SpecMessage.STOP_PONG.value,
+                             {"skill_id": "skill_a", "can_handle": True},
+                             {"utterance_id": "round-N-minus-1"})
+        good_pong = round_n.reply(SpecMessage.STOP_PONG.value,
+                                  {"skill_id": "skill_b", "can_handle": True})
+
+        with patch.object(StopService, "get_active_skills",
+                          return_value=["skill_a", "skill_b"]), \
+             patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=sess):
+            result = self._run_round(svc, round_n, [stale_pong, good_pong])
+
+        self.assertNotIn("skill_a", result,
+                         "a pong from an earlier lifecycle decided this round")
+        self.assertIn("skill_b", result)
+
+    def test_cross_session_pong_is_discarded(self):
+        svc = _make_service()
+        sess = self._session_with_skills(["skill_a", "skill_b"])
+        other_sess = Session("other")
+
+        round_n = Message("test", {}, {"utterance_id": "round-N",
+                                       "session": sess.serialize()})
+        foreign_pong = Message(SpecMessage.STOP_PONG.value,
+                               {"skill_id": "skill_a", "can_handle": True},
+                               {"utterance_id": "round-N",
+                                "session": other_sess.serialize()})
+        good_pong = round_n.reply(SpecMessage.STOP_PONG.value,
+                                  {"skill_id": "skill_b", "can_handle": True})
+
+        with patch.object(StopService, "get_active_skills",
+                          return_value=["skill_a", "skill_b"]), \
+             patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=sess):
+            result = self._run_round(svc, round_n, [foreign_pong, good_pong])
+
+        self.assertNotIn("skill_a", result,
+                         "a pong from a foreign session decided this round")
+        self.assertIn("skill_b", result)
+
+    def test_matching_pong_is_accepted(self):
+        svc = _make_service()
+        sess = self._session_with_skills(["skill_a"])
+
+        round_n = Message("test", {}, {"utterance_id": "round-N",
+                                       "session": sess.serialize()})
+        good_pong = round_n.reply(SpecMessage.STOP_PONG.value,
+                                  {"skill_id": "skill_a", "can_handle": True})
+
+        with patch.object(StopService, "get_active_skills", return_value=["skill_a"]), \
+             patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=sess):
+            result = self._run_round(svc, round_n, [good_pong])
+
+        self.assertEqual(result, ["skill_a"])
+
+    def test_unnamed_round_accepts_pongs_as_before(self):
+        """V0 compat: a round with no utterance_id keeps the old behaviour."""
+        svc = _make_service()
+        sess = self._session_with_skills(["skill_a"])
+
+        round_msg = Message("test", {}, {"session": sess.serialize()})
+        pong = Message(SpecMessage.STOP_PONG.value,
+                       {"skill_id": "skill_a", "can_handle": True})
+
+        with patch.object(StopService, "get_active_skills", return_value=["skill_a"]), \
+             patch("ovos_core.intent_services.stop_service.SessionManager.get",
+                   return_value=sess):
+            result = self._run_round(svc, round_msg, [pong])
+
+        self.assertEqual(result, ["skill_a"])
 
 
 class TestHandleStopConfirmation(unittest.TestCase):

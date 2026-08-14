@@ -315,6 +315,111 @@ class TestCollectFallbackSkills(unittest.TestCase):
         self.assertEqual(result, [])
 
 
+class TestFallbackRoundCorrelation(unittest.TestCase):
+    """A pong must prove which round it answers, or it decides nothing."""
+
+    def _run_round(self, svc, ping_msg, pongs, fb_range=None):
+        ack_handler = None
+
+        def capture_on(event, handler):
+            nonlocal ack_handler
+            if event == "ovos.skills.fallback.pong":
+                ack_handler = handler
+
+        svc.bus.on = capture_on
+        svc.bus.remove = MagicMock()
+        svc.bus.emit = MagicMock()
+
+        result_holder = []
+
+        def run():
+            result_holder.append(
+                svc._collect_fallback_skills(ping_msg, fb_range=fb_range))
+
+        t = threading.Thread(target=run)
+        t.start()
+        time.sleep(0.05)
+        for pong in pongs:
+            if ack_handler:
+                ack_handler(pong)
+        t.join(timeout=2)
+        return result_holder[0]
+
+    def test_stale_pong_from_previous_round_is_discarded(self):
+        svc = _make_service()
+        svc.registered_fallbacks = {"skill_a": 50}
+        sess = Session("s")
+
+        round_n = Message("test", {}, {"utterance_id": "round-N",
+                                       "session": sess.serialize()})
+        stale_pong = Message("ovos.skills.fallback.pong",
+                             {"skill_id": "skill_a", "can_handle": True},
+                             {"utterance_id": "round-N-minus-1"})
+
+        with patch("ovos_core.intent_services.fallback_service.SessionManager.get",
+                   return_value=sess):
+            result = self._run_round(svc, round_n, [stale_pong],
+                                     fb_range=FallbackRange(5, 90))
+
+        self.assertEqual(result, [],
+                         "a pong from an earlier lifecycle decided this round")
+
+    def test_cross_session_pong_is_discarded(self):
+        svc = _make_service()
+        svc.registered_fallbacks = {"skill_a": 50}
+        sess = Session("s")
+        other_sess = Session("other")
+
+        round_n = Message("test", {}, {"utterance_id": "round-N",
+                                       "session": sess.serialize()})
+        foreign_pong = Message("ovos.skills.fallback.pong",
+                               {"skill_id": "skill_a", "can_handle": True},
+                               {"utterance_id": "round-N",
+                                "session": other_sess.serialize()})
+
+        with patch("ovos_core.intent_services.fallback_service.SessionManager.get",
+                   return_value=sess):
+            result = self._run_round(svc, round_n, [foreign_pong],
+                                     fb_range=FallbackRange(5, 90))
+
+        self.assertEqual(result, [],
+                         "a pong from a foreign session decided this round")
+
+    def test_matching_pong_is_accepted(self):
+        svc = _make_service()
+        svc.registered_fallbacks = {"skill_a": 50}
+        sess = Session("s")
+
+        round_n = Message("test", {}, {"utterance_id": "round-N",
+                                       "session": sess.serialize()})
+        good_pong = round_n.reply("ovos.skills.fallback.pong",
+                                  {"skill_id": "skill_a", "can_handle": True})
+
+        with patch("ovos_core.intent_services.fallback_service.SessionManager.get",
+                   return_value=sess):
+            result = self._run_round(svc, round_n, [good_pong],
+                                     fb_range=FallbackRange(5, 90))
+
+        self.assertEqual(result, ["skill_a"])
+
+    def test_unnamed_round_accepts_pongs_as_before(self):
+        """V0 compat: a round with no utterance_id keeps the old behaviour."""
+        svc = _make_service()
+        svc.registered_fallbacks = {"skill_a": 50}
+        sess = Session("s")
+
+        round_msg = Message("test", {}, {"session": sess.serialize()})
+        pong = Message("ovos.skills.fallback.pong",
+                       {"skill_id": "skill_a", "can_handle": True})
+
+        with patch("ovos_core.intent_services.fallback_service.SessionManager.get",
+                   return_value=sess):
+            result = self._run_round(svc, round_msg, [pong],
+                                     fb_range=FallbackRange(5, 90))
+
+        self.assertEqual(result, ["skill_a"])
+
+
 class TestFallbackRange(unittest.TestCase):
     """Tests for _fallback_range method."""
 
