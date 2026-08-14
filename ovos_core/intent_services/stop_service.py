@@ -109,7 +109,7 @@ class StopService(ConfidenceMatcherPipeline):
             active_skills (list): ordered list of skill_ids
         """
         session = SessionManager.get(message)
-        return [skill[0] for skill in session.active_skills]
+        return [h["skill_id"] for h in session.active_handlers]
 
     @staticmethod
     def get_response_mode_holder(message: Optional[Message] = None) -> Optional[str]:
@@ -299,8 +299,10 @@ class StopService(ConfidenceMatcherPipeline):
             # live reads of utterance_states/active_handlers lie; consult the
             # pre-drain snapshot popped above, falling back to the live read
             # for direct-invocation callers that bypass _targeted_stop.
-            utt_state = snapshot.utt_state if snapshot else sess.utterance_states.get(
-                skill_id, UtteranceState.INTENT)
+            utt_state = snapshot.utt_state if snapshot else (
+                UtteranceState.RESPONSE
+                if sess.response_mode and sess.response_mode.get("skill_id") == skill_id
+                else UtteranceState.INTENT)
             if utt_state == UtteranceState.RESPONSE:
                 LOG.debug("Forcing get_response timeout")
                 # force-kill any ongoing get_response - see @killable_event decorator (ovos-workshop)
@@ -373,7 +375,9 @@ class StopService(ConfidenceMatcherPipeline):
         # answer either question truthfully.
         self._pre_drain[(sess.session_id, skill_id)] = PreDrainSnapshot(
             was_active=sess.is_active(skill_id),
-            utt_state=sess.utterance_states.get(skill_id, UtteranceState.INTENT),
+            utt_state=(UtteranceState.RESPONSE
+                       if sess.response_mode and sess.response_mode.get("skill_id") == skill_id
+                       else UtteranceState.INTENT),
         )
         drained = Session.deserialize(sess.serialize())
         drained.disable_response_mode(skill_id)
@@ -401,7 +405,7 @@ class StopService(ConfidenceMatcherPipeline):
         (blacklist/missing-slots/dispatch-exception) leaves the live session
         untouched.
         """
-        LOG.info(f"Emitting global stop, {len(sess.active_skills)} active skills")
+        LOG.info(f"Emitting global stop, {len(sess.active_handlers)} active skills")
         # read-only: the pre-drain holder, carried through match_data so
         # handle_global_stop (dispatch time, NOT here) can emit the targeted
         # `<skill_id>.stop` a killable-event abort actually listens on —
