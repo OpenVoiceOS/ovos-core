@@ -1,11 +1,16 @@
 # Changelog
 
+## [3.0.5a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.5a2) (2026-08-14)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.5a1...3.0.5a2)
+
 ## [3.0.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.5a1) (2026-08-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.4a1...3.0.5a1)
 
 **Merged pull requests:**
 
+- fix: mutate session intent context under the context lock [\#868](https://github.com/OpenVoiceOS/ovos-core/pull/868) ([JarbasAl](https://github.com/JarbasAl))
 - docs+test: mark add\_context/remove\_context as legacy-compat, prove idempotency [\#865](https://github.com/OpenVoiceOS/ovos-core/pull/865) ([JarbasAl](https://github.com/JarbasAl))
 - feat\(converse\): broadcast contest poll \(OVOS-CONVERSE-1 §4.2\) [\#863](https://github.com/OpenVoiceOS/ovos-core/pull/863) ([JarbasAl](https://github.com/JarbasAl))
 - fix: extend \#859 round guard to fallback/stop ping-pong \(PIPELINE-1 §9.1.1\) [\#862](https://github.com/OpenVoiceOS/ovos-core/pull/862) ([JarbasAl](https://github.com/JarbasAl))
