@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.3a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.3a2) (2026-08-14)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.3a1...3.0.3a2)
+
+**Merged pull requests:**
+
+- docs: rewrite review-campaign comment narration as plain invariants [\#873](https://github.com/OpenVoiceOS/ovos-core/pull/873) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.0.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.3a1) (2026-08-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.2a1...3.0.3a1)
@@ -336,10 +344,6 @@
 ## [2.1.3a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.3a2) (2026-03-07)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.3a1...2.1.3a2)
-
-**Merged pull requests:**
-
-- Prevent duplicate skill loads during overlapping rescans [\#744](https://github.com/OpenVoiceOS/ovos-core/pull/744) ([goldyfruit](https://github.com/goldyfruit))
 
 ## [2.1.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.3a1) (2026-03-04)
 
