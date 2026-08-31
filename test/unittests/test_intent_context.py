@@ -73,6 +73,7 @@ def _make_service(config=None) -> IntentService:
     svc.bus = bus
     svc.config = config or {}
     svc.pipeline_plugins = {}
+    svc._unconstructed_pipeline_warned = set()
     svc._deactivations = defaultdict(list)
 
     ut = MagicMock()

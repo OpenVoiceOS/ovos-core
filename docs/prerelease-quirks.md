@@ -9,6 +9,25 @@ This file resets at the next stable release. At that point its contents
 become upgrade notes for the `2.1.1 -> next-stable` jump, and a new, empty
 quirks log starts.
 
+## 3.1.0a2
+
+`IntentService` now only constructs the pipeline plugins referenced by the
+configured `intents.pipeline` at boot, instead of every installed pipeline
+plugin. A plugin left installed but no longer selected (eg. a heavy model
+plugin such as `ovos-m2v-pipeline`) is no longer instantiated at startup,
+which removes it as a boot-time memory/CPU cost and a possible boot wedge.
+
+This is a deliberate limitation, not a partial fix: a session cannot select
+a pipeline plugin that was not part of the boot-time `intents.pipeline`.
+Constructing plugins on session demand was considered and rejected -
+skills register their intents against a plugin's bus handlers exactly once,
+at load time, before any session could ever trigger an on-demand
+construction, and there is no replay mechanism (nor is a new bus topic to
+build one in scope). A plugin requested by a session but not part of the
+boot-time pipeline logs one WARN and returns no matcher; add it to
+`intents.pipeline` and restart to make it selectable. `intents.blacklisted_pipelines`
+is unaffected: a blacklisted plugin is never constructed.
+
 ## 3.0.7a5
 
 `main()` now closes the messagebus client and joins its receiver thread,

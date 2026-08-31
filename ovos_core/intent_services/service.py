@@ -174,6 +174,11 @@ class IntentService:
 
         # load and cache the plugins right away so they receive all bus messages
         self.pipeline_plugins: dict = {}
+        # a plugin installed but not part of the configured pipeline (or
+        # blacklisted) cannot be constructed on demand (see
+        # get_pipeline_matcher); this tracks which plugin ids already got
+        # their one-shot warning about that, so it is not repeated per-request
+        self._unconstructed_pipeline_warned: set = set()
 
         self.utterance_plugins: UtteranceTransformersService = UtteranceTransformersService(bus)
         self.metadata_plugins: MetadataTransformersService = MetadataTransformersService(bus)
@@ -225,9 +230,12 @@ class IntentService:
 
         # `intents.blacklisted_pipelines` lets a deployment opt a plugin out
         # of ovos-core entirely, so it is never imported/instantiated.
-        # ovos-core still deliberately loads every OTHER installed plugin
-        # regardless of the active `intents.pipeline` selection, because a
-        # remote client/session may select a different pipeline at runtime.
+        # Every OTHER installed plugin is only constructed if the configured
+        # `intents.pipeline` actually references it: a remote client/session
+        # may lawfully select a different, installed-but-unconfigured plugin
+        # at runtime (OVOS-SESSION-1), so `get_pipeline_matcher` lazily
+        # constructs those on first use instead of paying their init cost
+        # (model loads, embedding stores, ...) for every boot.
         # Matching is by exact installed plugin id (as returned by
         # `OVOSPipelineFactory.get_installed_pipeline_ids`, eg.
         # "ovos-m2v-pipeline"), NOT by confidence-suffixed matcher id (eg.
@@ -235,21 +243,26 @@ class IntentService:
         # its matcher variants since they are all produced by the same class.
         blacklist = set(self.config.get("blacklisted_pipelines", []))
         active_pipeline = self.config.get("pipeline", [])
+        # `intents.pipeline` may list legacy matcher ids (eg. "adapt_high");
+        # normalize through _PIPELINE_MIGRATION_MAP and strip the confidence
+        # suffix to get the installed plugin ids actually in use.
+        configured_plugins = {
+            _PIPELINE_RE.sub('', _PIPELINE_MIGRATION_MAP.get(matcher_id, matcher_id))
+            for matcher_id in active_pipeline
+        }
 
         for p in pipeline_plugins:
             if p in blacklist:
                 LOG.info(f"Skipping blacklisted pipeline plugin: '{p}'")
-                # `intents.pipeline` may list legacy matcher ids (eg.
-                # "adapt_high"); normalize through _PIPELINE_MIGRATION_MAP
-                # before comparing against the installed plugin id, or this
-                # warning silently fails to fire for legacy configs.
-                if any(_PIPELINE_MIGRATION_MAP.get(matcher_id, matcher_id) == p or
-                       _PIPELINE_MIGRATION_MAP.get(matcher_id, matcher_id).startswith(f"{p}-")
-                       for matcher_id in active_pipeline):
+                if p in configured_plugins:
                     LOG.warning(f"Pipeline plugin '{p}' is blacklisted in "
                                 f"'intents.blacklisted_pipelines' but also "
                                 f"selected in 'intents.pipeline'; the "
                                 f"blacklist wins and it will stay disabled")
+                continue
+            if p not in configured_plugins:
+                LOG.info(f"Pipeline plugin '{p}' is installed but not in "
+                         f"the configured pipeline; it will load on demand")
                 continue
             try:
                 self.pipeline_plugins[p] = OVOSPipelineFactory.load_plugin(p, bus=self.bus)
@@ -317,7 +330,21 @@ class IntentService:
         pipe_id = _PIPELINE_RE.sub('', matcher_id)
         plugin = self.pipeline_plugins.get(pipe_id)
         if not plugin:
-            LOG.error(f"Unknown pipeline matcher: {matcher_id}")
+            # Constructing a plugin here, on-demand, cannot work: skills
+            # register their intents against a plugin's bus handlers exactly
+            # once, at load time, before any session-time request could ever
+            # trigger a lazy construction, and no replay mechanism exists (nor
+            # is a new bus topic to trigger one in scope). A plugin installed
+            # but not part of the boot-time configured pipeline (see
+            # handle_reload_pipelines) - or blacklisted - is therefore simply
+            # unusable this run; warn once per plugin instead of on every
+            # request.
+            if pipe_id not in self._unconstructed_pipeline_warned:
+                self._unconstructed_pipeline_warned.add(pipe_id)
+                LOG.warning(f"Pipeline plugin '{pipe_id}' is installed but "
+                            f"not in 'intents.pipeline' at boot; sessions "
+                            f"cannot use it - add it to the configured "
+                            f"pipeline and restart")
             return None
 
         if isinstance(plugin, ConfidenceMatcherPipeline):
