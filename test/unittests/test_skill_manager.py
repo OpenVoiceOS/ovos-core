@@ -471,6 +471,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
         config = mock_config()
         config['skills']['use_deferred_loading'] = False  # Explicitly set to False
         with patch.dict(Configuration._Configuration__patch, config):
+            Configuration._invalidate_cache()
             skill_manager = SkillManager(self.message_bus_mock)
             self.addCleanup(skill_manager.shutdown)
             self.assertFalse(skill_manager._use_deferred_loading)
@@ -480,6 +481,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
         config = mock_config()
         config['skills']['use_deferred_loading'] = True
         with patch.dict(Configuration._Configuration__patch, config):
+            Configuration._invalidate_cache()
             skill_manager = SkillManager(self.message_bus_mock)
             self.addCleanup(skill_manager.shutdown)
             self.assertTrue(skill_manager._use_deferred_loading)
@@ -489,6 +491,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
         config = mock_config()
         config['skills']['use_deferred_loading'] = False  # Explicitly set to False
         with patch.dict(Configuration._Configuration__patch, config):
+            Configuration._invalidate_cache()
             skill_manager = SkillManager(self.message_bus_mock)
             self.addCleanup(skill_manager.shutdown)
 
@@ -519,6 +522,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
         config = mock_config()
         config['skills']['use_deferred_loading'] = True
         with patch.dict(Configuration._Configuration__patch, config):
+            Configuration._invalidate_cache()
             skill_manager = SkillManager(self.message_bus_mock)
             self.addCleanup(skill_manager.shutdown)
 
@@ -552,6 +556,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
         config = mock_config()
         config['skills']['use_deferred_loading'] = False  # Explicitly set to False
         with patch.dict(Configuration._Configuration__patch, config):
+            Configuration._invalidate_cache()
             skill_manager = SkillManager(self.message_bus_mock)
             self.addCleanup(skill_manager.shutdown)
 
@@ -583,6 +588,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
         config = mock_config()
         config['skills']['use_deferred_loading'] = True
         with patch.dict(Configuration._Configuration__patch, config):
+            Configuration._invalidate_cache()
             skill_manager = SkillManager(self.message_bus_mock)
             self.addCleanup(skill_manager.shutdown)
 
@@ -612,6 +618,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
         config = mock_config()
         config['skills']['use_deferred_loading'] = False  # Explicitly set to False
         with patch.dict(Configuration._Configuration__patch, config):
+            Configuration._invalidate_cache()
             skill_manager = SkillManager(self.message_bus_mock)
             self.addCleanup(skill_manager.shutdown)
 
@@ -638,6 +645,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
         config = mock_config()
         config['skills']['use_deferred_loading'] = True
         with patch.dict(Configuration._Configuration__patch, config):
+            Configuration._invalidate_cache()
             skill_manager = SkillManager(self.message_bus_mock)
             self.addCleanup(skill_manager.shutdown)
 
