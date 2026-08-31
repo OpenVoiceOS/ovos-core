@@ -303,7 +303,11 @@ class SkillsStore:
 
         url = message.data["url"]
         if self.validate_skill(url):
-            success = self.pip_install([f"git+{url}"])
+            try:
+                success = self.pip_install([f"git+{url}"])
+            except RuntimeError as e:
+                LOG.error(f"pip failed: {e}")
+                success = False
             if success:
                 self.bus.emit(message.reply("ovos.skills.install.complete"))
             else:
@@ -363,7 +367,12 @@ class SkillsStore:
             return
         pkgs = message.data.get("packages")
         if pkgs:
-            if self.pip_install(pkgs):
+            try:
+                success = self.pip_install(pkgs)
+            except RuntimeError as e:
+                LOG.error(f"pip failed: {e}")
+                success = False
+            if success:
                 self.bus.emit(message.reply("ovos.pip.install.complete"))
             else:
                 self.bus.emit(message.reply("ovos.pip.install.failed",
@@ -382,7 +391,12 @@ class SkillsStore:
             return
         pkgs = message.data.get("packages")
         if pkgs:
-            if self.pip_uninstall(pkgs):
+            try:
+                success = self.pip_uninstall(pkgs)
+            except RuntimeError as e:
+                LOG.error(f"pip failed: {e}")
+                success = False
+            if success:
                 self.bus.emit(message.reply("ovos.pip.uninstall.complete"))
             else:
                 self.bus.emit(message.reply("ovos.pip.uninstall.failed",
