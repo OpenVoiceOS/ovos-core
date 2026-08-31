@@ -9,6 +9,26 @@ This file resets at the next stable release. At that point its contents
 become upgrade notes for the `2.1.1 -> next-stable` jump, and a new, empty
 quirks log starts.
 
+## 3.0.7a5
+
+`main()` now closes the messagebus client and joins its receiver thread,
+with a bounded timeout, before returning on shutdown. Without this, the
+daemon thread spawned by `bus.run_in_thread()` could still be dispatching a
+buffered inbound frame onto `bus.emitter`'s `ThreadPoolExecutor` after the
+interpreter started tearing down, raising `RuntimeError: cannot schedule
+new futures after shutdown` from a background thread and leaving the
+process hung until SIGKILL.
+
+Known quirk: this narrows the race but does not fully close it. If the bus
+client is caught inside its reconnect backoff (transport error -> sleep ->
+recreate the websocket -> recurse) at shutdown time, `bus.close()` on every
+`ovos-bus-client` release up to and including `2.8.5a1` has no effect on
+that recursion, so the receiver thread can outlive the bounded join.
+Fixed on the `ovos-bus-client` side in
+[OpenVoiceOS/ovos-bus-client#295](https://github.com/OpenVoiceOS/ovos-bus-client/pull/295);
+until that fix is released and the floor pin bumped here, a service
+restart that lands mid-reconnect can still hang past the join timeout.
+
 ## 3.0 major (breaking, from #802)
 
 `ovos-core` moved to a 3.0 major version. The stop pipeline's dispatch

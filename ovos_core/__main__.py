@@ -44,7 +44,7 @@ def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
 
     # Connect this process to the OpenVoiceOS message bus
     bus = MessageBusClient()
-    bus.run_in_thread()
+    bus_thread = bus.run_in_thread()
     bus.connected_event.wait()
 
     skill_manager = SkillManager(bus, watchdog,
@@ -64,6 +64,28 @@ def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
     wait_for_exit_signal()
 
     skill_manager.shutdown()
+
+    # Stop the messagebus websocket thread and its event dispatcher before
+    # the interpreter starts tearing down. `bus.run_in_thread()` spawns a
+    # daemon thread that keeps receiving messages and dispatching them onto
+    # `bus.emitter`'s internal ThreadPoolExecutor for as long as the socket
+    # is open. If that thread is still alive when Python begins interpreter
+    # shutdown, an incoming message can call `emitter.emit()` -> `executor
+    # .submit()` after the executor has already been torn down, raising
+    # `RuntimeError: cannot schedule new futures after shutdown` from a
+    # background thread and leaving the process unable to exit cleanly
+    # (systemd then waits out the stop timeout and SIGKILLs it).
+    #
+    # `bus.close()` itself is fire-and-forget: it signals the run_forever
+    # loop to stop and closes the socket, but does not wait for the
+    # receiver thread to actually exit. We join that thread here, with a
+    # bounded timeout, to narrow the window further. This is not a
+    # guarantee the thread has fully stopped by the time we return (the
+    # join can time out), but it removes most of the residual race where a
+    # buffered inbound frame is still being dispatched during teardown.
+    bus.close()
+    if bus_thread is not None:
+        bus_thread.join(timeout=3)
 
     LOG.info('Skills service shutdown complete!')
 
