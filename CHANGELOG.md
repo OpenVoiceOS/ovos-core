@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.0.10a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a2) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a1...3.0.10a2)
+
+**Merged pull requests:**
+
+- fix: emit bus reply when pip install/uninstall raises RuntimeError [\#891](https://github.com/OpenVoiceOS/ovos-core/pull/891) ([JarbasAl](https://github.com/JarbasAl))
+- docs: add AGENTS.md with the conventions for coding agents [\#890](https://github.com/OpenVoiceOS/ovos-core/pull/890) ([JarbasAl](https://github.com/JarbasAl))
+
+## [3.0.10a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a1) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.9a1...3.0.10a1)
+
+**Merged pull requests:**
+
+- fix: normalize pipeline ids when matching session blacklists [\#854](https://github.com/OpenVoiceOS/ovos-core/pull/854) ([JarbasAl](https://github.com/JarbasAl))
+- ci: channel-compat — run the unit tests on the OVOS distro release channels [\#838](https://github.com/OpenVoiceOS/ovos-core/pull/838) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.0.9a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.9a1) (2026-08-31)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.8a1...3.0.9a1)
@@ -378,10 +396,6 @@
 ## [2.1.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.6a1) (2026-06-20)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.5a1...2.1.6a1)
-
-**Closed issues:**
-
-- suggestion for starting up jarvis [\#757](https://github.com/OpenVoiceOS/ovos-core/issues/757)
 
 **Merged pull requests:**
 
