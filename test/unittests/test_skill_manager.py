@@ -111,6 +111,7 @@ class TestSkillManager(TestCase):
         config['skills']['use_deferred_loading'] = False
         SessionManager.bus = None
         with patch.dict(Configuration._Configuration__patch, config):
+            Configuration._invalidate_cache()
             bus_mock = MessageBusMock()
             skill_manager = SkillManager(bus_mock)
             try:
