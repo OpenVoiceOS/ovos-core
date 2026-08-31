@@ -350,5 +350,42 @@ def test_handle_uninstall_python_success(skills_store):
     assert skills_store.bus.message_data[-1] == {}
 
 
+@pytest.mark.parametrize('skills_store', [{"allow_pip": True}], indirect=True)
+def test_handle_install_python_pip_raises(skills_store):
+    # pip_install raises RuntimeError on a genuine pip failure (non-zero
+    # exit); the handler must still emit a .failed reply instead of
+    # letting the exception propagate and leaving the caller hanging.
+    skills_store.play_error_sound = Mock()
+    skills_store.pip_install = Mock(side_effect=RuntimeError("pip exited with status 1"))
+    packages = ["some-broken-package"]
+    skills_store.handle_install_python(Message(msg_type="test", data={"packages": packages}))
+    skills_store.pip_install.assert_called_once_with(packages)
+    assert skills_store.bus.message_types[-1] == "ovos.pip.install.failed"
+    assert skills_store.bus.message_data[-1] == {"error": "error in pip subprocess"}
+
+
+@pytest.mark.parametrize('skills_store', [{"allow_pip": True}], indirect=True)
+def test_handle_uninstall_python_pip_raises(skills_store):
+    skills_store.play_error_sound = Mock()
+    skills_store.pip_uninstall = Mock(side_effect=RuntimeError("pip exited with status 1"))
+    packages = ["some-broken-package"]
+    skills_store.handle_uninstall_python(Message(msg_type="test", data={"packages": packages}))
+    skills_store.pip_uninstall.assert_called_once_with(packages)
+    assert skills_store.bus.message_types[-1] == "ovos.pip.uninstall.failed"
+    assert skills_store.bus.message_data[-1] == {"error": "error in pip subprocess"}
+
+
+@pytest.mark.parametrize('skills_store', [{"allow_pip": True}], indirect=True)
+def test_handle_install_skill_pip_raises(skills_store):
+    skills_store.play_error_sound = Mock()
+    skills_store.pip_install = Mock(side_effect=RuntimeError("pip exited with status 1"))
+    skills_store.validate_skill = Mock(return_value=True)
+    skills_store.handle_install_skill(
+        Message(msg_type="test", data={"url": "https://github.com/OpenVoiceOS/skill-foo"}))
+    skills_store.pip_install.assert_called_once_with(["git+https://github.com/OpenVoiceOS/skill-foo"])
+    assert skills_store.bus.message_types[-1] == "ovos.skills.install.failed"
+    assert skills_store.bus.message_data[-1] == {"error": "error in pip subprocess"}
+
+
 if __name__ == "__main__":
     pytest.main()
