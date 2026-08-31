@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.8a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.8a1) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.7a4...3.0.8a1)
+
+**Merged pull requests:**
+
+- fix: invalidate ovos-config merge cache in deferred-loading config-flag tests [\#892](https://github.com/OpenVoiceOS/ovos-core/pull/892) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.0.7a4](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.7a4) (2026-08-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.7a3...3.0.7a4)
@@ -365,7 +373,6 @@
 
 **Closed issues:**
 
-- Research-collab proposal: URML primitive vocabulary as substrate-neutral intent target for OVOS skills [\#764](https://github.com/OpenVoiceOS/ovos-core/issues/764)
 - suggestion for starting up jarvis [\#757](https://github.com/OpenVoiceOS/ovos-core/issues/757)
 
 **Merged pull requests:**
@@ -378,10 +385,6 @@
 ## [2.1.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.5a1) (2026-03-24)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.1.4a2...2.1.5a1)
-
-**Merged pull requests:**
-
-- fix: rename bare lang code locale directories [\#754](https://github.com/OpenVoiceOS/ovos-core/pull/754) ([ovos-localize[bot]](https://github.com/apps/ovos-localize))
 
 ## [2.1.4a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.4a2) (2026-03-14)
 
