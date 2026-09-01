@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.1.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.1.2a1) (2026-09-01)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.1.1a1...3.1.2a1)
+
+**Merged pull requests:**
+
+- fix: back off failed plugin-skill loads and report loaded\_new truthfully [\#905](https://github.com/OpenVoiceOS/ovos-core/pull/905) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.1.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.1.1a1) (2026-09-01)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.1.0a1...3.1.1a1)
@@ -429,7 +437,6 @@
 
 - fix: drop dead gitlocalize translations job from release workflow [\#768](https://github.com/OpenVoiceOS/ovos-core/pull/768) ([JarbasAl](https://github.com/JarbasAl))
 - fix: allow ovos-bus-client 2.x [\#767](https://github.com/OpenVoiceOS/ovos-core/pull/767) ([JarbasAl](https://github.com/JarbasAl))
-- fix\(deps\): allow ovos-bus-client 2.x \(widen cap to \<3.0.0\) [\#766](https://github.com/OpenVoiceOS/ovos-core/pull/766) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.1.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.5a1) (2026-03-24)
 
