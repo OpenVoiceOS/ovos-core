@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.1.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.1.1a1) (2026-09-01)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.1.0a1...3.1.1a1)
+
+**Merged pull requests:**
+
+- fix: allow ovos-config 3.x [\#902](https://github.com/OpenVoiceOS/ovos-core/pull/902) ([JarbasAl](https://github.com/JarbasAl))
+
+## [3.1.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.1.0a1) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.12a1...3.1.0a1)
+
 ## [3.0.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.12a1) (2026-08-31)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.12a1)
@@ -418,7 +430,6 @@
 - fix: drop dead gitlocalize translations job from release workflow [\#768](https://github.com/OpenVoiceOS/ovos-core/pull/768) ([JarbasAl](https://github.com/JarbasAl))
 - fix: allow ovos-bus-client 2.x [\#767](https://github.com/OpenVoiceOS/ovos-core/pull/767) ([JarbasAl](https://github.com/JarbasAl))
 - fix\(deps\): allow ovos-bus-client 2.x \(widen cap to \<3.0.0\) [\#766](https://github.com/OpenVoiceOS/ovos-core/pull/766) ([JarbasAl](https://github.com/JarbasAl))
-- refactor: migrate language matching to ovos-spec-tools [\#763](https://github.com/OpenVoiceOS/ovos-core/pull/763) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.1.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.1.5a1) (2026-03-24)
 
