@@ -37,6 +37,14 @@ from ovos_workshop.skills.api import SkillApi
 
 from ovos_plugin_manager.skills import find_skill_plugins
 
+# Backoff schedule for retrying a plugin skill whose load raised before a
+# `PluginSkillLoader` instance existed (eg. an error in the skill's own
+# `__init__`). Without a backoff such a skill is indistinguishable from
+# "never attempted" on the next scan and gets fully re-instantiated - and its
+# intents re-registered - on every 30s scan, forever.
+PLUGIN_SKILL_RETRY_BASE_SECONDS = 30
+PLUGIN_SKILL_RETRY_MAX_SECONDS = 15 * 60
+
 
 def on_started() -> None:
     LOG.info('Skills Manager is starting up.')
@@ -127,6 +135,10 @@ class SkillManager(Thread):
         self.plugin_skills = {}
         self._plugin_skills_lock = threading.RLock()
         self._loading_plugin_skills = set()
+        # skill_id -> (attempt_count, last_attempt_time) for plugin skills whose
+        # load raised before a loader object existed (see _load_plugin_skill).
+        # These are retried with an exponential backoff instead of every scan.
+        self._plugin_skill_failures = {}
         self.num_install_retries = 0
         self.empty_skill_dirs = set()  # Save a record of empty skill dirs.
 
@@ -256,6 +268,28 @@ class SkillManager(Thread):
         with self._plugin_skills_lock:
             self._loading_plugin_skills.discard(skill_id)
 
+    def _should_retry_plugin_skill(self, skill_id: str) -> bool:
+        """Check whether enough time has passed to retry a previously failed load."""
+        with self._plugin_skills_lock:
+            failure = self._plugin_skill_failures.get(skill_id)
+        if failure is None:
+            return True
+        attempts, last_attempt = failure
+        delay = min(PLUGIN_SKILL_RETRY_BASE_SECONDS * (2 ** (attempts - 1)),
+                    PLUGIN_SKILL_RETRY_MAX_SECONDS)
+        return time.time() - last_attempt >= delay
+
+    def _record_plugin_skill_failure(self, skill_id: str) -> None:
+        """Record a failed load attempt, extending the backoff before the next retry."""
+        with self._plugin_skills_lock:
+            attempts, _ = self._plugin_skill_failures.get(skill_id, (0, 0.0))
+            self._plugin_skill_failures[skill_id] = (attempts + 1, time.time())
+
+    def _clear_plugin_skill_failure(self, skill_id: str) -> None:
+        """Clear any recorded backoff once a skill loads successfully."""
+        with self._plugin_skills_lock:
+            self._plugin_skill_failures.pop(skill_id, None)
+
     def _defer_skill_load_until_startup_complete(self):
         """Queue connectivity-triggered skill loads until the intent service is ready."""
         with self._startup_lock:
@@ -379,6 +413,8 @@ class SkillManager(Thread):
                 continue
             if self._is_plugin_skill_tracked(skill_id):
                 continue
+            if not self._should_retry_plugin_skill(skill_id):
+                continue
             skill_loader = self._get_plugin_skill_loader(skill_id, init_bus=False,
                                                          skill_class=plug)
             requirements = skill_loader.runtime_requirements
@@ -388,8 +424,8 @@ class SkillManager(Thread):
                 continue
             if not self._reserve_plugin_skill_load(skill_id):
                 continue
-            self._load_plugin_skill(skill_id, plug, reserved=True)
-            loaded_new = True
+            if self._load_plugin_skill(skill_id, plug, reserved=True) is not None:
+                loaded_new = True
         return loaded_new
 
     def _get_internal_skill_bus(self) -> MessageBusClient:
@@ -457,6 +493,15 @@ class SkillManager(Thread):
             if skill_loader is not None:
                 with self._plugin_skills_lock:
                     self.plugin_skills[skill_id] = skill_loader
+                if load_status:
+                    self._clear_plugin_skill_failure(skill_id)
+            else:
+                # `_get_plugin_skill_loader`/`.load()` raised before a loader
+                # object existed - there is nothing to track in
+                # `self.plugin_skills`, so record the failure separately or
+                # this skill would look "never attempted" and get retried
+                # (and its intents re-registered) on every 30s scan forever.
+                self._record_plugin_skill_failure(skill_id)
             self._release_plugin_skill_load(skill_id)
 
         return skill_loader if load_status else None

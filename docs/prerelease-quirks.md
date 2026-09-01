@@ -9,6 +9,22 @@ This file resets at the next stable release. At that point its contents
 become upgrade notes for the `2.1.1 -> next-stable` jump, and a new, empty
 quirks log starts.
 
+## #905 (alpha of 2026-09-01)
+
+`SkillManager._load_plugin_skill`'s `finally` block only tracked a plugin
+skill in `self.plugin_skills` once a `PluginSkillLoader` instance existed;
+if `_get_plugin_skill_loader`/`.load()` raised before that instance was
+bound, the skill was left out of `plugin_skills` while the in-flight marker
+was still cleared, so the next periodic scan (`load_plugin_skills`, every
+30s) saw it as "never attempted" and reloaded it from scratch — reinstating
+the skill and re-registering its intents on every scan, indefinitely.
+Failed loads are now tracked separately with an exponential backoff (30s,
+capped at 15 minutes) before a retry is attempted again; a successful load
+clears the backoff. Separately, `load_plugin_skills` set `loaded_new = True`
+on every load *attempt* rather than on confirmed success, so a skill stuck
+in the retry loop above also re-triggered the `mycroft.skills.train`
+broadcast on every scan; `loaded_new` now reflects the actual load result.
+
 ## 3.0.7a5
 
 `main()` now closes the messagebus client and joins its receiver thread,

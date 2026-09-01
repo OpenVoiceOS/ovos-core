@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 import tempfile
+import time as time_module
 from copy import deepcopy
 from pathlib import Path
 from shutil import rmtree
@@ -25,7 +26,8 @@ from ovos_config import Configuration
 from ovos_config import LocalConf, DEFAULT_CONFIG
 from ovos_bus_client.session import SessionManager
 from ovos_spec_tools import SpecMessage
-from ovos_core.skill_manager import SkillManager
+from ovos_core.skill_manager import (SkillManager, PLUGIN_SKILL_RETRY_BASE_SECONDS,
+                                      PLUGIN_SKILL_RETRY_MAX_SECONDS)
 from ovos_workshop.skill_launcher import SkillLoader
 
 
@@ -449,6 +451,150 @@ class TestSkillManager(TestCase):
         self.assertIsNone(result)
 
 
+    def _loader_creation_side_effect(self, error):
+        """Build a `_get_plugin_skill_loader` side_effect that succeeds for the
+        `load_plugin_skills` runtime-requirements probe (init_bus=False) but
+        raises `error` for the real load attempt inside `_load_plugin_skill`
+        (init_bus defaults to True there)."""
+        def side_effect(skill_id, init_bus=True, skill_class=None):
+            if not init_bus:
+                requirements = Mock()
+                requirements.network_before_load = False
+                requirements.internet_before_load = False
+                loader = Mock()
+                loader.runtime_requirements = requirements
+                return loader
+            raise error
+        return side_effect
+
+    @patch('ovos_core.skill_manager.find_skill_plugins')
+    def test_loader_creation_exception_backs_off_before_retry(self, mock_find_skill_plugins):
+        """A skill whose loader raises before an instance exists must not be
+        retried on every 30s scan - only once a backoff window has elapsed."""
+        skill_id = 'test.flaky.loader.skill'
+        mock_find_skill_plugins.return_value = {skill_id: Mock()}
+        self.skill_manager.plugin_skills = {}
+        self.skill_manager._plugin_skill_failures = {}
+        self.skill_manager._get_plugin_skill_loader = Mock(
+            side_effect=self._loader_creation_side_effect(RuntimeError("boom"))
+        )
+
+        fake_now = [1000.0]
+        with patch('ovos_core.skill_manager.time.time', side_effect=lambda: fake_now[0]):
+            loaded_new = self.skill_manager.load_plugin_skills(network=True, internet=True)
+            self.assertFalse(loaded_new)
+            first_attempt_calls = self.skill_manager._get_plugin_skill_loader.call_count
+
+            # Still inside the backoff window: no retry attempted.
+            fake_now[0] += 5
+            self.skill_manager.load_plugin_skills(network=True, internet=True)
+            self.assertEqual(
+                first_attempt_calls, self.skill_manager._get_plugin_skill_loader.call_count,
+                "skill was retried before its backoff window elapsed"
+            )
+
+            # Past the base backoff window: retry happens again.
+            fake_now[0] += PLUGIN_SKILL_RETRY_BASE_SECONDS
+            self.skill_manager.load_plugin_skills(network=True, internet=True)
+            self.assertGreater(
+                self.skill_manager._get_plugin_skill_loader.call_count, first_attempt_calls,
+                "skill was not retried after its backoff window elapsed"
+            )
+
+    @patch('ovos_core.skill_manager.find_skill_plugins')
+    def test_plugin_skill_success_clears_backoff(self, mock_find_skill_plugins):
+        """Once a flaky skill finally loads, its failure record must be
+        cleared so a later unrelated reload is not throttled by stale state."""
+        skill_id = 'test.recovering.skill'
+        mock_plugin = Mock()
+        mock_find_skill_plugins.return_value = {skill_id: mock_plugin}
+        self.skill_manager.plugin_skills = {}
+        self.skill_manager._plugin_skill_failures = {}
+
+        # Record a prior failure directly (mirrors what _load_plugin_skill does).
+        self.skill_manager._record_plugin_skill_failure(skill_id)
+        self.assertIn(skill_id, self.skill_manager._plugin_skill_failures)
+
+        mock_loader = Mock(spec=SkillLoader)
+        mock_loader.skill_id = skill_id
+        mock_loader.load.return_value = True
+        mock_loader.runtime_requirements.network_before_load = False
+        mock_loader.runtime_requirements.internet_before_load = False
+        self.skill_manager._get_plugin_skill_loader = Mock(return_value=mock_loader)
+
+        # Move well past the backoff window so the load is attempted at all.
+        fake_now = [time_module.time() + PLUGIN_SKILL_RETRY_MAX_SECONDS + 1]
+        with patch('ovos_core.skill_manager.time.time', side_effect=lambda: fake_now[0]):
+            loaded_new = self.skill_manager.load_plugin_skills(network=True, internet=True)
+
+        self.assertTrue(loaded_new)
+        self.assertNotIn(skill_id, self.skill_manager._plugin_skill_failures)
+        self.assertIn(skill_id, self.skill_manager.plugin_skills)
+
+    def test_loaded_new_reflects_actual_load_status_not_attempt(self):
+        """`loaded_new`/the train request must only fire on confirmed success,
+        never merely because a load was attempted."""
+        skill_id = 'test.attempt.only.skill'
+        mock_plugin = Mock()
+
+        with patch(self.mock_package + 'find_skill_plugins',
+                    return_value={skill_id: mock_plugin}):
+            self.skill_manager.plugin_skills = {}
+            self.skill_manager._plugin_skill_failures = {}
+            self.skill_manager._get_plugin_skill_loader = Mock(
+                side_effect=self._loader_creation_side_effect(RuntimeError("boom"))
+            )
+            self.message_bus_mock.message_types = []
+            self.skill_manager._use_deferred_loading = False
+
+            # A failed attempt must not request retraining.
+            self.skill_manager._load_new_skills(network=True, internet=True, gui=False)
+            self.assertNotIn('mycroft.skills.train', self.message_bus_mock.message_types)
+
+            # A successful load must request retraining.
+            mock_loader = Mock(spec=SkillLoader)
+            mock_loader.skill_id = skill_id
+            mock_loader.load.return_value = True
+            mock_loader.runtime_requirements.network_before_load = False
+            mock_loader.runtime_requirements.internet_before_load = False
+            self.skill_manager._get_plugin_skill_loader = Mock(return_value=mock_loader)
+            self.skill_manager._plugin_skill_failures = {}
+            self.message_bus_mock.message_types = []
+
+            self.skill_manager._load_new_skills(network=True, internet=True, gui=False)
+            self.assertIn('mycroft.skills.train', self.message_bus_mock.message_types)
+
+    @patch('ovos_core.skill_manager.find_skill_plugins')
+    def test_always_failing_skill_load_attempts_grow_sub_linearly(self, mock_find_skill_plugins):
+        """Field shape of the bug: without backoff a flaky skill is retried
+        once per 30s scan forever; with backoff, N scans over the same span
+        must yield far fewer than N load attempts."""
+        skill_id = 'test.always.failing.skill'
+        mock_find_skill_plugins.return_value = {skill_id: Mock()}
+        self.skill_manager.plugin_skills = {}
+        self.skill_manager._plugin_skill_failures = {}
+        self.skill_manager._get_plugin_skill_loader = Mock(
+            side_effect=self._loader_creation_side_effect(RuntimeError("boom"))
+        )
+
+        cycles = 40
+        fake_now = [2000.0]
+        with patch('ovos_core.skill_manager.time.time', side_effect=lambda: fake_now[0]):
+            for _ in range(cycles):
+                self.skill_manager.load_plugin_skills(network=True, internet=True)
+                fake_now[0] += PLUGIN_SKILL_RETRY_BASE_SECONDS  # one 30s scan tick
+
+        # Each call to `_get_plugin_skill_loader` inside `_load_plugin_skill`
+        # is one real load attempt (the runtime-requirements probe is a
+        # separate, non-retrying call gated out by the backoff check).
+        load_attempts = sum(
+            1 for call in self.skill_manager._get_plugin_skill_loader.call_args_list
+            if call.kwargs.get('init_bus', True)
+        )
+        self.assertLess(load_attempts, cycles,
+                         "load attempts grew linearly with scan cycles - backoff is not applied")
+        self.assertGreater(load_attempts, 0, "skill should still be retried eventually")
+
 class TestDeferredLoadingConfigFlag(TestCase):
     """Test suite for the optional deferred loading config flag."""
 
@@ -719,3 +865,4 @@ class TestSkillManagerSessionManagerBus(TestCase):
                 f"expected exactly one handler for {topic}, got "
                 f"{bus.event_handlers.count(topic)}"
             )
+
