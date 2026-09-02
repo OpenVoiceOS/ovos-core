@@ -624,9 +624,15 @@ class IntentService:
             # update Session if modified by pipeline
             reply.context["session"] = sess.serialize()
 
-            # stamp the matching plugin's identity on the dispatch (§3.1, §7.1)
+            # stamp the matching plugin's identity on the dispatch (§3.1, §7.1).
+            # `pipeline_id` here is whatever entry `session.pipeline` used
+            # (e.g. a confidence-tier matcher id like "adapt-high"); §3 requires
+            # attribution to name the plugin's single bare `pipeline_id`, never
+            # an entry-specific string, so it is normalized the same way
+            # `get_pipeline_matcher` resolves it to a plugin.
             if pipeline_id:
-                reply.context["pipeline_id"] = pipeline_id
+                reply.context["pipeline_id"] = _PIPELINE_RE.sub(
+                    '', _PIPELINE_MIGRATION_MAP.get(pipeline_id, pipeline_id))
 
             skill_id = (match.skill_id
                         or (match.match_data or {}).get("skill_id")

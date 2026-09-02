@@ -9,6 +9,19 @@ This file resets at the next stable release. At that point its contents
 become upgrade notes for the `2.1.1 -> next-stable` jump, and a new, empty
 quirks log starts.
 
+## #906 (alpha of 2026-09-02)
+
+`ovos.intent.matched`'s `pipeline_id` field (OVOS-PIPELINE-1 §9.2) carried
+the raw `session.pipeline` entry that produced the match — a
+confidence-tier matcher id such as `ovos-adapt-pipeline-plugin-high` —
+instead of the plugin's bare `pipeline_id`. Per §3.1, attribution names
+"the plugin's single `pipeline_id` — never an entry-specific string";
+`session.blacklisted_pipelines` (#854) and `_produces_reserved_name`
+already normalized before comparing, but the stamp on
+`context["pipeline_id"]`/`ovos.intent.matched` did not. The stamp is now
+normalized the same way (`_PIPELINE_MIGRATION_MAP` then the
+`-high`/`-medium`/`-low` suffix stripped) before it reaches the bus.
+
 ## #905 (alpha of 2026-09-01)
 
 `SkillManager._load_plugin_skill`'s `finally` block only tracked a plugin
