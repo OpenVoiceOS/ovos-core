@@ -579,7 +579,8 @@ class IntentService:
                                                         match.match_type,
                                                         lang,
                                                         match.match_data,
-                                                        sess.pipeline))
+                                                        sess.pipeline,
+                                                        sess.session_id == "default"))
 
         if reply is not None:
             reply.data["utterance"] = match.utterance
@@ -649,16 +650,24 @@ class IntentService:
                                                         "complete_intent_failure",
                                                         lang,
                                                         match.match_data,
-                                                        sess.pipeline))
+                                                        sess.pipeline,
+                                                        sess.session_id == "default"))
 
     @staticmethod
-    def _upload_match_data(utterance: str, intent: str, lang: str, match_data: dict, pipeline: List[str]):
+    def _upload_match_data(utterance: str, intent: str, lang: str, match_data: dict, pipeline: List[str],
+                            session_default: bool):
         """if enabled upload the intent match data to a server, allowing users and developers
         to collect metrics/datasets to improve the pipeline plugins and skills.
 
         There isn't a default server to upload things too, users needs to explicitly configure one
 
         https://github.com/OpenVoiceOS/ovos-opendata-server
+
+        ``session_default`` is True when the match came from the "default" session
+        (ie. a local client). It is a privacy-preserving proxy for counting remote
+        (HiveMind) clients by exclusion: remote clients always carry a non-default
+        session id, so no session id or other identifier is ever uploaded, only
+        this boolean.
         """
         config = Configuration().get("open_data", {})
         endpoints: List[str] = config.get("intent_urls", [])  # eg. "http://localhost:8000/intents"
@@ -674,7 +683,8 @@ class IntentService:
             "lang": lang,
             "match_data": json.dumps(match_data, ensure_ascii=False),
             "pipeline": "|".join(pipeline),
-            "core_version": OVOS_VERSION_STR
+            "core_version": OVOS_VERSION_STR,
+            "session_default": session_default
         }
         for url in endpoints:
             try:

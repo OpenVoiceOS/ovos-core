@@ -1558,7 +1558,7 @@ class TestBlacklistedPipelines(unittest.TestCase):
 class TestUploadMatchData(unittest.TestCase):
     """The intent-metrics payload carries the session pipeline and core version."""
 
-    def _post_payload(self, pipeline):
+    def _post_payload(self, pipeline, session_default=False):
         captured = {}
 
         def _fake_post(url, data=None, headers=None, timeout=None):
@@ -1572,17 +1572,27 @@ class TestUploadMatchData(unittest.TestCase):
                       side_effect=_fake_post):
             IntentService._upload_match_data(
                 "turn on the lights", "test:intent", "en-US",
-                {"skill_id": "test.skill"}, pipeline)
+                {"skill_id": "test.skill"}, pipeline, session_default)
         return captured
 
     def test_pipeline_joined_into_payload(self):
-        captured = self._post_payload(["adapt_high", "padatious_high"])
+        captured = self._post_payload(["adapt_high", "padatious_high"], False)
         self.assertEqual(captured["pipeline"], "adapt_high|padatious_high")
 
     def test_core_version_in_payload(self):
         from ovos_core.version import OVOS_VERSION_STR
-        captured = self._post_payload(["adapt_high"])
+        captured = self._post_payload(["adapt_high"], False)
         self.assertEqual(captured["core_version"], OVOS_VERSION_STR)
+
+    def test_default_session_reported_true(self):
+        """A match from the "default" session is flagged so remote (HiveMind)
+        clients can be counted, by exclusion, without uploading any session id."""
+        captured = self._post_payload(["adapt_high"], True)
+        self.assertIs(captured["session_default"], True)
+
+    def test_non_default_session_reported_false(self):
+        captured = self._post_payload(["adapt_high"], False)
+        self.assertIs(captured["session_default"], False)
 
 
 if __name__ == "__main__":
