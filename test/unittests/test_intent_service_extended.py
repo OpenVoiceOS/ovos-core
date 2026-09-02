@@ -256,17 +256,6 @@ class TestGetPipelineMatcher(unittest.TestCase):
         result = svc.get_pipeline_matcher("ovos-plain-pipeline-plugin")
         self.assertEqual(result, plugin.match)
 
-    def test_migration_map_resolves_old_style_names(self):
-        """Old-style pipeline names like 'adapt_high' are migrated to the new plugin ID."""
-        plugin = MagicMock(spec=ConfidenceMatcherPipeline)
-        plugin.match_high = MagicMock()
-        svc = _make_service()
-        # migration: adapt_high → ovos-adapt-pipeline-plugin-high
-        svc.pipeline_plugins["ovos-adapt-pipeline-plugin"] = plugin
-        result = svc.get_pipeline_matcher("adapt_high")
-        self.assertEqual(result, plugin.match_high)
-
-
 # ---------------------------------------------------------------------------
 # get_pipeline
 # ---------------------------------------------------------------------------
@@ -279,7 +268,7 @@ class TestGetPipeline(unittest.TestCase):
         svc = _make_service()
         # No plugins installed → all matchers return None
         sess = Session("s")
-        sess.pipeline = ["adapt_high", "fallback_high"]
+        sess.pipeline = ["ovos-adapt-pipeline-plugin-high", "ovos-fallback-pipeline-plugin-high"]
         result = svc.get_pipeline(session=sess)
         self.assertEqual(result, [])
 
@@ -290,10 +279,10 @@ class TestGetPipeline(unittest.TestCase):
         svc = _make_service()
         svc.pipeline_plugins["ovos-adapt-pipeline-plugin"] = plugin
         sess = Session("s")
-        sess.pipeline = ["adapt_high"]
+        sess.pipeline = ["ovos-adapt-pipeline-plugin-high"]
         result = svc.get_pipeline(session=sess)
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0][0], "adapt_high")
+        self.assertEqual(result[0][0], "ovos-adapt-pipeline-plugin-high")
 
 
 # ---------------------------------------------------------------------------
@@ -328,15 +317,15 @@ class TestGetPipelineSessionBlacklist(unittest.TestCase):
         svc = self._svc_with_adapt_fallback()
 
         blocked = Session("blocked")
-        blocked.pipeline = ["adapt_high", "fallback_high"]
-        blocked.blacklisted_pipelines = ["adapt_high"]
+        blocked.pipeline = ["ovos-adapt-pipeline-plugin-high", "ovos-fallback-pipeline-plugin-high"]
+        blocked.blacklisted_pipelines = ["ovos-adapt-pipeline-plugin-high"]
         blocked_result = svc.get_pipeline(session=blocked)
-        self.assertEqual([m[0] for m in blocked_result], ["fallback_high"])
+        self.assertEqual([m[0] for m in blocked_result], ["ovos-fallback-pipeline-plugin-high"])
 
         free = Session("free")
-        free.pipeline = ["adapt_high", "fallback_high"]
+        free.pipeline = ["ovos-adapt-pipeline-plugin-high", "ovos-fallback-pipeline-plugin-high"]
         free_result = svc.get_pipeline(session=free)
-        self.assertEqual([m[0] for m in free_result], ["adapt_high", "fallback_high"])
+        self.assertEqual([m[0] for m in free_result], ["ovos-adapt-pipeline-plugin-high", "ovos-fallback-pipeline-plugin-high"])
 
     def test_blacklist_overrides_explicit_pipeline_preference(self):
         """A matcher listed in BOTH session.pipeline and
@@ -345,8 +334,8 @@ class TestGetPipelineSessionBlacklist(unittest.TestCase):
         svc = self._svc_with_adapt_fallback()
 
         sess = Session("s")
-        sess.pipeline = ["adapt_high", "fallback_high"]
-        sess.blacklisted_pipelines = ["adapt_high", "fallback_high"]
+        sess.pipeline = ["ovos-adapt-pipeline-plugin-high", "ovos-fallback-pipeline-plugin-high"]
+        sess.blacklisted_pipelines = ["ovos-adapt-pipeline-plugin-high", "ovos-fallback-pipeline-plugin-high"]
         result = svc.get_pipeline(session=sess)
         self.assertEqual(result, [])
 
@@ -356,10 +345,10 @@ class TestGetPipelineSessionBlacklist(unittest.TestCase):
         svc = self._svc_with_adapt_fallback()
 
         sess = Session("s")
-        sess.pipeline = ["adapt_high"]
+        sess.pipeline = ["ovos-adapt-pipeline-plugin-high"]
         sess.blacklisted_pipelines = ["totally-unknown-pipeline-id"]
         result = svc.get_pipeline(session=sess)
-        self.assertEqual([m[0] for m in result], ["adapt_high"])
+        self.assertEqual([m[0] for m in result], ["ovos-adapt-pipeline-plugin-high"])
 
     def test_plugin_blacklist_skips_all_confidence_matchers_before_lookup(self):
         """A base plugin policy ID blocks its suffixed matcher variants.
@@ -373,7 +362,7 @@ class TestGetPipelineSessionBlacklist(unittest.TestCase):
         sess = Session("s")
         sess.pipeline = [
             "ovos-adapt-pipeline-plugin-high",
-            "fallback_high",
+            "ovos-fallback-pipeline-plugin-high",
         ]
         sess.blacklisted_pipelines = ["ovos-adapt-pipeline-plugin"]
 
@@ -381,8 +370,8 @@ class TestGetPipelineSessionBlacklist(unittest.TestCase):
                           wraps=svc.get_pipeline_matcher) as get_matcher:
             result = svc.get_pipeline(session=sess)
 
-        self.assertEqual([matcher[0] for matcher in result], ["fallback_high"])
-        get_matcher.assert_called_once_with("fallback_high")
+        self.assertEqual([matcher[0] for matcher in result], ["ovos-fallback-pipeline-plugin-high"])
+        get_matcher.assert_called_once_with("ovos-fallback-pipeline-plugin-high")
 
     def test_suffixed_blacklist_entry_denies_all_tiers_of_the_plugin(self):
         """A confidence-suffixed blacklist entry (legacy spelling) denies the
@@ -395,16 +384,16 @@ class TestGetPipelineSessionBlacklist(unittest.TestCase):
             "ovos-adapt-pipeline-plugin-high",
             "ovos-adapt-pipeline-plugin-medium",
             "ovos-adapt-pipeline-plugin-low",
-            "fallback_high",
+            "ovos-fallback-pipeline-plugin-high",
         ]
-        sess.blacklisted_pipelines = ["adapt_high"]  # legacy suffixed entry
+        sess.blacklisted_pipelines = ["ovos-adapt-pipeline-plugin-high"]  # suffixed entry
 
         with patch.object(svc, "get_pipeline_matcher",
                           wraps=svc.get_pipeline_matcher) as get_matcher:
             result = svc.get_pipeline(session=sess)
 
-        self.assertEqual([matcher[0] for matcher in result], ["fallback_high"])
-        get_matcher.assert_called_once_with("fallback_high")
+        self.assertEqual([matcher[0] for matcher in result], ["ovos-fallback-pipeline-plugin-high"])
+        get_matcher.assert_called_once_with("ovos-fallback-pipeline-plugin-high")
 
     def test_canonical_suffixed_blacklist_entry_denies_all_tiers_of_the_plugin(self):
         """Same as above but with a canonical (non-legacy) suffixed id."""
@@ -414,7 +403,7 @@ class TestGetPipelineSessionBlacklist(unittest.TestCase):
             "ovos-adapt-pipeline-plugin-high",
             "ovos-adapt-pipeline-plugin-medium",
             "ovos-adapt-pipeline-plugin-low",
-            "fallback_high",
+            "ovos-fallback-pipeline-plugin-high",
         ]
         sess.blacklisted_pipelines = ["ovos-adapt-pipeline-plugin-medium"]
 
@@ -422,8 +411,8 @@ class TestGetPipelineSessionBlacklist(unittest.TestCase):
                           wraps=svc.get_pipeline_matcher) as get_matcher:
             result = svc.get_pipeline(session=sess)
 
-        self.assertEqual([matcher[0] for matcher in result], ["fallback_high"])
-        get_matcher.assert_called_once_with("fallback_high")
+        self.assertEqual([matcher[0] for matcher in result], ["ovos-fallback-pipeline-plugin-high"])
+        get_matcher.assert_called_once_with("ovos-fallback-pipeline-plugin-high")
 
     def test_no_bus_emission_accompanies_skip(self):
         """The skip is orchestrator-only: no `match` call and no bus event
@@ -433,11 +422,11 @@ class TestGetPipelineSessionBlacklist(unittest.TestCase):
         svc.bus.on("message", lambda m: emitted.append(m))
 
         sess = Session("s")
-        sess.pipeline = ["adapt_high", "fallback_high"]
-        sess.blacklisted_pipelines = ["adapt_high"]
+        sess.pipeline = ["ovos-adapt-pipeline-plugin-high", "ovos-fallback-pipeline-plugin-high"]
+        sess.blacklisted_pipelines = ["ovos-adapt-pipeline-plugin-high"]
         result = svc.get_pipeline(session=sess)
 
-        self.assertEqual([m[0] for m in result], ["fallback_high"])
+        self.assertEqual([m[0] for m in result], ["ovos-fallback-pipeline-plugin-high"])
         adapt_plugin = svc.pipeline_plugins["ovos-adapt-pipeline-plugin"]
         adapt_plugin.match_high.assert_not_called()
         self.assertEqual(emitted, [])
@@ -1520,30 +1509,6 @@ class TestBlacklistedPipelines(unittest.TestCase):
 
     @patch("ovos_core.intent_services.service.LOG")
     @patch("ovos_core.intent_services.service.OVOSPipelineFactory")
-    def test_blacklisted_plugin_still_in_active_pipeline_warns_legacy_matcher_id(
-            self, mock_factory, mock_log):
-        # `intents.pipeline` may list legacy matcher ids (eg "adapt_high")
-        # instead of the installed plugin id; the warning must still fire
-        # when the blacklisted plugin backs that legacy matcher id
-        # (CodeRabbit review, ovos-core#832).
-        mock_factory.get_installed_pipeline_ids.return_value = [
-            "ovos-adapt-pipeline-plugin",
-        ]
-        mock_factory.load_plugin.side_effect = lambda p, bus=None: MagicMock(name=p)
-
-        svc = _make_service(config={
-            "blacklisted_pipelines": ["ovos-adapt-pipeline-plugin"],
-            "pipeline": ["adapt_high"],
-        })
-        svc.handle_reload_pipelines(Message("intent.service.pipelines.reload"))
-
-        self.assertNotIn("ovos-adapt-pipeline-plugin", svc.pipeline_plugins)
-        self.assertTrue(mock_log.warning.called)
-        warned = " ".join(str(c) for c in mock_log.warning.call_args_list)
-        self.assertIn("ovos-adapt-pipeline-plugin", warned)
-
-    @patch("ovos_core.intent_services.service.LOG")
-    @patch("ovos_core.intent_services.service.OVOSPipelineFactory")
     def test_blacklisted_plugin_logs_skip_info(self, mock_factory, mock_log):
         mock_factory.get_installed_pipeline_ids.return_value = ["ovos-m2v-pipeline"]
 
@@ -1576,12 +1541,12 @@ class TestUploadMatchData(unittest.TestCase):
         return captured
 
     def test_pipeline_joined_into_payload(self):
-        captured = self._post_payload(["adapt_high", "padatious_high"])
-        self.assertEqual(captured["pipeline"], "adapt_high|padatious_high")
+        captured = self._post_payload(["ovos-adapt-pipeline-plugin-high", "ovos-padatious-pipeline-plugin-high"])
+        self.assertEqual(captured["pipeline"], "ovos-adapt-pipeline-plugin-high|ovos-padatious-pipeline-plugin-high")
 
     def test_core_version_in_payload(self):
         from ovos_core.version import OVOS_VERSION_STR
-        captured = self._post_payload(["adapt_high"])
+        captured = self._post_payload(["ovos-adapt-pipeline-plugin-high"])
         self.assertEqual(captured["core_version"], OVOS_VERSION_STR)
 
 

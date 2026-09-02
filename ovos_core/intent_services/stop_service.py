@@ -15,8 +15,6 @@ from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
 from ovos_utils.parse import match_one
 
-from ovos_core.intent_services.stop_service_legacy import _LegacyStopBridge
-
 
 class PreDrainSnapshot(NamedTuple):
     """State a targeted stop observed before match() drained the session copy.
@@ -66,7 +64,6 @@ class StopService(ConfidenceMatcherPipeline):
         self.suppress_activation = suppress_activation
         # §5 global-stop dispatch target; bound once, shared across tiers (§3.1).
         self.bus.on(f"{self.pipeline_id}:global_stop", self.handle_global_stop)
-        self._legacy = _LegacyStopBridge(self)
         #: (session_id, skill_id) -> PreDrainSnapshot captured by _targeted_stop
         #: and consumed once by handle_stop_confirmation. Keyed per-session
         #: (not bare skill_id) so two concurrent targeted stops for the same
@@ -547,4 +544,3 @@ class StopService(ConfidenceMatcherPipeline):
     def shutdown(self) -> None:
         """Remove bus listeners registered by this service."""
         self.bus.remove(f"{self.pipeline_id}:global_stop", self.handle_global_stop)
-        self._legacy.shutdown()
