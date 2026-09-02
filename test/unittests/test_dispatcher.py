@@ -297,6 +297,30 @@ class TestDispatchFromMatch(unittest.TestCase):
         self.assertEqual(handled[0].data, {})
         svc.intent_dispatcher.shutdown()
 
+    def test_matched_notification_carries_bare_pipeline_id(self):
+        """OVOS-PIPELINE-1 §9.2/§3.1: ``pipeline_id`` on ``ovos.intent.matched``
+        identifies the plugin, never an entry-specific confidence-tier string
+        such as ``session.pipeline``'s ``-high``/``-medium``/``-low`` matcher
+        id. The loop in ``handle_utterance`` passes whatever ``session.pipeline``
+        entry produced the match; ``_dispatch_match`` must normalize it."""
+        svc, bus = self._make_service()
+        matched = []
+        bus.on(SpecMessage.INTENT_MATCHED.value, lambda m: matched.append(m))
+        self._report_complete(bus)
+
+        match = IntentHandlerMatch(match_type="test.skill:do",
+                                   match_data={}, skill_id="test.skill",
+                                   utterance="hello")
+        msg = Message(SpecMessage.UTTERANCE,
+                      {"utterances": ["hello"]},
+                      {"session": Session("s1").serialize()})
+        svc._dispatch_match(match, msg, "en-US",
+                            pipeline_id="ovos-adapt-pipeline-plugin-high")
+        self.assertEqual(len(matched), 1)
+        self.assertEqual(matched[0].data["pipeline_id"],
+                         "ovos-adapt-pipeline-plugin")
+        svc.intent_dispatcher.shutdown()
+
 
 if __name__ == "__main__":
     unittest.main()
