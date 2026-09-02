@@ -737,10 +737,6 @@ class SkillManager(Thread):
             LOG.exception(f'Couldn\'t activate (load) skill {message.data["skill"]}')
             self.bus.emit(message.response({'error': f'failed: {err}'}))
 
-    def stop(self) -> None:
-        """alias for shutdown (backwards compat)"""
-        return self.shutdown()
-
     def shutdown(self) -> None:
         """Tell the manager to shutdown."""
         self.status.set_stopping()

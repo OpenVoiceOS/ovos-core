@@ -156,13 +156,6 @@ class TestSkillManager(TestCase):
         skill_data = message_data['test_skill']
         self.assertDictEqual(dict(active=True, id='test_skill'), skill_data)
 
-    def test_stop(self):
-        self.skill_manager.stop()
-
-        self.assertTrue(self.skill_manager._stop_event.is_set())
-        instance = self.skill_loader_mock.instance
-        instance.default_shutdown.assert_called_once_with()
-
     def test_deactivate_skill(self):
         message = Message("test.message", {'skill': 'test_skill'})
         message.response = Mock()

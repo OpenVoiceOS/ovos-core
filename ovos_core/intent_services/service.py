@@ -49,31 +49,6 @@ from ovos_spec_tools.context import (
 )
 
 
-# Module-level constants for pipeline matcher migration and optimization
-_PIPELINE_MIGRATION_MAP = {
-    "converse": "ovos-converse-pipeline-plugin",
-    "common_qa": "ovos-common-query-pipeline-plugin",
-    "fallback_high": "ovos-fallback-pipeline-plugin-high",
-    "fallback_medium": "ovos-fallback-pipeline-plugin-medium",
-    "fallback_low": "ovos-fallback-pipeline-plugin-low",
-    "stop_high": "ovos-stop-pipeline-plugin-high",
-    "stop_medium": "ovos-stop-pipeline-plugin-medium",
-    "stop_low": "ovos-stop-pipeline-plugin-low",
-    "adapt_high": "ovos-adapt-pipeline-plugin-high",
-    "adapt_medium": "ovos-adapt-pipeline-plugin-medium",
-    "adapt_low": "ovos-adapt-pipeline-plugin-low",
-    "padacioso_high": "ovos-padacioso-pipeline-plugin-high",
-    "padacioso_medium": "ovos-padacioso-pipeline-plugin-medium",
-    "padacioso_low": "ovos-padacioso-pipeline-plugin-low",
-    "padatious_high": "ovos-padatious-pipeline-plugin-high",
-    "padatious_medium": "ovos-padatious-pipeline-plugin-medium",
-    "padatious_low": "ovos-padatious-pipeline-plugin-low",
-    "ocp_high": "ovos-ocp-pipeline-plugin-high",
-    "ocp_medium": "ovos-ocp-pipeline-plugin-medium",
-    "ocp_low": "ovos-ocp-pipeline-plugin-low",
-    "ocp_legacy": "ovos-ocp-pipeline-plugin-legacy"
-}
-
 _PIPELINE_RE = re.compile(r'-(high|medium|low)$')
 
 # OVOS-PIPELINE-1 §7.3 reserved intent_names. A Match produced by one of the
@@ -239,12 +214,7 @@ class IntentService:
         for p in pipeline_plugins:
             if p in blacklist:
                 LOG.info(f"Skipping blacklisted pipeline plugin: '{p}'")
-                # `intents.pipeline` may list legacy matcher ids (eg.
-                # "adapt_high"); normalize through _PIPELINE_MIGRATION_MAP
-                # before comparing against the installed plugin id, or this
-                # warning silently fails to fire for legacy configs.
-                if any(_PIPELINE_MIGRATION_MAP.get(matcher_id, matcher_id) == p or
-                       _PIPELINE_MIGRATION_MAP.get(matcher_id, matcher_id).startswith(f"{p}-")
+                if any(matcher_id == p or matcher_id.startswith(f"{p}-")
                        for matcher_id in active_pipeline):
                     LOG.warning(f"Pipeline plugin '{p}' is blacklisted in "
                                 f"'intents.blacklisted_pipelines' but also "
@@ -308,12 +278,11 @@ class IntentService:
         Retrieve a matcher function for a given pipeline matcher ID.
 
         Args:
-            matcher_id: The configured matcher ID (e.g. `adapt_high`).
+            matcher_id: The configured matcher ID (e.g. `ovos-adapt-pipeline-plugin-high`).
 
         Returns:
             A callable matcher function.
         """
-        matcher_id = _PIPELINE_MIGRATION_MAP.get(matcher_id, matcher_id)
         pipe_id = _PIPELINE_RE.sub('', matcher_id)
         plugin = self.pipeline_plugins.get(pipe_id)
         if not plugin:
@@ -346,13 +315,12 @@ class IntentService:
         # a blacklist entry denies the plugin (the actor), never a single
         # confidence tier of it, so entries are normalized to bare plugin ids
         blacklisted = {
-            _PIPELINE_RE.sub('', _PIPELINE_MIGRATION_MAP.get(pipeline_id, pipeline_id))
+            _PIPELINE_RE.sub('', pipeline_id)
             for pipeline_id in session.blacklisted_pipelines or []
         }
 
         def is_blacklisted(matcher_id: str) -> bool:
-            normalized = _PIPELINE_MIGRATION_MAP.get(matcher_id, matcher_id)
-            plugin_id = _PIPELINE_RE.sub('', normalized)
+            plugin_id = _PIPELINE_RE.sub('', matcher_id)
             return plugin_id in blacklisted
 
         requested = [p for p in session.pipeline if not is_blacklisted(p)]
@@ -626,13 +594,11 @@ class IntentService:
 
             # stamp the matching plugin's identity on the dispatch (§3.1, §7.1).
             # `pipeline_id` here is whatever entry `session.pipeline` used
-            # (e.g. a confidence-tier matcher id like "adapt-high"); §3 requires
-            # attribution to name the plugin's single bare `pipeline_id`, never
-            # an entry-specific string, so it is normalized the same way
-            # `get_pipeline_matcher` resolves it to a plugin.
+            # (e.g. a confidence-tier matcher id like "ovos-adapt-pipeline-plugin-high");
+            # §3 requires attribution to name the plugin's single bare
+            # `pipeline_id`, never an entry-specific string.
             if pipeline_id:
-                reply.context["pipeline_id"] = _PIPELINE_RE.sub(
-                    '', _PIPELINE_MIGRATION_MAP.get(pipeline_id, pipeline_id))
+                reply.context["pipeline_id"] = _PIPELINE_RE.sub('', pipeline_id)
 
             skill_id = (match.skill_id
                         or (match.match_data or {}).get("skill_id")
