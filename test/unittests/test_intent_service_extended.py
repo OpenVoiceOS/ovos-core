@@ -212,11 +212,17 @@ class TestDisambiguateLang(unittest.TestCase):
 class TestGetPipelineMatcher(unittest.TestCase):
     """Tests for IntentService.get_pipeline_matcher."""
 
-    def test_returns_none_for_unknown_plugin(self):
+    @patch("ovos_core.intent_services.service.LOG")
+    def test_returns_none_for_unknown_plugin(self, mock_log):
         """An unknown matcher_id returns None and logs an error."""
         svc = _make_service()
         result = svc.get_pipeline_matcher("nonexistent-pipeline-plugin")
         self.assertIsNone(result)
+        # Verify error was logged with helpful message
+        self.assertTrue(mock_log.error.called)
+        error_msg = " ".join(str(c) for c in mock_log.error.call_args_list)
+        self.assertIn("nonexistent-pipeline-plugin", error_msg)
+        self.assertIn("no installed plugin provides it", error_msg)
 
     def test_returns_match_high_for_high_suffix(self):
         """A ConfidenceMatcherPipeline plugin with -high suffix returns match_high."""

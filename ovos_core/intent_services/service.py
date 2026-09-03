@@ -317,7 +317,7 @@ class IntentService:
         pipe_id = _PIPELINE_RE.sub('', matcher_id)
         plugin = self.pipeline_plugins.get(pipe_id)
         if not plugin:
-            LOG.error(f"Unknown pipeline matcher: {matcher_id}")
+            LOG.error(f"Unknown pipeline matcher '{matcher_id}': no installed plugin provides it. A bare ovos-core install ships no matchers - install ovos-core[plugins] or add the specific plugin to your environment.")
             return None
 
         if isinstance(plugin, ConfidenceMatcherPipeline):
