@@ -27,9 +27,8 @@ from ovos_config import LocalConf, DEFAULT_CONFIG
 from ovos_config.locale import setup_locale
 from ovos_core.intent_services import IntentService
 from ovos_core.intent_services import service as intent_service_module
-from ovos_utils.fakebus import FakeBus
+from ovos_core.intent_services.working_session import close_round, open_round
 from ovos_workshop.intents import IntentBuilder
-from ovos_workshop.skills.ovos import OVOSSkill
 
 # Setup configurations to use with default language tests
 BASE_CONF = deepcopy(LocalConf(DEFAULT_CONFIG))
@@ -90,10 +89,10 @@ class TestContextWriteLockRace(TestCase):
     """Finding 30a: `IntentService.handle_add_context` copy-modify-assigns
     `Session.intent_context` (`ctx = dict(sess.intent_context); ...;
     sess.intent_context = ctx`) OUTSIDE `ovos_bus_client.session._CONTEXT_LOCK`,
-    while a concurrent skill-side write (`ovos-workshop` >=9.3.13a1's
-    registry-first `set_context`/`remove_context`, calling
-    `Session.set_intent_context`/`remove_intent_context` directly) mutates the
-    SAME map under that lock. If the skill's write lands between core's
+    while a concurrent skill-side write (`OVOSSkill.set_context` /
+    `remove_context`, which call `Session.set_intent_context` /
+    `remove_intent_context` on the round's session) mutates the SAME map
+    under that lock. If the skill's write lands between core's
     snapshot read and its write-back, the stale snapshot silently overwrites
     it - the skill's write is lost with no error and no trace.
 
@@ -102,34 +101,32 @@ class TestContextWriteLockRace(TestCase):
     `handle_add_context` right after it snapshots `sess.intent_context` and
     right before it writes the result back - signals readiness and then
     blocks, giving the "skill" thread a bounded window to run its own
-    registry write before core's write-back proceeds.
+    write before core's write-back proceeds.
     """
 
     def setUp(self):
-        self.bus = FakeBus()
-        self.skill = OVOSSkill(bus=self.bus, skill_id="race.skill")
         self.sess = Session(session_id="s-race-lock-test")
-        SessionManager.update(self.sess)
         # seed a live layer0 entry, as if an earlier turn set it
         self.sess.set_intent_context("layer0", "1", scope="private",
                                      owner_id="race.skill")
+        # both frames belong to the same in-flight round, so both resolve to
+        # the one working session (OVOS-SESSION-2 §2.2/§2.6)
+        self.ctx = {"skill_id": "race.skill",
+                    "session": self.sess.serialize(),
+                    "utterance_id": "uid-s-race-lock-test"}
 
     def tearDown(self):
-        SessionManager.sessions.pop("s-race-lock-test", None)
+        close_round(Message("", {}, self.ctx))
 
     def test_concurrent_skill_write_survives_core_add_context(self):
-        skill_msg = Message("some.intent", {}, {
-            "skill_id": "race.skill",
-            "session": SessionManager.sessions["s-race-lock-test"].serialize()})
         # core processing a (possibly stale/duplicate) add_context for the
         # skill's OWN previously-set key, concurrently with the skill moving
         # on to a new context layer
         core_msg = Message("add_context",
                            {"context": "racskilllayer0", "word": "1",
                             "key": "layer0"},
-                           {"skill_id": "race.skill",
-                            "session": SessionManager.sessions[
-                                "s-race-lock-test"].serialize()})
+                           dict(self.ctx))
+        open_round(core_msg, self.sess)
 
         core_ready = threading.Event()
         skill_done = threading.Event()
@@ -142,13 +139,14 @@ class TestContextWriteLockRace(TestCase):
             skill_done.wait(timeout=5)
             return orig_resolve_key(*args, **kwargs)
 
-        def skill_turn(triggering_msg):
-            # `triggering_msg` is a positional arg on THIS frame so
-            # `dig_for_message()` (walked internally by
-            # `skill.remove_context`/`set_context`) resolves the right
-            # session - mirroring a real skill handler.
-            self.skill.remove_context("layer0")  # tombstone layer0
-            self.skill.set_context("layer1", "1")
+        def skill_turn():
+            # the skill-side write a co-located `OVOSSkill.set_context` /
+            # `remove_context` performs on the round's session, under
+            # `_CONTEXT_LOCK`
+            self.sess.remove_intent_context("layer0", scope="private",
+                                            owner_id="race.skill")
+            self.sess.set_intent_context("layer1", "1", scope="private",
+                                         owner_id="race.skill")
 
         core_thread = threading.Thread(
             target=IntentService.handle_add_context, args=(core_msg,))
@@ -157,7 +155,7 @@ class TestContextWriteLockRace(TestCase):
             core_thread.start()
             self.assertTrue(core_ready.wait(timeout=5),
                             "core thread never reached the snapshot window")
-            skill_turn(skill_msg)
+            skill_turn()
             skill_done.set()
             core_thread.join(timeout=5)
             self.assertFalse(core_thread.is_alive(),
@@ -165,7 +163,7 @@ class TestContextWriteLockRace(TestCase):
         finally:
             intent_service_module.resolve_key = orig_resolve_key
 
-        final_ctx = SessionManager.sessions["s-race-lock-test"].intent_context
+        final_ctx = self.sess.intent_context
         # the skill's new write (layer1) must not be silently dropped
         self.assertIn("race.skill:layer1", final_ctx)
         self.assertEqual(final_ctx["race.skill:layer1"]["value"], "1")

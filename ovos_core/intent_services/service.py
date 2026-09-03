@@ -23,12 +23,13 @@ from typing import Optional, Tuple, Callable, List
 
 import requests
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import SessionManager, _CONTEXT_LOCK
+from ovos_bus_client.session import SessionManager, Session, _CONTEXT_LOCK
 from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
 from ovos_spec_tools import closest_lang, standardize_lang, SpecMessage
 from ovos_spec_tools.context import resolve_key
+from ovos_spec_tools.session import merge_carrier
 from ovos_utils.log import LOG
 from ovos_utils.metrics import Stopwatch
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
@@ -37,6 +38,9 @@ from ovos_utils.thread_utils import create_daemon
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService, IntentTransformersService
 from ovos_core.intent_services.dispatcher import IntentDispatcher, DEFAULT_HANDLER_TIMEOUT
 from ovos_core.intent_services.manifest import IntentManifest
+from ovos_core.intent_services.working_session import (
+    close_round, open_round, working_session,
+)
 from ovos_core.version import OVOS_VERSION_STR
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
@@ -199,8 +203,10 @@ class IntentService:
 
         self.bus.on(SpecMessage.UTTERANCE, self.handle_utterance)
 
-        # OVOS-CONTEXT-1 §5.3: intent_context is owned by SessionManager,
-        # not subscribed to here.
+        # OVOS-SESSION-2 §6.2: honour a synced session snapshot. The §5.3
+        # intent_context half of this topic is SessionManager's and is already
+        # subscribed there; this handler takes the whole-session snapshot.
+        self.bus.on(SpecMessage.SESSION_SYNC, self.handle_session_sync)
 
         # Context related handlers
         self.bus.on('add_context', self.handle_add_context)
@@ -218,6 +224,32 @@ class IntentService:
         self.status.set_alive()
         if preload_pipelines:
             self.bus.emit(Message('intent.service.pipelines.reload'))
+
+    def handle_session_sync(self, message: Message):
+        """OVOS-SESSION-2 §2.7 — take a synced session snapshot into the
+        session it is for.
+
+        §2.7 puts the snapshot in ``Message.data["session"]`` and leaves
+        ``Message.context["session"]`` as the ambient carrier saying *which*
+        session the sync is about, so the content comes from the data and the
+        identity from the context. The merge is §5.1's: a field the snapshot
+        carries replaces, a field it omits leaves the current value alone.
+
+        For the default session the merge lands in the store, which
+        ``SessionManager`` owns. For a named session there is no store (§2.2)
+        and §2.7 directs the update at the session of the utterance in
+        progress — so it applies while that round is open, and a sync arriving
+        outside one has no session to revise and is dropped.
+        """
+        payload = message.data.get("session") or {}
+        if not payload:
+            return
+        sess = working_session(message)
+        if sess is not None and not sess.is_default:
+            sess.update_from(
+                Session.deserialize(merge_carrier(sess, payload)))
+            return
+        SessionManager.handle_sync(message)
 
     def handle_reload_pipelines(self, message: Message):
         pipeline_plugins = OVOSPipelineFactory.get_installed_pipeline_ids()
@@ -373,10 +405,20 @@ class IntentService:
 
     @staticmethod
     def _validate_session(message, lang):
-        # get session
+        """Take the inbound utterance into session state and return the session
+        to run it on.
+
+        This is the arrival OVOS-SESSION-2 §5.1 describes, and the only one:
+        ``fold_inbound`` merges the raw carrier into the default-session store
+        field by field, or builds a named session from its carrier alone since
+        the orchestrator holds no state for one (§2.2). Nowhere else in the
+        utterance flow may fold a carrier — §2.6 makes an incidental Message
+        arriving mid-round unable to revise the working session, and a second
+        fold of a stale snapshot is exactly that revision.
+        """
         lang = standardize_lang(lang)
-        sess = SessionManager.get(message)
-        if sess.session_id == "default":
+        sess = SessionManager.fold_inbound(message)
+        if sess.is_default:
             updated = False
             # Default session, check if it needs to be (re)-created
             if sess.expired():
@@ -390,7 +432,6 @@ class IntentService:
                 SessionManager.sync(message)
         else:
             sess.lang = lang
-            SessionManager.update(sess)
         sess.touch()
         return sess
 
@@ -414,14 +455,13 @@ class IntentService:
         emit their own end-marker inline; together they give exactly one per
         utterance."""
         msg = dispatch_msg.forward(SpecMessage.UTTERANCE_HANDLED, {})
-        # no fold here; see _registry_session_for_context_write (SESSION-2 §2.6).
-        # Re-apply the tracked deactivations to the live session and stamp it
-        # on the end-marker so the utterance terminates with the state the
-        # handler actually requested, not the dispatch message's stale snapshot.
-        sid = (dispatch_msg.context.get("session") or {}).get("session_id")
-        live = SessionManager.sessions.get(sid) if sid else None
+        # No fold here (SESSION-2 §2.6): the dispatch message is a snapshot the
+        # round has since moved past. Re-apply the tracked deactivations to the
+        # working session and stamp that on the end-marker, so the utterance
+        # terminates with the state the handler actually requested.
+        live = close_round(dispatch_msg)
         if live is not None:
-            for skill_id in self._deactivations.get(sid) or []:
+            for skill_id in self._deactivations.pop(live.session_id, None) or []:
                 if live.is_active(skill_id):
                     live.deactivate_skill(skill_id)
             msg.context["session"] = live.serialize()
@@ -496,32 +536,24 @@ class IntentService:
         )
 
     @staticmethod
-    def _apply_post_match_decay(session_id: str, pre_match_entries: dict):
-        """OVOS-CONTEXT-1 §4/§4.1: decrement turns_remaining on the managed
-        session, skipping keys refreshed since ``pre_match_entries`` was
-        snapshotted (compared by value, not identity, since reply/forward
+    def _apply_post_match_decay(sess: "Session", pre_match_entries: dict):
+        """OVOS-CONTEXT-1 §4/§4.1: decrement turns_remaining on the session the
+        round is running on, skipping keys refreshed since ``pre_match_entries``
+        was snapshotted (compared by value, not identity, since reply/forward
         round-trips entries through serialize/deserialize).
 
         Must run before the dispatch reaches the IntentDispatcher / before
         any §9.3/§9.5 terminal is emitted (see ``_dispatch_match``).
 
-        An unregistered ``session_id`` is a no-op: decaying the DEFAULT
-        session with another session's pre-match snapshot would corrupt an
-        unrelated conversation.
+        The caller passes the working session rather than an id to look up:
+        OVOS-SESSION-2 §2.2 keeps the orchestrator stateless for named
+        sessions, so there is no registry entry to find one by, and a lookup
+        that missed would silently stop decaying every session but the
+        device's.
 
         Returns:
-            Optional[Session]: the decayed session, or ``None`` when the id
-                is unknown and nothing was touched.
+            Session: the decayed session.
         """
-        default_sess = SessionManager.get_default_session()
-        sess = SessionManager.sessions.get(session_id)
-        if sess is None:
-            if session_id != default_sess.session_id:
-                LOG.warning(f"skipping intent_context decay: session "
-                            f"'{session_id}' is not registered (decaying the "
-                            f"default session here would corrupt it)")
-                return None
-            sess = default_sess
         post_ctx = dict(sess.intent_context or {})
         unchanged_keys = {k for k in pre_match_entries
                           if k in post_ctx and post_ctx[k] == pre_match_entries[k]}
@@ -539,9 +571,8 @@ class IntentService:
         the OVOS-CONTEXT-1 §4.2 decrement, and ``context['pipeline_id']``
         stamping (§7.1); emits §9.2 ``ovos.intent.matched``; hands the
         dispatch Message to the IntentDispatcher (§7/§8). The §4.2 decrement
-        must run before the dispatch is put on the bus, or a later fold (see
-        _registry_session_for_context_write, SESSION-2 §2.6) would re-stamp
-        the pre-decrement map onto the registry.
+        must run before the dispatch is put on the bus, or the pre-decrement
+        map would be what the dispatch's consumers see.
 
         Args:
             match (IntentHandlerMatch): The matched intent (utterance, match_type,
@@ -559,11 +590,16 @@ class IntentService:
             LOG.exception("_dispatch_match failed")
 
         reply = None
-        # no fold here; see _registry_session_for_context_write (SESSION-2 §2.6).
-        sid = (message.context.get("session") or {}).get("session_id")
-        sess = (match.updated_session
-                or (sid and SessionManager.sessions.get(sid))
-                or SessionManager.get(message))
+        # §5.1: a committed ``Match.updated_session`` replaces the working
+        # session wholesale; otherwise the round continues on the session it
+        # was folded onto at entry. No fold here (§2.6).
+        sess = match.updated_session or working_session(message) or \
+            SessionManager.get(message)
+        if match.updated_session is not None:
+            # ``update`` returns the store for the default session, so the
+            # round carries on the one object every co-located view holds.
+            sess = SessionManager.update(sess)
+            open_round(message, sess)
         sess.lang = lang  # ensure it is updated
 
         # Launch intent handler
@@ -616,10 +652,7 @@ class IntentService:
             self._apply_context_slots(match, sess, reply)
 
             # OVOS-CONTEXT-1 §4.2: decrement before dispatch (see docstring)
-            decayed = self._apply_post_match_decay(sess.session_id,
-                                                   pre_match_entries or {})
-            if decayed is not None:
-                sess = decayed
+            sess = self._apply_post_match_decay(sess, pre_match_entries or {})
 
             # update Session if modified by pipeline
             reply.context["session"] = sess.serialize()
@@ -804,8 +837,12 @@ class IntentService:
 
         stopwatch = Stopwatch()
 
-        # get session
+        # get session: the single arrival of the round (SESSION-2 §5.1)
         sess = self._validate_session(message, lang)
+        # §2.2's utterance-scoped cache. Every Message derived from this round
+        # can now reach the session the round is running on, which for a named
+        # session is the only place it lives.
+        open_round(message, sess)
 
         # OVOS-CONTEXT-1 §4 (pre-match): prune dead entries so every matcher
         # this round sees the same gating snapshot
@@ -899,9 +936,14 @@ class IntentService:
         # OVOS-CONTEXT-1 §4.2 no-match path (matched path decrements in
         # _dispatch_match)
         if no_match_lang is not None:
-            self._apply_post_match_decay(sess.session_id, pre_match_entries)
+            self._apply_post_match_decay(sess, pre_match_entries)
             message.data["lang"] = no_match_lang
+            # §9.5 wants the end-marker to carry the round's final session,
+            # and the decay just changed it. For a named session this stamp is
+            # the only way the decayed context reaches the client (§2.2).
+            message.context["session"] = sess.serialize()
             self.send_complete_intent_failure(message)
+            close_round(message)
 
         # sync any changes made to the default session, eg by ConverseService
         if sess.session_id == "default":
@@ -951,28 +993,24 @@ class IntentService:
             LOG.debug(f"context-supplied slots (§7): {supplied}")
 
     @staticmethod
-    def _registry_session_for_context_write(message: Message) -> "Session":
-        """Resolve the session object to mutate for an in-lifecycle context write.
+    def _session_for_context_write(message: Message) -> "Session":
+        """Resolve the session object a legacy context write should mutate.
 
-        FOLD LAW: a message's session snapshot folds onto the live registry
-        session only at lifecycle entry; an incidental message arriving
-        mid-lifecycle (a skill reply, a follow-up handler frame) must never
-        fold its stale snapshot onto the registry, or it silently overwrites
-        whatever the registry has accumulated since — including named-session
-        ``update_from`` full-replaces and the same-shaped bug on the
-        ``"default"`` session. Writes belong on the registry session object
-        itself, never on a fresh fold of the message. See SESSION-2 §2.6.
+        A context write belongs to the round it was emitted from, so it lands
+        on that round's working session (SESSION-2 §2.6: a mutation happens at
+        a lifecycle boundary the writer participates in, and an incidental
+        Message may not revise the working session with its own snapshot). The
+        working session is looked up by ``utterance_id``, which the skill's
+        handler frame carries for free.
 
-        This resolves the session_id off the message and, if the registry
-        already holds a live entry for it, returns that object directly - no
-        fold. Falls back to ``SessionManager.get(message)`` only when no
-        registry entry exists yet, e.g. out-of-registry/test callers.
+        With no round open there is no lifecycle to write into. The default
+        session is still the device's store and a write to it is meaningful at
+        any time (§5), so that case resolves to the store; a named session
+        resolves to a throwaway built from the carrier and the write goes
+        nowhere, which is what §2.2 leaves available — the orchestrator holds
+        no named session between utterances to write into.
         """
-        session_data = message.context.get("session") if message and message.context else None
-        session_id = session_data.get("session_id") if isinstance(session_data, dict) else None
-        if session_id and session_id in SessionManager.sessions:
-            return SessionManager.sessions[session_id]
-        return SessionManager.get(message)
+        return working_session(message) or SessionManager.get(message)
 
     @staticmethod
     def handle_add_context(message: Message):
@@ -1012,7 +1050,7 @@ class IntentService:
         entity['match'] = word
         entity['key'] = word
         entity['origin'] = origin
-        sess = IntentService._registry_session_for_context_write(message)
+        sess = IntentService._session_for_context_write(message)
         # Finding 30a: `sess.context.inject_context()` folds its own write
         # into `intent_context` under `ovos_bus_client.session._CONTEXT_LOCK`
         # (the same lock guarding `Session.set_intent_context` /
@@ -1081,7 +1119,7 @@ class IntentService:
         """
         context = message.data.get('context')
         if context:
-            sess = IntentService._registry_session_for_context_write(message)
+            sess = IntentService._session_for_context_write(message)
             # Finding 30a: same atomicity requirement as `handle_add_context`
             # - hold `_CONTEXT_LOCK` across the `remove_context`-style fold
             # AND the copy-modify-assign below, so a concurrent skill-side
@@ -1106,7 +1144,7 @@ class IntentService:
     @staticmethod
     def handle_clear_context(message: Message):
         """Clears all keywords from context """
-        sess = IntentService._registry_session_for_context_write(message)
+        sess = IntentService._session_for_context_write(message)
         # Finding 30a: same atomicity requirement as `handle_add_context`.
         with _CONTEXT_LOCK:
             sess.context.clear_context()

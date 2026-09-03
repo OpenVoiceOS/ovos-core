@@ -23,7 +23,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import Session, SessionManager
+from ovos_bus_client.session import DEFAULT_SESSION_ID, Session, SessionManager
 from ovos_utils.fakebus import FakeBus
 
 from ovos_spec_tools.context import (
@@ -262,35 +262,39 @@ class TestLiveSessionManagerSync(unittest.TestCase):
         self.assertIn("tea.skill:confirming_milk", merged)
         self.assertNotIn("keep", merged)
 
-    def test_orchestrator_decays_managed_session(self):
+    def test_orchestrator_decays_a_named_session_over_the_wire(self):
+        """§4.2 decay on a named session, which the orchestrator holds no
+        state for between utterances (SESSION-2 §2.2) — each turn's decayed
+        session comes back on the wire and the client sends it on the next."""
         bus = FakeBus()
         SessionManager.connect_to_bus(bus)
         svc = _make_service()
         svc.bus = bus
 
-        sess = Session("turn-sess")
-        sess.intent_context = {"tea.skill:flag": {"value": None,
-                                                  "turns_remaining": 1}}
-        SessionManager.update(sess)
+        carrier = Session("turn-sess")
+        carrier.intent_context = {"tea.skill:flag": {"value": None,
+                                                     "turns_remaining": 1}}
 
-        def _drive():
+        def _drive(snapshot):
+            handled = []
+            bus.on("ovos.utterance.handled", handled.append)
             msg = Message("recognizer_loop:utterance",
                           data={"utterances": ["hello"]},
-                          context={"session":
-                                   SessionManager.sessions["turn-sess"].serialize()})
+                          context={"session": snapshot})
             # no pipelines loaded -> no match, decay still runs
             svc.handle_utterance(msg)
+            bus.remove("ovos.utterance.handled", handled.append)
+            self.assertEqual(len(handled), 1)
+            return handled[0].context["session"]
 
         # turn 1: flag is live during the round, decremented to 0 after
-        _drive()
+        turn1 = _drive(carrier.serialize())
         self.assertEqual(
-            SessionManager.sessions["turn-sess"].intent_context["tea.skill:flag"]["turns_remaining"],
-            0)
+            turn1[INTENT_CONTEXT_FIELD]["tea.skill:flag"]["turns_remaining"], 0)
         # turn 2: pre-match prune removes the now-dead flag
-        _drive()
-        self.assertNotIn(
-            "tea.skill:flag",
-            SessionManager.sessions["turn-sess"].intent_context or {})
+        turn2 = _drive(turn1)
+        self.assertNotIn("tea.skill:flag",
+                         turn2.get(INTENT_CONTEXT_FIELD) or {})
 
     @pytest.mark.xfail(strict=True, reason=_NEEDS_BUS_CLIENT_278)
     def test_midispatch_sync_survives_decay(self):
@@ -376,11 +380,15 @@ class TestSessionSyncCarrier(unittest.TestCase):
 
     def test_legacy_context_carrier_is_still_honoured(self):
         """§2.7 fallback: the legacy ``context['session']`` shape must keep
-        working for one major. This passes on bus-client dev today."""
-        sess = self._tracked("carrier-ctx")
+        working for one major.
+
+        Driven on the default session, the only one the orchestrator holds
+        state for (§2.3/§5) and so the only one a sync arriving outside an
+        utterance has somewhere to land."""
+        sess = self._tracked(DEFAULT_SESSION_ID)
         snap = self._snap(sess, {"from.ctx": {"value": "ctx"}})
         SessionManager.handle_session_sync(_sync_msg(snap, carrier="context"))
-        merged = SessionManager.sessions["carrier-ctx"].intent_context
+        merged = SessionManager.get_default_session().intent_context
         self.assertEqual(merged.get("from.ctx"), {"value": "ctx"})
 
     @pytest.mark.xfail(strict=True, reason=_NEEDS_BUS_CLIENT_278)
@@ -417,33 +425,30 @@ class TestDecayIgnoresUnknownSession(unittest.TestCase):
 
     tearDown = setUp
 
-    def test_unregistered_session_id_leaves_default_untouched(self):
+    def test_named_session_decay_leaves_default_untouched(self):
         default = SessionManager.get_default_session()
         default.intent_context = {"person": {"value": "Bob",
                                              "turns_remaining": 3}}
         before = copy.deepcopy(default.intent_context)
 
+        sess = Session("foreign-session")
+        sess.intent_context = {"person": {"value": "Bob", "turns_remaining": 3}}
         svc = _make_service()
-        # a foreign session's pre-match snapshot, for an id nobody registered
-        result = svc._apply_post_match_decay(
-            "ghost-session", {"person": {"value": "Bob", "turns_remaining": 3}})
+        svc._apply_post_match_decay(
+            sess, {"person": {"value": "Bob", "turns_remaining": 3}})
 
-        self.assertIsNone(result, "unknown session must be a no-op")
+        self.assertEqual(sess.intent_context["person"]["turns_remaining"], 2)
         self.assertEqual(
             SessionManager.get_default_session().intent_context, before,
             "the default session's intent_context must be untouched")
 
-    def test_registered_session_still_decays(self):
-        # guard: the no-op branch must not have disabled decay outright
+    def test_named_session_decays(self):
         sess = Session("real-session")
         sess.intent_context = {"person": {"value": "Bob", "turns_remaining": 3}}
-        SessionManager.update(sess)
         svc = _make_service()
         svc._apply_post_match_decay(
-            "real-session", {"person": {"value": "Bob", "turns_remaining": 3}})
-        self.assertEqual(
-            SessionManager.sessions["real-session"]
-            .intent_context["person"]["turns_remaining"], 2)
+            sess, {"person": {"value": "Bob", "turns_remaining": 3}})
+        self.assertEqual(sess.intent_context["person"]["turns_remaining"], 2)
 
 
 
@@ -660,9 +665,9 @@ class TestDecayPropagatesToTerminalEmissions(unittest.TestCase):
     def test_decrement_actually_runs(self):
         sess = Session("decay-sanity")
         sess.intent_context = {"person": {"value": "Bob", "turns_remaining": 3}}
-        self._run_full_dispatch(sess)
-        managed = SessionManager.sessions["decay-sanity"].intent_context
-        self.assertEqual(managed["person"]["turns_remaining"], 2)
+        handled_frames, _ = self._run_full_dispatch(sess)
+        decayed = handled_frames[0].context["session"][INTENT_CONTEXT_FIELD]
+        self.assertEqual(decayed["person"]["turns_remaining"], 2)
 
     def test_terminal_emissions_carry_decayed_context(self):
         sess = Session("wire-sess")
