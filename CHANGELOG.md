@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.2.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.2a1) (2026-09-03)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.1a1...3.2.2a1)
+
+**Merged pull requests:**
+
+- fix: improve unknown pipeline matcher log message [\#913](https://github.com/OpenVoiceOS/ovos-core/pull/913) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.2.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.1a1) (2026-09-02)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.0a1...3.2.1a1)
@@ -42,19 +50,19 @@
 
 ## [3.0.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.12a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.12a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.12a1)
 
 **Merged pull requests:**
 
 - fix: close messagebus client before main\(\) returns on shutdown [\#870](https://github.com/OpenVoiceOS/ovos-core/pull/870) ([JarbasAl](https://github.com/JarbasAl))
 
-## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.10a3)
-
 ## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.11a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.11a1)
+
+## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.10a3)
 
 ## [3.0.10a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a2) (2026-08-31)
 
@@ -359,10 +367,6 @@
 ## [2.5.0a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.0a2) (2026-07-04)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.0a1...2.5.0a2)
-
-**Merged pull requests:**
-
-- test: verify skill install from ggwave audio end-to-end [\#770](https://github.com/OpenVoiceOS/ovos-core/pull/770) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.5.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.0a1) (2026-07-02)
 
