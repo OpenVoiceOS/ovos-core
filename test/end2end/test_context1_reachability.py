@@ -54,6 +54,7 @@ from ovos_utils.fakebus import FakeBus
 from ovos_spec_tools.context import gate_satisfied
 
 from ovos_core.intent_services.service import IntentService
+from ovos_core.intent_services.working_session import close_round, open_round
 from ovos_workshop.skills.ovos import OVOSSkill
 
 SKILL_ID = "my.skill"
@@ -72,13 +73,14 @@ class TestContext1EndToEndReachability(TestCase):
         self.requires = [CONTEXT_KEY]
         self.excludes = []
 
-        # Register a REAL named session in the shared singleton registry -
-        # nothing is mocked here by default. This is what
-        # SessionManager.get(message) would fold onto for any message
-        # declaring session_id=SESSION_ID.
         self._saved_sessions = dict(SessionManager.sessions)
         SessionManager.sessions.clear()
         self.session = Session(SESSION_ID)
+        # OVOS-SESSION-2 §2.2 keeps the orchestrator stateless for a named
+        # session, so core resolves one through the round's working session.
+        # ovos-workshop's producer still resolves through the registry, so the
+        # same object is planted there too and both halves write the one
+        # session a real round would be running on.
         SessionManager.sessions[SESSION_ID] = self.session
 
         self.bus.on("add_context", IntentService.handle_add_context)
@@ -93,10 +95,9 @@ class TestContext1EndToEndReachability(TestCase):
         SessionManager.sessions.update(self._saved_sessions)
 
     def _live_intent_context(self) -> dict:
-        """What ``ovos.utterance.handled`` would serialize (SESSION-1/SESSION-2:
-        the terminal event carries the live registry session, not a private
-        reference) - read directly off the singleton, never off a variable
-        the test happens to still be holding."""
+        """What ``ovos.utterance.handled`` would serialize: the session the
+        round is running on, read through the working-session registry rather
+        than off a variable the test happens to still be holding."""
         return SessionManager.sessions[SESSION_ID].intent_context or {}
 
     def _gate_open(self) -> bool:
@@ -173,15 +174,14 @@ class TestContext1EndToEndReachability(TestCase):
                 SessionManager.sessions.pop(DEFAULT_SESSION_ID, None)
 
     def test_named_session_context_survives_a_second_stale_client_message(self):
-        """Without the registry-first fold discipline, this assertion fails:
-        a stale second message wipes a NAMED session's context before it
-        ever reaches the terminal event.
+        """A stale second message must not wipe a NAMED session's context
+        before it reaches the terminal event.
 
         Step 1 drives the REAL producer (``OVOSSkill.set_context``) over the
         bus, in-handler (so ``dig_for_message`` finds the driving message),
         exactly like the repro above, but on an explicit NAMED session
-        registered in the real ``SessionManager.sessions`` registry. This
-        opens the gate and moves the registry forward.
+        on an explicit NAMED session. This opens the gate and moves the
+        round's session forward.
 
         ``Message.forward()`` (used internally by the workshop producer)
         self-heals staleness for messages derived *within this same
@@ -201,10 +201,11 @@ class TestContext1EndToEndReachability(TestCase):
         ``MessageBusClient`` hands a deserialized wire message to the
         registered handler.
 
-        Without the fix, ``handle_add_context`` folds this stale snapshot
-        onto the registry entry before writing to it - for a NAMED session
-        that fold is full-replace, wiping step 1's entry - so the
-        ``"kitchen" entry present`` assertion below fails.
+        The frame belongs to the round, so it carries the round's
+        ``utterance_id`` and reaches the working session that way
+        (OVOS-SESSION-2 §2.6). What it must NOT do is adopt its own stale
+        snapshot: that would full-replace the named session and wipe step 1's
+        entry, so the ``"kitchen" entry present`` assertion below fails.
         """
         # Step 1: real producer, real consumer, over the bus, in-handler.
         stale_snapshot = self.session.serialize()  # captured BEFORE any write
@@ -216,7 +217,10 @@ class TestContext1EndToEndReachability(TestCase):
         inbound = Message("recognizer_loop:utterance",
                           {"utterances": ["irrelevant"]},
                           {"session": self.session.serialize(),
-                           "skill_id": SKILL_ID})
+                           "skill_id": SKILL_ID,
+                           "utterance_id": "uid-ctx1-e2e"})
+        open_round(inbound, self.session)
+        self.addCleanup(close_round, inbound)
         self.bus.on("recognizer_loop:utterance", _handler)
         self._emit_and_wait("ovos.utterance.handled",
                             lambda: self.bus.emit(inbound))
@@ -235,7 +239,8 @@ class TestContext1EndToEndReachability(TestCase):
             "add_context",
             {"context": "my_skillother", "word": "other", "origin": "",
              "key": "other"},
-            {"session": stale_snapshot, "skill_id": SKILL_ID})
+            {"session": stale_snapshot, "skill_id": SKILL_ID,
+             "utterance_id": "uid-ctx1-e2e"})
         IntentService.handle_add_context(stale_second_message)
 
         ctx = self._live_intent_context()

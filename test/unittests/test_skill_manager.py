@@ -42,16 +42,19 @@ class MessageBusMock:
         self.message_types = []
         self.message_data = []
         self.event_handlers = []
+        self.handlers = []
 
     def emit(self, message):
         self.message_types.append(message.msg_type)
         self.message_data.append(message.data)
 
-    def on(self, event, _):
+    def on(self, event, handler):
         self.event_handlers.append(event)
+        self.handlers.append((event, handler))
 
-    def once(self, event, _):
+    def once(self, event, handler):
         self.event_handlers.append(event)
+        self.handlers.append((event, handler))
 
     def wait_for_response(self, message):
         self.emit(message)
@@ -845,9 +848,13 @@ class TestSkillManagerSessionManagerBus(TestCase):
         constructing IntentService, and IntentService.__init__ used to call
         SessionManager.connect_to_bus() unconditionally. Same bus object on
         both call sites means every standard monolith boot registered all
-        five SessionManager bus handlers twice. Assert exactly one handler
-        per topic is registered, regardless of which subsystem connects
-        first.
+        five SessionManager bus handlers twice. Assert exactly one
+        SessionManager-owned handler per topic is registered, regardless of
+        which subsystem connects first.
+
+        Counted by handler owner, not by topic: ``ovos.session.sync`` also
+        carries IntentService's own OVOS-SESSION-2 §2.7 subscriber, which is
+        a different handler doing a different job on the same topic.
         """
         bus = MessageBusMock()
         SkillManager(bus, enable_intent_service=True, enable_file_watcher=False)
@@ -860,9 +867,12 @@ class TestSkillManagerSessionManagerBus(TestCase):
             "recognizer_loop:audio_output_end",
             SpecMessage.SESSION_SYNC,
         ):
+            owned = [h for t, h in bus.handlers
+                     if t == topic
+                     and getattr(h, "__self__", None) is SessionManager]
             self.assertEqual(
-                bus.event_handlers.count(topic), 1,
-                f"expected exactly one handler for {topic}, got "
-                f"{bus.event_handlers.count(topic)}"
+                len(owned), 1,
+                f"expected exactly one SessionManager handler for {topic}, "
+                f"got {len(owned)}"
             )
 

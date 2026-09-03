@@ -30,6 +30,7 @@ from ovos_spec_tools import SpecMessage
 from ovos_core.intent_services.service import IntentService
 from ovos_core.intent_services.dispatcher import IntentDispatcher
 from ovos_core.intent_services.manifest import IntentManifest
+from ovos_core.intent_services.working_session import close_round, open_round
 
 
 def _make_service(config=None) -> IntentService:
@@ -457,7 +458,7 @@ class TestContextHandlers(unittest.TestCase):
     """Tests for the context management static methods."""
 
     def setUp(self):
-        # The handlers resolve registry-first (_registry_session_for_context_write),
+        # The handlers resolve the round's working session,
         # so a leftover real SessionManager.sessions["s"] entry from
         # `Session.touch()`'s self-registration (triggered internally by
         # intent_context writes) would otherwise shadow this test's
@@ -890,18 +891,13 @@ class TestContextHandlers(unittest.TestCase):
 
 
 class TestContextHandlersLiveRegistry(unittest.TestCase):
-    """FOLD LAW (see IntentService._registry_session_for_context_write,
-    SESSION-2 §2.6): a message's session snapshot folds onto the live
-    registry session only at lifecycle entry, never on an incidental
-    mid-lifecycle message. `SessionManager.get(message)` folds unconditionally,
-    and for NAMED sessions that fold is full-replace (`update_from`), so an
-    incidental fold wipes the registry entry's intent_context with a stale
-    snapshot - a named session's context can never survive to the terminal
-    event.
+    """A legacy context write lands on the working session of the round it
+    came from, and the snapshot the incidental Message happens to carry does
+    not revise that session (OVOS-SESSION-2 §2.6).
 
-    These tests exercise the REAL SessionManager.sessions registry (no
-    mocking of SessionManager.get) so they fail against an unconditional
-    every-call fold.
+    Named sessions are the load-bearing case: the orchestrator holds no state
+    for one between utterances (§2.2), so a write that resolved through the
+    carrier would land on a throwaway and be gone by the terminal event.
     """
 
     def setUp(self):
@@ -912,48 +908,46 @@ class TestContextHandlersLiveRegistry(unittest.TestCase):
         SessionManager.sessions.clear()
         SessionManager.sessions.update(self._saved_sessions)
 
+    @staticmethod
+    def _in_round(session, data, carrier=None):
+        msg = Message("add_context", data=data,
+                      context={"session": (carrier or session).serialize(),
+                               "utterance_id": f"uid-{session.session_id}"})
+        open_round(msg, session)
+        return msg
+
     def test_add_context_survives_stale_message_snapshot_fold(self):
-        """A registry entry's pre-existing intent_context must survive a
-        handle_add_context call driven by a message carrying a STALE
-        session snapshot (no knowledge of the pre-existing entry) - the
-        write must land on the LIVE registry object, not a folded copy."""
+        """The round's pre-existing intent_context survives a
+        handle_add_context driven by a Message carrying a stale snapshot."""
         sess = Session("named-r4")
         sess.intent_context = {"Existing": {"value": "existing"}}
-        SessionManager.sessions[sess.session_id] = sess
 
         stale = Session(sess.session_id)  # unaware of "Existing"
-        msg = Message("add_context",
-                      data={"context": "New", "word": "newword"},
-                      context={"session": stale.serialize()})
+        msg = self._in_round(sess, {"context": "New", "word": "newword"},
+                             carrier=stale)
 
         IntentService.handle_add_context(msg)
 
-        live = SessionManager.sessions[sess.session_id]
-        self.assertIn("Existing", live.intent_context)
-        self.assertIn("New", live.intent_context)
+        self.assertIn("Existing", sess.intent_context)
+        self.assertIn("New", sess.intent_context)
+        close_round(msg)
 
     def test_add_context_accumulates_across_two_stale_calls(self):
-        """Two handle_add_context calls, each driven by a message with its
-        own stale snapshot (mirroring successive mid-lifecycle frames),
-        must both survive on the live registry entry."""
+        """Two handle_add_context calls in the same round, each carrying its
+        own stale snapshot, both survive."""
         sess = Session("named-r4-2")
-        SessionManager.sessions[sess.session_id] = sess
 
-        stale1 = Session(sess.session_id)
-        msg1 = Message("add_context",
-                       data={"context": "First", "word": "one"},
-                       context={"session": stale1.serialize()})
+        msg1 = self._in_round(sess, {"context": "First", "word": "one"},
+                              carrier=Session(sess.session_id))
         IntentService.handle_add_context(msg1)
 
-        stale2 = Session(sess.session_id)
-        msg2 = Message("add_context",
-                       data={"context": "Second", "word": "two"},
-                       context={"session": stale2.serialize()})
+        msg2 = self._in_round(sess, {"context": "Second", "word": "two"},
+                              carrier=Session(sess.session_id))
         IntentService.handle_add_context(msg2)
 
-        live = SessionManager.sessions[sess.session_id]
-        self.assertIn("First", live.intent_context)
-        self.assertIn("Second", live.intent_context)
+        self.assertIn("First", sess.intent_context)
+        self.assertIn("Second", sess.intent_context)
+        close_round(msg2)
 
     def test_add_context_survives_stale_default_session_snapshot_fold(self):
         """The registry-first fix is load-bearing for the DEVICE-LOCAL

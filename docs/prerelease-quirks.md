@@ -9,6 +9,35 @@ This file resets at the next stable release. At that point its contents
 become upgrade notes for the `2.1.1 -> next-stable` jump, and a new, empty
 quirks log starts.
 
+## #915 (alpha of 2026-09-03)
+
+Floors moved to `ovos-bus-client` 2.11.1a1 and `ovos-spec-tools` 1.10.1a1,
+and core now requires them: `SessionManager.get()` is a pure read there and
+the registry holds only the `default` session, per OVOS-SESSION-2 §2.2.
+
+The inbound session is taken once per utterance, at the intake, via
+`SessionManager.fold_inbound` — the §5.1 arrival, where an omitted field
+leaves the stored value standing and a present one replaces it. Before this,
+a device that declared `intent_context` on one utterance lost it before the
+next, so context-gated skills were unreachable after the first turn.
+
+A named session no longer has a registry entry to look up. The session the
+arrival produces is held for the round in `ovos_core.intent_services.working_session`,
+keyed on the `utterance_id`, and the decay, deactivation-replay, legacy
+context writes and converse write paths all read it from there. Anything
+that reached into `SessionManager.sessions` for a named id needs the same
+treatment; `ovos-workshop`'s `set_context` producer still does.
+
+`ovos.utterance.handled` on the no-match path now carries the decayed
+`intent_context`, which for a named session is the only channel it has.
+`ovos.session.sync` is consumed for its §2.7 whole-session snapshot on
+`Message.data["session"]`, in addition to SessionManager's §5.3
+`intent_context` merge on the same topic.
+
+Core takes one arrival per utterance, but `MessageBusClient` still folds
+every inbound default-session message at the transport layer. Narrowing that
+is a bus-client change.
+
 ## #906 (alpha of 2026-09-02)
 
 `ovos.intent.matched`'s `pipeline_id` field (OVOS-PIPELINE-1 §9.2) carried
