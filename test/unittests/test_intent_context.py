@@ -236,12 +236,10 @@ class TestLiveSessionManagerSync(unittest.TestCase):
     def setUp(self):
         # isolate the singleton between tests
         SessionManager.sessions = {"default": Session("default")}
-        SessionManager.default_session = SessionManager.sessions["default"]
         SessionManager.bus = None
 
     def tearDown(self):
         SessionManager.sessions = {"default": Session("default")}
-        SessionManager.default_session = SessionManager.sessions["default"]
         SessionManager.bus = None
 
     @pytest.mark.xfail(strict=True, reason=_NEEDS_BUS_CLIENT_278)
@@ -416,7 +414,6 @@ class TestDispatchMatchRejectsMismatchedUpdatedSession(unittest.TestCase):
 
     def setUp(self):
         SessionManager.sessions = {"default": Session("default")}
-        SessionManager.default_session = SessionManager.sessions["default"]
         SessionManager.bus = None
 
     tearDown = setUp
@@ -460,7 +457,6 @@ class TestSessionSyncCarrier(unittest.TestCase):
 
     def setUp(self):
         SessionManager.sessions = {"default": Session("default")}
-        SessionManager.default_session = SessionManager.sessions["default"]
         SessionManager.bus = None
 
     tearDown = setUp
@@ -518,7 +514,6 @@ class TestDecayIgnoresUnknownSession(unittest.TestCase):
 
     def setUp(self):
         SessionManager.sessions = {"default": Session("default")}
-        SessionManager.default_session = SessionManager.sessions["default"]
         SessionManager.bus = None
 
     tearDown = setUp
@@ -713,12 +708,10 @@ class TestDecayPropagatesToTerminalEmissions(unittest.TestCase):
 
     def setUp(self):
         SessionManager.sessions = {"default": Session("default")}
-        SessionManager.default_session = SessionManager.sessions["default"]
         SessionManager.bus = None
 
     def tearDown(self):
         SessionManager.sessions = {"default": Session("default")}
-        SessionManager.default_session = SessionManager.sessions["default"]
         SessionManager.bus = None
 
     def _run_full_dispatch(self, sess):
@@ -863,7 +856,6 @@ class TestRequiredSlotFilledFromContext(unittest.TestCase):
 
     def setUp(self):
         SessionManager.sessions = {"default": Session("default")}
-        SessionManager.default_session = SessionManager.sessions["default"]
         SessionManager.bus = None
 
     tearDown = setUp
