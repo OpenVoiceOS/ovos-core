@@ -18,6 +18,8 @@ from ovos_bus_client.message import Message
 from ovos_spec_tools import standardize_lang
 from ovos_utils.log import LOG
 
+from ovos_core.intent_services.working_session import raw_session_id
+
 
 class IntentManifest:
     """INTENT-4 §10 orchestrator-owned manifest.
@@ -74,17 +76,22 @@ class IntentManifest:
         return list(seen.values())
 
     @staticmethod
-    def _session_id_of(message: Message) -> str:
+    def _session_id_of(message: Message) -> Optional[str]:
         """Mutation scope per §11.1/§11.3 — always ``context.session.session_id``,
         NEVER ``Message.data``. A ``data.session_id`` on a mutation is not a
         scope assertion the producer is entitled to make; a producer could
         otherwise deregister/disable another session's intents by forging the
         payload. Any ``data.session_id`` that disagrees with the context is
         logged and ignored.
+
+        ``None`` for a malformed carrier (OVOS-SESSION-1 §2.5) — already
+        logged by ``raw_session_id``; matches no real key so the mutation is
+        a no-op instead of a crash or a misrouted default-session mutation.
         """
-        ctx_session_id = (message.context.get("session") or {}).get("session_id", "default")
+        ctx_session_id = raw_session_id(message)
         data_session_id = message.data.get("session_id")
-        if data_session_id is not None and data_session_id != ctx_session_id:
+        if (ctx_session_id is not None and data_session_id is not None
+                and data_session_id != ctx_session_id):
             LOG.warning(
                 f"{message.msg_type}: ignoring forged data.session_id={data_session_id!r}; "
                 f"session scope is context.session.session_id={ctx_session_id!r} (§11.1)")
@@ -134,7 +141,12 @@ class IntentManifest:
                 f"this collides with the OVOS-STOP-1 reserved '{skill_id}:stop' "
                 "targeted-dispatch topic, so both the registered intent handler "
                 "and the stop machinery will react to messages on that topic.")
-        session_id = (message.context.get("session") or {}).get("session_id", "default")
+        session_id = raw_session_id(message)
+        if session_id is None:
+            # malformed carrier (OVOS-SESSION-1 §2.5): already logged; drop
+            # the registration rather than indexing it under a fabricated
+            # session identity.
+            return
         key = self._key(session_id, skill_id, intent_name, lang, method)
         self._index[key] = {
             "skill_id": skill_id,

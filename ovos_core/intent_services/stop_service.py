@@ -16,6 +16,7 @@ from ovos_utils.log import LOG
 from ovos_utils.parse import match_one
 
 from ovos_core.intent_services.stop_service_legacy import _LegacyStopBridge
+from ovos_core.intent_services.working_session import raw_session_id
 
 
 class PreDrainSnapshot(NamedTuple):
@@ -280,7 +281,11 @@ class StopService(ConfidenceMatcherPipeline):
         skill_id = (message.data.get("skill_id") or
                     message.context.get("skill_id") or
                     message.msg_type.split(".stop.response")[0])
-        sess_id = (message.context.get("session") or {}).get("session_id", "default")
+        sess_id = raw_session_id(message)
+        if sess_id is None:
+            # malformed carrier (OVOS-SESSION-1 §2.5): already logged, and
+            # there is no (session_id, skill_id) key to resolve against.
+            return
         # Pop both snapshots unconditionally before either branch below: the
         # error/no-dispatch paths must not leak them or hold the
         # _resolve_dispatch_lifecycle gate open for this (session_id, skill_id).

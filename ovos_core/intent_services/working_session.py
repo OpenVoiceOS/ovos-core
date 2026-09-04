@@ -28,6 +28,7 @@ from typing import Dict, Optional
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
+from ovos_utils.log import LOG
 
 #: An utterance whose dispatch never reaches a terminal is never closed, so the
 #: oldest round is evicted once this many are open at once. Reaching the bound
@@ -39,6 +40,29 @@ _OPEN_ROUNDS: "OrderedDict[str, Session]" = OrderedDict()
 #: intent-context entries the round's pre-match prune removed, per open
 #: round, as key -> the entry the prune dropped.
 _PRUNED_ENTRIES: "OrderedDict[str, Dict[str, dict]]" = OrderedDict()
+
+
+def raw_session_id(message: Message) -> Optional[str]:
+    """The ``session_id`` a Message's raw ``context.session`` carrier names,
+    without folding it through :class:`Session` (OVOS-SESSION-1 §2.5).
+
+    A missing/``None`` carrier is the default session (§2.1/§3.1). A carrier
+    that is present but not a JSON object is malformed: this returns ``None``
+    instead of raising or substituting the default session's identity, so a
+    correlation lookup keyed on it is dropped rather than misrouted. Use for
+    call sites that only need the id for correlation (dispatch tracking,
+    manifest scoping) — not for reading session content, which goes through
+    ``SessionManager``/``Session`` and its own ``MalformedSession`` handling.
+    """
+    session = message.context.get("session")
+    if session is None:
+        return "default"
+    if not isinstance(session, dict):
+        LOG.error(f"OVOS-SESSION-1 §2.5: malformed session carrier on "
+                  f"{message.msg_type} (got {type(session).__name__}, "
+                  f"expected object); dropping")
+        return None
+    return session.get("session_id", "default")
 
 
 def _utterance_id(message: Optional[Message]) -> Optional[str]:
