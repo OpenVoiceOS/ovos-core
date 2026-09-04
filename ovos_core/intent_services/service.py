@@ -593,13 +593,27 @@ class IntentService:
         # §5.1: a committed ``Match.updated_session`` replaces the working
         # session wholesale; otherwise the round continues on the session it
         # was folded onto at entry. No fold here (§2.6).
-        sess = match.updated_session or working_session(message) or \
-            SessionManager.get(message)
+        sess = working_session(message) or SessionManager.get(message)
         if match.updated_session is not None:
-            # ``update`` returns the store for the default session, so the
-            # round carries on the one object every co-located view holds.
-            sess = SessionManager.update(sess)
-            open_round(message, sess)
+            updated = match.updated_session
+            if updated.resolved_session_id() != sess.resolved_session_id():
+                # §5.1/§4.2: updated_session is defined as the ROUND's session,
+                # updated — never a different session. A pipeline plugin
+                # returning one for a different id is a plugin bug, and a
+                # plugin bug must not kill the utterance: log it and keep
+                # dispatching on the round's own working session.
+                LOG.error(
+                    f"pipeline '{pipeline_id}' returned an updated_session "
+                    f"for '{updated.resolved_session_id()}' but the round is "
+                    f"running on '{sess.resolved_session_id()}'; ignoring "
+                    f"the updated_session and continuing on the round's own "
+                    f"session")
+            else:
+                # ``update`` returns the store for the default session, so the
+                # round carries on the one object every co-located view holds.
+                sess = SessionManager.update(updated)
+                open_round(message, sess)
+                SessionManager.bind(message, sess)
         sess.lang = lang  # ensure it is updated
 
         # Launch intent handler
@@ -843,6 +857,11 @@ class IntentService:
         # can now reach the session the round is running on, which for a named
         # session is the only place it lives.
         open_round(message, sess)
+        # Bind the working session as the message's own session: every
+        # ``SessionManager.get(message)`` this round and every derivation's
+        # ``stamp_derived`` must see this exact object, mutations included,
+        # rather than rebuilding one from the (now stale) carrier.
+        SessionManager.bind(message, sess)
 
         # OVOS-CONTEXT-1 §4 (pre-match): prune dead entries so every matcher
         # this round sees the same gating snapshot

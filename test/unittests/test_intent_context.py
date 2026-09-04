@@ -296,6 +296,57 @@ class TestLiveSessionManagerSync(unittest.TestCase):
         self.assertNotIn("tea.skill:flag",
                          turn2.get(INTENT_CONTEXT_FIELD) or {})
 
+    def test_intake_binds_the_working_session_to_the_message_named(self):
+        """The round must run on ONE session object: mid-round, the
+        message's bound session (what every ``SessionManager.get(message)``
+        and derivation sees) must be the exact working session object the
+        orchestrator opened the round with, for a named carrier."""
+        from ovos_core.intent_services.working_session import working_session
+        bus = FakeBus()
+        SessionManager.connect_to_bus(bus)
+        svc = _make_service()
+        svc.bus = bus
+
+        seen = {}
+
+        def _capture(utts, lang, message):
+            seen["bound"] = SessionManager.get(message)
+            seen["working"] = working_session(message)
+            return None
+
+        svc.get_pipeline = lambda session: [("fake", _capture)]
+
+        carrier = Session("bind-check-sess")
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["hello"]},
+                      context={"session": carrier.serialize()})
+        svc.handle_utterance(msg)
+        self.assertIs(seen["bound"], seen["working"])
+
+    def test_intake_binds_the_working_session_to_the_message_default(self):
+        """Same invariant for the default carrier: the object bound must be
+        the registry's own default-session store, not a copy, since
+        ``SessionManager.bind`` refuses anything else for a default-shaped
+        session."""
+        bus = FakeBus()
+        SessionManager.connect_to_bus(bus)
+        svc = _make_service()
+        svc.bus = bus
+
+        seen = {}
+
+        def _capture(utts, lang, message):
+            seen["bound"] = SessionManager.get(message)
+            return None
+
+        svc.get_pipeline = lambda session: [("fake", _capture)]
+
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["hello"]},
+                      context={})
+        svc.handle_utterance(msg)
+        self.assertIs(seen["bound"], SessionManager.get_default_session())
+
     @pytest.mark.xfail(strict=True, reason=_NEEDS_BUS_CLIENT_278)
     def test_midispatch_sync_survives_decay(self):
         # §4.1: a mid-dispatch entry is not decremented by the round it arrived in
@@ -355,6 +406,53 @@ class TestLiveSessionManagerSync(unittest.TestCase):
         ctx = SessionManager.sessions["refresh-sess"].intent_context
         self.assertEqual(ctx["tea.skill:flag"]["turns_remaining"], 5)
         self.assertEqual(ctx["tea.skill:flag"]["value"], "b")
+
+
+class TestDispatchMatchRejectsMismatchedUpdatedSession(unittest.TestCase):
+    """OVOS-PIPELINE-1 §4.2 / OVOS-SESSION-2 §5.1: ``updated_session`` is
+    defined as the ROUND's own session, updated — never a different
+    session. A pipeline plugin handing back one for a different id is a
+    plugin bug, and a plugin bug must not kill the utterance."""
+
+    def setUp(self):
+        SessionManager.sessions = {"default": Session("default")}
+        SessionManager.default_session = SessionManager.sessions["default"]
+        SessionManager.bus = None
+
+    tearDown = setUp
+
+    def test_mismatched_updated_session_id_is_rejected_not_fatal(self):
+        bus = FakeBus()
+        SessionManager.connect_to_bus(bus)
+        svc = _make_service()
+        svc.bus = bus
+        svc.intent_dispatcher = MagicMock()
+
+        carrier = Session("sat-1")
+        mismatched = Session("sat-2")
+        bad_match = IntentHandlerMatch(
+            match_type="test:intent", match_data={}, skill_id=None,
+            utterance="hello", updated_session=mismatched)
+        svc.get_pipeline = lambda session: [
+            ("fake-high", lambda utts, lang, msg: bad_match)]
+
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["hello"]},
+                      context={"session": carrier.serialize()})
+
+        from ovos_core.intent_services import service as service_module
+        with patch.object(service_module.LOG, "error") as mock_error:
+            svc.handle_utterance(msg)
+
+        mock_error.assert_called_once()
+        logged = mock_error.call_args[0][0]
+        self.assertIn("sat-1", logged)
+        self.assertIn("sat-2", logged)
+        # dispatch proceeded on the round's own session, not the rejected one
+        svc.intent_dispatcher.dispatch.assert_called_once()
+        dispatched_reply = svc.intent_dispatcher.dispatch.call_args[0][0]
+        self.assertEqual(
+            dispatched_reply.context["session"]["session_id"], "sat-1")
 
 
 class TestSessionSyncCarrier(unittest.TestCase):
