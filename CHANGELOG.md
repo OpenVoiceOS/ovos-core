@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.2.6a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.6a2) (2026-09-04)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.6a1...3.2.6a2)
+
+**Merged pull requests:**
+
+- test: remove stale SessionManager.default\_session mirror assignments [\#926](https://github.com/OpenVoiceOS/ovos-core/pull/926) ([JarbasAl](https://github.com/JarbasAl))
+- refactor: readability cleanup of the intent service [\#925](https://github.com/OpenVoiceOS/ovos-core/pull/925) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.2.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.6a1) (2026-09-04)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.5a1...3.2.6a1)
@@ -355,17 +364,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.4a1...2.5.5a1)
 
-**Merged pull requests:**
-
-- fix: stop blocking boot on a pipeline training reply [\#816](https://github.com/OpenVoiceOS/ovos-core/pull/816) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [2.5.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.4a1) (2026-07-16)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.3a1...2.5.4a1)
-
-**Merged pull requests:**
-
-- fix: require registration-resilient plugin releases [\#815](https://github.com/OpenVoiceOS/ovos-core/pull/815) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.5.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.3a1) (2026-07-16)
 
