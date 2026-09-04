@@ -15,7 +15,7 @@ from ovos_utils.log import LOG
 from ovos_plugin_manager.templates.pipeline import PipelinePlugin, IntentHandlerMatch
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
 
-from ovos_core.intent_services.working_session import working_session
+from ovos_core.intent_services.working_session import round_session
 
 #: upper bound, seconds, on how long core waits for a skill's
 #: ``skill.converse.response`` before the dispatch lifecycle is declared a
@@ -28,24 +28,6 @@ CONVERSE_HANDLER_TIMEOUT = 5 * 60
 
 class ConverseService(PipelinePlugin):
     """Intent Service handling conversational skills."""
-
-    @staticmethod
-    def _session_for_write(message: Optional[Message]) -> "Session":
-        """Resolve the session object a converse write should mutate.
-
-        Converse's write paths are all reached from a bus event a skill emits
-        while its round is in flight — an activation request, a get_response
-        toggle. OVOS-SESSION-2 §2.6 says such a Message does not revise the
-        working session with its own carrier, so the write lands on the
-        session the round is already running on, found by ``utterance_id``.
-
-        With no round open the write is out-of-band. The default session is
-        the device's store and remains writable at any time (§5); a named
-        session resolves to a throwaway built from the carrier, because §2.2
-        leaves the orchestrator holding nothing for it between utterances and
-        there is no session here for the write to reach.
-        """
-        return working_session(message) or SessionManager.get(message)
 
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
                  config: Optional[Dict] = None) -> None:
@@ -162,7 +144,7 @@ class ConverseService(PipelinePlugin):
         source_skill = source_skill or skill_id
         if self._deactivate_allowed(skill_id, source_skill):
             message = message or Message("")
-            session = self._session_for_write(message)
+            session = round_session(message)
             if session.is_active(skill_id):
                 # update converse session
                 session.deactivate_skill(skill_id)
@@ -193,7 +175,7 @@ class ConverseService(PipelinePlugin):
         source_skill = source_skill or skill_id
         if self._activate_allowed(skill_id, source_skill):
             message = message or Message("")
-            session = self._session_for_write(message)
+            session = round_session(message)
             session.activate_skill(skill_id)
 
             # keep message.context
@@ -322,7 +304,7 @@ class ConverseService(PipelinePlugin):
         """
         answered = []  # candidates whose first valid pong already landed
         claimed = set()  # candidates whose first valid pong was a claim
-        session = session or self._session_for_write(message)
+        session = session or round_session(message)
 
         # note: this is sorted by priority already
         active_skills = [skill_id for skill_id in self.get_active_skills(message, session=session)
@@ -425,7 +407,7 @@ class ConverseService(PipelinePlugin):
         """
         timeouts = self.config.get("skill_timeouts") or {}
         def_timeout = self.config.get("timeout", 300)
-        session = self._session_for_write(message)
+        session = round_session(message)
         session.active_handlers = [
             h for h in session.active_handlers
             if time.time() - h["activated_at"] <= timeouts.get(h["skill_id"], def_timeout)]
@@ -460,7 +442,7 @@ class ConverseService(PipelinePlugin):
         # each step reads what the previous one wrote. The arrival already
         # happened at the orchestrator's lifecycle entry (SESSION-2 §5.1);
         # this pipeline does not fold again (§2.6).
-        session = self._session_for_write(message)
+        session = round_session(message)
 
         # we call flatten in case someone is sending the old style list of tuples
         utterances = flatten_list(utterances)
@@ -506,7 +488,7 @@ class ConverseService(PipelinePlugin):
     @staticmethod
     def handle_get_response_enable(message: Message):
         skill_id = message.data["skill_id"]
-        session = ConverseService._session_for_write(message)
+        session = round_session(message)
         session.enable_response_mode(skill_id)
         if session.session_id == "default":
             SessionManager.sync(message)
@@ -514,7 +496,7 @@ class ConverseService(PipelinePlugin):
     @staticmethod
     def handle_get_response_disable(message: Message):
         skill_id = message.data["skill_id"]
-        session = ConverseService._session_for_write(message)
+        session = round_session(message)
         session.disable_response_mode(skill_id)
         if session.session_id == "default":
             SessionManager.sync(message)

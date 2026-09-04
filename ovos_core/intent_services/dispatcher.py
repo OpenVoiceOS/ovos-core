@@ -22,10 +22,12 @@ as the completion hint. A §8.3 timeout backstops every dispatch. The §9.5
 orchestrator's ``on_terminal`` callback is invoked after each §8 terminal.
 """
 import threading
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Union
 
+from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
 from ovos_spec_tools import SpecMessage
+from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
 
 from ovos_core.intent_services.working_session import raw_session_id
@@ -61,7 +63,8 @@ class IntentDispatcher:
     done-signals (``mycroft.skill.handler.complete``/``.error``).
     """
 
-    def __init__(self, bus, timeout: Optional[float] = DEFAULT_HANDLER_TIMEOUT,
+    def __init__(self, bus: Union[MessageBusClient, FakeBus],
+                 timeout: Optional[float] = DEFAULT_HANDLER_TIMEOUT,
                  on_terminal: Optional[Callable[[Message], None]] = None,
                  on_done_signal: Optional[Callable[[Message, Message], None]] = None):
         self.bus = bus
@@ -126,9 +129,9 @@ class IntentDispatcher:
         if intent_name is None:
             intent_name = topic.split(":", 1)[-1]
 
-        sid = self._session_id(dispatch_msg)
+        sid = raw_session_id(dispatch_msg)
         if sid is None:
-            # already logged by _session_id; nothing safe to track this under
+            # already logged by raw_session_id; nothing safe to track this under
             return
         entry = _InFlightDispatch(skill_id, intent_name, dispatch_msg)
         with self._lock:
@@ -146,17 +149,6 @@ class IntentDispatcher:
         self.bus.emit(dispatch_msg)
 
     # -- emission helpers ------------------------------------------------
-    @staticmethod
-    def _session_id(message: Message) -> Optional[str]:
-        """The session id a Message's carrier names.
-
-        ``None`` for a malformed carrier (OVOS-SESSION-1 §2.5): callers drop
-        the Message rather than substituting the default session identity
-        for it, and must not crash — a forged or corrupted framework
-        done-signal must not tear down this dispatcher.
-        """
-        return raw_session_id(message)
-
     def _emit(self, topic, dispatch_msg: Message, data: dict):
         """Emit a Message forwarded from the dispatch (§6.1 / §8 — context, incl.
         session, preserved unchanged via MSG-1 §5.1 ``forward``)."""
@@ -197,8 +189,7 @@ class IntentDispatcher:
         handler running, so that alone is unambiguous), but a caller with
         more precise knowledge of which dispatch it is concluding (e.g. a
         synthetic completion raised on behalf of a specific intent) can avoid
-        resolving an unrelated in-flight entry for the same skill. Omitted
-        (the default), this behaves exactly as before.
+        resolving an unrelated in-flight entry for the same skill.
 
         Callers MUST source this from ``message.data``, never
         ``message.context`` — context is forwarded/deep-copied down the
@@ -241,7 +232,7 @@ class IntentDispatcher:
         left untouched and resolves through its own correct done-signal or
         the §8.3 timeout.
         """
-        sid = self._session_id(message)
+        sid = raw_session_id(message)
         if sid is None:
             LOG.error(
                 "malformed session carrier on framework done-signal "
