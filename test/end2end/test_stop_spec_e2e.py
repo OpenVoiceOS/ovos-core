@@ -17,11 +17,11 @@ The un-migrated ``ovos-skill-count`` still subscribes to the legacy
 ``modernize=True, emit_legacy=True`` (the translator active). The global
 scenario needs no skill and runs on the pure spec namespace.
 """
-import time
+import threading
 from unittest import TestCase
 
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import Session, SessionManager
+from ovos_bus_client.session import Session
 from ovos_spec_tools import SpecMessage
 from ovos_utils import create_daemon
 from ovos_utils.log import LOG
@@ -69,14 +69,40 @@ _IGNORE = [
 ]
 
 
-def _wait_for_active_skill(session_id, skill_id, timeout=10, interval=0.1):
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        sess = SessionManager.sessions.get(session_id)
-        if sess and sess.is_active(skill_id):
+def _wait_for_active_skill(bus, session_id, skill_id, timeout=10):
+    """Observe a named session's activation on the wire, and return the
+    activated ``Session`` observed there.
+
+    ``SessionManager.sessions`` (ovos-spec-tools >=1.10.1a1, SESSION-2
+    §2.2/§2.3) only ever holds the default session; a named session's state
+    lives in the utterance flow that carries it, not in that registry. The
+    §8.1 ``ovos.intent.handler.start`` dispatch is forwarded from the
+    matched intent's message *after* the orchestrator has stamped the
+    activated session onto its context (see ``IntentService.handle_utterance``:
+    ``sess.activate_skill`` runs, then ``reply.context["session"]`` is set,
+    then the dispatcher forwards from that same message), so it is the
+    earliest point on the bus where a named session's activation is
+    observable.
+    """
+    activated = threading.Event()
+    observed = {}
+
+    def on_handler_start(message):
+        session = (message.context or {}).get("session") or {}
+        if session.get("session_id") != session_id:
             return
-        time.sleep(interval)
-    raise TimeoutError(f"Skill {skill_id} did not activate within {timeout}s")
+        sess = Session.deserialize(session)
+        if sess.is_active(skill_id):
+            observed["session"] = sess
+            activated.set()
+
+    bus.on(SpecMessage.INTENT_HANDLER_START.value, on_handler_start)
+    try:
+        if not activated.wait(timeout):
+            raise TimeoutError(f"Skill {skill_id} did not activate within {timeout}s")
+    finally:
+        bus.remove(SpecMessage.INTENT_HANDLER_START.value, on_handler_start)
+    return observed["session"]
 
 
 class TestGlobalStopSpec(TestCase):
@@ -157,9 +183,8 @@ class TestTargetedStopSpec(TestCase):
                     {"session": session.serialize(), "source": "A", "destination": "B"}))
 
             create_daemon(make_it_count)
-            _wait_for_active_skill(session.session_id, self.skill_id)
+            live = _wait_for_active_skill(minicroft.bus, session.session_id, self.skill_id)
 
-            live = SessionManager.sessions[session.session_id]
             message = Message(SPEC_UTTERANCE,
                               {"utterances": ["stop"], "lang": live.lang},
                               {"session": live.serialize(), "source": "A", "destination": "B"})
@@ -193,11 +218,28 @@ class TestTargetedStopSpec(TestCase):
                             {"skill_id": self.skill_id}),
                 ]
             )
-            test.execute()
+            captured = test.execute()
 
-            # §6.2: the stopped skill is drained from active_handlers.
-            drained = SessionManager.sessions[session.session_id]
-            self.assertNotIn(self.skill_id,
-                             [s[0] for s in drained.active_skills])
+            # §6.2: the stopped skill is drained from active_handlers. Read
+            # the drained state off the stop dispatch's own §9.5 terminal —
+            # the first ``ovos.utterance.handled`` following the
+            # ``{skill_id}:stop`` dispatch — not the registry (a named
+            # session never lands in ``SessionManager.sessions``) and not
+            # just any later message: the interrupted count intent's own
+            # (aborted) handler completes afterwards from an earlier,
+            # un-drained snapshot of this named session's flow, since only
+            # the default session gets re-stamped from a shared store.
+            stop_topic = f"{self.skill_id}:stop"
+            drained = None
+            seen_stop = False
+            for m in captured:
+                if m.msg_type == stop_topic:
+                    seen_stop = True
+                    continue
+                if seen_stop and m.msg_type == SpecMessage.UTTERANCE_HANDLED.value:
+                    drained = Session.deserialize(m.context["session"])
+                    break
+            self.assertIsNotNone(drained, "no utterance.handled terminal followed the stop dispatch")
+            self.assertFalse(drained.is_active(self.skill_id))
         finally:
             minicroft.stop()

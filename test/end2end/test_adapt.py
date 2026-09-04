@@ -18,6 +18,9 @@ from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
 from ovos_spec_tools import SpecMessage, migration_counterpart
 from ovos_utils.log import LOG
+from ovos_workshop.decorators import intent_handler
+from ovos_workshop.intents import IntentBuilder
+from ovos_workshop.skills import OVOSSkill
 
 from ovoscope import End2EndTest, get_minicroft
 
@@ -44,11 +47,26 @@ NAMESPACE_PATHS = {
 }
 
 
+class AdaptHelloWorldSkill(OVOSSkill):
+    """A minimal Adapt-only fixture skill, kept in-repo so this suite owns
+    its lifecycle shape (10 messages on a match, 4 on a no-match) instead of
+    borrowing it from a plugin skill that can migrate its intents to a
+    different pipeline out from under these tests (see ovos-skill-hello-world
+    0.2.8a2, which moved ``HelloWorldIntent`` to Padatious)."""
+
+    def initialize(self):
+        self.register_vocabulary("hello world", "HelloWorldKeyword")
+
+    @intent_handler(IntentBuilder("HelloWorldIntent").require("HelloWorldKeyword"))
+    def handle_hello_world_intent(self, message):
+        self.speak("Hello world")
+
+
 class TestAdaptIntent(TestCase):
 
     def setUp(self):
         LOG.set_level("DEBUG")
-        self.skill_id = "ovos-skill-hello-world.openvoiceos"
+        self.skill_id = "test-adapt-hello-world.openvoiceos"
 
     def tearDown(self):
         LOG.set_level("CRITICAL")
@@ -56,7 +74,8 @@ class TestAdaptIntent(TestCase):
     def _run_adapt_match(self, namespace):
         modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
         minicroft = get_minicroft([self.skill_id], modernize=modernize,
-                                  emit_legacy=emit_legacy)
+                                  emit_legacy=emit_legacy,
+                                  extra_skills={self.skill_id: AdaptHelloWorldSkill})
         try:
 
             session = Session("123")
@@ -101,19 +120,17 @@ class TestAdaptIntent(TestCase):
                             data={"utterance": "hello world", "lang": session.lang},
                             context={"skill_id": self.skill_id}),
                     Message("mycroft.skill.handler.start",
-                            data={"name": "HelloWorldSkill.handle_hello_world_intent"},
+                            data={"name": "AdaptHelloWorldSkill.handle_hello_world_intent"},
                             context={"skill_id": self.skill_id}),
                     Message(SPEC_SPEAK,
                             data={"utterance": "Hello world",
                                   "expect_response": False,
                                   "meta": {
-                                      "dialog": "hello.world",
-                                      "data": {},
                                       "skill": self.skill_id
                                   }},
                             context={"skill_id": self.skill_id}),
                     Message("mycroft.skill.handler.complete",
-                            data={"name": "HelloWorldSkill.handle_hello_world_intent"},
+                            data={"name": "AdaptHelloWorldSkill.handle_hello_world_intent"},
                             context={"skill_id": self.skill_id}),
                 # PIPELINE-1 §8.1: orchestrator emits complete on the handler's
                 # completion, before the end-marker (spec ordering §6.1).
@@ -139,7 +156,8 @@ class TestAdaptIntent(TestCase):
     def _run_skill_blacklist(self, namespace):
         modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
         minicroft = get_minicroft([self.skill_id], modernize=modernize,
-                                  emit_legacy=emit_legacy)
+                                  emit_legacy=emit_legacy,
+                                  extra_skills={self.skill_id: AdaptHelloWorldSkill})
         try:
 
             session = Session("123")
@@ -177,7 +195,8 @@ class TestAdaptIntent(TestCase):
     def _run_intent_blacklist(self, namespace):
         modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
         minicroft = get_minicroft([self.skill_id], modernize=modernize,
-                                  emit_legacy=emit_legacy)
+                                  emit_legacy=emit_legacy,
+                                  extra_skills={self.skill_id: AdaptHelloWorldSkill})
         try:
 
             session = Session("123")
@@ -215,7 +234,8 @@ class TestAdaptIntent(TestCase):
     def _run_padatious_no_match(self, namespace):
         modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
         minicroft = get_minicroft([self.skill_id], modernize=modernize,
-                                  emit_legacy=emit_legacy)
+                                  emit_legacy=emit_legacy,
+                                  extra_skills={self.skill_id: AdaptHelloWorldSkill})
         try:
 
             session = Session("123")

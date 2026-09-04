@@ -13,11 +13,11 @@ skill_id is the target skill or the pipeline_id). When the bridge is removed
 these tests fail — the legacy topics are gone — which is the intended signal
 that the compatibility unit was dropped.
 """
-import time
+import threading
 from unittest import TestCase
 
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import Session, SessionManager
+from ovos_bus_client.session import Session
 from ovos_spec_tools import SpecMessage
 from ovos_utils import create_daemon
 from ovos_utils.log import LOG
@@ -50,14 +50,37 @@ _IGNORE = [
 ]
 
 
-def _wait_for_active_skill(session_id, skill_id, timeout=10, interval=0.1):
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        sess = SessionManager.sessions.get(session_id)
-        if sess and sess.is_active(skill_id):
+def _wait_for_active_skill(bus, session_id, skill_id, timeout=10):
+    """Observe a named session's activation on the wire, and return the
+    activated ``Session`` observed there.
+
+    ``SessionManager.sessions`` (ovos-spec-tools >=1.10.1a1, SESSION-2
+    §2.2/§2.3) only ever holds the default session; a named session's state
+    lives in the utterance flow that carries it, not in that registry. The
+    §8.1 ``ovos.intent.handler.start`` dispatch is forwarded from the
+    matched intent's message *after* the orchestrator has stamped the
+    activated session onto its context, so it is the earliest point on the
+    bus where a named session's activation is observable.
+    """
+    activated = threading.Event()
+    observed = {}
+
+    def on_handler_start(message):
+        session = (message.context or {}).get("session") or {}
+        if session.get("session_id") != session_id:
             return
-        time.sleep(interval)
-    raise TimeoutError(f"Skill {skill_id} did not activate within {timeout}s")
+        sess = Session.deserialize(session)
+        if sess.is_active(skill_id):
+            observed["session"] = sess
+            activated.set()
+
+    bus.on(SpecMessage.INTENT_HANDLER_START.value, on_handler_start)
+    try:
+        if not activated.wait(timeout):
+            raise TimeoutError(f"Skill {skill_id} did not activate within {timeout}s")
+    finally:
+        bus.remove(SpecMessage.INTENT_HANDLER_START.value, on_handler_start)
+    return observed["session"]
 
 
 class TestLegacyGlobalStop(TestCase):
@@ -133,9 +156,8 @@ class TestLegacyTargetedStop(TestCase):
                     {"session": session.serialize(), "source": "A", "destination": "B"}))
 
             create_daemon(make_it_count)
-            _wait_for_active_skill(session.session_id, self.skill_id)
+            live = _wait_for_active_skill(minicroft.bus, session.session_id, self.skill_id)
 
-            live = SessionManager.sessions[session.session_id]
             message = Message(SPEC_UTTERANCE,
                               {"utterances": ["stop"], "lang": live.lang},
                               {"session": live.serialize(), "source": "A", "destination": "B"})
