@@ -23,13 +23,14 @@ from typing import Optional, Tuple, Callable, List
 
 import requests
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import SessionManager, Session, _CONTEXT_LOCK
+from ovos_bus_client.session import (SessionManager, Session, MalformedSession,
+                                     session_carrier, _CONTEXT_LOCK)
 from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
 from ovos_spec_tools import closest_lang, standardize_lang, SpecMessage
 from ovos_spec_tools.context import resolve_key
-from ovos_spec_tools.session import merge_carrier
+from ovos_spec_tools.session import merge_carrier, resolve_session_id
 from ovos_utils.log import LOG
 from ovos_utils.metrics import Stopwatch
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
@@ -39,7 +40,7 @@ from ovos_core.transformers import MetadataTransformersService, UtteranceTransfo
 from ovos_core.intent_services.dispatcher import IntentDispatcher, DEFAULT_HANDLER_TIMEOUT
 from ovos_core.intent_services.manifest import IntentManifest
 from ovos_core.intent_services.working_session import (
-    close_round, open_round, working_session,
+    close_round, open_round, pruned_entries, record_pruned, working_session,
 )
 from ovos_core.version import OVOS_VERSION_STR
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
@@ -185,7 +186,8 @@ class IntentService:
 
         handler_timeout = self.config.get("handler_timeout", DEFAULT_HANDLER_TIMEOUT)
         self.intent_dispatcher: IntentDispatcher = IntentDispatcher(
-            bus, timeout=handler_timeout, on_terminal=self._emit_utterance_handled)
+            bus, timeout=handler_timeout, on_terminal=self._emit_utterance_handled,
+            on_done_signal=self._sync_handler_mutations)
 
         # INTENT-4 §10 manifest — indexes registration broadcasts and serves
         # ovos.intent.list / ovos.intent.describe pull-queries.
@@ -444,6 +446,91 @@ class IntentService:
         sess = SessionManager.get(message)
         skill_id = message.data.get("skill_id")
         self._deactivations[sess.session_id].append(skill_id)
+
+    def _sync_handler_mutations(self, done_msg: Message, dispatch_msg: Message):
+        """OVOS-SESSION-2 §2.6 — sync the round's working session with the
+        handler's mutations, at handler completion.
+
+        The handler runs in its own process and mutates its own copy of the
+        dispatch session, so the writes come back on the framework done-signal,
+        which ovos-workshop forwards from the very Message the handler was
+        given. Reading that carrier here is how the orchestrator learns of the
+        mutation; §2.6 fixes what happens to it, not how it arrives.
+
+        Only fields the handler owns are taken: ``intent_context``, merged
+        entry-by-entry per OVOS-CONTEXT-1 §5.3 through the same
+        ``SessionManager`` helper an inbound sync goes through;
+        ``response_mode``; and removals from ``active_handlers``, the one
+        write OVOS-STOP-1 §4.4 prescribes there. Everything else — ``lang``,
+        ``pipeline``, ``site_id``, the rest of the registry — stays as the
+        round has it, because a handler writing those is forbidden by §2.6 and
+        an orchestrator that applied the write anyway would make the
+        prohibition unenforced.
+
+        What is taken is the *difference* against the dispatch snapshot, not
+        the carrier wholesale, so a handler that touched nothing changes
+        nothing and two handlers on one session cannot clobber each other with
+        their stale halves. The round's decay outranks the carrier either way:
+        an entry the pre-match prune dropped (see ``handle_utterance``) is
+        never put back, however stale the copy the handler answered with. That
+        is about the *entry*, not the key — a handler re-arming the same key
+        with a fresh entry, which is what a skill asking the same follow-up
+        question twice does, is writing, not echoing, and its write lands.
+
+        For the default session the working session *is* the store (§5.1), so
+        merging into it here is the store merge §2.6 asks for.
+        """
+        try:
+            carrier = session_carrier(done_msg)
+        except MalformedSession:
+            LOG.error("done-signal carries a malformed session; skipping the "
+                      "OVOS-SESSION-2 §2.6 completion sync")
+            return
+        if not carrier:
+            return
+
+        live = working_session(dispatch_msg) or SessionManager.get(dispatch_msg)
+        carried_id = resolve_session_id(carrier)
+        if carried_id != live.resolved_session_id():
+            # §2.6 scopes the sync to the round's own session; a done-signal
+            # naming another one is a handler or transport fault, and folding
+            # it would write one session's state into another.
+            LOG.error(f"done-signal for the round on "
+                      f"'{live.resolved_session_id()}' carries session "
+                      f"'{carried_id}'; not syncing it")
+            return
+
+        baseline = dispatch_msg.context.get("session") or {}
+        base_ctx = baseline.get("intent_context") or {}
+        new_ctx = carrier.get("intent_context") or {}
+        payload = {k: v for k, v in new_ctx.items() if base_ctx.get(k) != v}
+        payload.update({k: None for k in base_ctx if k not in new_ctx})
+        for key, dropped in pruned_entries(dispatch_msg).items():
+            # only the stale carry-over of a pruned entry is beaten by the
+            # decay; the same key re-armed with a different entry is a fresh
+            # handler write and lands like any other.
+            if payload.get(key) == dropped:
+                payload.pop(key)
+        if payload:
+            with _CONTEXT_LOCK:
+                ctx = dict(live.intent_context or {})
+                SessionManager.merge_intent_context(ctx, payload)
+                _replace_intent_context(live, ctx)
+
+        if carrier.get("response_mode") != baseline.get("response_mode"):
+            live.response_mode = carrier.get("response_mode")
+
+        def handler_ids(session_dict):
+            return {h.get("skill_id") for h in session_dict.get("active_handlers") or []}
+
+        for skill_id in handler_ids(baseline) - handler_ids(carrier):
+            live.remove_active_handler(skill_id)
+
+        SessionManager.update(live)
+        # The §8 terminal and the §9.5 end-marker are both forwarded from the
+        # dispatch Message, so re-stamping it here is what makes them carry the
+        # synced session instead of the snapshot the round has moved past.
+        dispatch_msg.context["session"] = live.serialize()
 
     def _emit_utterance_handled(self, dispatch_msg: Message):
         """OVOS-PIPELINE-1 §9.5 — emit the universal ``ovos.utterance.handled``
@@ -867,6 +954,11 @@ class IntentService:
         # this round sees the same gating snapshot
         intent_ctx = dict(sess.intent_context or {})
         prune_intent_context(intent_ctx)
+        # SESSION-2 §2.6: what the prune removed here is authoritative for the
+        # round, so remember it — the completion sync must not let a handler
+        # holding a pre-prune copy of the session put any of it back.
+        record_pruned(message, {k: v for k, v in (sess.intent_context or {}).items()
+                                if k not in intent_ctx})
         # §4.1: snapshot entry *value* (not identity, which reply/forward
         # round-tripping churns) so a mid-dispatch refresh is exempted below.
         # Deep, so an in-place mutation of a nested entry value later in the

@@ -22,8 +22,9 @@ working session for it — per §2.6 an out-of-lifecycle write has nowhere
 legitimate to land — and callers get ``None``.
 """
 from collections import OrderedDict
+from copy import deepcopy
 from threading import RLock
-from typing import Optional
+from typing import Dict, Optional
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
@@ -35,6 +36,9 @@ _MAX_OPEN_ROUNDS = 32
 
 _LOCK = RLock()
 _OPEN_ROUNDS: "OrderedDict[str, Session]" = OrderedDict()
+#: intent-context entries the round's pre-match prune removed, per open
+#: round, as key -> the entry the prune dropped.
+_PRUNED_ENTRIES: "OrderedDict[str, Dict[str, dict]]" = OrderedDict()
 
 
 def _utterance_id(message: Optional[Message]) -> Optional[str]:
@@ -51,7 +55,34 @@ def open_round(message: Message, session: Session) -> None:
         _OPEN_ROUNDS[uid] = session
         _OPEN_ROUNDS.move_to_end(uid)
         while len(_OPEN_ROUNDS) > _MAX_OPEN_ROUNDS:
-            _OPEN_ROUNDS.popitem(last=False)
+            evicted, _ = _OPEN_ROUNDS.popitem(last=False)
+            _PRUNED_ENTRIES.pop(evicted, None)
+
+
+def record_pruned(message: Message, entries: Dict[str, dict]) -> None:
+    """Record the intent-context entries this round's pre-match prune removed.
+
+    OVOS-SESSION-2 §2.6 makes the round's decay authoritative over what a
+    handler carries back: an entry the prune dropped stays dropped even when
+    the handler's copy of the session predates the prune and still holds it.
+    The dropped *entry* is kept, not just its key, so that a handler re-arming
+    the same key with a fresh entry is told apart from one echoing the stale
+    one — only the echo is beaten by the decay.
+    """
+    uid = _utterance_id(message)
+    if not uid:
+        return
+    with _LOCK:
+        _PRUNED_ENTRIES[uid] = deepcopy(entries)
+
+
+def pruned_entries(message: Optional[Message]) -> Dict[str, dict]:
+    """The intent-context entries this round's pre-match prune removed."""
+    uid = _utterance_id(message)
+    if not uid:
+        return {}
+    with _LOCK:
+        return deepcopy(_PRUNED_ENTRIES.get(uid) or {})
 
 
 def working_session(message: Optional[Message]) -> Optional[Session]:
@@ -69,4 +100,5 @@ def close_round(message: Optional[Message]) -> Optional[Session]:
     if not uid:
         return None
     with _LOCK:
+        _PRUNED_ENTRIES.pop(uid, None)
         return _OPEN_ROUNDS.pop(uid, None)
