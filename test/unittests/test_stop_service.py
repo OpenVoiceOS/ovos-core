@@ -29,6 +29,16 @@ from ovos_core.intent_services.stop_service_legacy import _LegacyStopBridge
 GLOBAL_STOP = f"{StopService.pipeline_id}:global_stop"
 
 
+def _round_message(utterance_id, sess=None):
+    """A Message carrying ``context["utterance_id"]`` the way the
+    orchestrator stamps it at lifecycle entry (§9.1.1) -- what
+    ``_targeted_stop`` needs as its ``message`` argument."""
+    context = {"utterance_id": utterance_id}
+    if sess is not None:
+        context["session"] = sess.serialize()
+    return Message("test", {}, context)
+
+
 def _make_service() -> StopService:
     """Construct a StopService backed by a FakeBus."""
     bus = FakeBus()
@@ -45,6 +55,7 @@ def _make_service() -> StopService:
         svc._locale = MagicMock()
         svc._legacy = MagicMock()
         svc._pre_drain = {}
+        svc._stop_listeners = set()
     return svc
 
 
@@ -405,9 +416,12 @@ class TestHandleStopConfirmation(unittest.TestCase):
     def test_error_in_data_is_logged(self):
         svc = _make_service()
         svc.bus.emit = MagicMock()
+        sess = Session("s")
+        sess.activate_skill("skill_a")
+        svc._targeted_stop("skill_a", 1.0, "stop", sess, _round_message("uid-1"))
         msg = Message("skill_a.stop.response",
                       data={"skill_id": "skill_a", "error": "boom"},
-                      context={})
+                      context={"utterance_id": "uid-1", "session": sess.serialize()})
         with patch("ovos_core.intent_services.stop_service.LOG") as mock_log:
             svc.handle_stop_confirmation(msg)
         mock_log.error.assert_called_once()
@@ -420,10 +434,11 @@ class TestHandleStopConfirmation(unittest.TestCase):
         sess = Session("s")
         sess.activate_skill("skill_a")
         sess.enable_response_mode("skill_a")
+        svc._targeted_stop("skill_a", 1.0, "stop", sess, _round_message("uid-1"))
 
         msg = Message("skill_a.stop.response",
                       data={"skill_id": "skill_a", "result": True},
-                      context={"session": sess.serialize()})
+                      context={"utterance_id": "uid-1", "session": sess.serialize()})
 
         with patch("ovos_core.intent_services.stop_service.SessionManager.get",
                    return_value=sess):
@@ -432,8 +447,9 @@ class TestHandleStopConfirmation(unittest.TestCase):
         emitted = [c[0][0].msg_type for c in svc.bus.emit.call_args_list]
         self.assertIn("mycroft.skills.abort_question", emitted)
 
-    def test_skill_id_extracted_from_msg_type_fallback(self):
-        """skill_id can be inferred from the message type if not in data/context."""
+    def test_no_utterance_id_is_a_no_op(self):
+        """A `.stop.response` with no `utterance_id` (a V0/direct-invocation
+        caller) has no snapshot to resolve against and must not raise."""
         svc = _make_service()
         svc.bus.emit = MagicMock()
         sess = Session("s")
@@ -446,6 +462,8 @@ class TestHandleStopConfirmation(unittest.TestCase):
                    return_value=sess):
             # Should not raise
             svc.handle_stop_confirmation(msg)
+
+        self.assertEqual(svc.bus.emit.call_args_list, [])
 
 
 class TestAbortQuestionReachable(unittest.TestCase):
@@ -465,13 +483,13 @@ class TestAbortQuestionReachable(unittest.TestCase):
 
         # simulate _targeted_stop's pre-drain snapshot + the dispatch carrying
         # the POST-drain session forward to the .stop.response handler.
-        match = svc._targeted_stop("skill_a", 1.0, "stop", sess)
+        match = svc._targeted_stop("skill_a", 1.0, "stop", sess, _round_message("uid-1"))
         drained_sess = match.updated_session
         self.assertFalse(drained_sess.response_mode)  # sanity: already drained
 
         msg = Message("skill_a.stop.response",
                       data={"skill_id": "skill_a", "result": True},
-                      context={"session": drained_sess.serialize()})
+                      context={"utterance_id": "uid-1", "session": drained_sess.serialize()})
 
         with patch("ovos_core.intent_services.stop_service.SessionManager.get",
                    return_value=drained_sess):
@@ -491,12 +509,12 @@ class TestAbortQuestionReachable(unittest.TestCase):
         sess = Session("s")
         sess.activate_skill("skill_a")  # active, NOT response-mode
 
-        match = svc._targeted_stop("skill_a", 1.0, "stop", sess)
+        match = svc._targeted_stop("skill_a", 1.0, "stop", sess, _round_message("uid-1"))
         drained_sess = match.updated_session
 
         msg = Message("skill_a.stop.response",
                       data={"skill_id": "skill_a", "result": True},
-                      context={"session": drained_sess.serialize()})
+                      context={"utterance_id": "uid-1", "session": drained_sess.serialize()})
 
         with patch("ovos_core.intent_services.stop_service.SessionManager.get",
                    return_value=drained_sess):
@@ -538,7 +556,6 @@ class TestMatchHigh(unittest.TestCase):
              patch.object(self.svc, "_collect_stop_skills", return_value=["skill_a"]), \
              patch("ovos_core.intent_services.stop_service.SessionManager.get",
                    return_value=Session("s")):
-            self.svc.bus.once = MagicMock()
             result = self.svc.match_high(["stop"], "en-US", Message("test"))
 
         self.assertIsNotNone(result)
@@ -604,7 +621,6 @@ class TestMatchLow(unittest.TestCase):
     def test_above_threshold_with_stoppable_skill(self):
         """A confident match with a stoppable skill → skill stop."""
         self.svc.config = {"min_conf": 0.5}
-        self.svc.bus.once = MagicMock()
         with patch.object(self.svc._locale, "voc_list", return_value=["stop"]), \
              patch("ovos_core.intent_services.stop_service.match_one",
                    return_value=("stop", 0.8)), \
@@ -632,10 +648,11 @@ class TestHandleStopConfirmationExtra(unittest.TestCase):
         sess.activate_skill("skill_a")
         # INTENT state (not RESPONSE) — should NOT trigger abort_question
         # but skill is still active → should trigger converse force_timeout
+        svc._targeted_stop("skill_a", 1.0, "stop", sess, _round_message("uid-1"))
 
         msg = Message("skill_a.stop.response",
                       data={"skill_id": "skill_a", "result": True},
-                      context={"session": sess.serialize()})
+                      context={"utterance_id": "uid-1", "session": sess.serialize()})
 
         with patch("ovos_core.intent_services.stop_service.SessionManager.get",
                    return_value=sess):
@@ -653,10 +670,11 @@ class TestHandleStopConfirmationExtra(unittest.TestCase):
         sess = Session("s")
         sess.activate_skill("skill_a")
         sess.is_speaking = True
+        svc._targeted_stop("skill_a", 1.0, "stop", sess, _round_message("uid-1"))
 
         msg = Message("skill_a.stop.response",
                       data={"skill_id": "skill_a", "result": True},
-                      context={"session": sess.serialize()})
+                      context={"utterance_id": "uid-1", "session": sess.serialize()})
 
         with patch("ovos_core.intent_services.stop_service.SessionManager.get",
                    return_value=sess):
@@ -900,7 +918,6 @@ class TestResponseModeHolderCandidate(unittest.TestCase):
         sess = Session("s")
         sess.enable_response_mode("skill_x")  # no active_handlers push
 
-        self.svc.bus.once = MagicMock()
         with patch.object(self.svc._locale, "voc_match",
                           side_effect=lambda utt, voc, lang, exact: voc == "stop"), \
              patch.object(StopService, "get_active_skills", return_value=[]), \
@@ -1039,9 +1056,9 @@ class TestDispatcherLifecycleResolvedByStopRoundTrip(unittest.TestCase):
                lambda m: bus.emit(m.reply(f"{skill_id}.stop.response",
                                           {"skill_id": skill_id, "result": True})))
 
-        match = svc._targeted_stop(skill_id, 1.0, "stop", sess)
+        match = svc._targeted_stop(skill_id, 1.0, "stop", sess, _round_message("uid-1"))
         reply = Message(match.match_type, dict(match.match_data),
-                        {"skill_id": skill_id,
+                        {"skill_id": skill_id, "utterance_id": "uid-1",
                          "session": match.updated_session.serialize()})
 
         disp.dispatch(reply, skill_id, "stop")
@@ -1055,24 +1072,17 @@ class TestDispatcherLifecycleResolvedByStopRoundTrip(unittest.TestCase):
             "parked on the 5-minute §8.3 timeout")
 
 
-class TestStaleStopOnceDoesNotResolveUnrelatedEntry(unittest.TestCase):
-    """`_targeted_stop` registers
-    `bus.once(f"{skill_id}.stop.response", handle_stop_confirmation)`
-    at MATCH-BUILD time -- a side effect that survives even when the
-    orchestrator later DISCARDS the Match (blacklisted intent, missing
-    slots, etc: see service.py's blacklist check) and never actually
-    dispatches it. Before this fix, if that skill later emits ANY
-    `.stop.response` for an unrelated reason (e.g. a global stop's own
-    ping-pong round trip), the stale listener fires `handle_stop_confirmation`,
-    whose synthetic `mycroft.skill.handler.complete` popped the dispatcher's
-    in-flight entry for that skill_id regardless of which intent it actually
-    belonged to -- a still-running, unrelated intent handler got a premature
-    `ovos.utterance.handled` end-marker.
+class TestStaleStopResponseDoesNotResolveUnrelatedEntry(unittest.TestCase):
+    """`_targeted_stop` records the `_pre_drain` snapshot and binds the
+    (permanent) `.stop.response` listener at MATCH-BUILD time -- allowed by
+    OVOS-PIPELINE-1 §4.2. If the orchestrator later DISCARDS this Match
+    (blacklisted intent, missing slots, etc: see service.py's blacklist
+    check) and never actually dispatches it, the snapshot is stale but keyed
+    by this round's own `utterance_id`, so it can only ever resolve a
+    `.stop.response` correlated to THIS round -- never an unrelated,
+    genuinely in-flight intent for the same skill_id in a different round."""
 
-    Mirrors the live auditor's attack.py::test_B_stale_once_pops_wrong_entry.
-    """
-
-    def test_stale_once_does_not_resolve_unrelated_running_intent(self):
+    def test_stale_snapshot_does_not_resolve_unrelated_running_intent(self):
         from ovos_core.intent_services.dispatcher import IntentDispatcher
 
         svc = _make_service()
@@ -1083,22 +1093,26 @@ class TestStaleStopOnceDoesNotResolveUnrelatedEntry(unittest.TestCase):
         sess = Session("sessB")
         sess.activate_skill("skillA")
 
-        # 1) a stop match is built (registers the bus.once side effect) but
-        #    is DISCARDED -- never handed to disp.dispatch().
-        svc._targeted_stop("skillA", 1.0, "stop", sess)
+        # 1) a stop match is built for round "uid-discarded" (records the
+        #    pre-drain snapshot + permanent listener) but is DISCARDED --
+        #    never handed to disp.dispatch().
+        svc._targeted_stop("skillA", 1.0, "stop", sess, _round_message("uid-discarded"))
 
-        # 2) an ordinary, unrelated intent for the SAME skill is genuinely
-        #    in flight.
+        # 2) an ordinary, unrelated intent for the SAME skill, a DIFFERENT
+        #    round, is genuinely in flight.
         intent_msg = Message("skillA:my.intent", {},
-                             {"skill_id": "skillA", "session": sess.serialize()})
+                             {"skill_id": "skillA", "utterance_id": "uid-running",
+                              "session": sess.serialize()})
         disp.dispatch(intent_msg, "skillA", "my.intent")
 
         # 3) later, skillA answers .stop.response for an unrelated reason
-        #    (e.g. a global stop's ping-pong) -- this fires the stale
-        #    bus.once() listener from step 1.
+        #    (e.g. a global stop's ping-pong), carrying the RUNNING intent's
+        #    round id -- the discarded snapshot is keyed on "uid-discarded"
+        #    and can never match this.
         bus.emit(Message("skillA.stop.response",
                          {"skill_id": "skillA", "result": True},
-                         {"skill_id": "skillA", "session": sess.serialize()}))
+                         {"skill_id": "skillA", "utterance_id": "uid-running",
+                          "session": sess.serialize()}))
 
         with disp._lock:
             entries = list(disp._in_flight.get("sessB", []))
@@ -1106,7 +1120,7 @@ class TestStaleStopOnceDoesNotResolveUnrelatedEntry(unittest.TestCase):
             [(e.skill_id, e.intent_name) for e in entries],
             [("skillA", "my.intent")],
             "the still-running, unrelated intent's dispatcher entry must "
-            "survive a stale/foreign .stop.response for the same skill_id")
+            "survive a stale/foreign .stop.response for a different round")
 
 
 class TestFailedStopYieldsErrorTerminal(unittest.TestCase):
@@ -1138,9 +1152,9 @@ class TestFailedStopYieldsErrorTerminal(unittest.TestCase):
                                           {"skill_id": "skillA",
                                            "error": "stop() raised ValueError"})))
 
-        match = svc._targeted_stop("skillA", 1.0, "stop", sess)
+        match = svc._targeted_stop("skillA", 1.0, "stop", sess, _round_message("uid-1"))
         reply = Message(match.match_type, dict(match.match_data),
-                        {"skill_id": "skillA",
+                        {"skill_id": "skillA", "utterance_id": "uid-1",
                          "session": match.updated_session.serialize()})
         disp.dispatch(reply, "skillA", "stop")
 
@@ -1210,9 +1224,9 @@ class TestIntentNameFilterIsDataNotContext(unittest.TestCase):
                lambda m: bus.emit(m.reply("skillA.stop.response",
                                           {"skill_id": "skillA", "result": True})))
 
-        match = svc._targeted_stop("skillA", 1.0, "stop", sess)
+        match = svc._targeted_stop("skillA", 1.0, "stop", sess, _round_message("uid-1"))
         reply = Message(match.match_type, dict(match.match_data),
-                        {"skill_id": "skillA",
+                        {"skill_id": "skillA", "utterance_id": "uid-1",
                          "session": match.updated_session.serialize()})
         disp.dispatch(reply, "skillA", "stop")
 
@@ -1225,7 +1239,7 @@ class TestPreDrainSnapshotsDoNotLeakOnFailedStop(unittest.TestCase):
     """The pre-drain snapshot must be popped for every `.stop.response`,
     not only a successful one: an error, a decline (`result: False`), or a
     response for a dispatch that never completed must not leave
-    `(session_id, skill_id)` in `_pre_drain` forever, and must not leave the
+    `(utterance_id, skill_id)` in `_pre_drain` forever, and must not leave the
     `_resolve_dispatch_lifecycle` presence-gate open for that pair."""
 
     def test_fifty_failed_stops_leave_no_leaked_snapshot_keys(self):
@@ -1233,11 +1247,12 @@ class TestPreDrainSnapshotsDoNotLeakOnFailedStop(unittest.TestCase):
         for i in range(50):
             sess = Session(f"sess{i}")
             sess.activate_skill("skillA")
-            svc._targeted_stop("skillA", 1.0, "stop", sess)
+            svc._targeted_stop("skillA", 1.0, "stop", sess, _round_message(f"uid-{i}"))
             svc.handle_stop_confirmation(Message(
                 "skillA.stop.response",
                 {"skill_id": "skillA", "error": "boom"},
-                {"skill_id": "skillA", "session": sess.serialize()}))
+                {"skill_id": "skillA", "utterance_id": f"uid-{i}",
+                 "session": sess.serialize()}))
         self.assertEqual(len(svc._pre_drain), 0)
 
     def test_fifty_declined_stops_leave_no_leaked_snapshot_keys(self):
@@ -1245,11 +1260,12 @@ class TestPreDrainSnapshotsDoNotLeakOnFailedStop(unittest.TestCase):
         for i in range(50):
             sess = Session(f"x{i}")
             sess.activate_skill("skillA")
-            svc._targeted_stop("skillA", 1.0, "stop", sess)
+            svc._targeted_stop("skillA", 1.0, "stop", sess, _round_message(f"uid-{i}"))
             svc.handle_stop_confirmation(Message(
                 "skillA.stop.response",
                 {"skill_id": "skillA", "result": False},
-                {"skill_id": "skillA", "session": sess.serialize()}))
+                {"skill_id": "skillA", "utterance_id": f"uid-{i}",
+                 "session": sess.serialize()}))
         self.assertEqual(len(svc._pre_drain), 0)
 
     def test_successful_stop_still_clears_snapshot(self):
@@ -1257,17 +1273,17 @@ class TestPreDrainSnapshotsDoNotLeakOnFailedStop(unittest.TestCase):
         svc = _make_service()
         sess = Session("ok")
         sess.activate_skill("skillA")
-        svc._targeted_stop("skillA", 1.0, "stop", sess)
+        svc._targeted_stop("skillA", 1.0, "stop", sess, _round_message("uid-1"))
         svc.handle_stop_confirmation(Message(
             "skillA.stop.response",
             {"skill_id": "skillA", "result": True},
-            {"skill_id": "skillA", "session": sess.serialize()}))
+            {"skill_id": "skillA", "utterance_id": "uid-1", "session": sess.serialize()}))
         self.assertEqual(len(svc._pre_drain), 0)
 
 
 class TestPreDrainGateBlocksUnknownPair(unittest.TestCase):
     """`handle_stop_confirmation` must only emit a synthetic
-    handler.complete/.error for a (session_id, skill_id) pair it actually
+    handler.complete/.error for a (utterance_id, skill_id) pair it actually
     has a pre-drain snapshot for. A `.stop.response` for a pair with NO
     pre-drain snapshot at all (never went through `_targeted_stop`) must
     emit no `mycroft.skill.handler.complete`/`.error` whatsoever."""
@@ -1279,18 +1295,19 @@ class TestPreDrainGateBlocksUnknownPair(unittest.TestCase):
 
         sess = Session("unknown-sess")
         # deliberately skip _targeted_stop -- no pre-drain snapshot exists
-        # for ("unknown-sess", "skillA").
+        # for ("uid-unknown", "skillA").
         svc.handle_stop_confirmation(Message(
             "skillA.stop.response",
             {"skill_id": "skillA", "result": True},
-            {"skill_id": "skillA", "session": sess.serialize()}))
+            {"skill_id": "skillA", "utterance_id": "uid-unknown",
+             "session": sess.serialize()}))
 
         handler_signals = [t for t in emitted
                            if t in ("mycroft.skill.handler.complete",
                                     "mycroft.skill.handler.error")]
         self.assertEqual(
             handler_signals, [],
-            "a .stop.response for a (session, skill) pair with no pre-drain "
+            "a .stop.response for a (round, skill) pair with no pre-drain "
             f"snapshot must never emit a synthetic handler signal, got {emitted!r}")
 
 
@@ -1302,25 +1319,44 @@ class TestShutdown(unittest.TestCase):
         svc.shutdown()
         calls = {c[0][0] for c in svc.bus.remove.call_args_list}
         self.assertIn(GLOBAL_STOP, calls)
+        self.assertIn(SpecMessage.UTTERANCE_HANDLED.value, calls)
         # the legacy listeners are removed by the (mocked) bridge
         svc._legacy.shutdown.assert_called_once()
 
+    def test_shutdown_removes_one_listener_per_skill_regardless_of_dispatch_count(self):
+        """50 targeted-stop dispatches for the SAME skill_id must bind the
+        `.stop.response` listener exactly once -- shutdown() must remove
+        exactly that one registration, not 50."""
+        svc = _make_service()
+        for i in range(50):
+            sess = Session(f"s{i}")
+            sess.activate_skill("skillA")
+            svc._targeted_stop("skillA", 1.0, "stop", sess, _round_message(f"uid-{i}"))
+        self.assertEqual(svc._stop_listeners, {"skillA"})
 
-class TestPreDrainSnapshotsAreSessionScoped(unittest.TestCase):
-    """`_pre_drain` is keyed by ``(session_id, skill_id)``, not bare
+        svc.bus.remove = MagicMock()
+        svc.shutdown()
+        stop_response_removals = [c for c in svc.bus.remove.call_args_list
+                                  if c[0][0] == "skillA.stop.response"]
+        self.assertEqual(len(stop_response_removals), 1)
+        self.assertEqual(svc._stop_listeners, set())
+
+
+class TestPreDrainSnapshotsAreRoundScoped(unittest.TestCase):
+    """`_pre_drain` is keyed by ``(utterance_id, skill_id)``, not bare
     ``skill_id``: two concurrent targeted stops for the same skill_id in
-    different sessions must not collide or consume each other's snapshot."""
+    different rounds must not collide or consume each other's snapshot."""
 
-    def test_interleaved_targeted_stops_same_skill_different_sessions(self):
+    def test_interleaved_targeted_stops_same_skill_different_rounds(self):
         svc = _make_service()
         svc.bus.emit = MagicMock()
 
-        # Session A: skill_a is blocked in get_response (RESPONSE state) ->
+        # Round A: skill_a is blocked in get_response (RESPONSE state) ->
         # its confirmation must trigger abort_question.
         sess_a = Session("session_a")
         sess_a.enable_response_mode("skill_a")
 
-        # Session B: skill_a is merely active via converse (INTENT state) ->
+        # Round B: skill_a is merely active via converse (INTENT state) ->
         # its confirmation must trigger converse.force_timeout, NOT
         # abort_question.
         sess_b = Session("session_b")
@@ -1328,21 +1364,21 @@ class TestPreDrainSnapshotsAreSessionScoped(unittest.TestCase):
 
         # interleave: A's pre-drain snapshot, then B's pre-drain snapshot,
         # both for the same skill_id, BEFORE either confirmation arrives.
-        match_a = svc._targeted_stop("skill_a", 1.0, "stop", sess_a)
-        match_b = svc._targeted_stop("skill_a", 1.0, "stop", sess_b)
+        match_a = svc._targeted_stop("skill_a", 1.0, "stop", sess_a, _round_message("uid-a"))
+        match_b = svc._targeted_stop("skill_a", 1.0, "stop", sess_b, _round_message("uid-b"))
         drained_a = match_a.updated_session
         drained_b = match_b.updated_session
 
         self.assertEqual(
             len(svc._pre_drain), 2,
-            "both sessions' snapshots must coexist, keyed independently")
+            "both rounds' snapshots must coexist, keyed independently")
 
         msg_a = Message("skill_a.stop.response",
                         data={"skill_id": "skill_a", "result": True},
-                        context={"session": drained_a.serialize()})
+                        context={"utterance_id": "uid-a", "session": drained_a.serialize()})
         msg_b = Message("skill_a.stop.response",
                         data={"skill_id": "skill_a", "result": True},
-                        context={"session": drained_b.serialize()})
+                        context={"utterance_id": "uid-b", "session": drained_b.serialize()})
 
         # A's confirmation arrives first, then B's.
         with patch("ovos_core.intent_services.stop_service.SessionManager.get",
@@ -1350,10 +1386,10 @@ class TestPreDrainSnapshotsAreSessionScoped(unittest.TestCase):
             svc.handle_stop_confirmation(msg_a)
         emitted_after_a = [c[0][0].msg_type for c in svc.bus.emit.call_args_list]
         self.assertIn("mycroft.skills.abort_question", emitted_after_a,
-                      "session A's own RESPONSE-state snapshot must drive its "
-                      "confirmation, not session B's")
+                      "round A's own RESPONSE-state snapshot must drive its "
+                      "confirmation, not round B's")
         self.assertNotIn("ovos.skills.converse.force_timeout", emitted_after_a,
-                         "session A was never converse-active; only its own "
+                         "round A was never converse-active; only its own "
                          "snapshot (RESPONSE-state) should be consulted")
 
         svc.bus.emit.reset_mock()
@@ -1362,13 +1398,175 @@ class TestPreDrainSnapshotsAreSessionScoped(unittest.TestCase):
             svc.handle_stop_confirmation(msg_b)
         emitted_after_b = [c[0][0].msg_type for c in svc.bus.emit.call_args_list]
         self.assertIn("ovos.skills.converse.force_timeout", emitted_after_b,
-                      "session B's own converse-active snapshot must drive "
-                      "its confirmation, not session A's (already-consumed) one")
+                      "round B's own converse-active snapshot must drive "
+                      "its confirmation, not round A's (already-consumed) one")
         self.assertNotIn("mycroft.skills.abort_question", emitted_after_b,
-                         "session B was never in RESPONSE state; the bug would "
-                         "have it consume session A's leftover/absent snapshot")
+                         "round B was never in RESPONSE state; the bug would "
+                         "have it consume round A's leftover/absent snapshot")
 
         self.assertEqual(len(svc._pre_drain), 0)
+
+
+class TestPreDrainEvictedByUtteranceHandled(unittest.TestCase):
+    """The ONLY `_pre_drain` eviction is `ovos.utterance.handled` (§9.5): the
+    universal, exactly-once-per-round end marker. A discarded Match's
+    snapshot dies with its own round's end marker; a barge-in for a NEW
+    utterance in the SAME session must never evict a different round's
+    still-pending (dispatched) snapshot."""
+
+    def test_discarded_match_snapshot_evicted_by_its_own_end_marker(self):
+        svc = _make_service()
+        svc.bus.emit = MagicMock()
+
+        sess = Session("discarded-sess")
+        sess.activate_skill("skillA")
+
+        # match() builds the Match and records the snapshot, but the
+        # orchestrator discards it (e.g. blacklist, missing slots, a
+        # higher-priority Match wins) -- never dispatched.
+        svc._targeted_stop("skillA", 1.0, "stop", sess, _round_message("uid-discarded"))
+        self.assertEqual(len(svc._pre_drain), 1)
+
+        # this round's own §9.5 end marker fires regardless of whether a
+        # Match from it was ever dispatched.
+        svc._on_utterance_handled(Message(
+            SpecMessage.UTTERANCE_HANDLED.value, {},
+            {"utterance_id": "uid-discarded"}))
+
+        self.assertEqual(len(svc._pre_drain), 0,
+                         "the discarded Match's snapshot must be evicted by "
+                         "its own round's end marker")
+
+        # skillA later answers a genuine, unrelated .stop.response carrying a
+        # DIFFERENT round id (e.g. a global stop's own ping-pong round trip
+        # in a later utterance) -- no snapshot is left to resolve against.
+        svc.handle_stop_confirmation(Message(
+            "skillA.stop.response",
+            {"skill_id": "skillA", "result": True},
+            {"skill_id": "skillA", "utterance_id": "uid-later",
+             "session": sess.serialize()}))
+
+        emitted = [c[0][0].msg_type for c in svc.bus.emit.call_args_list]
+        self.assertEqual(
+            emitted, [],
+            "a discarded Match's evicted snapshot must not fire kill signals "
+            f"for a stop it never caused, got {emitted!r}")
+
+    def test_barge_in_same_session_does_not_evict_a_different_dispatched_round(self):
+        """A NEW utterance (a barge-in) in the SAME session must not evict a
+        still-running, dispatched stop's snapshot from an EARLIER round --
+        only that earlier round's own end marker may."""
+        svc = _make_service()
+        svc.bus.emit = MagicMock()
+
+        sess = Session("bargein-sess")
+        sess.activate_skill("skillA")
+
+        # round 1: a targeted stop is dispatched (genuinely, not discarded)
+        # and is still awaiting its .stop.response.
+        match = svc._targeted_stop("skillA", 1.0, "stop", sess, _round_message("uid-1"))
+        self.assertEqual(len(svc._pre_drain), 1)
+
+        # round 2: a NEW utterance barges in on the SAME session and
+        # concludes (its own end marker fires) before round 1's stop() ever
+        # answers.
+        svc._on_utterance_handled(Message(
+            SpecMessage.UTTERANCE_HANDLED.value, {},
+            {"utterance_id": "uid-2", "session": sess.serialize()}))
+
+        self.assertEqual(len(svc._pre_drain), 1,
+                         "a different round's end marker must not evict "
+                         "round 1's still-pending snapshot")
+
+        # round 1's stop() finally answers -- it must still resolve.
+        svc.handle_stop_confirmation(Message(
+            "skillA.stop.response",
+            {"skill_id": "skillA", "result": True},
+            {"skill_id": "skillA", "utterance_id": "uid-1",
+             "session": match.updated_session.serialize()}))
+
+        emitted = [c[0][0].msg_type for c in svc.bus.emit.call_args_list]
+        self.assertIn("ovos.skills.converse.force_timeout", emitted,
+                      "round 1's dispatched stop must still resolve after "
+                      "surviving the barge-in in round 2")
+        self.assertEqual(len(svc._pre_drain), 0)
+
+        # round 1's own (belated) end marker is a no-op -- already consumed.
+        svc._on_utterance_handled(Message(
+            SpecMessage.UTTERANCE_HANDLED.value, {}, {"utterance_id": "uid-1"}))
+        self.assertEqual(len(svc._pre_drain), 0)
+
+    def test_dispatched_match_still_registers_and_resolves(self):
+        """Sanity companion: a Match that IS dispatched and confirmed
+        resolves correctly and clears its own snapshot."""
+        svc = _make_service()
+        svc.bus.emit = MagicMock()
+
+        sess = Session("dispatched-sess")
+        sess.enable_response_mode("skillA")
+
+        match = svc._targeted_stop("skillA", 1.0, "stop", sess, _round_message("uid-1"))
+        self.assertEqual(len(svc._pre_drain), 1)
+
+        svc.handle_stop_confirmation(Message(
+            "skillA.stop.response",
+            {"skill_id": "skillA", "result": True},
+            {"skill_id": "skillA", "utterance_id": "uid-1",
+             "session": match.updated_session.serialize()}))
+
+        emitted = [c[0][0].msg_type for c in svc.bus.emit.call_args_list]
+        self.assertIn("mycroft.skills.abort_question", emitted)
+        self.assertEqual(len(svc._pre_drain), 0)
+
+
+class TestPreDrainCrossSessionIsolationOnDispatch(unittest.TestCase):
+    """Two sessions targeting the same skill_id must both be resolved
+    correctly over the real bus: the listener is a single PERMANENT
+    `bus.on` per skill_id (not a fresh `bus.once` per dispatch, which pyee
+    dedupes by (topic, function) and would silently drop a second
+    concurrent session's confirmation for the same skill_id)."""
+
+    def test_two_sessions_same_skill_both_resolve_over_the_bus(self):
+        svc = _make_service()
+        bus = svc.bus
+        emitted = []
+        orig_emit = bus.emit
+
+        def capture(m):
+            emitted.append(m)
+            return orig_emit(m)
+
+        bus.emit = capture
+
+        sess_1 = Session("sess-1")
+        sess_1.enable_response_mode("skillA")  # RESPONSE state
+        sess_2 = Session("sess-2")
+        sess_2.activate_skill("skillA")  # INTENT state (converse-active)
+
+        match_1 = svc._targeted_stop("skillA", 1.0, "stop", sess_1, _round_message("uid-1"))
+        match_2 = svc._targeted_stop("skillA", 1.0, "stop", sess_2, _round_message("uid-2"))
+        self.assertEqual(len(svc._pre_drain), 2)
+
+        # both sessions' skillA answer on the SAME topic, over the real bus
+        # (the single permanent listener bound for "skillA").
+        bus.emit(Message("skillA.stop.response",
+                         {"skill_id": "skillA", "result": True},
+                         {"skill_id": "skillA", "utterance_id": "uid-1",
+                          "session": match_1.updated_session.serialize()}))
+        bus.emit(Message("skillA.stop.response",
+                         {"skill_id": "skillA", "result": True},
+                         {"skill_id": "skillA", "utterance_id": "uid-2",
+                          "session": match_2.updated_session.serialize()}))
+
+        emitted_types = [m.msg_type for m in emitted]
+        self.assertIn("mycroft.skills.abort_question", emitted_types,
+                      "round 1's RESPONSE-state snapshot must still fire "
+                      "abort_question")
+        self.assertIn("ovos.skills.converse.force_timeout", emitted_types,
+                      "round 2's converse-active snapshot must still fire "
+                      "force_timeout, not be dropped by a once() dedupe")
+        self.assertEqual(len(svc._pre_drain), 0,
+                         "both rounds' snapshots must be consumed")
 
 
 if __name__ == "__main__":

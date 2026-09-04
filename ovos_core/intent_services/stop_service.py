@@ -1,6 +1,6 @@
 from os.path import dirname, join
 from threading import Event
-from typing import Optional, Dict, List, NamedTuple, Tuple, Union
+from typing import Optional, Dict, List, NamedTuple, Set, Tuple, Union
 
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.handler import HandlerLifecycle
@@ -16,7 +16,6 @@ from ovos_utils.log import LOG
 from ovos_utils.parse import match_one
 
 from ovos_core.intent_services.stop_service_legacy import _LegacyStopBridge
-from ovos_core.intent_services.working_session import raw_session_id
 
 
 class PreDrainSnapshot(NamedTuple):
@@ -24,9 +23,15 @@ class PreDrainSnapshot(NamedTuple):
 
     ``match()`` drains ``active_handlers``/``response_mode`` before dispatch,
     so by the time ``.stop.response`` arrives the live session already lies
-    about both fields. Capture them together at drain time, keyed by
-    ``(session_id, skill_id)``, and pop them together in
-    ``handle_stop_confirmation`` before either result branch runs.
+    about both fields. OVOS-PIPELINE-1 §4.2 permits a plugin's own bus
+    side effects and internal bookkeeping inside ``match()`` — this is
+    recorded there, keyed by ``(utterance_id, skill_id)``, and popped in
+    ``handle_stop_confirmation`` before either result branch runs. Keying by
+    the round rather than the session means a barge-in for a NEW utterance in
+    the same session can never evict a still-running dispatched stop's
+    snapshot — only that round's own §9.5 ``ovos.utterance.handled`` end
+    marker does (see ``_on_utterance_handled``), and a dispatched stop is
+    always consumed before its own round's end marker fires.
     """
     was_active: bool
     utt_state: UtteranceState
@@ -67,12 +72,18 @@ class StopService(ConfidenceMatcherPipeline):
         self.suppress_activation = suppress_activation
         # §5 global-stop dispatch target; bound once, shared across tiers (§3.1).
         self.bus.on(f"{self.pipeline_id}:global_stop", self.handle_global_stop)
+        # The ONLY `_pre_drain` eviction: §9.5's universal, exactly-once-per-
+        # round end marker.
+        self.bus.on(SpecMessage.UTTERANCE_HANDLED.value, self._on_utterance_handled)
         self._legacy = _LegacyStopBridge(self)
-        #: (session_id, skill_id) -> PreDrainSnapshot captured by _targeted_stop
-        #: and consumed once by handle_stop_confirmation. Keyed per-session
-        #: (not bare skill_id) so two concurrent targeted stops for the same
-        #: skill_id in different sessions can't clobber each other's snapshot.
+        #: (utterance_id, skill_id) -> PreDrainSnapshot recorded by
+        #: `_targeted_stop` and consumed once by `handle_stop_confirmation`.
+        #: Keyed per-round (not bare skill_id) so two concurrent targeted
+        #: stops for the same skill_id can't clobber each other's snapshot.
         self._pre_drain: Dict[Tuple[str, str], PreDrainSnapshot] = {}
+        #: skill_ids with a permanent `<skill_id>.stop.response` listener
+        #: already bound (see `_targeted_stop`).
+        self._stop_listeners: Set[str] = set()
 
     def handle_global_stop(self, message: Message) -> None:
         """OVOS-STOP-1 §5.3 — broadcast the universal ``ovos.stop``.
@@ -250,54 +261,71 @@ class StopService(ConfidenceMatcherPipeline):
         dispatcher's 5-minute §8.3 timeout. Emitting the framework done-signal
         here, rather than reaching into ``IntentDispatcher`` directly, keeps
         ``StopService`` decoupled from the dispatcher's internals.
+
+        The ``.stop.response`` listener is bound permanently per skill_id
+        (``_targeted_stop``), so this fires for every round's response for
+        that skill, not just the one that just dispatched it. A response with
+        no matching ``(utterance_id, skill_id)`` snapshot is therefore a
+        no-op: either this skill_id was never targeted by a stop for this
+        round, or its snapshot was already consumed/evicted.
         """
         skill_id = (message.data.get("skill_id") or
                     message.context.get("skill_id") or
                     message.msg_type.split(".stop.response")[0])
-        sess_id = raw_session_id(message)
-        if sess_id is None:
-            # malformed carrier (OVOS-SESSION-1 §2.5): already logged, and
-            # there is no (session_id, skill_id) key to resolve against.
+        utt_id = message.context.get("utterance_id")
+        if not utt_id:
+            # no round to correlate against (a V0/direct-invocation caller
+            # that never entered through the orchestrator's §9.1.1 stamping)
+            # -- `_targeted_stop` never records a snapshot for this case
+            # either, so there is nothing to resolve.
             return
-        # Pop both snapshots unconditionally before either branch below: the
-        # error/no-dispatch paths must not leak them or hold the
-        # _resolve_dispatch_lifecycle gate open for this (session_id, skill_id).
-        snapshot = self._pre_drain.pop((sess_id, skill_id), None)
+        snapshot = self._pre_drain.pop((utt_id, skill_id), None)
+        if snapshot is None:
+            return  # no pending targeted stop for this (round, skill) pair
         try:
-            if snapshot is not None:
-                self._resolve_dispatch_lifecycle(message, skill_id)
+            self._resolve_dispatch_lifecycle(message, skill_id)
         except Exception:
             LOG.exception(f"failed to resolve dispatch lifecycle for {skill_id}:stop")
         if 'error' in message.data:
             error_msg = message.data['error']
             LOG.error(f"{skill_id}: {error_msg}")
         elif message.data.get('result', False):
-            sess = SessionManager.get(message)
-            # The session on this .stop.response is already post-drain, so
-            # live reads of utterance_states/active_handlers lie; consult the
-            # pre-drain snapshot popped above, falling back to the live read
-            # for direct-invocation callers that bypass _targeted_stop.
-            utt_state = snapshot.utt_state if snapshot else (
-                UtteranceState.RESPONSE
-                if sess.response_mode and sess.response_mode.get("skill_id") == skill_id
-                else UtteranceState.INTENT)
-            if utt_state == UtteranceState.RESPONSE:
+            if snapshot.utt_state == UtteranceState.RESPONSE:
                 LOG.debug("Forcing get_response timeout")
                 # force-kill any ongoing get_response - see @killable_event decorator (ovos-workshop)
                 self.bus.emit(message.reply("mycroft.skills.abort_question", {"skill_id": skill_id}))
-            was_active = snapshot.was_active if snapshot else sess.is_active(skill_id)
-            if was_active:
+            if snapshot.was_active:
                 LOG.debug("Forcing converse timeout")
                 # force-kill any ongoing converse - see @killable_event decorator (ovos-workshop)
                 self.bus.emit(message.reply("ovos.skills.converse.force_timeout", {"skill_id": skill_id}))
 
             # TODO - track if speech is coming from this skill! not currently tracked (ovos-audio)
+            sess = SessionManager.get(message)
             if sess.is_speaking:
                 # force-kill any ongoing TTS
                 # SpecMessage.AUDIO_STOP.value == "ovos.audio.stop"; the
                 # translator's MIGRATION_MAP mirrors it onto the legacy
                 # "mycroft.audio.speech.stop" ovos-audio still listens on.
                 self.bus.emit(message.forward(SpecMessage.AUDIO_STOP.value, {"skill_id": skill_id}))
+
+    def _on_utterance_handled(self, message: Message) -> None:
+        """Evict every pending ``_pre_drain`` snapshot for a finished round.
+
+        ``ovos.utterance.handled`` (§9.5) is the universal end marker: exactly
+        one is emitted per utterance lifecycle, on every exit path (a
+        dispatched Match's §8 terminal, a discarded/blacklisted Match, no
+        Match at all). A snapshot still pending when its own round's end
+        marker fires can only belong to a Match that was never dispatched, or
+        was dispatched but never got a ``.stop.response`` back — either way
+        the round is over and the snapshot is stale. A dispatched, genuinely
+        answered stop is always popped by `handle_stop_confirmation` before
+        this fires, so this is a no-op for it.
+        """
+        utt_id = message.context.get("utterance_id")
+        if not utt_id:
+            return
+        for key in [k for k in self._pre_drain if k[0] == utt_id]:
+            self._pre_drain.pop(key, None)
 
     def _resolve_dispatch_lifecycle(self, message: Message, skill_id: str) -> None:
         """Emit the framework done-signal for the ``<skill_id>:stop`` dispatch
@@ -332,7 +360,7 @@ class StopService(ConfidenceMatcherPipeline):
         self.bus.emit(done)
 
     def _targeted_stop(self, skill_id: str, conf: float, utterance: str,
-                       sess: Session) -> IntentHandlerMatch:
+                       sess: Session, message: Message) -> IntentHandlerMatch:
         """Build the OVOS-STOP-1 §2 targeted ``<skill_id>:stop`` Match.
 
         Drains the dispatch target from ``active_handlers`` and clears its
@@ -347,29 +375,42 @@ class StopService(ConfidenceMatcherPipeline):
         session if/when ``_dispatch_match`` actually commits it. The live
         ``sess`` passed in is read but never mutated.
 
-        This does have two side effects beyond building the Match: it records
-        a ``_pre_drain`` snapshot and registers a one-shot ``.stop.response``
-        listener, both keyed on ``(sess.session_id, skill_id)``. The snapshot
-        is only consumed by a ``.stop.response`` in the same session, so a
-        discarded Match leaves an entry that is never popped (no eviction), and
-        the stale listener survives to fire on the skill's NEXT genuine
-        ``.stop.response`` in this session — re-emitting the get_response/
-        converse kill signals for a stop this Match never actually caused.
+        Recording the ``_pre_drain`` snapshot and binding the (permanent,
+        per-skill_id) ``.stop.response`` listener here, in ``match()``, is
+        allowed by OVOS-PIPELINE-1 §4.2: a plugin's own bus registrations and
+        internal bookkeeping are not dispatch actions. If this Match is later
+        discarded, the snapshot is stale but not permanently leaked — it is
+        keyed by ``message.context["utterance_id"]`` (§9.1.1, stamped by the
+        orchestrator at lifecycle entry and carried by every derived Message),
+        so it dies with that round's own §9.5 end marker (see
+        ``_on_utterance_handled``) regardless of what happens to this Match.
         """
         LOG.debug(f"Telling skill to stop: {skill_id}")
-        # Captured before the drain: the post-drain session that reaches
-        # handle_stop_confirmation via the dispatch round-trip can no longer
-        # answer either question truthfully.
-        self._pre_drain[(sess.session_id, skill_id)] = PreDrainSnapshot(
-            was_active=sess.is_active(skill_id),
-            utt_state=(UtteranceState.RESPONSE
-                       if sess.response_mode and sess.response_mode.get("skill_id") == skill_id
-                       else UtteranceState.INTENT),
-        )
+        utt_id = message.context.get("utterance_id")
+        if not utt_id:
+            # No round to key the snapshot by (a V0/direct-invocation caller
+            # that never entered through the orchestrator's §9.1.1 stamping).
+            # The stop still dispatches; it just loses the automatic
+            # get_response/converse kill signals and dispatcher-lifecycle
+            # resolution `handle_stop_confirmation` would otherwise provide.
+            LOG.debug(f"no utterance_id on the stop Match for '{skill_id}'; "
+                      f"skipping the pre-drain snapshot")
+        else:
+            # Captured before the drain: the post-drain session that reaches
+            # handle_stop_confirmation via the dispatch round-trip can no
+            # longer answer either question truthfully.
+            self._pre_drain[(utt_id, skill_id)] = PreDrainSnapshot(
+                was_active=sess.is_active(skill_id),
+                utt_state=(UtteranceState.RESPONSE
+                           if sess.response_mode and sess.response_mode.get("skill_id") == skill_id
+                           else UtteranceState.INTENT),
+            )
+        if skill_id not in self._stop_listeners:
+            self._stop_listeners.add(skill_id)
+            self.bus.on(f"{skill_id}.stop.response", self.handle_stop_confirmation)
         drained = Session.deserialize(sess.serialize())
         drained.disable_response_mode(skill_id)
         drained.deactivate_skill(skill_id)
-        self.bus.once(f"{skill_id}.stop.response", self.handle_stop_confirmation)
         return IntentHandlerMatch(
             match_type=f"{skill_id}:stop",
             match_data={"conf": conf, "skill_id": skill_id},
@@ -441,7 +482,7 @@ class StopService(ConfidenceMatcherPipeline):
             # check if any skill can stop (§4 cascade)
             candidates = self._collect_stop_skills(message)
             if candidates:
-                return self._targeted_stop(candidates[0], conf, utterance, sess)
+                return self._targeted_stop(candidates[0], conf, utterance, sess, message)
 
         return None
 
@@ -482,7 +523,7 @@ class StopService(ConfidenceMatcherPipeline):
         # check if any skill can stop (§4 cascade)
         candidates = self._collect_stop_skills(message)
         if candidates:
-            return self._targeted_stop(candidates[0], conf, utterance, sess)
+            return self._targeted_stop(candidates[0], conf, utterance, sess, message)
 
         # no positive pong responder -> escalate to a §5 global stop
         return self._global_stop(conf, utterance, sess)
@@ -490,4 +531,8 @@ class StopService(ConfidenceMatcherPipeline):
     def shutdown(self) -> None:
         """Remove bus listeners registered by this service."""
         self.bus.remove(f"{self.pipeline_id}:global_stop", self.handle_global_stop)
+        self.bus.remove(SpecMessage.UTTERANCE_HANDLED.value, self._on_utterance_handled)
+        for skill_id in self._stop_listeners:
+            self.bus.remove(f"{skill_id}.stop.response", self.handle_stop_confirmation)
+        self._stop_listeners.clear()
         self._legacy.shutdown()
