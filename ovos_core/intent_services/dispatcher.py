@@ -60,9 +60,20 @@ class IntentDispatcher:
     """
 
     def __init__(self, bus, timeout: Optional[float] = DEFAULT_HANDLER_TIMEOUT,
-                 on_terminal: Optional[Callable[[Message], None]] = None):
+                 on_terminal: Optional[Callable[[Message], None]] = None,
+                 on_done_signal: Optional[Callable[[Message, Message], None]] = None):
         self.bus = bus
         self.timeout = timeout
+        # Called with (done-signal Message, dispatch Message) before the §8
+        # terminal is emitted. The done-signal is forwarded from the handler's
+        # own copy of the dispatch, so its session carries whatever the handler
+        # wrote; OVOS-SESSION-2 §2.6 has the orchestrator sync the round's
+        # working session with those writes at this point, so that the terminal
+        # and everything after it carry the synced session. Which fields sync
+        # and how is session semantics and belongs to the orchestrator, not
+        # here. There is no handler session on the §8.3 timeout path — the
+        # handler never reported — so this is not called for it.
+        self.on_done_signal = on_done_signal
         # Called synchronously with the dispatch Message immediately AFTER each §8
         # terminal (complete/error/timeout) is emitted, so the orchestrator can emit
         # its §9.5 ovos.utterance.handled end-marker. Doing this in the same step
@@ -139,6 +150,21 @@ class IntentDispatcher:
         session, preserved unchanged via MSG-1 §5.1 ``forward``)."""
         self.bus.emit(dispatch_msg.forward(topic, data))
 
+    def _sync_handler_session(self, done_msg: Message, dispatch_msg: Message):
+        """Hand the done-signal to the orchestrator's §2.6 completion sync.
+
+        Runs before the §8 terminal is emitted so the terminal — and the §9.5
+        end-marker after it — carry the synced session. A sync that raises is a
+        bug in the orchestrator's callback, not a reason to lose the terminal.
+        """
+        if self.on_done_signal is None:
+            return
+        try:
+            self.on_done_signal(done_msg, dispatch_msg)
+        except Exception:
+            LOG.exception("handler-completion session sync failed; "
+                          "emitting the terminal with the dispatch session")
+
     def _notify_terminal(self, dispatch_msg: Message):
         """Tell the orchestrator a §8 terminal just fired so it can emit its §9.5
         end-marker. Called after the terminal is on the bus, so the terminal is
@@ -196,6 +222,7 @@ class IntentDispatcher:
                           message.data.get("intent_name"))
         if entry is None:
             return
+        self._sync_handler_session(message, entry.dispatch_msg)
         try:
             self._emit(SpecMessage.INTENT_HANDLER_COMPLETE, entry.dispatch_msg,
                        {"skill_id": entry.skill_id, "intent_name": entry.intent_name})
@@ -208,6 +235,7 @@ class IntentDispatcher:
                           message.data.get("intent_name"))
         if entry is None:
             return
+        self._sync_handler_session(message, entry.dispatch_msg)
         exception = (message.data.get("exception")
                      or message.data.get("error")
                      or "handler raised an exception")
