@@ -28,6 +28,8 @@ from ovos_bus_client.message import Message
 from ovos_spec_tools import SpecMessage
 from ovos_utils.log import LOG
 
+from ovos_core.intent_services.working_session import raw_session_id
+
 #: default upper bound on handler execution before §8.3 timeout fires, seconds.
 #: handlers are long-running by design (§6.5) so this is generous; set to 0 or a
 #: negative value (config ``intents.handler_timeout``) to disable the timer.
@@ -124,8 +126,11 @@ class IntentDispatcher:
         if intent_name is None:
             intent_name = topic.split(":", 1)[-1]
 
-        entry = _InFlightDispatch(skill_id, intent_name, dispatch_msg)
         sid = self._session_id(dispatch_msg)
+        if sid is None:
+            # already logged by _session_id; nothing safe to track this under
+            return
+        entry = _InFlightDispatch(skill_id, intent_name, dispatch_msg)
         with self._lock:
             self._in_flight.setdefault(sid, []).append(entry)
             if self.timeout and self.timeout > 0:
@@ -142,8 +147,15 @@ class IntentDispatcher:
 
     # -- emission helpers ------------------------------------------------
     @staticmethod
-    def _session_id(message: Message) -> str:
-        return (message.context.get("session") or {}).get("session_id", "default")
+    def _session_id(message: Message) -> Optional[str]:
+        """The session id a Message's carrier names.
+
+        ``None`` for a malformed carrier (OVOS-SESSION-1 §2.5): callers drop
+        the Message rather than substituting the default session identity
+        for it, and must not crash — a forged or corrupted framework
+        done-signal must not tear down this dispatcher.
+        """
+        return raw_session_id(message)
 
     def _emit(self, topic, dispatch_msg: Message, data: dict):
         """Emit a Message forwarded from the dispatch (§6.1 / §8 — context, incl.
@@ -216,10 +228,35 @@ class IntentDispatcher:
                 return entry
             return None
 
+    def _resolve_entry(self, message: Message) -> Optional[_InFlightDispatch]:
+        """Find the in-flight entry a framework done-signal concludes.
+
+        A malformed session carrier on the done-signal (§2.5) gives no
+        trustworthy session id to key the lookup on. With multiple rounds for
+        the same skill/intent in flight across different sessions,
+        ``skill_id``/``intent_name`` alone cannot tell which session's entry
+        the signal actually belongs to — guessing risks popping the wrong
+        session's entry and misrouting its terminal (§2.5: never fabricate an
+        identity). So this drops the signal instead: every in-flight entry is
+        left untouched and resolves through its own correct done-signal or
+        the §8.3 timeout.
+        """
+        sid = self._session_id(message)
+        if sid is None:
+            LOG.error(
+                "malformed session carrier on framework done-signal "
+                f"{message.msg_type} (skill_id={message.context.get('skill_id')}, "
+                f"intent_name={message.data.get('intent_name')}, "
+                f"carrier_type={type(message.context.get('session')).__name__}); "
+                "dropping signal, in-flight dispatches left untouched")
+            return None
+        skill_id = message.context.get("skill_id")
+        intent_name = message.data.get("intent_name")
+        return self._pop(sid, skill_id, intent_name)
+
     def _on_skill_complete(self, message: Message):
         """Framework done-signal -> ``complete`` (§8.1)."""
-        entry = self._pop(self._session_id(message), message.context.get("skill_id"),
-                          message.data.get("intent_name"))
+        entry = self._resolve_entry(message)
         if entry is None:
             return
         self._sync_handler_session(message, entry.dispatch_msg)
@@ -231,8 +268,7 @@ class IntentDispatcher:
 
     def _on_skill_error(self, message: Message):
         """Framework done-signal -> ``error`` with the exception (§8.2)."""
-        entry = self._pop(self._session_id(message), message.context.get("skill_id"),
-                          message.data.get("intent_name"))
+        entry = self._resolve_entry(message)
         if entry is None:
             return
         self._sync_handler_session(message, entry.dispatch_msg)
