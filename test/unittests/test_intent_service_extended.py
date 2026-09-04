@@ -1227,18 +1227,19 @@ class TestHandleUtterance(unittest.TestCase):
         sess.blacklisted_intents = ["skill_a:stop"]
         before = list(sess.active_handlers)
 
+        # the carrier must name session "s" too: the round's own working
+        # session (what blacklisted_intents gating reads) now comes from
+        # the intake carrier fold, not from the ``SessionManager.get`` patch
+        # below (which only satisfies StopService's own lookups).
         msg = Message("recognizer_loop:utterance",
                       data={"utterances": ["stop"]},
-                      context={})
+                      context={"session": sess.serialize()})
 
         with patch.object(svc, "get_pipeline",
                           return_value=[("ovos-stop-pipeline-plugin", stop_svc.match_high)]), \
              patch.object(stop_svc, "_collect_stop_skills", return_value=["skill_a"]), \
              patch("ovos_core.intent_services.service.SessionManager.get",
                    return_value=sess), \
-             patch("ovos_core.intent_services.service.SessionManager.reset_default_session",
-                   return_value=sess), \
-             patch("ovos_core.intent_services.service.SessionManager.update"), \
              patch("ovos_core.intent_services.service.SessionManager.sync"), \
              patch("ovos_core.intent_services.service.get_message_lang",
                    return_value="en-US"), \
