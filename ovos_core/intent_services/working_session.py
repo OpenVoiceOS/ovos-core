@@ -27,7 +27,7 @@ from threading import RLock
 from typing import Dict, Optional
 
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import Session
+from ovos_bus_client.session import Session, SessionManager
 from ovos_utils.log import LOG
 
 #: An utterance whose dispatch never reaches a terminal is never closed, so the
@@ -66,8 +66,7 @@ def raw_session_id(message: Message) -> Optional[str]:
 
 
 def _utterance_id(message: Optional[Message]) -> Optional[str]:
-    ctx = getattr(message, "context", None) or {}
-    return ctx.get("utterance_id")
+    return message.context.get("utterance_id") if message else None
 
 
 def open_round(message: Message, session: Session) -> None:
@@ -116,6 +115,11 @@ def working_session(message: Optional[Message]) -> Optional[Session]:
         return None
     with _LOCK:
         return _OPEN_ROUNDS.get(uid)
+
+
+def round_session(message: Message) -> Session:
+    """The session the round is running on, or the one the Message names."""
+    return working_session(message) or SessionManager.get(message)
 
 
 def close_round(message: Optional[Message]) -> Optional[Session]:

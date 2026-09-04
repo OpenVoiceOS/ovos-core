@@ -1,6 +1,6 @@
 from os.path import dirname, join
 from threading import Event
-from typing import Optional, Dict, List, NamedTuple, Union
+from typing import Optional, Dict, List, NamedTuple, Tuple, Union
 
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.handler import HandlerLifecycle
@@ -72,7 +72,7 @@ class StopService(ConfidenceMatcherPipeline):
         #: and consumed once by handle_stop_confirmation. Keyed per-session
         #: (not bare skill_id) so two concurrent targeted stops for the same
         #: skill_id in different sessions can't clobber each other's snapshot.
-        self._pre_drain: Dict[tuple, PreDrainSnapshot] = {}
+        self._pre_drain: Dict[Tuple[str, str], PreDrainSnapshot] = {}
 
     def handle_global_stop(self, message: Message) -> None:
         """OVOS-STOP-1 §5.3 — broadcast the universal ``ovos.stop``.
@@ -146,27 +146,9 @@ class StopService(ConfidenceMatcherPipeline):
         return candidates
 
     def _collect_stop_skills(self, message: Message) -> List[str]:
-        """
-        Collect skills that can be stopped based on a ping-pong mechanism (§4).
-
-        This method determines which active skills can handle a stop request by sending
-        a stop ping to each active skill and waiting for their acknowledgment.
-
-        Individual skills respond to this request via the `can_stop` method.
-
-        Parameters:
-            message (Message): The original message triggering the stop request.
-
-        Returns:
-            List[str]: A list of skill IDs that can be stopped. If no skills explicitly
-                      indicate they can stop, returns all active skills.
-
-        Notes:
-            - Excludes skills that are blacklisted in the current session (§6.3)
-            - Uses a non-blocking event mechanism to collect skill responses
-            - Waits up to 0.5 seconds for skills to respond (§4.1)
-            - Falls back to all active skills if no explicit stop confirmation is received
-        """
+        """OVOS-STOP-1 §4 ping-pong: ask each active skill whether it can
+        stop, wait up to 0.5s (§4.1), and return the stoppable ones in
+        recency order. Falls back to all active skills if none confirm."""
         want_stop = []
         skill_ids = []
 
@@ -187,17 +169,8 @@ class StopService(ConfidenceMatcherPipeline):
         round_session_id = SessionManager.get(message).session_id
 
         def handle_ack(msg: Message) -> None:
-            """
-            Handle acknowledgment from skills during the stop process.
-
-            Parameters:
-                msg (Message): Message containing skill acknowledgment details.
-
-            Side Effects:
-                - Modifies the `want_stop` list with skills that can handle stopping
-                - Updates the `skill_ids` list to track which skills have responded
-                - Sets the threading event when all active skills have responded
-            """
+            """Record a skill's stop-ping pong, and signal ``event`` once
+            every active skill has answered."""
             nonlocal event, skill_ids
             skill_id = msg.data.get("skill_id")
             if not skill_id:
@@ -367,12 +340,21 @@ class StopService(ConfidenceMatcherPipeline):
         §7.1 stamping push is suppressed (``suppress_activation``, §7.3), so the
         removal is the final state.
 
-        CONFIRMED-3: match() must be side-effect-free — the orchestrator may
-        still discard this Match (blacklisted intent, missing required slots, a
+        match() must not touch the live session: the orchestrator may still
+        discard this Match (blacklisted intent, missing required slots, a
         dispatch exception) without ever consuming ``updated_session``, so the
         drain is carried on a COPY and only lands on the live SessionManager
         session if/when ``_dispatch_match`` actually commits it. The live
-        ``sess`` passed in is read but never mutated here.
+        ``sess`` passed in is read but never mutated.
+
+        This does have two side effects beyond building the Match: it records
+        a ``_pre_drain`` snapshot and registers a one-shot ``.stop.response``
+        listener, both keyed on ``(sess.session_id, skill_id)``. The snapshot
+        is only consumed by a ``.stop.response`` in the same session, so a
+        discarded Match leaves an entry that is never popped (no eviction), and
+        the stale listener survives to fire on the skill's NEXT genuine
+        ``.stop.response`` in this session — re-emitting the get_response/
+        converse kill signals for a stop this Match never actually caused.
         """
         LOG.debug(f"Telling skill to stop: {skill_id}")
         # Captured before the drain: the post-drain session that reaches
@@ -405,17 +387,17 @@ class StopService(ConfidenceMatcherPipeline):
         and ``converse_handlers`` emptied and ``response_mode`` removed, all
         committed before dispatch.
 
-        CONFIRMED-3: side-effect-free like ``_targeted_stop`` — the clear is
-        carried on a COPY, never the live ``sess``, so a discarded Match
-        (blacklist/missing-slots/dispatch-exception) leaves the live session
-        untouched.
+        Like ``_targeted_stop``, match() must not touch the live session: the
+        clear is carried on a COPY, never the live ``sess``, so a discarded
+        Match (blacklist/missing-slots/dispatch-exception) leaves the live
+        session untouched.
         """
         LOG.info(f"Emitting global stop, {len(sess.active_handlers)} active skills")
         # read-only: the pre-drain holder, carried through match_data so
         # handle_global_stop (dispatch time, NOT here) can emit the targeted
-        # `<skill_id>.stop` a killable-event abort actually listens on —
-        # emitting it here would violate the CONFIRMED-3 side-effect-free
-        # match() invariant, since this Match can still be discarded.
+        # `<skill_id>.stop` a killable-event abort actually listens on — match()
+        # must not act on the world: this Match can still be discarded, so the
+        # targeted stop topic goes out at dispatch time.
         holder = sess.response_mode.get("skill_id") if sess.response_mode else None
         drained = Session.deserialize(sess.serialize())
         drained.active_handlers = []
@@ -434,22 +416,12 @@ class StopService(ConfidenceMatcherPipeline):
         )
 
     def match_high(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
-        """
-        Handle high-confidence stop requests by matching exact stop vocabulary (§4/§5).
+        """High-confidence stop match: exact stop vocabulary only (§4/§5).
 
-        - explicit ``global_stop`` vocabulary (or bare ``stop`` with no active
-          skills) yields a §5 global stop;
-        - a bare ``stop`` with active skills runs the §4 cascade and yields a
-          targeted ``<skill_id>:stop`` for the recency-selected stoppable skill.
-
-        Parameters:
-            utterances (List[str]): List of user utterances to match against stop vocabulary
-            lang (str): Four-letter ISO language code for language-specific matching
-            message (Message): Message context for generating appropriate responses
-
-        Returns:
-            Optional[IntentHandlerMatch]: the stop Match, or None if no stop
-            vocabulary matched.
+        Explicit ``global_stop`` vocabulary (or bare ``stop`` with no active
+        skills) yields a §5 global stop; a bare ``stop`` with active skills
+        runs the §4 cascade and yields a targeted ``<skill_id>:stop`` for the
+        recency-selected stoppable skill.
         """
         sess = SessionManager.get(message)
 
@@ -458,7 +430,7 @@ class StopService(ConfidenceMatcherPipeline):
 
         is_stop = self._locale.voc_match(utterance, 'stop', lang, exact=True)
         is_global_stop = self._locale.voc_match(utterance, 'global_stop', lang, exact=True) or \
-                         (is_stop and not len(self._stop_candidates(message)))
+                         (is_stop and not self._stop_candidates(message))
 
         conf = 1.0
 
@@ -467,64 +439,29 @@ class StopService(ConfidenceMatcherPipeline):
 
         if is_stop:
             # check if any skill can stop (§4 cascade)
-            for skill_id in self._collect_stop_skills(message):
-                return self._targeted_stop(skill_id, conf, utterance, sess)
+            candidates = self._collect_stop_skills(message)
+            if candidates:
+                return self._targeted_stop(candidates[0], conf, utterance, sess)
 
         return None
 
     def match_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
-        """
-        Handle stop intent with additional context beyond simple stop commands.
-
-        This method processes utterances that contain "stop" or global stop vocabulary but may include
-        additional words not explicitly defined in intent files. It performs a medium-confidence
-        intent matching for stop requests.
-
-        Parameters:
-            utterances (List[str]): List of input utterances to analyze
-            lang (str): Four-letter ISO language code for localization
-            message (Message): Message context for generating appropriate responses
-
-        Returns:
-            Optional[IntentHandlerMatch]: A pipeline match if the stop intent is successfully processed,
-            otherwise None if no stop intent is detected
-
-        Notes:
-            - Attempts to match stop vocabulary with fuzzy matching
-            - Falls back to low-confidence matching if medium-confidence match is inconclusive
-            - Handles global stop scenarios when no active skills are present
-        """
+        """Medium-confidence stop match: fuzzy ``stop``/``global_stop``
+        vocabulary, delegated to ``match_low`` for the actual dispatch."""
         # we call flatten in case someone is sending the old style list of tuples
         utterance = flatten_list(utterances)[0]
 
-        is_stop = self._locale.voc_match(utterance, 'stop', lang, exact=False)
-        if not is_stop:
-            is_global_stop = self._locale.voc_match(utterance, 'global_stop', lang, exact=False) or \
-                             (is_stop and not len(self._stop_candidates(message)))
-            if not is_global_stop:
-                return None
-
+        if not (self._locale.voc_match(utterance, 'stop', lang, exact=False) or
+                self._locale.voc_match(utterance, 'global_stop', lang, exact=False)):
+            return None
         return self.match_low(utterances, lang, message)
 
     def match_low(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
-        """
-        Perform a low-confidence fuzzy match for stop intent before fallback processing.
+        """Low-confidence fuzzy stop match, tried last before fallback.
 
-        This method attempts to match stop-related vocabulary with low confidence and handle stopping of active skills.
-
-        Parameters:
-            utterances (List[str]): List of input utterances to match against stop vocabulary
-            lang (str): Four-letter ISO language code for vocabulary matching
-            message (Message): Message context used for generating replies and managing session
-
-        Returns:
-            Optional[IntentHandlerMatch]: A pipeline match object if a stop action is handled, otherwise None
-
-        Notes:
-            - Increases confidence if active skills are present
-            - Attempts to stop individual skills before emitting a global stop signal
-            - Handles language-specific vocabulary matching
-            - Configurable minimum confidence threshold for stop intent
+        Confidence is boosted when active skills are present. Below
+        ``min_conf`` (default 0.5), no match. Otherwise runs the §4 cascade
+        and falls back to a §5 global stop when no skill responds.
         """
         sess = SessionManager.get(message)
         # we call flatten in case someone is sending the old style list of tuples
@@ -543,8 +480,9 @@ class StopService(ConfidenceMatcherPipeline):
             return None
 
         # check if any skill can stop (§4 cascade)
-        for skill_id in self._collect_stop_skills(message):
-            return self._targeted_stop(skill_id, conf, utterance, sess)
+        candidates = self._collect_stop_skills(message)
+        if candidates:
+            return self._targeted_stop(candidates[0], conf, utterance, sess)
 
         # no positive pong responder -> escalate to a §5 global stop
         return self._global_stop(conf, utterance, sess)

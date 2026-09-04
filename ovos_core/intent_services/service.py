@@ -40,7 +40,7 @@ from ovos_core.transformers import MetadataTransformersService, UtteranceTransfo
 from ovos_core.intent_services.dispatcher import IntentDispatcher, DEFAULT_HANDLER_TIMEOUT
 from ovos_core.intent_services.manifest import IntentManifest
 from ovos_core.intent_services.working_session import (
-    close_round, open_round, pruned_entries, record_pruned, working_session,
+    close_round, open_round, pruned_entries, record_pruned, round_session, working_session,
 )
 from ovos_core.version import OVOS_VERSION_STR
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
@@ -158,15 +158,10 @@ class IntentService:
                  alive_hook=on_alive, started_hook=on_started,
                  ready_hook=on_ready,
                  error_hook=on_error, stopping_hook=on_stopping) -> None:
-        """
-        Initializes the IntentService with all intent parsing pipelines, transformer services, and messagebus event handlers.
-
-        Args:
-            bus: The messagebus connection used for event-driven communication.
-            config: Optional configuration dictionary for intent services.
-
-        Sets up skill name mapping, loads all supported intent matching pipelines (including Adapt, Padatious, Padacioso, Fallback, Converse, CommonQA, Stop, OCP, Persona, and optionally LLM and Model2Vec pipelines), initializes utterance and metadata transformer services, connects the session manager, and registers all relevant messagebus event handlers for utterance processing, context management, intent queries, and skill deactivation tracking.
-        """
+        """Loads the installed pipeline plugins, transformer services, and
+        session manager, and registers the bus handlers for utterance
+        processing, context mutation, intent queries, and skill deactivation
+        tracking."""
         callbacks = StatusCallbackMap(on_started=started_hook,
                                       on_alive=alive_hook,
                                       on_ready=ready_hook,
@@ -253,7 +248,7 @@ class IntentService:
             return
         SessionManager.handle_sync(message)
 
-    def handle_reload_pipelines(self, message: Message):
+    def handle_reload_pipelines(self, message: Message) -> None:
         pipeline_plugins = OVOSPipelineFactory.get_installed_pipeline_ids()
         LOG.debug(f"Installed pipeline plugins: {pipeline_plugins}")
 
@@ -292,7 +287,7 @@ class IntentService:
                 LOG.error(f"Failed to load pipeline plugin '{p}': {e}")
         self.status.set_ready()
 
-    def _handle_transformers(self, message):
+    def _handle_transformers(self, message: Message) -> Message:
         """
         Pipe utterance through transformer plugins to get more metadata.
         Utterances may be modified by any parser and context overwritten
@@ -308,7 +303,7 @@ class IntentService:
         return message
 
     @staticmethod
-    def disambiguate_lang(message):
+    def disambiguate_lang(message: Message) -> str:
         """ disambiguate language of the query via pre-defined context keys
         1 - stt_lang -> tagged in stt stage  (STT used this lang to transcribe speech)
         2 - request_lang -> tagged in source message (wake word/request volunteered lang info)
@@ -337,7 +332,7 @@ class IntentService:
 
         return default_lang
 
-    def get_pipeline_matcher(self, matcher_id: str):
+    def get_pipeline_matcher(self, matcher_id: str) -> Optional[Callable]:
         """
         Retrieve a matcher function for a given pipeline matcher ID.
 
@@ -396,7 +391,7 @@ class IntentService:
                 LOG.debug(f"Session '{session.session_id}' blacklisted "
                           f"pipelines skipped: {skipped}")
 
-        matchers = [(p, self.get_pipeline_matcher(p)) for p in requested]
+        matchers: List[Tuple[str, Callable]] = [(p, self.get_pipeline_matcher(p)) for p in requested]
         matchers = [m for m in matchers if m[1] is not None]  # filter any that failed to load
         final_pipeline = [k[0] for k in matchers]
         if requested != final_pipeline:
@@ -406,7 +401,7 @@ class IntentService:
         return matchers
 
     @staticmethod
-    def _validate_session(message, lang):
+    def _validate_session(message: Message, lang: str) -> Session:
         """Take the inbound utterance into session state and return the session
         to run it on.
 
@@ -437,7 +432,7 @@ class IntentService:
         sess.touch()
         return sess
 
-    def _handle_deactivate(self, message):
+    def _handle_deactivate(self, message: Message) -> None:
         """internal helper, track if a skill asked to be removed from active list during intent match
         in this case we want to avoid reactivating it again
         This only matters in PipelineMatchers, such as fallback and converse
@@ -489,7 +484,7 @@ class IntentService:
         if not carrier:
             return
 
-        live = working_session(dispatch_msg) or SessionManager.get(dispatch_msg)
+        live = round_session(dispatch_msg)
         carried_id = resolve_session_id(carrier)
         if carried_id != live.resolved_session_id():
             # §2.6 scopes the sync to the round's own session; a done-signal
@@ -503,8 +498,10 @@ class IntentService:
         baseline = dispatch_msg.context.get("session") or {}
         base_ctx = baseline.get("intent_context") or {}
         new_ctx = carrier.get("intent_context") or {}
-        payload = {k: v for k, v in new_ctx.items() if base_ctx.get(k) != v}
-        payload.update({k: None for k in base_ctx if k not in new_ctx})
+        # None is CONTEXT-1 §5.3's "remove this key" tombstone, not a value
+        changed = {k: v for k, v in new_ctx.items() if base_ctx.get(k) != v}
+        removed = {k: None for k in base_ctx if k not in new_ctx}
+        payload = {**changed, **removed}
         for key, dropped in pruned_entries(dispatch_msg).items():
             # only the stale carry-over of a pruned entry is beaten by the
             # decay; the same key re-armed with a different entry is a fresh
@@ -520,10 +517,9 @@ class IntentService:
         if carrier.get("response_mode") != baseline.get("response_mode"):
             live.response_mode = carrier.get("response_mode")
 
-        def handler_ids(session_dict):
-            return {h.get("skill_id") for h in session_dict.get("active_handlers") or []}
-
-        for skill_id in handler_ids(baseline) - handler_ids(carrier):
+        baseline_handlers = {h.get("skill_id") for h in baseline.get("active_handlers") or []}
+        carrier_handlers = {h.get("skill_id") for h in carrier.get("active_handlers") or []}
+        for skill_id in baseline_handlers - carrier_handlers:
             live.remove_active_handler(skill_id)
 
         SessionManager.update(live)
@@ -596,7 +592,7 @@ class IntentService:
         return [slot for slot in required_slots
                 if not match_data.get(slot) and not from_context.get(slot)]
 
-    def _context_supplied_slots(self, match, session_id: str, lang: str,
+    def _context_supplied_slots(self, match: IntentHandlerMatch, session_id: str, lang: str,
                                 intent_context: Optional[dict]) -> dict:
         """OVOS-CONTEXT-1 §7 — the slots the live ``intent_context`` can fill
         for ``match``. Shared by the §6.2 missing-required backstop and by the
@@ -623,7 +619,7 @@ class IntentService:
         )
 
     @staticmethod
-    def _apply_post_match_decay(sess: "Session", pre_match_entries: dict):
+    def _apply_post_match_decay(sess: "Session", pre_match_entries: dict) -> Session:
         """OVOS-CONTEXT-1 §4/§4.1: decrement turns_remaining on the session the
         round is running on, skipping keys refreshed since ``pre_match_entries``
         was snapshotted (compared by value, not identity, since reply/forward
@@ -650,7 +646,7 @@ class IntentService:
         return sess
 
     def _dispatch_match(self, match: IntentHandlerMatch, message: Message, lang: str,
-                        pipeline_id: str = None,
+                        pipeline_id: Optional[str] = None,
                         pre_match_entries: Optional[dict] = None) -> None:
         """Orchestrate the OVOS-PIPELINE-1 §6.1 post-match steps, then dispatch.
 
@@ -680,7 +676,7 @@ class IntentService:
         # §5.1: a committed ``Match.updated_session`` replaces the working
         # session wholesale; otherwise the round continues on the session it
         # was folded onto at entry. No fold here (§2.6).
-        sess = working_session(message) or SessionManager.get(message)
+        sess = round_session(message)
         if match.updated_session is not None:
             updated = match.updated_session
             if updated.resolved_session_id() != sess.resolved_session_id():
@@ -824,25 +820,9 @@ class IntentService:
             except Exception as e:
                 LOG.warning(f"Failed to upload metrics: {e}")
 
-    def send_cancel_event(self, message):
-        """
-        Emit events and play a sound when an utterance is canceled.
-
-        Logs the cancellation with the specific cancel word, plays a predefined cancel sound,
-        and emits multiple events to signal the utterance cancellation.
-
-        Parameters:
-            message (Message): The original message that triggered the cancellation.
-
-        Events Emitted:
-            - 'mycroft.audio.play_sound': Plays a cancel sound from configuration
-            - 'ovos.utterance.cancelled': Signals that the utterance was canceled
-            - 'ovos.utterance.handled': Indicates the utterance processing is complete
-
-        Notes:
-            - Uses the default cancel sound path 'snd/cancel.mp3' if not specified in configuration
-            - Ensures events are sent as replies to the original message
-        """
+    def send_cancel_event(self, message: Message) -> None:
+        """OVOS-PIPELINE-1 §6.4 cancellation terminal path: play the cancel
+        sound, emit ``ovos.utterance.cancelled``, then the §9.5 end-marker."""
         LOG.info(f"utterance canceled, cancel_word:{message.context.get('cancel_word')}")
         # play dedicated cancel sound
         sound = Configuration().get('sounds', {}).get('cancel', "snd/cancel.mp3")
@@ -883,31 +863,14 @@ class IntentService:
         return uid
 
     def handle_utterance(self, message: Message):
-        """Main entrypoint for handling user utterances
+        """Main entrypoint for handling user utterances, typically generated
+        by a spoken interaction but potentially also from a CLI or other
+        method of injecting a 'user utterance' into the system.
 
-        Monitor the messagebus for 'ovos.utterance.handle', typically
-        generated by a spoken interaction but potentially also from a CLI
-        or other method of injecting a 'user utterance' into the system.
-
-        Utterances then work through this sequence to be handled:
-        1) UtteranceTransformers can modify the utterance and metadata in message.context
-        2) MetadataTransformers can modify the metadata in message.context
-        3) Language is extracted from message
-        4) Active skills attempt to handle using converse()
-        5) Padatious high match intents (conf > 0.95)
-        6) Adapt intent handlers
-        7) CommonQuery Skills
-        8) High Priority Fallbacks
-        9) Padatious near match intents (conf > 0.8)
-        10) General Fallbacks
-        11) Padatious loose match intents (conf > 0.5)
-        12) Catch all fallbacks including Unknown intent handler
-
-        If all these fail the complete_intent_failure message will be sent
-        and a generic error sound played.
-
-        Args:
-            message (Message): The messagebus data
+        Runs the utterance/metadata transformer chain, disambiguates
+        language, then tries each configured pipeline matcher in order until
+        one produces a Match. If none does, ``send_complete_intent_failure``
+        is emitted instead.
         """
         # OVOS-SESSION-1 §2.5: reject a present-but-non-object session carrier
         # before anything downstream (transformers, lang disambiguation, the
@@ -1090,7 +1053,6 @@ class IntentService:
             SessionManager.sync(message)
         elif sess.session_id in self._deactivations:
             self._deactivations.pop(sess.session_id)
-        return match, message.context, stopwatch
 
     def send_complete_intent_failure(self, message):
         """Emit the OVOS-PIPELINE-1 §9.3 no-match terminal.
@@ -1116,7 +1078,7 @@ class IntentService:
         # §9.5: universal end-marker
         self.bus.emit(message.reply(SpecMessage.UTTERANCE_HANDLED))
 
-    def _apply_context_slots(self, match, sess, reply) -> None:
+    def _apply_context_slots(self, match: IntentHandlerMatch, sess: Session, reply: Message) -> None:
         """OVOS-CONTEXT-1 §7 — fill an intent's unfilled slots from live
         context. Fallback for engines that don't implement §7 themselves;
         no-op when the intent declares no context-gated slot.
@@ -1131,26 +1093,6 @@ class IntentService:
             reply.data[key] = value
         if supplied:
             LOG.debug(f"context-supplied slots (§7): {supplied}")
-
-    @staticmethod
-    def _session_for_context_write(message: Message) -> "Session":
-        """Resolve the session object a legacy context write should mutate.
-
-        A context write belongs to the round it was emitted from, so it lands
-        on that round's working session (SESSION-2 §2.6: a mutation happens at
-        a lifecycle boundary the writer participates in, and an incidental
-        Message may not revise the working session with its own snapshot). The
-        working session is looked up by ``utterance_id``, which the skill's
-        handler frame carries for free.
-
-        With no round open there is no lifecycle to write into. The default
-        session is still the device's store and a write to it is meaningful at
-        any time (§5), so that case resolves to the store; a named session
-        resolves to a throwaway built from the carrier and the write goes
-        nowhere, which is what §2.2 leaves available — the orchestrator holds
-        no named session between utterances to write into.
-        """
-        return working_session(message) or SessionManager.get(message)
 
     @staticmethod
     def handle_add_context(message: Message):
@@ -1190,19 +1132,13 @@ class IntentService:
         entity['match'] = word
         entity['key'] = word
         entity['origin'] = origin
-        sess = IntentService._session_for_context_write(message)
-        # Finding 30a: `sess.context.inject_context()` folds its own write
-        # into `intent_context` under `ovos_bus_client.session._CONTEXT_LOCK`
-        # (the same lock guarding `Session.set_intent_context` /
-        # `remove_intent_context`, which a skill's `set_context`/
-        # `remove_context` call reaches concurrently). The copy-modify-assign
-        # below must run in the SAME critical section as that fold, or a
-        # concurrent skill-side write landing between the read and the
-        # reassign is silently clobbered when the stale snapshot is written
-        # back. Holding `_CONTEXT_LOCK` (an `RLock`) across the whole
-        # sequence - including the nested `inject_context()` call and
-        # `_replace_intent_context()`, both of which reacquire it - makes the
-        # read-modify-write atomic with every other locked mutator.
+        sess = round_session(message)
+        # The read-modify-write below must share the critical section with
+        # `inject_context()`'s own fold under `_CONTEXT_LOCK`, or a concurrent
+        # skill-side `set_context`/`remove_context` write landing between the
+        # read and the reassign is silently clobbered. `_CONTEXT_LOCK` is an
+        # RLock because the nested `inject_context()` and
+        # `_replace_intent_context()` calls below both reacquire it.
         with _CONTEXT_LOCK:
             sess.context.inject_context(entity)
             # Two dialects meet here: ADAPT's munged `skillidkey` spelling and
@@ -1259,12 +1195,10 @@ class IntentService:
         """
         context = message.data.get('context')
         if context:
-            sess = IntentService._session_for_context_write(message)
-            # Finding 30a: same atomicity requirement as `handle_add_context`
-            # - hold `_CONTEXT_LOCK` across the `remove_context`-style fold
-            # AND the copy-modify-assign below, so a concurrent skill-side
-            # `set_intent_context`/`remove_intent_context` call can't land
-            # between the read and the reassign and get silently clobbered.
+            sess = round_session(message)
+            # Same atomicity requirement as `handle_add_context`: hold
+            # `_CONTEXT_LOCK` across the fold and the copy-modify-assign below,
+            # or a concurrent skill-side session write is silently clobbered.
             with _CONTEXT_LOCK:
                 sess.context.remove_context(context)
                 # mirror the removal into the OVOS-CONTEXT-1 map (see
@@ -1284,14 +1218,14 @@ class IntentService:
     @staticmethod
     def handle_clear_context(message: Message):
         """Clears all keywords from context """
-        sess = IntentService._session_for_context_write(message)
-        # Finding 30a: same atomicity requirement as `handle_add_context`.
+        sess = round_session(message)
+        # Same atomicity requirement as `handle_add_context`.
         with _CONTEXT_LOCK:
             sess.context.clear_context()
             # mirror the clear into the OVOS-CONTEXT-1 map (see `handle_add_context`)
             _replace_intent_context(sess, {})
 
-    def handle_get_intent(self, message):
+    def handle_get_intent(self, message: Message) -> None:
         """Get intent from either adapt or padatious.
 
         Args:

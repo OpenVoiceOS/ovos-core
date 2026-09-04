@@ -695,6 +695,18 @@ class TestMatchMedium(unittest.TestCase):
         self.assertEqual(result, "LOW_RESULT")
         mock_low.assert_called_once()
 
+    def test_global_stop_voc_without_stop_voc_still_matches(self):
+        """A 'global_stop' utterance with no 'stop' vocab match must still
+        reach match_low (the dead is_stop-guarded branch never applied)."""
+        def voc_match_side_effect(utt, voc, lang, exact):
+            return voc == "global_stop"
+
+        with patch.object(self.svc._locale, "voc_match", side_effect=voc_match_side_effect), \
+             patch.object(self.svc, "match_low", return_value="LOW_RESULT") as mock_low:
+            result = self.svc.match_medium(["global_stop_only"], "en-US", Message("test"))
+        self.assertEqual(result, "LOW_RESULT")
+        mock_low.assert_called_once()
+
 
 class TestGetActiveSkills(unittest.TestCase):
 

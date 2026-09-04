@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
+from typing import List, Optional, Tuple, Union
 
+from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
 from ovos_spec_tools import standardize_lang
+from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
 
 from ovos_core.intent_services.working_session import raw_session_id
@@ -30,7 +32,7 @@ class IntentManifest:
     ``(session_id, skill_id, intent_name, lang, method)`` per §11.1.
     """
 
-    def __init__(self, bus):
+    def __init__(self, bus: Union[MessageBusClient, FakeBus]):
         self.bus = bus
         # (session_id, skill_id, intent_name, lang, method) → entry dict
         self._index: dict = {}
@@ -60,10 +62,10 @@ class IntentManifest:
 
     @staticmethod
     def _key(session_id: str, skill_id: str, intent_name: str,
-              lang: str, method: str) -> tuple:
+              lang: str, method: str) -> Tuple[str, str, str, str, str]:
         return session_id, skill_id, intent_name, standardize_lang(lang), method
 
-    def _effective_pool(self, session_id: str) -> list:
+    def _effective_pool(self, session_id: str) -> List[dict]:
         """Return entries for *session_id* merged with 'default' (§11.2)."""
         seen = {}
         for key, entry in self._index.items():
@@ -98,7 +100,7 @@ class IntentManifest:
         return ctx_session_id
 
     def get_required_slots(self, session_id: str, skill_id: str,
-                           intent_name: str, lang: str) -> list:
+                           intent_name: str, lang: str) -> List[str]:
         """OVOS-INTENT-4 §6.1 / §10 — the ``required_slots`` an intent declares.
 
         The canonical source for the OVOS-PIPELINE-1 §6.2 orchestrator backstop:
@@ -263,7 +265,7 @@ class IntentManifest:
     # OVOS-CONTEXT-1: orchestrator lookups for declared context gates / slots
 
     def _matching_definitions(self, session_id: str, skill_id: str,
-                              intent_name: str, lang: Optional[str]) -> list:
+                              intent_name: str, lang: Optional[str]) -> List[dict]:
         lang = standardize_lang(lang) if lang else None
         out = []
         for entry in self._effective_pool(session_id):
@@ -275,7 +277,8 @@ class IntentManifest:
         return out
 
     def get_context_requirements(self, session_id: str, skill_id: str,
-                                 intent_name: str, lang: Optional[str] = None):
+                                 intent_name: str, lang: Optional[str] = None
+                                 ) -> Tuple[List[str], List[str]]:
         """OVOS-CONTEXT-1 §6/§6.1 — declared ``requires_context`` /
         ``excludes_context``, unioned across registration definitions.
 
