@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.2.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.4a1) (2026-09-04)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.3a1...3.2.4a1)
+
+**Merged pull requests:**
+
+- fix: bind the round's working session to the dispatch message at intake [\#917](https://github.com/OpenVoiceOS/ovos-core/pull/917) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.2.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.3a1) (2026-09-03)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.2a1...3.2.3a1)
@@ -58,19 +66,19 @@
 
 ## [3.0.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.12a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.12a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.12a1)
 
 **Merged pull requests:**
 
 - fix: close messagebus client before main\(\) returns on shutdown [\#870](https://github.com/OpenVoiceOS/ovos-core/pull/870) ([JarbasAl](https://github.com/JarbasAl))
 
-## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.10a3)
-
 ## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.11a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.11a1)
+
+## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.10a3)
 
 ## [3.0.10a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a2) (2026-08-31)
 
