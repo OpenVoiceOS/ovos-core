@@ -30,6 +30,13 @@ class IntentManifest:
     ``ovos.intent.list`` / ``ovos.intent.describe`` pull-queries.
     The manifest is keyed by the quintuple
     ``(session_id, skill_id, intent_name, lang, method)`` per §11.1.
+
+    ``ovos.intent.list`` accepts ``{"include_definitions": true}``: each
+    result row then also carries ``definition``, the stored registration
+    payload that ``ovos.intent.describe`` would return for it, so a client
+    that wants every intent's sentences needs one round trip per language
+    instead of one describe per intent. Without the flag the reply is the
+    plain §10.1 row.
     """
 
     def __init__(self, bus: Union[MessageBusClient, FakeBus]):
@@ -205,6 +212,10 @@ class IntentManifest:
         f_skill = message.data.get("skill_id")
         f_lang = message.data.get("lang")
         f_session = message.data.get("session_id")
+        # Opt-in: attach each row's registration payload (what
+        # ``ovos.intent.describe`` returns as ``definition``) so a client
+        # gets the sentences for a whole language in this one reply.
+        include_definitions = bool(message.data.get("include_definitions", False))
         if f_lang:
             f_lang = standardize_lang(f_lang)
 
@@ -215,8 +226,11 @@ class IntentManifest:
                 continue
             if f_lang and entry["lang"] != f_lang:
                 continue
-            results.append({k: entry[k] for k in
-                            ("skill_id", "intent_name", "lang", "method", "enabled", "session_id")})
+            row = {k: entry[k] for k in
+                   ("skill_id", "intent_name", "lang", "method", "enabled", "session_id")}
+            if include_definitions:
+                row["definition"] = entry["definition"]
+            results.append(row)
 
         self.bus.emit(message.reply("ovos.intent.list.response", {"ok": True, "intents": results}))
 

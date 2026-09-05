@@ -25,10 +25,14 @@ def _manifest() -> IntentManifest:
     return IntentManifest(FakeBus())
 
 
-def _reg(skill_id, intent_name, lang="en-US", method="keyword", session_id="default"):
+def _reg(skill_id, intent_name, lang="en-US", method="keyword", session_id="default",
+         **definition):
+    """A registration broadcast; extra kwargs are the rest of the payload
+    (``samples`` for a template intent, ``required`` for a keyword one)."""
     topic = f"ovos.intent.register.{method}"
     return Message(topic,
-                   data={"skill_id": skill_id, "intent_name": intent_name, "lang": lang},
+                   data={"skill_id": skill_id, "intent_name": intent_name, "lang": lang,
+                         **definition},
                    context={"session": {"session_id": session_id}, "skill_id": skill_id})
 
 
@@ -214,6 +218,104 @@ class TestIntentListQuery(unittest.TestCase):
         resp = self._query(lang="de-DE")
         self.assertEqual(len(resp["intents"]), 1)
         self.assertEqual(resp["intents"][0]["skill_id"], "skill.b")
+
+
+class TestIntentListDefinitions(unittest.TestCase):
+    """``ovos.intent.list`` with ``include_definitions``: one round trip per
+    language instead of one ``ovos.intent.describe`` per intent."""
+
+    ROW_FIELDS = {"skill_id", "intent_name", "lang", "method", "enabled", "session_id"}
+    EN_SAMPLES = ["what is the weather", "what is the weather in {location}"]
+    DE_SAMPLES = ["wie ist das wetter", "wie ist das wetter in {location}"]
+
+    def setUp(self):
+        self.m = _manifest()
+        self.m._on_register(_reg("skill.weather", "current.weather", lang="en-US",
+                                 method="template", samples=self.EN_SAMPLES))
+        self.m._on_register(_reg("skill.weather", "current.weather", lang="de-DE",
+                                 method="template", samples=self.DE_SAMPLES))
+        self.m._on_register(_reg("skill.weather", "current.weather", lang="en-US",
+                                 method="keyword", required=["WeatherKeyword"]))
+
+    def _list(self, **kwargs):
+        replies = []
+        self.m.bus.on("ovos.intent.list.response", lambda msg: replies.append(msg))
+        self.m._on_list(Message("ovos.intent.list", data=kwargs))
+        return replies[-1].data
+
+    def _describe(self, **kwargs):
+        replies = []
+        self.m.bus.on("ovos.intent.describe.response", lambda msg: replies.append(msg))
+        self.m._on_describe(Message("ovos.intent.describe", data=kwargs))
+        return replies[-1].data
+
+    @staticmethod
+    def _row(resp, method, lang):
+        rows = [r for r in resp["intents"] if r["method"] == method and r["lang"] == lang]
+        assert len(rows) == 1, rows
+        return rows[0]
+
+    def test_default_reply_carries_no_definition(self):
+        resp = self._list(lang="en-US")
+        self.assertTrue(resp["ok"])
+        self.assertEqual(len(resp["intents"]), 2)
+        for row in resp["intents"]:
+            self.assertEqual(set(row), self.ROW_FIELDS)
+
+    def test_include_definitions_false_is_the_default(self):
+        self.assertEqual(self._list(lang="en-US", include_definitions=False),
+                         self._list(lang="en-US"))
+
+    def test_include_definitions_attaches_the_describe_payload(self):
+        resp = self._list(lang="en-US", include_definitions=True)
+        self.assertTrue(resp["ok"])
+        row = self._row(resp, "template", "en-US")
+        self.assertEqual(set(row), self.ROW_FIELDS | {"definition"})
+        self.assertEqual(row["definition"]["samples"], self.EN_SAMPLES)
+        # Exactly what a describe of the same registration returns.
+        described = self._describe(skill_id="skill.weather", intent_name="current.weather",
+                                   lang="en-US", method="template")
+        self.assertEqual(row["definition"], described["definitions"][0]["definition"])
+
+    def test_each_registration_carries_its_own_payload(self):
+        resp = self._list(lang="en-US", include_definitions=True)
+        keyword = self._row(resp, "keyword", "en-US")["definition"]
+        template = self._row(resp, "template", "en-US")["definition"]
+        self.assertEqual(keyword["required"], ["WeatherKeyword"])
+        self.assertNotIn("samples", keyword)
+        self.assertEqual(template["samples"], self.EN_SAMPLES)
+        self.assertNotIn("required", template)
+
+    def test_definitions_follow_the_language_filter(self):
+        # "de-de" is folded to the stored "de-DE"; the English rows stay out.
+        resp = self._list(lang="de-de", include_definitions=True)
+        self.assertEqual(len(resp["intents"]), 1)
+        row = resp["intents"][0]
+        self.assertEqual(row["lang"], "de-DE")
+        self.assertEqual(row["definition"]["samples"], self.DE_SAMPLES)
+
+    def test_definitions_without_a_language_cover_every_row(self):
+        resp = self._list(include_definitions=True)
+        self.assertEqual(len(resp["intents"]), 3)
+        self.assertTrue(all("definition" in row for row in resp["intents"]))
+        self.assertEqual(self._row(resp, "template", "de-DE")["definition"]["samples"],
+                         self.DE_SAMPLES)
+
+    def test_definitions_come_from_the_session_effective_pool(self):
+        # A satellite re-registering the intent for its own session wins over
+        # the default one (§11.2) and its payload is the satellite's.
+        sat_samples = ["how is the weather"]
+        self.m._on_register(_reg("skill.weather", "current.weather", lang="en-US",
+                                 method="template", session_id="sat-1",
+                                 samples=sat_samples))
+        resp = self._list(lang="en-US", session_id="sat-1", include_definitions=True)
+        template = self._row(resp, "template", "en-US")
+        self.assertEqual(template["session_id"], "sat-1")
+        self.assertEqual(template["definition"]["samples"], sat_samples)
+        # The default-session keyword registration is inherited, payload intact.
+        keyword = self._row(resp, "keyword", "en-US")
+        self.assertEqual(keyword["session_id"], "default")
+        self.assertEqual(keyword["definition"]["required"], ["WeatherKeyword"])
 
 
 class TestIntentDescribeQuery(unittest.TestCase):
