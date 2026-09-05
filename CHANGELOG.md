@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.2.8a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.8a1) (2026-09-05)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.7a1...3.2.8a1)
+
+**Merged pull requests:**
+
+- fix: write/read session.converse\_handlers per OVOS-CONVERSE-1 [\#933](https://github.com/OpenVoiceOS/ovos-core/pull/933) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.2.7a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.7a1) (2026-09-05)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.6a3...3.2.7a1)
@@ -111,19 +119,19 @@
 
 ## [3.0.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.12a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.12a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.12a1)
 
 **Merged pull requests:**
 
 - fix: close messagebus client before main\(\) returns on shutdown [\#870](https://github.com/OpenVoiceOS/ovos-core/pull/870) ([JarbasAl](https://github.com/JarbasAl))
 
-## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.10a3)
-
 ## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.11a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.11a1)
+
+## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.10a3)
 
 ## [3.0.10a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a2) (2026-08-31)
 
@@ -366,7 +374,6 @@
 **Merged pull requests:**
 
 - chore: drop deprecated bus-client EnclosureAPI from skill\_manager [\#822](https://github.com/OpenVoiceOS/ovos-core/pull/822) ([JarbasAl](https://github.com/JarbasAl))
-- chore: drop unused direct watchdog dependency [\#821](https://github.com/OpenVoiceOS/ovos-core/pull/821) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.5.5a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.5a2) (2026-07-17)
 
