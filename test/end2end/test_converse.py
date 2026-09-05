@@ -132,9 +132,10 @@ class TestConverse(TestCase):
                 Message("skill.converse.pong",
                         data={"can_handle": True, "skill_id": self.skill_id},
                         context={"skill_id": self.skill_id}),
-                Message(f"{self.skill_id}.activate",
-                        data={},
-                        context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §7.3 marks `converse` non-activating: the
+                # dispatch continues an existing participation, so no
+                # activation is registered and no activation callback
+                # fires.
                 Message(INTENT_MATCHED,
                         data={"skill_id": self.skill_id, "intent_name": "converse:skill"},
                         context={"skill_id": self.skill_id}),
@@ -183,10 +184,10 @@ class TestConverse(TestCase):
                 Message("skill.converse.pong",
                         data={"can_handle": True, "skill_id": self.skill_id},
                         context={"skill_id": self.skill_id}),
-                Message(f"{self.skill_id}.activate",
-                        data={},
-                        context={"skill_id": self.skill_id}),
-
+                # PIPELINE-1 §7.3 marks `converse` non-activating: the
+                # dispatch continues an existing participation, so no
+                # activation is registered and no activation callback
+                # fires.
                 Message(INTENT_MATCHED,
                         data={"skill_id": self.skill_id, "intent_name": "converse:skill"},
                         context={"skill_id": self.skill_id}),

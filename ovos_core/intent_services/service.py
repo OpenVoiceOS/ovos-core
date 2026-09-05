@@ -42,7 +42,7 @@ from ovos_core.intent_services.manifest import IntentManifest
 from ovos_core.intent_services.working_session import (
     close_round, open_round, pruned_entries, record_pruned, round_session, working_session,
 )
-from ovos_core.version import OVOS_VERSION_STR
+from ovos_core.version import OVOS_VERSION_STR, VERSION_MAJOR
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
 
@@ -81,31 +81,51 @@ _PIPELINE_MIGRATION_MAP = {
 
 _PIPELINE_RE = re.compile(r'-(high|medium|low)$')
 
-# OVOS-PIPELINE-1 §7.3 reserved intent_names. A Match produced by one of the
-# reserving pipeline-plugin roles below is a reserved-name dispatch: §7.1
-# requires the ``session.active_handlers`` push to be SUPPRESSED for it, because
-# a reserved name represents a continuation/termination of an already-active
-# skill's participation, not a fresh activation. Keyed off the producing
-# pipeline_id (the role that holds the namespace lease), with the confidence
-# suffix (``-high``/``-medium``/``-low``) stripped before lookup.
+# OVOS-PIPELINE-1 §7.3 reserved intent_names, with the registry's "activation
+# push" column. §7.1: "Suppression MUST be keyed on the Match's ``intent_name``
+# and its registry row — never on the producing ``pipeline_id``". §7.3 states
+# the column per row rather than for reserved names as a class:
 #
-#   converse       -> ovos-converse-pipeline-plugin     (CONVERSE-1 §4/§5: converse, response)
-#   fallback       -> ovos-fallback-pipeline-plugin      (FALLBACK-1 §6.3: fallback)
-#   common_query   -> ovos-common-query-pipeline-plugin  (COMMON-QUERY-1 §3: common_query)
+#   converse      suppressed  (CONVERSE-1 §4)      continues an existing participation
+#   response      suppressed  (CONVERSE-1 §5)      continues an existing participation
+#   stop          suppressed  (STOP-1 §4)          ends an existing participation
+#   common_query  suppressed  (COMMON-QUERY-1 §3)  runs the plugin's own bundled handler
+#   fallback      PUSHES      (FALLBACK-1 §6.3)    the dispatch *is* its activation
 #
-# OVOS-STOP-1 dispatches (``stop``/``global_stop``) also suppress the §7.1 push,
-# but express it per-Match via ``IntentHandlerMatch.suppress_activation`` (§6.2)
-# rather than through this pipeline_id table.
+# ``global_stop`` is not a reserved intent_name (STOP-1 §2), so it pushes: §5.2
+# requires the committed post-dispatch ``active_handlers`` to hold exactly the
+# stop plugin's own entry.
+_ACTIVATION_PUSH_SUPPRESSED = {"converse", "response", "stop", "common_query"}
+
+# Pre-spec fallback for producers that have not migrated to spec-shaped
+# ``intent_name``s yet. Their match_types carry no recognizable reserved name —
+# ``converse:skill``, ``<skill_id>.converse.get_response``,
+# ``question:action.<skill_id>`` — so the rule above cannot see them and the
+# §7.3 suppression they are entitled to would be lost. Keyed off the producing
+# pipeline_id, with the confidence suffix stripped, until each producer emits
+# the reserved name:
+#
+#   converse plugin                  -> ``<skill_id>:converse`` / ``<skill_id>:response``
+#   ovos-common-query-pipeline-plugin -> ``<pipeline_id>:common_query``
+#
+# Removed in ovos-core _RESERVED_PIPELINE_FALLBACK_REMOVAL_VERSION, at which
+# point suppression is keyed on intent_name alone as §7.1 requires. The
+# fallback plugin is deliberately absent: §7.3 marks ``fallback`` as PUSHING,
+# and listing it here is what suppressed the push it is owed.
 _RESERVED_NAME_PIPELINES = {
     "ovos-converse-pipeline-plugin",
-    "ovos-fallback-pipeline-plugin",
     "ovos-common-query-pipeline-plugin",
 }
 
+_RESERVED_PIPELINE_FALLBACK_REMOVAL_VERSION = f"{VERSION_MAJOR + 1}.0.0"
+
 
 def _produces_reserved_name(pipeline_id: Optional[str]) -> bool:
-    """OVOS-PIPELINE-1 §7.3: True when ``pipeline_id`` is a reserved-name role
-    whose dispatches must NOT stamp ``session.active_handlers`` (§7.1)."""
+    """Whether ``pipeline_id`` is an unmigrated reserved-name producer.
+
+    Transitional companion to ``_ACTIVATION_PUSH_SUPPRESSED``; see the comment
+    above for the producers it covers and when it goes away.
+    """
     if not pipeline_id:
         return False
     return _PIPELINE_RE.sub("", pipeline_id) in _RESERVED_NAME_PIPELINES
@@ -731,20 +751,19 @@ class IntentService:
                 reply.context["skill_id"] = match.skill_id
 
                 was_deactivated = match.skill_id in self._deactivations[sess.session_id]
-                # ``suppress_activation`` (OVOS-STOP-1 §6.2/§7.3) marks a dispatch
-                # that terminates an already-active skill's participation — a stop —
-                # so it must register no activation at all: neither the §7.1
-                # ``active_handlers`` push nor the ``{skill_id}.activate`` callback.
-                if not was_deactivated and not match.suppress_activation:
-                    # OVOS-PIPELINE-1 §7.1 pushes the skill onto the session's
-                    # active-handler recency list. §7.3 SUPPRESSES that push for
-                    # reserved intent_name dispatches (converse/response/
-                    # fallback/common_query): a reserved name is a continuation
-                    # or termination of an already-active skill's participation,
-                    # not a fresh activation. `activate_skill` is a back-compat
-                    # shim over `add_active_handler` (§7.1) in current bus-client.
-                    if not _produces_reserved_name(pipeline_id):
-                        sess.activate_skill(match.skill_id)
+                # OVOS-PIPELINE-1 §7.1 pushes the skill onto the session's
+                # active-handler recency list; §7.3's registry suppresses that
+                # push per reserved intent_name, keyed on the Match's
+                # `intent_name` and never on the producing pipeline_id.
+                # `_produces_reserved_name` is the transitional second gate for
+                # producers still emitting pre-spec match_types.
+                # `activate_skill` is a back-compat shim over
+                # `add_active_handler` (§7.1) in current bus-client.
+                dispatched_intent = match.match_type.split(":", 1)[-1]
+                if not was_deactivated and \
+                        dispatched_intent not in _ACTIVATION_PUSH_SUPPRESSED and \
+                        not _produces_reserved_name(pipeline_id):
+                    sess.activate_skill(match.skill_id)
                     # emit event for skills callback -> self.handle_activate
                     self.bus.emit(reply.forward(f"{match.skill_id}.activate"))
 

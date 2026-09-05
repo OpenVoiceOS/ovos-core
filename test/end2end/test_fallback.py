@@ -64,6 +64,10 @@ class TestFallback(TestCase):
                               {"session": session.serialize(), "source": "A", "destination": "B"})
 
             final_session = deepcopy(session)
+            # PIPELINE-1 §7.3: the fallback dispatch activates its handler, so
+            # it is in active_handlers when the round ends -- what makes it
+            # reachable by OVOS-STOP-1 and eligible for a converse follow-up.
+            final_session.activate_skill(self.skill_id)
 
             test = End2EndTest(
                 minicroft=minicroft,
@@ -85,6 +89,11 @@ class TestFallback(TestCase):
                     Message("ovos.skills.fallback.ping",
                             {"utterances": ["hello world"], "lang": session.lang, "range": [90, 101]}),
                     Message("ovos.skills.fallback.pong", {"skill_id": self.skill_id, "can_handle": True}),
+                # PIPELINE-1 §7.3: `fallback` PUSHES onto active_handlers --
+                # "the dispatch *is* its activation" -- so the activation
+                # callback fires, unlike converse/response/stop/common_query.
+                    Message(f"{self.skill_id}.activate", {},
+                            {"skill_id": self.skill_id}),
                 # PIPELINE-1 §9.2: matched notification precedes the dispatch. The
                 # fallback match_type is the .request topic; it bears no ':' so
                 # skill_id/intent_name resolve to that topic.
