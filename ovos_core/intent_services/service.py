@@ -30,7 +30,7 @@ from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
 from ovos_spec_tools import closest_lang, standardize_lang, SpecMessage
 from ovos_spec_tools.context import resolve_key
-from ovos_spec_tools.session import merge_carrier, resolve_session_id
+from ovos_spec_tools.session import resolve_session_id
 from ovos_utils.log import LOG
 from ovos_utils.metrics import Stopwatch
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
@@ -40,7 +40,7 @@ from ovos_core.transformers import MetadataTransformersService, UtteranceTransfo
 from ovos_core.intent_services.dispatcher import IntentDispatcher, DEFAULT_HANDLER_TIMEOUT
 from ovos_core.intent_services.manifest import IntentManifest
 from ovos_core.intent_services.working_session import (
-    close_round, open_round, pruned_entries, record_pruned, round_session, working_session,
+    close_round, open_round, pruned_entries, record_pruned, round_session,
 )
 from ovos_core.version import OVOS_VERSION_STR, VERSION_MAJOR
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
@@ -136,9 +136,8 @@ def _replace_intent_context(sess, new_ctx: dict) -> None:
 
     ``Session.intent_context`` dict identity must be preserved; see the
     ovos-bus-client ``_CONTEXT_LOCK`` contract (every live view — the adapt
-    frame-stack projection, a mid-round ``ovos.session.sync`` merge — holds
-    the same map object). It also stays a dict, never ``None``: an empty
-    context is an empty dict.
+    frame-stack projection among them — holds the same map object). It also
+    stays a dict, never ``None``: an empty context is an empty dict.
     """
     with _CONTEXT_LOCK:
         if sess.intent_context is None:
@@ -220,11 +219,6 @@ class IntentService:
 
         self.bus.on(SpecMessage.UTTERANCE, self.handle_utterance)
 
-        # OVOS-SESSION-2 §6.2: honour a synced session snapshot. The §5.3
-        # intent_context half of this topic is SessionManager's and is already
-        # subscribed there; this handler takes the whole-session snapshot.
-        self.bus.on(SpecMessage.SESSION_SYNC, self.handle_session_sync)
-
         # Context related handlers
         self.bus.on('add_context', self.handle_add_context)
         self.bus.on('remove_context', self.handle_remove_context)
@@ -241,32 +235,6 @@ class IntentService:
         self.status.set_alive()
         if preload_pipelines:
             self.bus.emit(Message('intent.service.pipelines.reload'))
-
-    def handle_session_sync(self, message: Message):
-        """OVOS-SESSION-2 §2.7 — take a synced session snapshot into the
-        session it is for.
-
-        §2.7 puts the snapshot in ``Message.data["session"]`` and leaves
-        ``Message.context["session"]`` as the ambient carrier saying *which*
-        session the sync is about, so the content comes from the data and the
-        identity from the context. The merge is §5.1's: a field the snapshot
-        carries replaces, a field it omits leaves the current value alone.
-
-        For the default session the merge lands in the store, which
-        ``SessionManager`` owns. For a named session there is no store (§2.2)
-        and §2.7 directs the update at the session of the utterance in
-        progress — so it applies while that round is open, and a sync arriving
-        outside one has no session to revise and is dropped.
-        """
-        payload = message.data.get("session") or {}
-        if not payload:
-            return
-        sess = working_session(message)
-        if sess is not None and not sess.is_default:
-            sess.update_from(
-                Session.deserialize(merge_carrier(sess, payload)))
-            return
-        SessionManager.handle_sync(message)
 
     def handle_reload_pipelines(self, message: Message) -> None:
         pipeline_plugins = OVOSPipelineFactory.get_installed_pipeline_ids()
@@ -780,8 +748,8 @@ class IntentService:
                 sess.add_converse_handler(match.skill_id)
 
             # OVOS-CONTEXT-1 §5.1: matcher-captured entries reach the session
-            # via ``match.updated_session`` + the §5.3 ``ovos.session.sync``
-            # merge — IntentHandlerMatch carries no ``intent_context`` field.
+            # only via ``match.updated_session`` — IntentHandlerMatch carries
+            # no ``intent_context`` field of its own.
 
             # OVOS-CONTEXT-1 §7: fill unfilled slots from live context
             self._apply_context_slots(match, sess, reply)
