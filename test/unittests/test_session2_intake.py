@@ -170,50 +170,62 @@ class TestArrivalHappensOnceAnUtterance(SessionIntakeTestCase):
         self.assertIn("Kitchen", stored.intent_context or {})
 
 
-class TestSessionSyncConsumer(SessionIntakeTestCase):
-    """§2.7 / §6.2 — ``ovos.session.sync`` carries a snapshot in
-    ``Message.data["session"]`` and the orchestrator honours it."""
+class TestSessionSyncIsRetired(SessionIntakeTestCase):
+    """OVOS-SESSION-2 §2.7 defines no topic on which any participant pushes
+    a session at another, and §7 defines no bus topic at all. IntentService
+    MUST NOT subscribe ``ovos.session.sync`` nor own a merge for it."""
 
-    def _sync(self, snapshot, carrier=None):
-        context = {} if carrier is None else {"session": carrier}
-        return Message(SpecMessage.SESSION_SYNC, {"session": snapshot}, context)
-
-    def test_sync_merges_the_data_carrier_into_the_store(self):
-        svc = _make_service(self.bus)
-        stored = SessionManager.get_default_session()
-        stored.blacklisted_intents = ["skill_x"]
-
-        synced = Session(DEFAULT_SESSION_ID)
-        synced.intent_context = {"tea.skill:brewing": {"value": "yes"}}
-        svc.handle_session_sync(self._sync(synced.serialize()))
-
-        stored = SessionManager.get_default_session()
-        self.assertIn("tea.skill:brewing", stored.intent_context or {})
-        # §5.1: what the snapshot omits keeps its stored value
-        self.assertEqual(stored.blacklisted_intents, ["skill_x"])
-
-    def test_sync_for_an_unknown_named_session_is_dropped(self):
-        """§2.2: no round is open for it, so there is nothing to revise — and
-        certainly not the default store."""
-        svc = _make_service(self.bus)
-
-        synced = Session("nobody-here")
-        synced.intent_context = {"tea.skill:brewing": {"value": "yes"}}
-        svc.handle_session_sync(
-            self._sync(synced.serialize(), carrier=synced.serialize()))
-
-        self.assertEqual(SessionManager.sessions.get("nobody-here"), None)
+    def test_init_does_not_subscribe_session_sync(self):
+        """A real ``IntentService`` (constructed through ``__init__``, not
+        ``_make_service``'s ``__new__`` bypass) must add no listener of its
+        own on ``ovos.session.sync``. ``SessionManager.connect_to_bus`` is
+        run first, exactly as ``IntentService.__init__`` itself would trigger
+        it, so the only listener before and after construction must be
+        ovos-bus-client's own retained shim, by identity -- never one added
+        by ``IntentService``."""
+        SessionManager.connect_to_bus(self.bus)
+        before = list(self.bus.ee.listeners(SpecMessage.SESSION_SYNC))
         self.assertEqual(
-            SessionManager.get_default_session().intent_context or {}, {})
+            before, [SessionManager.handle_session_sync],
+            "sanity check failed: expected only ovos-bus-client's own "
+            "SessionManager.handle_session_sync listening before "
+            "IntentService exists")
 
-    def test_sync_reaches_the_named_session_of_an_open_round(self):
-        """§2.7 directs a named-session sync at the utterance in progress."""
+        IntentService(self.bus, preload_pipelines=False)
+
+        after = list(self.bus.ee.listeners(SpecMessage.SESSION_SYNC))
+        self.assertEqual(
+            after, before,
+            "IntentService.__init__ added its own ovos.session.sync "
+            "listener; OVOS-SESSION-2 §2.7/§7 define no such topic")
+
+    def test_intent_service_has_no_session_sync_handler(self):
+        """The method itself must not exist: this is a retirement, not a
+        no-op stub."""
+        svc = _make_service(self.bus)
+        self.assertFalse(hasattr(svc, "handle_session_sync"))
+
+    def test_pushed_named_session_does_not_mutate_the_open_round(self):
+        """Even if something on the bus still emits the retired topic, no
+        subscriber of IntentService's own reacts to it — the open round's
+        session is untouched.
+
+        Constructed through ``IntentService(bus, ...)`` (``__init__``), not
+        ``_make_service``'s ``__new__`` bypass: the bypass never registers
+        any bus listener at all, named-session merge or not, so emitting
+        ``ovos.session.sync`` against it would reach no subscriber
+        regardless of whether the retired handler exists -- a vacuous test.
+        Constructing through ``__init__`` means the emitted sync actually
+        reaches whatever the real subscription set contains.
+        """
         received = []
         self.bus.on("lights.skill:on", received.append)
         match = IntentHandlerMatch(match_type="lights.skill:on",
                                    match_data={"conf": 1.0},
                                    skill_id="lights.skill", utterance="turn on")
-        svc = _make_service(self.bus, match=match)
+        svc = IntentService(self.bus, preload_pipelines=False)
+        svc.get_pipeline = lambda session: (
+            [("fake-high", lambda utts, lang, msg: match)])
 
         carrier = Session("client-1")
         message = _utterance(carrier.serialize(), utterance="turn on")
@@ -222,19 +234,19 @@ class TestSessionSyncConsumer(SessionIntakeTestCase):
         svc.handle_utterance(message)
         self.assertEqual(len(received), 1, "handler was never dispatched")
 
-        # the skill syncs a context entry mid-round, on its own dispatch frame
+        # a would-be pusher tries to sync a context entry into the open round
         synced = Session("client-1")
         synced.intent_context = {"lights.skill:room": {"value": "kitchen"}}
-        svc.handle_session_sync(
-            Message(SpecMessage.SESSION_SYNC, {"session": synced.serialize()},
-                    dict(received[0].context)))
+        self.bus.emit(Message(SpecMessage.SESSION_SYNC,
+                              {"session": synced.serialize()},
+                              dict(received[0].context)))
 
         self.bus.emit(Message("mycroft.skill.handler.complete", {},
                               {"skill_id": "lights.skill",
                                "session": received[0].context.get("session")}))
         self.assertEqual(len(handled), 1)
-        self.assertIn("lights.skill:room",
-                      handled[0].context["session"].get(INTENT_CONTEXT_FIELD) or {})
+        self.assertNotIn("lights.skill:room",
+                         handled[0].context["session"].get(INTENT_CONTEXT_FIELD) or {})
 
 
 class TestNamedSessionThreading(SessionIntakeTestCase):
