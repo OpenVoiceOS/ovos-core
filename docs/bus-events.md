@@ -30,8 +30,8 @@ All events use the OVOS `Message` format: `{type, data, context}`.
 | `mycroft.intents.is_ready` | * → core | Health-check: is IntentService ready? |
 | `ovos.intent.list` | * → core | Query the intent manifest (INTENT-4 §10); optional filters `skill_id`, `lang`, `session_id`; `include_definitions: true` attaches each row's registration payload |
 | `ovos.intent.list.response` | core → * | Response to `ovos.intent.list`: `{ok, intents: [{skill_id, intent_name, lang, method, enabled, session_id[, definition]}]}` |
-| `ovos.intent.describe` | * → core | Fetch the registration payload(s) behind one intent: `skill_id`, `intent_name`, `lang` (optional `method`) |
-| `ovos.intent.describe.response` | core → * | Response to `ovos.intent.describe`: `{ok, definitions: [{method, definition}]}` or `{ok: false, error}` |
+| `ovos.intent.describe` | * → core | Fetch the registration payload(s) behind one intent: `skill_id`, `intent_name`, `lang`; optional filters `method`, `session_id` |
+| `ovos.intent.describe.response` | core → * | Response to `ovos.intent.describe`: `{ok, definitions: [{method, session_id, definition}]}`, ordered `default` first then by session and method, or `{ok: false, error}` |
 
 ## Skill Manager
 
