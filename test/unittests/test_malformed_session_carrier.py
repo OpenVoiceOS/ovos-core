@@ -1,17 +1,22 @@
 """OVOS-SESSION-1 §2.5 — a malformed session carrier (a present ``session``
 that is not a JSON object) must never crash a consumer, and must never be
-substituted for the default session.
+folded into the default session (that would pollute shared default-session
+state with an identity nobody named).
 
 These drive the real entry points a forged/corrupted carrier can reach:
-utterance intake (``IntentService.handle_utterance``) and the
-``IntentDispatcher`` framework done-signal path.
+utterance intake (``IntentService.handle_utterance``), where the Message is
+dropped before any transformer or dispatch runs but PIPELINE-1 §9.5 still
+owes it exactly one ``ovos.utterance.handled`` end-marker, and the
+``IntentDispatcher`` framework done-signal path, where there is no round to
+safely resolve so the signal is dropped and every in-flight entry is left
+untouched.
 """
 import unittest
 from collections import defaultdict
 from unittest.mock import MagicMock, patch
 
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import DEFAULT_SESSION_ID, SessionManager
+from ovos_bus_client.session import SessionManager
 from ovos_utils.fakebus import FakeBus
 
 from ovos_core.intent_services.dispatcher import IntentDispatcher
@@ -59,37 +64,59 @@ class TestMalformedCarrierAtIntake(unittest.TestCase):
 
     tearDown = setUp
 
-    def test_malformed_carrier_never_crashes_and_is_dropped(self):
+    def test_malformed_carrier_is_dropped_but_gets_its_end_marker(self):
         for carrier in MALFORMED_CARRIERS:
             with self.subTest(carrier=carrier):
                 svc = _make_service(self.bus)
                 default_before = SessionManager.get_default_session().serialize()
 
+                # A bare `bus.emit` mock, not FakeBus's own listener dispatch:
+                # FakeBus.on_message replicates MessageBusClient's inbound
+                # session-take for realism, but (unlike the real client) does
+                # not catch MalformedSession around it, so an emit carrying
+                # a malformed carrier straight back through a live FakeBus
+                # loop would raise there -- a FakeBus test-harness gap, not a
+                # crash a real bus client hits (client.py's own
+                # ``_take_inbound_session`` call is wrapped in exactly that
+                # try/except). Patching emit isolates the one thing under
+                # test here: what IntentService itself emits.
                 handled = []
-                self.bus.on("ovos.utterance.handled", handled.append)
-                try:
+                with patch.object(svc.bus, "emit", side_effect=handled.append):
                     svc.handle_utterance(_utterance(carrier))  # must not raise
-                finally:
-                    self.bus.remove("ovos.utterance.handled", handled.append)
 
-                self.assertEqual(len(handled), 0,
-                                 "a dropped utterance owes no end-marker")
+                svc.utterance_plugins.transform.assert_not_called()
+                svc.metadata_plugins.transform.assert_not_called()
+                self.assertEqual(svc.intent_dispatcher._in_flight, {},
+                                 "a dropped Message is never dispatched")
                 self.assertEqual(
                     SessionManager.get_default_session().serialize(),
                     default_before,
                     "malformed carrier must not touch the default session")
 
+                self.assertEqual(len(handled), 1,
+                                 "PIPELINE-1 §9.5 owes exactly one "
+                                 "ovos.utterance.handled per entry-topic "
+                                 "Message, even a dropped one")
+                marker = handled[0]
+                self.assertEqual(marker.context["session"], carrier,
+                                 "the end-marker's context propagates the "
+                                 "original carrier unchanged; nothing is "
+                                 "fabricated")
+                self.assertIsNotNone(marker.context.get("utterance_id"),
+                                     "§9.1.1 stamps utterance_id before the "
+                                     "carrier check runs")
+
     def test_service_keeps_working_after_a_malformed_carrier(self):
         svc = _make_service(self.bus)
-        svc.handle_utterance(_utterance("notanobject"))  # dropped
 
-        handled = []
-        self.bus.on("ovos.utterance.handled", handled.append)
-        svc.handle_utterance(_utterance(None))  # a normal follow-up
-        self.bus.remove("ovos.utterance.handled", handled.append)
-        self.assertEqual(len(handled), 1,
-                         "a normal utterance after a malformed one must still "
-                         "be handled")
+        emitted = []
+        with patch.object(svc.bus, "emit", side_effect=emitted.append):
+            svc.handle_utterance(_utterance("notanobject"))  # dropped, end-marker owed
+            svc.handle_utterance(_utterance(None))  # a normal follow-up
+        handled = [m for m in emitted if m.msg_type == "ovos.utterance.handled"]
+        self.assertEqual(len(handled), 2,
+                         "both the dropped and the normal utterance must "
+                         "get their end-marker")
 
 
 class TestMalformedCarrierAtDispatcherDoneSignal(unittest.TestCase):

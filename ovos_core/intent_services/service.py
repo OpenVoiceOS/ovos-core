@@ -872,26 +872,31 @@ class IntentService:
         one produces a Match. If none does, ``send_complete_intent_failure``
         is emitted instead.
         """
+        # OVOS-PIPELINE-1 §9.1.1: stamp the lifecycle identifier exactly once,
+        # at lifecycle entry, before anything derives from this Message. A value
+        # already present is never overwritten — regenerating it downstream would
+        # detach every already-derived Message from its lifecycle. Stamped
+        # before the §2.5 carrier check below so the dropped Message's own
+        # end-marker also carries one.
+        uid = self._stamp_utterance_id(message)
+
         # OVOS-SESSION-1 §2.5: reject a present-but-non-object session carrier
         # before anything downstream (transformers, lang disambiguation, the
         # §5.1 arrival) tries to read it through SessionManager and raises.
         # It is never folded into the default session nor substituted for
         # it — that would process the utterance under a fabricated identity.
-        # The Message is dropped before it ever enters the lifecycle (no
-        # utterance_id is stamped, no dispatch happens), so no §9.5
-        # ovos.utterance.handled end-marker is owed for it either.
+        # No transformers run and no dispatch happens, but PIPELINE-1 §9.5
+        # still owes exactly one ovos.utterance.handled for this entry-topic
+        # Message, so it is emitted here directly via ``forward`` — carrying
+        # the context (malformed carrier included) unchanged, with no §8
+        # terminal (no trio) since nothing was dispatched.
         carrier = message.context.get("session")
         if carrier is not None and not isinstance(carrier, dict):
-            LOG.error(f"OVOS-SESSION-1 §2.5: malformed session carrier on "
-                      f"{message.msg_type} (got {type(carrier).__name__}, "
-                      f"expected object); dropping utterance")
+            LOG.warning(f"OVOS-SESSION-1 §2.5: malformed session carrier on "
+                        f"{message.msg_type} (got {type(carrier).__name__}, "
+                        f"expected object); dropping utterance")
+            self.bus.emit(message.forward(SpecMessage.UTTERANCE_HANDLED, {}))
             return
-
-        # OVOS-PIPELINE-1 §9.1.1: stamp the lifecycle identifier exactly once,
-        # at lifecycle entry, before anything derives from this Message. A value
-        # already present is never overwritten — regenerating it downstream would
-        # detach every already-derived Message from its lifecycle.
-        uid = self._stamp_utterance_id(message)
 
         # Get utterance utterance_plugins additional context
         message = self._handle_transformers(message)
@@ -916,22 +921,10 @@ class IntentService:
 
         stopwatch = Stopwatch()
 
-        # get session: the single arrival of the round (SESSION-2 §5.1)
-        try:
-            sess = self._validate_session(message, lang)
-        except MalformedSession:
-            # OVOS-SESSION-1 §2.5: a present-but-non-object session carrier is
-            # a producer error. It is never folded into the default session
-            # nor substituted for it — that would process the utterance under
-            # a fabricated identity. The Message is dropped before it ever
-            # enters the lifecycle (no utterance_id was bound to a session,
-            # no dispatch happened), so no §9.5 ovos.utterance.handled
-            # end-marker is owed for it either.
-            LOG.error(f"OVOS-SESSION-1 §2.5: malformed session carrier on "
-                      f"{message.msg_type} (got "
-                      f"{type(message.context.get('session')).__name__}, "
-                      f"expected object); dropping utterance")
-            return
+        # get session: the single arrival of the round (SESSION-2 §5.1). The
+        # a malformed carrier was already rejected above, so it is always a
+        # JSON object here and this never raises MalformedSession.
+        sess = self._validate_session(message, lang)
         # §2.2's utterance-scoped cache. Every Message derived from this round
         # can now reach the session the round is running on, which for a named
         # session is the only place it lives.
