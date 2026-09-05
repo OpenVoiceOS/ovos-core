@@ -1,25 +1,36 @@
 import time
-from threading import Event
+from threading import Event, Lock, Timer
 from typing import Optional, Dict, List, Union
 
 from ovos_bus_client.client import MessageBusClient
+from ovos_bus_client.handler import HandlerLifecycle
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import SessionManager, UtteranceState, Session
+from ovos_bus_client.session import SessionManager, Session
 from ovos_config.config import Configuration
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
-from ovos_utils.lang import standardize_lang_tag
+from ovos_spec_tools import standardize_lang
 from ovos_utils.log import LOG
 
 from ovos_plugin_manager.templates.pipeline import PipelinePlugin, IntentHandlerMatch
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
+
+from ovos_core.intent_services.working_session import round_session
+
+#: upper bound, seconds, on how long core waits for a skill's
+#: ``skill.converse.response`` before the dispatch lifecycle is declared a
+#: timeout (``mycroft.skill.handler.error``). Generous: converse handlers may
+#: legitimately run a while, but this must eventually backstop a silent skill so
+#: an orchestrator observing the done-signal never hangs on the in-flight
+#: dispatch.
+CONVERSE_HANDLER_TIMEOUT = 5 * 60
 
 
 class ConverseService(PipelinePlugin):
     """Intent Service handling conversational skills."""
 
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
-                 config: Optional[Dict] = None):
+                 config: Optional[Dict] = None) -> None:
         config = config or Configuration().get("skills", {}).get("converse", {})
         super().__init__(bus, config)
         self._consecutive_activations = {}
@@ -31,7 +42,56 @@ class ConverseService(PipelinePlugin):
         self.bus.on("converse:skill", self.handle_converse)
 
     def handle_converse(self, message: Message):
+        """Priority-based skill activation and deactivation. Tracks active skills per session, handles converse requests, and manages lifecycle events."""
         skill_id = message.data["skill_id"]
+        # the dispatch belongs to this session; only an ack carrying the same
+        # session may resolve it (a concurrent converse dispatch to the same
+        # skill in another session must not cross-resolve).
+        session_id = SessionManager.get(message).session_id
+
+        lifecycle = HandlerLifecycle(self.bus, message, skill_id=skill_id,
+                                     handler_name=f"{skill_id}.converse")
+
+        resolved = Event()
+        resolve_lock = Lock()
+
+        def _claim() -> bool:
+            with resolve_lock:
+                if resolved.is_set():
+                    return False
+                resolved.set()
+                return True
+
+        def _resolve_complete(msg: Message) -> None:
+            if msg.data.get("skill_id") and msg.data.get("skill_id") != skill_id:
+                return  # ack from a different skill, ignore
+            # only peek at the ack's session id; an incidental Message does
+            # not revise the working session (SESSION-2 §2.6).
+            ack_sess = Session.from_message(msg) if "session" in msg.context else None
+            if ack_sess and ack_sess.session_id != session_id:
+                return  # ack from a different session, ignore
+            if not _claim():
+                return
+            timer.cancel()
+            self.bus.remove("skill.converse.response", _resolve_complete)
+            lifecycle.complete()
+
+        def _resolve_timeout() -> None:
+            if not _claim():
+                return
+            self.bus.remove("skill.converse.response", _resolve_complete)
+            LOG.warning(f"converse dispatch to {skill_id} timed out after "
+                        f"{CONVERSE_HANDLER_TIMEOUT}s; emitting handler error")
+            lifecycle.error(TimeoutError(
+                f"converse handler timed out after {CONVERSE_HANDLER_TIMEOUT} seconds"))
+
+        timer = Timer(CONVERSE_HANDLER_TIMEOUT, _resolve_timeout)
+        timer.daemon = True
+
+        self.bus.on("skill.converse.response", _resolve_complete)
+        timer.start()
+        # mycroft.skill.handler.start, then the dispatch itself
+        lifecycle.start()
         self.bus.emit(message.reply(f"{skill_id}.converse.request", message.data))
 
     @property
@@ -47,34 +107,66 @@ class ConverseService(PipelinePlugin):
             session.activate_skill(skill_id)
 
     @staticmethod
-    def get_active_skills(message: Optional[Message] = None) -> List[str]:
-        """Active skill ids ordered by converse priority
-        this represents the order in which converse will be called
+    def get_active_skills(message: Optional[Message] = None,
+                          session: Optional[Session] = None) -> List[str]:
+        """Converse-eligible skill ids, head-first by recency.
+
+        OVOS-CONVERSE-1 §2.1: "session.converse_handlers is this
+        specification's converse eligibility list — the set of intent
+        owners the converse plugin (§4) will poll. It is distinct from
+        session.active_handlers (OVOS-PIPELINE-1 §7.1), which is the
+        dispatch-recency record used by the stop cascade." This is the
+        candidate set both the broadcast poll leg and the legacy
+        per-skill ping leg read (§4.2).
+
+        Args:
+            message: bus message to resolve a session from when ``session``
+                     is not already known (standalone/incidental callers).
+            session: an already-resolved session to read from directly -
+                     pass this when the caller is a step in a chain that
+                     already resolved it, so every step reads the one object
+                     the round is mutating.
 
         Returns:
             active_skills (list): ordered list of skill_ids
         """
-        session = SessionManager.get(message)
-        return [skill[0] for skill in session.active_skills]
+        session = session or SessionManager.get(message)
+        return [h["skill_id"] for h in session.converse_handlers]
 
     def deactivate_skill(self, skill_id: str, source_skill: Optional[str] = None,
-                         message: Optional[Message] = None):
+                         message: Optional[Message] = None) -> Optional[Session]:
         """Remove a skill from being targetable by converse.
 
         Args:
             skill_id (str): skill to remove
             source_skill (str): skill requesting the removal
             message (Message): the bus message that requested deactivation
+
+        Returns:
+            the resolved Session if a deactivation actually happened
+            (callers can reuse it instead of re-resolving via
+            ``SessionManager.get(message)``), else None (blocked or
+            already-inactive no-op - nothing changed, nothing to reuse).
         """
         source_skill = source_skill or skill_id
         if self._deactivate_allowed(skill_id, source_skill):
-            session = SessionManager.get(message)
-            if session.is_active(skill_id):
+            message = message or Message("")
+            session = round_session(message)
+            was_converse_candidate = skill_id in [h["skill_id"] for h in session.converse_handlers]
+            if session.is_active(skill_id) or was_converse_candidate:
                 # update converse session
-                session.deactivate_skill(skill_id)
+                if session.is_active(skill_id):
+                    session.deactivate_skill(skill_id)
+                # OVOS-CONVERSE-1 §2.1's converse_handlers list is
+                # independent of active_handlers, but "Remove a skill from
+                # being targetable by converse" (this method's own contract)
+                # means both lists must drop the skill together, or a
+                # skill that deactivates itself from within converse()
+                # stays a converse candidate forever.
+                if was_converse_candidate:
+                    session.remove_converse_handler(skill_id)
 
                 # keep message.context
-                message = message or Message("")
                 message.context["session"] = session.serialize()  # update session active skills
                 # send bus event
                 self.bus.emit(
@@ -82,6 +174,8 @@ class ConverseService(PipelinePlugin):
                                     data={"skill_id": skill_id}))
                 if skill_id in self._consecutive_activations:
                     self._consecutive_activations[skill_id] = 0
+                return session
+        return None
 
     def activate_skill(self, skill_id: str, source_skill: Optional[str] = None,
                        message: Optional[Message] = None) -> Optional[Session]:
@@ -97,12 +191,11 @@ class ConverseService(PipelinePlugin):
         """
         source_skill = source_skill or skill_id
         if self._activate_allowed(skill_id, source_skill):
-            # update converse session
-            session = SessionManager.get(message)
+            message = message or Message("")
+            session = round_session(message)
             session.activate_skill(skill_id)
 
             # keep message.context
-            message = message or Message("")
             message.context["session"] = session.serialize()  # update session active skills
             message = message.forward("intent.service.skills.activated",
                                       {"skill_id": skill_id})
@@ -159,7 +252,7 @@ class ConverseService(PipelinePlugin):
         default_max = self.config.get("max_activations", -1)
         # per skill override limit of consecutive activations
         skill_max = self.config.get("skill_activations", {}).get(skill_id)
-        max_activations = skill_max or default_max
+        max_activations = skill_max if skill_max is not None else default_max
         if skill_id not in self._consecutive_activations:
             self._consecutive_activations[skill_id] = 0
         if max_activations < 0:
@@ -212,59 +305,142 @@ class ConverseService(PipelinePlugin):
             return False
         return True
 
-    def _collect_converse_skills(self, message: Message) -> List[str]:
+    def _collect_converse_skills(self, message: Message,
+                                 session: Optional[Session] = None) -> List[str]:
         """use the messagebus api to determine which skills want to converse
 
-        Individual skills respond to this request via the `can_converse` method"""
-        skill_ids = []
-        want_converse = []
-        session = SessionManager.get(message)
+        Individual skills respond to this request via the `can_converse` method
+
+        Args:
+            message: the bus message driving this converse attempt.
+            session: an already-resolved session to use instead of
+                     resolving ``message`` again - ``match()`` resolves once
+                     and threads the result through this whole call chain, so
+                     every step reads and writes the one object the round is
+                     running on. Standalone callers may omit it.
+        """
+        answered = []  # candidates whose first valid pong already landed
+        claimed = set()  # candidates whose first valid pong was a claim
+        session = session or round_session(message)
 
         # note: this is sorted by priority already
-        active_skills = [skill_id for skill_id in self.get_active_skills(message)
-                     if session.utterance_states.get(skill_id, UtteranceState.INTENT) == UtteranceState.INTENT]
+        active_skills = [skill_id for skill_id in self.get_active_skills(message, session=session)
+                     if not (session.response_mode and session.response_mode.get("skill_id") == skill_id)]
         if not active_skills:
-            return want_converse
+            return []
 
         event = Event()
 
-        def handle_ack(msg):
+        # OVOS-CONVERSE-1 §4.2 round correlation: the round IS the utterance
+        # lifecycle, named by context.utterance_id (OVOS-PIPELINE-1 §9.1.1).
+        # The ping carries it by `forward` derivation and the pong carries it
+        # back by `reply` derivation — no skill-side action.
+        round_uid = message.context.get("utterance_id")
+
+        def handle_ack(msg: Message) -> None:
             nonlocal event
-            skill_id = msg.data["skill_id"]
+            skill_id = msg.data.get("skill_id")
+            if not skill_id:
+                return  # guard against malformed pong messages
 
-            # validate the converse pong
-            if all((skill_id not in want_converse,
-                    msg.data.get("can_handle", True),
-                    skill_id in active_skills)):
-                want_converse.append(skill_id)
+            # A pong that cannot prove which question it answers never decides a
+            # round: discard pongs from an earlier (or foreign) lifecycle. When
+            # the round itself is unnamed the guard stands down, so a V0 caller
+            # that never entered through the orchestrator behaves as before.
+            if round_uid is not None and \
+                    msg.context.get("utterance_id") != round_uid:
+                LOG.debug(f"discarding stale converse pong from '{skill_id}': "
+                          f"utterance_id {msg.context.get('utterance_id')!r} "
+                          f"does not match round {round_uid!r}")
+                return
 
-            if skill_id not in skill_ids:  # track which answer we got
-                skill_ids.append(skill_id)
+            # OVOS-CONVERSE-1 §4.2: "the first valid pong per candidate wins".
+            # During the dual-emit compat window a current skill answers the
+            # round twice — once on the broadcast leg, once on the legacy
+            # per-skill leg — so each candidate MUST be counted exactly once.
+            if skill_id in answered:
+                return
+            answered.append(skill_id)
 
-            if all(s in skill_ids for s in active_skills):
-                # all skills answered the ping!
+            # the claim boolean is `result` in OVOS-CONVERSE-1 §4.2 and
+            # `can_handle` on the legacy per-skill leg. A missing or
+            # non-boolean value is a decline: a skill that does not answer
+            # clearly must not converse.
+            claim = msg.data.get("result", msg.data.get("can_handle"))
+            if claim is True:
+                claimed.add(skill_id)
+
+            if all(s in answered for s in active_skills):
+                # every candidate named by the round has answered — nothing
+                # more can arrive that the round would wait for
                 event.set()
 
-        self.bus.on("skill.converse.pong", handle_ack)
+        self.bus.on("skill.converse.pong", handle_ack)  # legacy leg
+        self.bus.on("ovos.converse.pong", handle_ack)  # OVOS-CONVERSE-1 §6.2
+        try:
+            # OVOS-CONVERSE-1 §4.2: ONE broadcast ping for the round. No
+            # candidate identity travels in topic or payload — a skill decides
+            # it is a candidate by testing its own skill_id against
+            # context.session.converse_handlers, which `reply` carries along.
+            #
+            # The payload is the inbound data minus skill_id, so a skill that
+            # binds BOTH legs decides the round from identical input whichever
+            # ping reaches it first. Feeding the two legs different data makes
+            # the verdict depend on which leg won the race.
+            broadcast_data = {k: v for k, v in message.data.items()
+                              if k != "skill_id"}
+            self.bus.emit(message.reply("ovos.converse.ping", broadcast_data))
 
-        # ask skills if they want to converse
-        for skill_id in active_skills:
-            self.bus.emit(message.forward(f"{skill_id}.converse.ping", {**message.data, "skill_id": skill_id}))
+            # V0 compat: skills older than the broadcast binding only listen on
+            # the per-skill legacy ping. Dual-emit keeps them in the contest;
+            # the collector above counts each skill once whichever leg answers.
+            for skill_id in active_skills:
+                self.bus.emit(message.forward(f"{skill_id}.converse.ping",
+                                              {**message.data, "skill_id": skill_id}))
 
-        # wait for all skills to acknowledge they want to converse
-        event.wait(timeout=0.5)
+            # one bounded collection window for the whole round, not n x a
+            # per-owner wait (OVOS-CONVERSE-1 §4.2 stage collection ceiling)
+            event.wait(timeout=0.5)
+        finally:
+            self.bus.remove("skill.converse.pong", handle_ack)
+            self.bus.remove("ovos.converse.pong", handle_ack)
 
-        self.bus.remove("skill.converse.pong", handle_ack)
-        return want_converse
+        # This is also what keeps a foreign pong out of the round
+        # (OVOS-CONVERSE-1 §4.2): a skill_id absent from the candidate set
+        # cannot appear in the returned list, and it can never satisfy the
+        # early-close check above, which is keyed on `active_skills`.
+        #
+        # OVOS-CONVERSE-1 §4.1 step 3: selection is by recency order — the
+        # order of session.converse_handlers — and is NEVER by response-arrival
+        # order. Under a parallel broadcast round the arrival order is a race.
+        return [skill_id for skill_id in active_skills if skill_id in claimed]
 
-    def _check_converse_timeout(self, message: Message):
-        """ filter active skill list based on timestamps """
+    def _prune_converse_handlers(self, message: Message):
+        """OVOS-CONVERSE-1 §3.2 TTL prune, run at both §9.1 boundaries
+        (pre-converse, before the poll iteration; pre-list-emission, before
+        answering the active-skills introspection request).
+
+        "the orchestrator reads activated_at from the inbound session and
+        prunes any entry whose age (now - activated_at) exceeds T". This
+        reuses the existing ``converse.timeout`` deployment window (default
+        300s, matching the pre-OVOS-CONVERSE-1 behaviour this replaces) and
+        its ``converse.skill_timeouts`` per-skill overrides, rather than
+        introducing a second TTL surface that means the same thing.
+
+        The §2.1 exemption applies: "The owner named by a present,
+        non-expired session.response_mode MUST NOT be evicted ... nor
+        pruned by the §3.2 TTL."
+        """
         timeouts = self.config.get("skill_timeouts") or {}
         def_timeout = self.config.get("timeout", 300)
-        session = SessionManager.get(message)
-        session.active_skills = [
-            skill for skill in session.active_skills
-            if time.time() - skill[1] <= timeouts.get(skill[0], def_timeout)]
+        session = round_session(message)
+        now = time.time()
+        rm = session.response_mode
+        holder = rm.get("skill_id") if rm and rm.get("expires_at", 0) > now else None
+        session.converse_handlers = [
+            h for h in session.converse_handlers
+            if h["skill_id"] == holder
+            or now - h["activated_at"] <= timeouts.get(h["skill_id"], def_timeout)]
 
     def match(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """
@@ -291,19 +467,28 @@ class ConverseService(PipelinePlugin):
             - Checks for skill conversation timeouts
             - Attempts conversation with each eligible skill
         """
-        lang = standardize_lang_tag(lang)
-        session = SessionManager.get(message)
+        lang = standardize_lang(lang)
+        # the round's session, threaded through every sub-call below so
+        # each step reads what the previous one wrote. The arrival already
+        # happened at the orchestrator's lifecycle entry (SESSION-2 §5.1);
+        # this pipeline does not fold again (§2.6).
+        session = round_session(message)
 
         # we call flatten in case someone is sending the old style list of tuples
         utterances = flatten_list(utterances)
 
+        # OVOS-CONVERSE-1 §4.1 step 1: the §2.2 identity invariant (checked
+        # by the gr_skills filter below) is verified "after the §3.2 TTL
+        # prune (when configured)", so the prune runs first.
+        self._prune_converse_handlers(message)
+
         # note: this is sorted by priority already
-        gr_skills = [skill_id for skill_id in self.get_active_skills(message)
-                     if session.utterance_states.get(skill_id, UtteranceState.INTENT) == UtteranceState.RESPONSE]
+        gr_skills = [skill_id for skill_id in self.get_active_skills(message, session=session)
+                     if session.response_mode and session.response_mode.get("skill_id") == skill_id]
 
         # check if any skill wants to capture utterance for self.get_response method
         for skill_id in gr_skills:
-            if skill_id in session.blacklisted_skills:
+            if skill_id in (session.blacklisted_skills or []):
                 LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{session.session_id}'")
                 continue
             LOG.debug(f"utterance captured by skill.get_response method: {skill_id}")
@@ -315,12 +500,9 @@ class ConverseService(PipelinePlugin):
                 updated_session=session
             )
 
-        # filter allowed skills
-        self._check_converse_timeout(message)
-
         # check if any skill wants to converse
-        for skill_id in self._collect_converse_skills(message):
-            if skill_id in session.blacklisted_skills:
+        for skill_id in self._collect_converse_skills(message, session=session):
+            if skill_id in (session.blacklisted_skills or []):
                 LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{session.session_id}'")
                 continue
             LOG.debug(f"Attempting to converse with skill: {skill_id}")
@@ -338,7 +520,7 @@ class ConverseService(PipelinePlugin):
     @staticmethod
     def handle_get_response_enable(message: Message):
         skill_id = message.data["skill_id"]
-        session = SessionManager.get(message)
+        session = round_session(message)
         session.enable_response_mode(skill_id)
         if session.session_id == "default":
             SessionManager.sync(message)
@@ -346,7 +528,7 @@ class ConverseService(PipelinePlugin):
     @staticmethod
     def handle_get_response_disable(message: Message):
         skill_id = message.data["skill_id"]
-        session = SessionManager.get(message)
+        session = round_session(message)
         session.disable_response_mode(skill_id)
         if session.session_id == "default":
             SessionManager.sync(message)
@@ -358,9 +540,12 @@ class ConverseService(PipelinePlugin):
         # this doesnt happen accidentally at very least
         skill_id = message.data['skill_id']
         source_skill = message.context.get("skill_id")
-        self.activate_skill(skill_id, source_skill, message)
-        sess = SessionManager.get(message)
-        if sess.session_id == "default":
+        # reuse the already-resolved live session `activate_skill` folded
+        # and wrote to - a second `SessionManager.get(message)` here would
+        # re-fold the SAME stale message and, on the reject/no-op path
+        # (`activate_skill` returns None), there is nothing to sync at all.
+        sess = self.activate_skill(skill_id, source_skill, message)
+        if sess is not None and sess.session_id == "default":
             SessionManager.sync(message)
 
     def handle_deactivate_skill_request(self, message: Message):
@@ -370,9 +555,12 @@ class ConverseService(PipelinePlugin):
         # this doesnt happen accidentally
         skill_id = message.data['skill_id']
         source_skill = message.context.get("skill_id") or skill_id
-        self.deactivate_skill(skill_id, source_skill, message)
-        sess = SessionManager.get(message)
-        if sess.session_id == "default":
+        # reuse the already-resolved live session `deactivate_skill` folded
+        # and wrote to - a second `SessionManager.get(message)` here would
+        # re-fold the SAME stale message and, on the reject/no-op path
+        # (`deactivate_skill` returns None), there is nothing to sync at all.
+        sess = self.deactivate_skill(skill_id, source_skill, message)
+        if sess is not None and sess.session_id == "default":
             SessionManager.sync(message)
 
     def handle_get_active_skills(self, message: Message):
@@ -381,10 +569,13 @@ class ConverseService(PipelinePlugin):
         Argument:
             message: query message to reply to.
         """
+        # OVOS-CONVERSE-1 §3.2 pre-list-emission TTL prune (§9.1's second
+        # boundary), so the reported list matches what a fresh poll would see.
+        self._prune_converse_handlers(message)
         self.bus.emit(message.reply("intent.service.active_skills.reply",
                                     {"skills": self.get_active_skills(message)}))
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         self.bus.remove("converse:skill", self.handle_converse)
         self.bus.remove('intent.service.skills.deactivate', self.handle_deactivate_skill_request)
         self.bus.remove('intent.service.skills.activate', self.handle_activate_skill_request)

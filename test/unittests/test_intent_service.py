@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import threading
 import time
 import unittest
 from copy import deepcopy
@@ -19,12 +20,14 @@ from unittest import TestCase, mock
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import IntentContextManager as ContextManager
+from ovos_bus_client.session import Session, SessionManager
 from ovos_bus_client.util import get_message_lang
 from ovos_config import Configuration
 from ovos_config import LocalConf, DEFAULT_CONFIG
 from ovos_config.locale import setup_locale
 from ovos_core.intent_services import IntentService
-from ovos_utils.fakebus import FakeBus
+from ovos_core.intent_services import service as intent_service_module
+from ovos_core.intent_services.working_session import close_round, open_round
 from ovos_workshop.intents import IntentBuilder
 
 # Setup configurations to use with default language tests
@@ -80,4 +83,93 @@ class TestLanguageExtraction(TestCase):
         self.assertEqual(get_message_lang(msg), 'de-DE')
         msg = Message('test msg', data={'lang': 'sv-se'})
         self.assertEqual(get_message_lang(msg), 'sv-SE')
+
+
+class TestContextWriteLockRace(TestCase):
+    """Finding 30a: `IntentService.handle_add_context` copy-modify-assigns
+    `Session.intent_context` (`ctx = dict(sess.intent_context); ...;
+    sess.intent_context = ctx`) OUTSIDE `ovos_bus_client.session._CONTEXT_LOCK`,
+    while a concurrent skill-side write (`OVOSSkill.set_context` /
+    `remove_context`, which call `Session.set_intent_context` /
+    `remove_intent_context` on the round's session) mutates the SAME map
+    under that lock. If the skill's write lands between core's
+    snapshot read and its write-back, the stale snapshot silently overwrites
+    it - the skill's write is lost with no error and no trace.
+
+    This interleave is sequenced deterministically with `threading.Event`s
+    (no `sleep`-based timing): a patched `resolve_key` - called by
+    `handle_add_context` right after it snapshots `sess.intent_context` and
+    right before it writes the result back - signals readiness and then
+    blocks, giving the "skill" thread a bounded window to run its own
+    write before core's write-back proceeds.
+    """
+
+    def setUp(self):
+        self.sess = Session(session_id="s-race-lock-test")
+        # seed a live layer0 entry, as if an earlier turn set it
+        self.sess.set_intent_context("layer0", "1", scope="private",
+                                     owner_id="race.skill")
+        # both frames belong to the same in-flight round, so both resolve to
+        # the one working session (OVOS-SESSION-2 §2.2/§2.6)
+        self.ctx = {"skill_id": "race.skill",
+                    "session": self.sess.serialize(),
+                    "utterance_id": "uid-s-race-lock-test"}
+
+    def tearDown(self):
+        close_round(Message("", {}, self.ctx))
+
+    def test_concurrent_skill_write_survives_core_add_context(self):
+        # core processing a (possibly stale/duplicate) add_context for the
+        # skill's OWN previously-set key, concurrently with the skill moving
+        # on to a new context layer
+        core_msg = Message("add_context",
+                           {"context": "racskilllayer0", "word": "1",
+                            "key": "layer0"},
+                           dict(self.ctx))
+        open_round(core_msg, self.sess)
+
+        core_ready = threading.Event()
+        skill_done = threading.Event()
+        orig_resolve_key = intent_service_module.resolve_key
+
+        def patched_resolve_key(*args, **kwargs):
+            # fires between `handle_add_context`'s `ctx = dict(...)` snapshot
+            # and its `sess.intent_context = ctx` write-back
+            core_ready.set()
+            skill_done.wait(timeout=5)
+            return orig_resolve_key(*args, **kwargs)
+
+        def skill_turn():
+            # the skill-side write a co-located `OVOSSkill.set_context` /
+            # `remove_context` performs on the round's session, under
+            # `_CONTEXT_LOCK`
+            self.sess.remove_intent_context("layer0", scope="private",
+                                            owner_id="race.skill")
+            self.sess.set_intent_context("layer1", "1", scope="private",
+                                         owner_id="race.skill")
+
+        core_thread = threading.Thread(
+            target=IntentService.handle_add_context, args=(core_msg,))
+        intent_service_module.resolve_key = patched_resolve_key
+        try:
+            core_thread.start()
+            self.assertTrue(core_ready.wait(timeout=5),
+                            "core thread never reached the snapshot window")
+            skill_turn()
+            skill_done.set()
+            core_thread.join(timeout=5)
+            self.assertFalse(core_thread.is_alive(),
+                             "core thread did not finish")
+        finally:
+            intent_service_module.resolve_key = orig_resolve_key
+
+        final_ctx = self.sess.intent_context
+        # the skill's new write (layer1) must not be silently dropped
+        self.assertIn("race.skill:layer1", final_ctx)
+        self.assertEqual(final_ctx["race.skill:layer1"]["value"], "1")
+        # the skill's tombstone (layer0 removal), applied after core's
+        # write-back completed (it was blocked on `_CONTEXT_LOCK` until
+        # then), must stick - not be silently un-done by a leftover stale
+        # snapshot
+        self.assertIsNone(final_ctx.get("race.skill:layer0"))
 

@@ -1,2 +1,0 @@
-# skills providing portuguese specific functionality
-ovos-skill-word-of-the-day
