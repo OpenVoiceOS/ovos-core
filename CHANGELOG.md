@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.2.7a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.7a1) (2026-09-05)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.6a3...3.2.7a1)
+
+**Merged pull requests:**
+
+- fix: drop a malformed session carrier but still emit its ovos.utterance.handled [\#930](https://github.com/OpenVoiceOS/ovos-core/pull/930) ([JarbasAl](https://github.com/JarbasAl))
+
+## [3.2.6a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.6a3) (2026-09-04)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.6a2...3.2.6a3)
+
 ## [3.2.6a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.6a2) (2026-09-04)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.6a1...3.2.6a2)
