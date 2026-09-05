@@ -547,6 +547,13 @@ class IntentService:
             for skill_id in self._deactivations.pop(live.session_id, None) or []:
                 if live.is_active(skill_id):
                     live.deactivate_skill(skill_id)
+                # OVOS-CONVERSE-1 §2.1: a tracked deactivation drops the
+                # skill from converse_handlers too, re-applied here for the
+                # same reason the active_handlers removal above is —
+                # a mid-dispatch self-deactivation (ConverseService.
+                # deactivate_skill) must survive to the round's own close,
+                # not just the snapshot it mutated in passing.
+                live.remove_converse_handler(skill_id)
             msg.context["session"] = live.serialize()
         self.bus.emit(msg)
 
@@ -740,6 +747,18 @@ class IntentService:
                         sess.activate_skill(match.skill_id)
                     # emit event for skills callback -> self.handle_activate
                     self.bus.emit(reply.forward(f"{match.skill_id}.activate"))
+
+                # OVOS-CONVERSE-1 §3.1 automatic activation on dispatch: "The
+                # orchestrator MUST stamp session.converse_handlers whenever
+                # it dispatches to an owner via the OVOS-PIPELINE-1 §7
+                # dispatch topic <skill_id>:<intent_name>. This rule is
+                # uniform — it applies to every dispatch including reserved
+                # intent_names converse (§4.3) and response (§5.2)." Unlike
+                # the §7.1 active_handlers push above, this stamp is never
+                # suppressed for reserved names or for a suppressed
+                # activation: "the two lists have independent stamping
+                # rules."
+                sess.add_converse_handler(match.skill_id)
 
             # OVOS-CONTEXT-1 §5.1: matcher-captured entries reach the session
             # via ``match.updated_session`` + the §5.3 ``ovos.session.sync``
