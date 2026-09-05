@@ -1,3 +1,4 @@
+import threading
 from unittest import TestCase
 
 from ovos_bus_client.message import Message
@@ -170,10 +171,27 @@ class TestDeactivate(TestCase):
         session = Session("123")
         session.lang = "en-US"
         session.activate_skill(self.skill_id) # start with skill active
+        # OVOS-CONVERSE-1 §2.1: converse candidacy is read from
+        # converse_handlers, a list independent of active_handlers -- seed
+        # it too so the skill is offered the poll below.
+        session.add_converse_handler(self.skill_id)
 
-        message = Message(utt_topic,
+        message1 = Message(utt_topic,
                           {"utterances": ["deactivate skill from within converse"], "lang": session.lang},
                           {"session": session.serialize(), "source": "A", "destination": "B"})
+        # OVOS-CONVERSE-1 §2.1/B1: a skill that deactivates itself from
+        # within converse() must leave converse_handlers too, not just
+        # active_handlers -- otherwise it hijacks every later utterance in
+        # the session. This third utterance (following the session's own
+        # earlier activation and this scenario's converse-and-deactivate
+        # turn) must NOT be polled at all: converse_handlers is empty, so
+        # ConverseService.match() returns None without ever emitting a ping.
+        # NOTE: no session in context -- End2EndTest threads the round's
+        # own session forward from message1, same as test_converse.py's
+        # multi-turn scenarios.
+        message2 = Message(utt_topic,
+                          {"utterances": ["are you still there"], "lang": session.lang},
+                          {"source": "A", "destination": "B"})
 
         # the skill deactivates itself inside converse, so the session ends
         # with the skill inactive (no re-activation — the skill explicitly
@@ -185,9 +203,9 @@ class TestDeactivate(TestCase):
         test = End2EndTest(
             minicroft=minicroft,
             skill_ids=[self.skill_id],
-            source_message=message,
+            source_message=[message1, message2],
             final_session=final_session,
-            activation_points=[message.msg_type], # starts activated
+            activation_points=[message1.msg_type], # starts activated
             flip_points=[utt_topic],
             entry_points=[utt_topic],
             deactivation_points=["intent.service.skills.deactivated"],
@@ -204,7 +222,7 @@ class TestDeactivate(TestCase):
                 #f"{self.skill_id}.activate", # TODO
             ],
             expected_messages=[
-                message,
+                message1,
                 # OVOS-CONVERSE-1 §4.2: one broadcast poll per round, emitted
                 # before the legacy per-skill pings (dual-emit compat window).
                 Message("ovos.converse.ping",
@@ -269,8 +287,18 @@ class TestDeactivate(TestCase):
                         context={"skill_id": self.skill_id}),
                 Message(SpecMessage.UTTERANCE_HANDLED,
                         data={},
-                        context={"skill_id": self.skill_id})
+                        context={"skill_id": self.skill_id}),
 
+                # --- message2: the skill must not be a converse candidate
+                # any more. No ovos.converse.ping / {skill_id}.converse.ping
+                # appear at all -- ConverseService._collect_converse_skills
+                # short-circuits on an empty candidate set (§4.2) before
+                # ever broadcasting -- so nothing else in the pipeline
+                # matches this utterance either.
+                message2,
+                Message("mycroft.audio.play_sound", data={"uri": "snd/error.mp3"}),
+                Message(SpecMessage.INTENT_UNMATCHED),
+                Message(SpecMessage.UTTERANCE_HANDLED),
             ]
         )
 
@@ -283,3 +311,71 @@ class TestDeactivate(TestCase):
         for namespace in NAMESPACE_PATHS:
             with self.subTest(namespace=namespace):
                 self._run_deactivate_inside_converse(namespace)
+
+
+class TestActiveHandlersOnlyIsNotPolled(TestCase):
+    """OVOS-CONVERSE-1 §2.1: "session.converse_handlers ... is distinct from
+    session.active_handlers (OVOS-PIPELINE-1 §7.1)". The converse plugin's
+    candidate set (ConverseService.get_active_skills) MUST be read from
+    converse_handlers, never active_handlers -- a skill present only on
+    active_handlers must not be offered a converse turn.
+
+    This fails against unfixed ovos-core (get_active_skills reads
+    active_handlers, so the skill is polled and claims); it passes here
+    (get_active_skills reads converse_handlers, which was never populated
+    for this skill)."""
+
+    skill_id = "ovos-skill-parrot.openvoiceos"
+
+    def setUp(self):
+        LOG.set_level("DEBUG")
+
+    def tearDown(self):
+        LOG.set_level("CRITICAL")
+
+    def test_active_handlers_only_skill_is_not_polled(self):
+        minicroft = get_minicroft([self.skill_id], modernize=False, emit_legacy=False)
+        try:
+            session = Session("789")
+            session.lang = "en-US"
+            session.pipeline = ["ovos-converse-pipeline-plugin",
+                                "ovos-padatious-pipeline-plugin-high"]
+            # candidacy source under test: active_handlers ONLY.
+            # converse_handlers is left empty.
+            session.activate_skill(self.skill_id)
+            self.assertEqual(session.converse_handlers, [])
+
+            message = Message(SpecMessage.UTTERANCE.value,
+                              {"utterances": ["echo test"], "lang": session.lang},
+                              {"session": session.serialize(),
+                               "source": "A", "destination": "B"})
+
+            captured = []
+            done = threading.Event()
+
+            def _capture(msg):
+                captured.append(msg.msg_type)
+
+            def _finish(msg):
+                done.set()
+
+            minicroft.bus.on("ovos.converse.ping", _capture)
+            minicroft.bus.on(f"{self.skill_id}.converse.ping", _capture)
+            minicroft.bus.on(SpecMessage.UTTERANCE_HANDLED.value, _finish)
+            try:
+                minicroft.bus.emit(message)
+                done.wait(timeout=10)
+            finally:
+                minicroft.bus.remove("ovos.converse.ping", _capture)
+                minicroft.bus.remove(f"{self.skill_id}.converse.ping", _capture)
+                minicroft.bus.remove(SpecMessage.UTTERANCE_HANDLED.value, _finish)
+
+            self.assertTrue(done.is_set(), "utterance round never completed")
+            self.assertNotIn("ovos.converse.ping", captured,
+                            f"{self.skill_id} was polled via the broadcast leg "
+                            f"despite being absent from converse_handlers")
+            self.assertNotIn(f"{self.skill_id}.converse.ping", captured,
+                            f"{self.skill_id} was polled via the legacy leg "
+                            f"despite being absent from converse_handlers")
+        finally:
+            minicroft.stop()

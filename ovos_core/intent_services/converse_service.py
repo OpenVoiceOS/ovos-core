@@ -109,8 +109,15 @@ class ConverseService(PipelinePlugin):
     @staticmethod
     def get_active_skills(message: Optional[Message] = None,
                           session: Optional[Session] = None) -> List[str]:
-        """Active skill ids ordered by converse priority
-        this represents the order in which converse will be called
+        """Converse-eligible skill ids, head-first by recency.
+
+        OVOS-CONVERSE-1 §2.1: "session.converse_handlers is this
+        specification's converse eligibility list — the set of intent
+        owners the converse plugin (§4) will poll. It is distinct from
+        session.active_handlers (OVOS-PIPELINE-1 §7.1), which is the
+        dispatch-recency record used by the stop cascade." This is the
+        candidate set both the broadcast poll leg and the legacy
+        per-skill ping leg read (§4.2).
 
         Args:
             message: bus message to resolve a session from when ``session``
@@ -124,7 +131,7 @@ class ConverseService(PipelinePlugin):
             active_skills (list): ordered list of skill_ids
         """
         session = session or SessionManager.get(message)
-        return [h["skill_id"] for h in session.active_handlers]
+        return [h["skill_id"] for h in session.converse_handlers]
 
     def deactivate_skill(self, skill_id: str, source_skill: Optional[str] = None,
                          message: Optional[Message] = None) -> Optional[Session]:
@@ -145,9 +152,19 @@ class ConverseService(PipelinePlugin):
         if self._deactivate_allowed(skill_id, source_skill):
             message = message or Message("")
             session = round_session(message)
-            if session.is_active(skill_id):
+            was_converse_candidate = skill_id in [h["skill_id"] for h in session.converse_handlers]
+            if session.is_active(skill_id) or was_converse_candidate:
                 # update converse session
-                session.deactivate_skill(skill_id)
+                if session.is_active(skill_id):
+                    session.deactivate_skill(skill_id)
+                # OVOS-CONVERSE-1 §2.1's converse_handlers list is
+                # independent of active_handlers, but "Remove a skill from
+                # being targetable by converse" (this method's own contract)
+                # means both lists must drop the skill together, or a
+                # skill that deactivates itself from within converse()
+                # stays a converse candidate forever.
+                if was_converse_candidate:
+                    session.remove_converse_handler(skill_id)
 
                 # keep message.context
                 message.context["session"] = session.serialize()  # update session active skills
@@ -398,19 +415,32 @@ class ConverseService(PipelinePlugin):
         # order. Under a parallel broadcast round the arrival order is a race.
         return [skill_id for skill_id in active_skills if skill_id in claimed]
 
-    def _check_converse_timeout(self, message: Message):
-        """Drop active handlers whose converse window has expired.
+    def _prune_converse_handlers(self, message: Message):
+        """OVOS-CONVERSE-1 §3.2 TTL prune, run at both §9.1 boundaries
+        (pre-converse, before the poll iteration; pre-list-emission, before
+        answering the active-skills introspection request).
 
-        The filter is a write, so it goes on the round's own session; resolved
-        from the message rather than threaded because every caller sits in the
-        same round and gets the same object either way.
+        "the orchestrator reads activated_at from the inbound session and
+        prunes any entry whose age (now - activated_at) exceeds T". This
+        reuses the existing ``converse.timeout`` deployment window (default
+        300s, matching the pre-OVOS-CONVERSE-1 behaviour this replaces) and
+        its ``converse.skill_timeouts`` per-skill overrides, rather than
+        introducing a second TTL surface that means the same thing.
+
+        The §2.1 exemption applies: "The owner named by a present,
+        non-expired session.response_mode MUST NOT be evicted ... nor
+        pruned by the §3.2 TTL."
         """
         timeouts = self.config.get("skill_timeouts") or {}
         def_timeout = self.config.get("timeout", 300)
         session = round_session(message)
-        session.active_handlers = [
-            h for h in session.active_handlers
-            if time.time() - h["activated_at"] <= timeouts.get(h["skill_id"], def_timeout)]
+        now = time.time()
+        rm = session.response_mode
+        holder = rm.get("skill_id") if rm and rm.get("expires_at", 0) > now else None
+        session.converse_handlers = [
+            h for h in session.converse_handlers
+            if h["skill_id"] == holder
+            or now - h["activated_at"] <= timeouts.get(h["skill_id"], def_timeout)]
 
     def match(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """
@@ -447,6 +477,11 @@ class ConverseService(PipelinePlugin):
         # we call flatten in case someone is sending the old style list of tuples
         utterances = flatten_list(utterances)
 
+        # OVOS-CONVERSE-1 §4.1 step 1: the §2.2 identity invariant (checked
+        # by the gr_skills filter below) is verified "after the §3.2 TTL
+        # prune (when configured)", so the prune runs first.
+        self._prune_converse_handlers(message)
+
         # note: this is sorted by priority already
         gr_skills = [skill_id for skill_id in self.get_active_skills(message, session=session)
                      if session.response_mode and session.response_mode.get("skill_id") == skill_id]
@@ -464,9 +499,6 @@ class ConverseService(PipelinePlugin):
                 utterance=utterances[0],
                 updated_session=session
             )
-
-        # filter allowed skills
-        self._check_converse_timeout(message)
 
         # check if any skill wants to converse
         for skill_id in self._collect_converse_skills(message, session=session):
@@ -537,6 +569,9 @@ class ConverseService(PipelinePlugin):
         Argument:
             message: query message to reply to.
         """
+        # OVOS-CONVERSE-1 §3.2 pre-list-emission TTL prune (§9.1's second
+        # boundary), so the reported list matches what a fresh poll would see.
+        self._prune_converse_handlers(message)
         self.bus.emit(message.reply("intent.service.active_skills.reply",
                                     {"skills": self.get_active_skills(message)}))
 

@@ -1141,6 +1141,25 @@ class TestEmitMatchMessage(unittest.TestCase):
         types = [m.msg_type for m in emitted]
         self.assertFalse(any("activate" in t for t in types))
 
+    def test_dispatch_stamps_converse_handlers(self):
+        """OVOS-CONVERSE-1 §3.1: every dispatch to an owner via
+        <skill_id>:<intent_name> MUST stamp session.converse_handlers, with
+        the §3.1 {skill_id, activated_at} shape."""
+        svc = _make_service()
+        svc.bus.emit = MagicMock()
+        sess = Session("s")
+        match = _make_match(session=sess)
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["hello"]},
+                      context={"session": sess.serialize()})
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess):
+            svc._dispatch_match(match, msg, "en-US")
+        synced_session = Session.deserialize(svc.bus.emit.call_args_list[-1][0][0].context["session"])
+        handlers = {h["skill_id"]: h for h in synced_session.converse_handlers}
+        self.assertIn(match.skill_id, handlers)
+        self.assertIsInstance(handlers[match.skill_id]["activated_at"], float)
+
     def test_intent_transformer_applied(self):
         """intent_plugins.transform is called before emitting the reply."""
         svc = _make_service()
