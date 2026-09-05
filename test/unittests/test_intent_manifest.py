@@ -25,10 +25,14 @@ def _manifest() -> IntentManifest:
     return IntentManifest(FakeBus())
 
 
-def _reg(skill_id, intent_name, lang="en-US", method="keyword", session_id="default"):
+def _reg(skill_id, intent_name, lang="en-US", method="keyword", session_id="default",
+         **definition):
+    """A registration broadcast; extra kwargs are the rest of the payload
+    (``samples`` for a template intent, ``required`` for a keyword one)."""
     topic = f"ovos.intent.register.{method}"
     return Message(topic,
-                   data={"skill_id": skill_id, "intent_name": intent_name, "lang": lang},
+                   data={"skill_id": skill_id, "intent_name": intent_name, "lang": lang,
+                         **definition},
                    context={"session": {"session_id": session_id}, "skill_id": skill_id})
 
 
@@ -243,9 +247,129 @@ class TestIntentDescribeQuery(unittest.TestCase):
         resp = self._query(skill_id="skill.a", intent_name="nonexistent", lang="en-US")
         self.assertFalse(resp["ok"])
 
-    def test_describe_missing_fields_returns_error(self):
-        resp = self._query(skill_id="skill.a")
+    def test_describe_without_a_skill_id_returns_error(self):
+        # skill_id is what bounds the reply, so it stays required.
+        resp = self._query(intent_name="play", lang="en-US")
         self.assertFalse(resp["ok"])
+        self.assertEqual(resp["error"], "skill_id is required")
+
+
+class TestIntentDescribeSkillWide(unittest.TestCase):
+    """§10.2 — ``intent_name`` and ``lang`` are optional filters, so one
+    describe can cover a whole skill. That is what makes the manifest usable
+    for "what can I ask this device": the client walks the skills it got from
+    ``ovos.intent.list`` and asks once per skill, instead of once per intent
+    per language, and no reply is ever larger than a single skill."""
+
+    ROW_FIELDS = {"skill_id", "intent_name", "lang", "method", "session_id", "definition"}
+    EN_WEATHER = ["what is the weather", "what is the weather in {location}"]
+    DE_WEATHER = ["wie ist das wetter", "wie ist das wetter in {location}"]
+    EN_FORECAST = ["what is the forecast"]
+
+    def setUp(self):
+        self.m = _manifest()
+        self.m._on_register(_reg("skill.weather", "current.weather", lang="en-US",
+                                 method="template", samples=self.EN_WEATHER))
+        self.m._on_register(_reg("skill.weather", "current.weather", lang="de-DE",
+                                 method="template", samples=self.DE_WEATHER))
+        self.m._on_register(_reg("skill.weather", "current.weather", lang="en-US",
+                                 method="keyword", required=["WeatherKeyword"]))
+        self.m._on_register(_reg("skill.weather", "forecast", lang="en-US",
+                                 method="template", samples=self.EN_FORECAST))
+        self.m._on_register(_reg("skill.timer", "set.timer", lang="en-US",
+                                 method="template", samples=["set a timer"]))
+
+    def _query(self, **kwargs):
+        replies = []
+        self.m.bus.on("ovos.intent.describe.response", lambda msg: replies.append(msg))
+        self.m._on_describe(Message("ovos.intent.describe", data=kwargs))
+        return replies[-1].data if replies else None
+
+    @staticmethod
+    def _keys(resp):
+        return {(d["intent_name"], d["lang"], d["method"]) for d in resp["definitions"]}
+
+    def test_skill_id_alone_returns_every_registration_of_that_skill(self):
+        resp = self._query(skill_id="skill.weather")
+        self.assertTrue(resp["ok"])
+        self.assertEqual(self._keys(resp),
+                         {("current.weather", "en-US", "template"),
+                          ("current.weather", "de-DE", "template"),
+                          ("current.weather", "en-US", "keyword"),
+                          ("forecast", "en-US", "template")})
+
+    def test_the_reply_stops_at_the_skill(self):
+        # The bound is what keeps a describe small: another skill's intents
+        # never ride along.
+        resp = self._query(skill_id="skill.weather")
+        self.assertNotIn("skill.timer", {d["skill_id"] for d in resp["definitions"]})
+
+    def test_every_row_identifies_its_intent_and_language(self):
+        # Without these a multi-intent reply could not be taken apart.
+        resp = self._query(skill_id="skill.weather")
+        for row in resp["definitions"]:
+            self.assertEqual(set(row), self.ROW_FIELDS)
+            self.assertEqual(row["skill_id"], "skill.weather")
+        by_key = {(d["intent_name"], d["lang"], d["method"]): d["definition"]
+                  for d in resp["definitions"]}
+        self.assertEqual(by_key[("current.weather", "en-US", "template")]["samples"],
+                         self.EN_WEATHER)
+        self.assertEqual(by_key[("current.weather", "de-DE", "template")]["samples"],
+                         self.DE_WEATHER)
+        self.assertEqual(by_key[("current.weather", "en-US", "keyword")]["required"],
+                         ["WeatherKeyword"])
+
+    def test_a_language_filter_narrows_and_still_folds(self):
+        # "de-de" folds to the stored "de-DE"; the English rows stay out.
+        resp = self._query(skill_id="skill.weather", lang="de-de")
+        self.assertEqual(self._keys(resp), {("current.weather", "de-DE", "template")})
+
+    def test_an_intent_without_a_language_covers_every_language(self):
+        resp = self._query(skill_id="skill.weather", intent_name="current.weather")
+        self.assertEqual({d["lang"] for d in resp["definitions"]}, {"en-US", "de-DE"})
+        self.assertNotIn("forecast", {d["intent_name"] for d in resp["definitions"]})
+
+    def test_method_and_session_filters_still_compose(self):
+        self.m._on_register(_reg("skill.weather", "current.weather", lang="en-US",
+                                 method="template", session_id="sat-1",
+                                 samples=["how is the weather"]))
+        resp = self._query(skill_id="skill.weather", method="template", session_id="sat-1")
+        self.assertEqual(len(resp["definitions"]), 1)
+        self.assertEqual(resp["definitions"][0]["definition"]["samples"],
+                         ["how is the weather"])
+
+    def test_one_skill_wide_query_equals_the_per_intent_queries(self):
+        # The claim the change rests on: asking once per skill returns exactly
+        # what asking once per intent per language returns.
+        wide = self._query(skill_id="skill.weather")
+        narrow = []
+        for intent_name, lang in (("current.weather", "en-US"), ("current.weather", "de-DE"),
+                                  ("forecast", "en-US")):
+            narrow += self._query(skill_id="skill.weather", intent_name=intent_name,
+                                  lang=lang)["definitions"]
+        self.assertEqual(wide["definitions"], sorted(
+            narrow, key=lambda d: (d["intent_name"], d["lang"],
+                                   0 if d["method"] == "keyword" else 1)))
+
+    def test_ordering_is_deterministic_across_intents_and_languages(self):
+        self.m._on_register(_reg("skill.weather", "forecast", lang="en-US",
+                                 method="template", session_id="sat-1",
+                                 samples=["forecast please"]))
+        resp = self._query(skill_id="skill.weather")
+        order = [(d["session_id"], d["intent_name"], d["lang"], d["method"])
+                 for d in resp["definitions"]]
+        self.assertEqual(order, [
+            ("default", "current.weather", "de-DE", "template"),
+            ("default", "current.weather", "en-US", "keyword"),
+            ("default", "current.weather", "en-US", "template"),
+            ("default", "forecast", "en-US", "template"),
+            ("sat-1", "forecast", "en-US", "template"),
+        ])
+
+    def test_an_unknown_skill_names_the_wildcarded_target(self):
+        resp = self._query(skill_id="skill.nope")
+        self.assertFalse(resp["ok"])
+        self.assertEqual(resp["error"], "unknown intent skill.nope:*:*")
 
 
 class TestIntentDescribeSessionScope(unittest.TestCase):
