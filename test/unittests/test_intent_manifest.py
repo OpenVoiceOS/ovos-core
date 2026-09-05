@@ -67,16 +67,13 @@ class TestManifestRegister(unittest.TestCase):
         self.assertEqual(key[0], "sat-1")
 
     def test_reserved_stop_intent_name_warns(self):
-        """CONFIRMED-5: a skill registering a real intent literally named
-        'stop' binds the same '<skill_id>:stop' topic OVOS-STOP-1 reserves for
-        the targeted-stop dispatch — the manifest must warn about the
-        collision, the natural point where core observes registration."""
+        """STOP-1 §2/§9 and PIPELINE-1 §7.3: a registration naming the
+        reserved `stop` is malformed — "log at WARN, do not index"."""
         with patch("ovos_core.intent_services.manifest.LOG") as mock_log:
             self.m._on_register(_reg("skill.test", "stop"))
         mock_log.warning.assert_called_once()
         self.assertIn("reserved", str(mock_log.warning.call_args))
-        # registration itself still proceeds (warn, don't reject)
-        self.assertEqual(len(self.m._index), 1)
+        self.assertEqual(self.m._index, {})
 
     def test_non_reserved_intent_name_does_not_warn(self):
         with patch("ovos_core.intent_services.manifest.LOG") as mock_log:
@@ -194,7 +191,7 @@ class TestIntentListQuery(unittest.TestCase):
     def setUp(self):
         self.m = _manifest()
         self.m._on_register(_reg("skill.a", "play", lang="en-US"))
-        self.m._on_register(_reg("skill.a", "stop", lang="en-US"))
+        self.m._on_register(_reg("skill.a", "pause", lang="en-US"))
         self.m._on_register(_reg("skill.b", "play", lang="de-DE"))
 
     def _query(self, **kwargs):
@@ -211,7 +208,7 @@ class TestIntentListQuery(unittest.TestCase):
     def test_filter_by_skill(self):
         resp = self._query(skill_id="skill.a")
         names = {e["intent_name"] for e in resp["intents"]}
-        self.assertEqual(names, {"play", "stop"})
+        self.assertEqual(names, {"play", "pause"})
 
     def test_filter_by_lang(self):
         resp = self._query(lang="de-DE")
@@ -333,3 +330,47 @@ class TestManifestContextLookups(unittest.TestCase):
         # a different session does not see the satellite-scoped declaration
         self.assertEqual(self.m.get_context_requirements("other", "s.skill", "on", "en-US"),
                          ([], []))
+
+
+class TestReservedStopIsNotIndexed(unittest.TestCase):
+    """OVOS-STOP-1 §2: "Skills and other pipelines MUST NOT register `stop`
+    under OVOS-INTENT-4. A registration naming this intent_name is malformed
+    per OVOS-INTENT-4 §5.3/§6.3 — consumers log at WARN and do not index."
+    PIPELINE-1 §7.3 repeats the rule for every reserved name, and STOP-1 §9
+    makes it an orchestrator MUST: "treat OVOS-INTENT-4 registrations naming
+    `stop` as malformed — log at WARN and decline to index".
+
+    Warning while indexing anyway is the failure this guards: the entry then
+    shows up in `ovos.intent.list`, in `ovos.intent.describe`, and in the
+    §6.2 required-slot backstop, where it shadows the stop pipeline's own
+    reserved `<skill_id>:stop` dispatch.
+    """
+
+    def setUp(self):
+        self.m = _manifest()
+
+    def test_stop_registration_is_not_indexed(self):
+        with patch("ovos_core.intent_services.manifest.LOG") as mock_log:
+            self.m._on_register(_reg("skill.test", "stop"))
+        mock_log.warning.assert_called_once()
+        self.assertEqual(self.m._index, {})
+
+    def test_stop_registration_absent_from_intent_list(self):
+        self.m._on_register(_reg("skill.test", "play"))
+        self.m._on_register(_reg("skill.test", "stop"))
+        replies = []
+        self.m.bus.on("ovos.intent.list.response", lambda msg: replies.append(msg))
+        self.m._on_list(Message("ovos.intent.list", data={}))
+        names = {e["intent_name"] for e in replies[-1].data["intents"]}
+        self.assertEqual(names, {"play"})
+
+    def test_global_stop_is_not_reserved_and_is_indexed(self):
+        """STOP-1 §2 leaves `global_stop` unreserved; only `stop` is."""
+        self.m._on_register(_reg("skill.test", "global_stop"))
+        self.assertEqual(len(self.m._index), 1)
+
+    def test_both_registration_methods_are_declined(self):
+        for method in ("keyword", "template"):
+            m = _manifest()
+            m._on_register(_reg("skill.test", "stop", method=method))
+            self.assertEqual(m._index, {}, method)

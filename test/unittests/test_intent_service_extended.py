@@ -1233,12 +1233,12 @@ class TestHandleUtterance(unittest.TestCase):
         stop_svc = StopService.__new__(StopService)
         stop_svc.bus = bus
         stop_svc.config = {}
-        stop_svc.suppress_activation = True
         stop_svc._locale = MagicMock()
         stop_svc._locale.voc_match.side_effect = (
             lambda utt, voc, lang, exact=False: voc == "stop")
         stop_svc._legacy = MagicMock()
         stop_svc._pre_drain = {}
+        stop_svc._stop_listeners = set()
 
         sess = Session("s")
         sess.activate_skill("skill_a")
@@ -1416,61 +1416,130 @@ class TestRequiredSlotsBackstop(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class TestReservedNameActivation(unittest.TestCase):
+    """OVOS-PIPELINE-1 §7.1: the `active_handlers` push "is **suppressed** for
+    dispatches whose `intent_name` is marked non-activating in the §7.3
+    reserved-name registry... Suppression **MUST** be keyed on the Match's
+    `intent_name` and its registry row — never on the producing
+    `pipeline_id`". §7.3 states the activation-push column per row: `converse`,
+    `response`, `stop` and `common_query` suppress; `fallback` **pushes**.
 
-    def _dispatch(self, pipeline_id, suppress_activation=False):
+    The shipped producers have not migrated to spec-shaped `intent_name`s yet,
+    so every case below uses the match_type that plugin ACTUALLY emits today
+    alongside the spec shape it will emit after migration. Both must reach the
+    same verdict; asserting only on invented `<skill>:<reserved_name>` strings
+    lets the suite stay green while real rounds are unsuppressed.
+    """
+
+    def _dispatch(self, match_type, pipeline_id, skill_id="test.skill"):
         svc = _make_service()
         sess = Session("s1")
         msg = Message("recognizer_loop:utterance", {"utterances": ["hi"]},
                       {"session": sess.serialize()})
-        match = _make_match(match_type="test.skill:intent",
-                            skill_id="test.skill", session=sess)
-        match.suppress_activation = suppress_activation
+        match = _make_match(match_type=match_type,
+                            skill_id=skill_id, session=sess)
         svc._dispatch_match(match, msg, "en-US", pipeline_id=pipeline_id)
-        return sess
+        return [h.get("skill_id") if isinstance(h, dict) else getattr(h, "skill_id", h)
+                for h in sess.active_handlers]
 
-    def test_regular_pipeline_pushes_active_handler(self):
-        sess = self._dispatch("ovos-adapt-pipeline-plugin-high")
-        ids = [h.get("skill_id") if isinstance(h, dict) else getattr(h, "skill_id", h)
-               for h in sess.active_handlers]
-        self.assertIn("test.skill", ids)
+    def test_ordinary_intent_pushes(self):
+        self.assertIn("test.skill",
+                      self._dispatch("test.skill:play_music",
+                                     "ovos-adapt-pipeline-plugin-high"))
 
-    def test_reserved_name_pipeline_suppresses_push(self):
-        # §7.3: converse/fallback/common_query dispatches must NOT push
-        for pid in ("ovos-converse-pipeline-plugin",
-                    "ovos-fallback-pipeline-plugin-medium",
-                    "ovos-common-query-pipeline-plugin"):
-            sess = self._dispatch(pid)
-            ids = [h.get("skill_id") if isinstance(h, dict) else getattr(h, "skill_id", h)
-                   for h in sess.active_handlers]
-            self.assertNotIn("test.skill", ids, f"{pid} should suppress the push")
+    def test_converse_shapes_suppress(self):
+        """`converse_service` emits `converse:skill` (CONVERSE-1 §4) and
+        `<skill_id>.converse.get_response` (§5) today."""
+        for match_type in ("converse:skill",
+                           "test.skill.converse.get_response",
+                           "test.skill:converse",
+                           "test.skill:response"):
+            with self.subTest(match_type=match_type):
+                self.assertNotIn("test.skill",
+                                 self._dispatch(match_type,
+                                                "ovos-converse-pipeline-plugin"))
 
-    def test_suppress_activation_match_suppresses_push(self):
-        # OVOS-STOP-1 §6.2/§7.3: a Match.suppress_activation dispatch (a stop)
-        # must NOT push onto active_handlers regardless of its pipeline_id.
-        sess = self._dispatch("ovos-adapt-pipeline-plugin-high",
-                              suppress_activation=True)
-        ids = [h.get("skill_id") if isinstance(h, dict) else getattr(h, "skill_id", h)
-               for h in sess.active_handlers]
-        self.assertNotIn("test.skill", ids)
+    def test_common_query_shapes_suppress(self):
+        """`ovos-common-query-pipeline-plugin` emits
+        `question:action.<skill_id>` today."""
+        for match_type in ("question:action.test.skill",
+                           "question:action",
+                           "ovos-common-query-pipeline-plugin:common_query"):
+            with self.subTest(match_type=match_type):
+                self.assertNotIn(
+                    "test.skill",
+                    self._dispatch(match_type,
+                                   "ovos-common-query-pipeline-plugin"))
+
+    def test_stop_suppresses(self):
+        """The stop plugin already emits the spec shape."""
+        self.assertNotIn("test.skill",
+                         self._dispatch("test.skill:stop",
+                                        "ovos-stop-pipeline-plugin-high"))
+
+    def test_fallback_shapes_push(self):
+        """§7.3: "`fallback` is different and therefore **not** suppressed. A
+        fallback handler was not active before the dispatch — the dispatch
+        *is* its activation." Suppressing it "would leave the handler
+        unreachable by OVOS-STOP-1". `fallback_service` emits
+        `ovos.skills.fallback.<skill_id>.request` today."""
+        for match_type in ("ovos.skills.fallback.test.skill.request",
+                           "test.skill:fallback"):
+            with self.subTest(match_type=match_type):
+                self.assertIn("test.skill",
+                              self._dispatch(match_type,
+                                             "ovos-fallback-pipeline-plugin-high"))
+
+    def test_global_stop_pushes(self):
+        """STOP-1 §5.2: "`global_stop` is not a reserved intent_name, so
+        PIPELINE-1 §7.1 stamping suppression does not apply: the orchestrator
+        pushes the stop plugin's `pipeline_id` onto `active_handlers`... The
+        committed post-dispatch state is therefore not an empty list"."""
+        self.assertIn("test.skill",
+                      self._dispatch("test.skill:global_stop",
+                                     "ovos-stop-pipeline-plugin-high"))
+
+    def test_spec_reserved_name_suppresses_whatever_produced_it(self):
+        """§7.1 forbids keying suppression on the producer, so a spec-shaped
+        reserved name suppresses even from an ordinary matcher."""
+        self.assertNotIn("test.skill",
+                         self._dispatch("test.skill:stop",
+                                        "ovos-adapt-pipeline-plugin-high"))
+
+    def test_ordinary_name_from_a_reserved_role_still_pushes(self):
+        """The transitional pipeline_id gate covers only the roles whose
+        producers are unmigrated, and the fallback plugin is not one of
+        them."""
+        self.assertIn("test.skill",
+                      self._dispatch("test.skill:play_music",
+                                     "ovos-adapt-pipeline-plugin-high"))
 
 
-class TestProducesReservedName(unittest.TestCase):
+class TestFallbackMatchCarriesSkillId(unittest.TestCase):
+    """OVOS-PIPELINE-1 §7.1 keys the activation push on `Match.skill_id`, and
+    §7.3 requires a `fallback` dispatch to push. A FallbackService Match built
+    without `skill_id` never pushes on either branch, leaving the handler
+    invisible to OVOS-STOP-1's cascade and ineligible for a converse
+    follow-up — exactly what §7.3 says suppressing it would cause."""
 
-    def test_reserved_roles_true_with_confidence_suffix(self):
-        from ovos_core.intent_services.service import _produces_reserved_name
-        self.assertTrue(_produces_reserved_name("ovos-converse-pipeline-plugin"))
-        self.assertTrue(_produces_reserved_name("ovos-fallback-pipeline-plugin-low"))
+    def test_match_sets_skill_id(self):
+        from ovos_core.intent_services.fallback_service import (
+            FallbackRange, FallbackService)
 
-    def test_stop_role_not_in_reserved_table(self):
-        # STOP-1 expresses suppression per-Match (suppress_activation), so the
-        # stop pipeline is intentionally absent from the reserved-name table.
-        from ovos_core.intent_services.service import _produces_reserved_name
-        self.assertFalse(_produces_reserved_name("ovos-stop-pipeline-plugin-high"))
+        bus = FakeBus()
+        svc = FallbackService(bus)
+        svc.registered_fallbacks = {"fallback.skill": 50}
+        sess = Session("s")
+        msg = Message("recognizer_loop:utterance", {"utterances": ["hi"]},
+                      {"session": sess.serialize()})
+        with patch.object(FallbackService, "_collect_fallback_skills",
+                          return_value=["fallback.skill"]), \
+             patch.object(FallbackService, "_fallback_allowed",
+                          return_value=True):
+            match = svc._fallback_range(["hi"], "en-US", msg,
+                                        FallbackRange(0, 100))
 
-    def test_regular_role_false(self):
-        from ovos_core.intent_services.service import _produces_reserved_name
-        self.assertFalse(_produces_reserved_name("ovos-adapt-pipeline-plugin-high"))
-        self.assertFalse(_produces_reserved_name(None))
+        self.assertIsNotNone(match)
+        self.assertEqual(match.skill_id, "fallback.skill")
 
 
 # ---------------------------------------------------------------------------

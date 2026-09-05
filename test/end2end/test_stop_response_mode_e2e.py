@@ -27,6 +27,7 @@ from unittest.mock import MagicMock
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session, SessionManager
+from ovos_spec_tools import SpecMessage
 from ovos_utils.fakebus import FakeBus
 
 from ovos_core.intent_services.stop_service import StopService
@@ -97,15 +98,33 @@ class TestResponseModeHolderStopE2E(unittest.TestCase):
         self.assertEqual(calls, [f"{skill_id}.stop"],
                          "lifecycle terminal (the abort) must fire exactly once")
 
-    def test_stop_releases_blocked_get_response_via_global_stop_path(self):
-        """Even when the utterance escalates to an explicit global stop, the
-        response-mode holder must still be released (handle_global_stop
-        emits the targeted topic before the broadcast)."""
+    def test_global_stop_releases_the_holder_via_the_ovos_stop_broadcast(self):
+        """An explicit global stop releases the holder through `ovos.stop`.
+
+        STOP-1 §5.3 gives the global-stop handler exactly one emission — "The
+        handler dispatched by `<pipeline_id>:global_stop` MUST emit
+        `ovos.stop`" — and makes the broadcast the universal channel: "Every
+        component performing user-visible activity MUST subscribe to
+        `ovos.stop` and cease activity for the `session_id` carried in Message
+        context." §9 restates it as a skill MUST: subscribe to both
+        `<own_skill_id>:stop` and `ovos.stop`.
+
+        So the release path for a blocked `get_response` under a global stop
+        is the skill's own `ovos.stop` subscription, not a per-skill topic
+        synthesized by the stop plugin.
+        """
         skill_id = "test-skill.openvoiceos"
         session = Session("resp-mode-only-2")
         session.enable_response_mode(skill_id)
 
-        released, calls = self._fake_skill_blocked_in_get_response(skill_id)
+        released = Event()
+        seen = []
+        # a §9-conformant skill: subscribed to the broadcast
+        self.bus.once(SpecMessage.STOP.value,
+                      lambda m: (seen.append(m.msg_type), released.set()))
+        # ...and to its own targeted topic, which a global stop must NOT use
+        targeted = []
+        self.bus.once(f"{skill_id}.stop", lambda m: targeted.append(m.msg_type))
 
         message = Message(
             "recognizer_loop:utterance",
@@ -119,7 +138,11 @@ class TestResponseModeHolderStopE2E(unittest.TestCase):
             match = self.svc.match_high(["stop everything"], "en-US", message)
 
         self.assertEqual(match.match_type, f"{StopService.pipeline_id}:global_stop")
-        self.assertEqual(match.match_data.get("response_mode_holder"), skill_id)
+        # PIPELINE-1 §4.3: slots are string->string, so no plugin-internal
+        # holder rides out on the dispatch.
+        self.assertEqual(match.match_data, {})
+        # §5.2: response_mode removed entirely by the Match's updated_session.
+        self.assertFalse(match.updated_session.response_mode)
 
         data = dict(message.data)
         data.update(match.match_data)
@@ -127,11 +150,13 @@ class TestResponseModeHolderStopE2E(unittest.TestCase):
         reply.context["skill_id"] = match.skill_id
         self.bus.emit(reply)
 
-        fired = released.wait(timeout=POLL_WINDOW)
-        self.assertTrue(fired,
-                        "an explicit global stop must still release a "
-                        "response-mode holder's blocked get_response")
-        self.assertEqual(calls, [f"{skill_id}.stop"])
+        self.assertTrue(released.wait(timeout=POLL_WINDOW),
+                        "an explicit global stop must reach a blocked "
+                        "get_response through the ovos.stop broadcast")
+        self.assertEqual(seen, [SpecMessage.STOP.value])
+        self.assertEqual(targeted, [],
+                         "§5.3 permits no per-skill emission from the "
+                         "global-stop handler")
 
 
 if __name__ == "__main__":

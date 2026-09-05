@@ -20,7 +20,7 @@ dependencies = [
     "ovos_bus_client>=2.11.1a1,<3.0.0",
     "ovos-plugin-manager>=2.11.1a1,<3.0.0",
     "ovos-config>=2.1.4a5,<4.0.0",
-    "ovos-workshop>=9.3.11a1,<10.0.0",
+    "ovos-workshop>=9.6.9a1,<10.0.0",
     "rapidfuzz>=3.6,<4.0",
     "ovos-spec-tools[langcodes]>=1.10.4a1,<2.0.0",
 ]

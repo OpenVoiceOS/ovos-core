@@ -134,15 +134,15 @@ class IntentManifest:
             LOG.warning(f"malformed intent registration from {skill_id!r}: missing required fields")
             return
         if intent_name == "stop":
-            # OVOS-STOP-1 reserves "<skill_id>:stop" for the pipeline's own
-            # targeted-stop dispatch (stop_service.py _targeted_stop); a real
-            # intent registered under the same name binds the identical topic
-            # and is shadowed by / collides with the reserved dispatch.
+            # OVOS-STOP-1 §2: "Skills and other pipelines MUST NOT register
+            # `stop`". Such a registration is malformed under OVOS-INTENT-4
+            # §5.3/§6.3 and PIPELINE-1 §7.3 — "log at WARN, do not index".
             LOG.warning(
                 f"skill '{skill_id}' registered an intent literally named 'stop' — "
-                f"this collides with the OVOS-STOP-1 reserved '{skill_id}:stop' "
-                "targeted-dispatch topic, so both the registered intent handler "
-                "and the stop machinery will react to messages on that topic.")
+                f"'stop' is reserved by OVOS-STOP-1 for the '{skill_id}:stop' "
+                "targeted-dispatch topic, so this registration is malformed "
+                "and is not indexed.")
+            return
         session_id = raw_session_id(message)
         if session_id is None:
             # malformed carrier (OVOS-SESSION-1 §2.5): already logged; drop

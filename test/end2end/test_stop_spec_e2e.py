@@ -6,9 +6,11 @@ These assert the primary, spec-mandated behaviour of the stop pipeline plugin:
   ``Match.skill_id == skill_id`` (§2, §3.1);
 - a **global** stop is dispatched on ``<pipeline_id>:global_stop`` with
   ``Match.skill_id == pipeline_id`` and broadcasts ``ovos.stop`` (§5);
-- ``suppress_activation`` (§6.2/§7.3) means neither dispatch emits a
-  ``{skill_id}.activate`` — a stop terminates participation, it does not
-  activate;
+- the reserved ``stop`` intent_name suppresses the PIPELINE-1 §7.1 activation
+  push per the §7.3 registry, so a targeted stop emits no
+  ``{skill_id}.activate`` — it terminates participation rather than starting
+  it — while the unreserved ``global_stop`` does activate the stop plugin
+  (STOP-1 §5.2);
 - the §5.2/§6 session drain is committed before dispatch.
 
 The un-migrated ``ovos-skill-count`` still subscribes to the legacy
@@ -38,7 +40,8 @@ GLOBAL_STOP = f"{PIPELINE_ID}:global_stop"                  # §5 global dispatc
 # Legacy-bridge and framework topics that wrap or shadow the spec dispatch;
 # ignored so the spec assertions stay focused on the STOP-1 surface. The
 # per-pipeline ``{pipeline_id}.activate`` / ``{skill_id}.activate`` topics are
-# deliberately NOT ignored: their absence is the §6.2 suppress_activation guard.
+# deliberately NOT ignored: whether each one appears is the §7.3 registry
+# assertion.
 _IGNORE = [
     SpecMessage.INTENT_MATCHED,
     SpecMessage.INTENT_HANDLER_START,
@@ -118,8 +121,10 @@ class TestGlobalStopSpec(TestCase):
         """Bare 'stop' with no active skills → global stop on the pipeline_id.
 
         Asserts: the §5 dispatch topic carries ``skill_id == pipeline_id``, it
-        broadcasts ``ovos.stop`` (§5.3), and — because suppress_activation is
-        set — NO ``{pipeline_id}.activate`` is emitted (§6.2/§7.3)."""
+        broadcasts ``ovos.stop`` (§5.3), and the stop plugin IS activated —
+        ``global_stop`` is not a reserved intent_name, so §7.3 suppression
+        does not apply and §5.2 requires the committed post-dispatch
+        ``active_handlers`` to hold exactly the stop plugin's own entry."""
         minicroft = get_minicroft([], modernize=False, emit_legacy=False)
         try:
             session = Session("123")
@@ -139,6 +144,8 @@ class TestGlobalStopSpec(TestCase):
                 source_message=message,
                 expected_messages=[
                     message,
+                    Message(f"{PIPELINE_ID}.activate", {},
+                            {"skill_id": PIPELINE_ID}),
                     Message(GLOBAL_STOP, {},
                             {"skill_id": PIPELINE_ID}),
                     Message(STOP_BROADCAST, {},
@@ -164,8 +171,9 @@ class TestTargetedStopSpec(TestCase):
 
     def test_targeted_stop_dispatch_shape(self):
         """A running skill is stopped via ``<skill_id>:stop`` with Match.skill_id
-        equal to the skill, no ``{skill_id}.activate`` (suppress_activation), and
-        the §6 drain removing the skill from active_handlers.
+        equal to the skill, no ``{skill_id}.activate`` (§7.3 marks the reserved
+        ``stop`` name non-activating), and the §6 drain removing the skill from
+        active_handlers.
 
         The translator (modernize/emit_legacy) bridges the spec ``:stop``
         dispatch onto the skill's legacy ``.stop`` subscription."""

@@ -240,6 +240,12 @@ class FallbackService(ConfidenceMatcherPipeline):
                                 "utterances": utterances,
                                 "lang": lang},
                     utterance=utterances[0],
+                    # OVOS-PIPELINE-1 §7.3: `fallback` PUSHES onto
+                    # `active_handlers` -- "the dispatch *is* its activation".
+                    # The push is keyed on `Match.skill_id` (§7.1), so without
+                    # it the handler stays invisible to OVOS-STOP-1's cascade
+                    # and ineligible for a converse follow-up.
+                    skill_id=skill_id,
                     updated_session=sess
                 )
 
