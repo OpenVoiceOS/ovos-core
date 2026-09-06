@@ -221,3 +221,19 @@ def test_opt_in_metrics_endpoint(monkeypatch):
         assert "test_fractional_work_total 1.6000000000000001" in payload
     finally:
         stop_metrics_server(server)
+
+
+def test_service_entrypoint_starts_and_stops_the_metrics_server():
+    """The scrape endpoint is only useful if the service actually starts it.
+
+    ovos_core.__main__ is the process entry point; without the
+    start/stop calls the histograms are collected but nothing ever serves
+    them, and the endpoint silently never comes up.
+    """
+    import inspect
+
+    import ovos_core.__main__ as service_main
+
+    source = inspect.getsource(service_main.main)
+    assert "start_metrics_server()" in source
+    assert "stop_metrics_server(" in source
