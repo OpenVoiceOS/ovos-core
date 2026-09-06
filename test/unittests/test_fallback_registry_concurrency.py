@@ -244,23 +244,47 @@ def test_deregister_of_unknown_skill_is_a_noop():
     assert service.registered_fallbacks == {}
 
 
-def test_registry_entry_and_lifecycle_wiring_are_one_critical_section():
-    """The entry and its bus wiring must not be separately observable.
+class _ObservableLock:
+    """A real lock that reports when someone blocks acquiring it."""
 
-    A deregistration is fired from another thread at the worst moment --
-    registration has written the entry but has not wired it yet. Split into
-    two critical sections it lands in between and leaves callbacks wired for
-    a skill that is no longer registered; as one section it cannot.
+    def __init__(self):
+        self._lock = threading.Lock()
+        self.contended = threading.Event()
+
+    def __enter__(self):
+        if not self._lock.acquire(blocking=False):
+            # somebody else is inside: record that, then wait our turn
+            self.contended.set()
+            self._lock.acquire()
+        return self
+
+    def __exit__(self, *exc):
+        self._lock.release()
+        return False
+
+
+def test_registry_entry_and_lifecycle_wiring_are_one_critical_section():
+    """A deregistration must block until the wiring is done.
+
+    Asserting on the final state alone is not enough: if the racing
+    deregistration is simply slow, a split implementation passes because it
+    wires first and the deregistration then removes both. So this observes
+    the lock instead -- the deregistration has to be BLOCKED on acquisition
+    while registration is still wiring. With the wiring outside the critical
+    section there is nothing to block on.
     """
     service = _service()
+    lock = _ObservableLock()
+    service._registry_lock = lock
+
     inside_wiring = threading.Event()
-    deregistered = threading.Event()
+    blocked = threading.Event()
     real_wire = service._wire_lifecycle
 
     def wire(skill_id):
         inside_wiring.set()
-        # give the racing deregistration every chance to interleave here
-        deregistered.wait(1.0)
+        # wait for the racer to actually block on the lock we are holding
+        blocked.wait(5)
         return real_wire(skill_id)
 
     service._wire_lifecycle = wire
@@ -269,15 +293,24 @@ def test_registry_entry_and_lifecycle_wiring_are_one_critical_section():
         assert inside_wiring.wait(5)
         service.handle_deregister_fallback(
             Message("ovos.skills.fallback.deregister", {"skill_id": "skill_a"}))
-        deregistered.set()
 
     racer = threading.Thread(target=deregister, daemon=True)
     racer.start()
+
+    watcher = threading.Thread(
+        target=lambda: blocked.set() if lock.contended.wait(5) else None,
+        daemon=True)
+    watcher.start()
+
     _register(service, "skill_a")
     racer.join(timeout=10)
+    watcher.join(timeout=10)
 
     assert not racer.is_alive(), "deregistration never completed"
-    # whichever order the two landed in, the registry and the wiring agree
+    # the deregistration could not get in while registration was wiring
+    assert lock.contended.is_set(), (
+        "deregistration acquired the lock during wiring: the registry write "
+        "and the lifecycle wiring are not one critical section")
     assert set(service._lifecycle_handlers) == set(service.registered_fallbacks)
 
 
