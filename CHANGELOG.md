@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.2.9a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.9a3) (2026-09-06)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.9a2...3.2.9a3)
+
+**Merged pull requests:**
+
+- fix: snapshot the fallback registry before reading it [\#939](https://github.com/OpenVoiceOS/ovos-core/pull/939) ([goldyfruit](https://github.com/goldyfruit))
+
 ## [3.2.9a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.9a2) (2026-09-06)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.9a1...3.2.9a2)
@@ -135,19 +143,19 @@
 
 ## [3.0.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.12a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.12a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.12a1)
 
 **Merged pull requests:**
 
 - fix: close messagebus client before main\(\) returns on shutdown [\#870](https://github.com/OpenVoiceOS/ovos-core/pull/870) ([JarbasAl](https://github.com/JarbasAl))
 
-## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.10a3)
-
 ## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.11a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.11a1)
+
+## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.10a3)
 
 ## [3.0.10a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a2) (2026-08-31)
 
@@ -323,10 +331,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.10a1...2.6.0a1)
 
-**Merged pull requests:**
-
-- feat: blacklist pipeline plugins at load time and per session [\#832](https://github.com/OpenVoiceOS/ovos-core/pull/832) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [2.5.10a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.10a1) (2026-08-02)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.9a1...2.5.10a1)
@@ -350,10 +354,6 @@
 ## [2.5.8a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.8a2) (2026-07-31)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.8a1...2.5.8a2)
-
-**Merged pull requests:**
-
-- chore: bump ecosystem dependency floors to latest alphas [\#831](https://github.com/OpenVoiceOS/ovos-core/pull/831) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.5.8a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.8a1) (2026-07-24)
 
