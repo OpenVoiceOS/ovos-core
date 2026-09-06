@@ -86,6 +86,17 @@ class IntentManifest:
         return list(seen.values())
 
     @staticmethod
+    def _invalid_filter(data: dict, *fields: str) -> Optional[str]:
+        """§10.1/§10.2 — every provided filter must be a string.
+        Returns the name of the first offending field, or ``None`` if all
+        of *fields* are either absent or strings."""
+        for field in fields:
+            value = data.get(field)
+            if value is not None and not isinstance(value, str):
+                return field
+        return None
+
+    @staticmethod
     def _session_id_of(message: Message) -> Optional[str]:
         """Mutation scope per §11.1/§11.3 — always ``context.session.session_id``,
         NEVER ``Message.data``. A ``data.session_id`` on a mutation is not a
@@ -231,6 +242,11 @@ class IntentManifest:
     # ------------------------------------------------------------------
 
     def _on_list(self, message: Message):
+        bad_field = self._invalid_filter(message.data, "skill_id", "lang", "session_id")
+        if bad_field:
+            self.bus.emit(message.reply("ovos.intent.list.response",
+                                        {"ok": False, "error": f"{bad_field} must be a string"}))
+            return
         f_skill = message.data.get("skill_id")
         f_lang = message.data.get("lang")
         f_session = message.data.get("session_id")
@@ -250,6 +266,12 @@ class IntentManifest:
         self.bus.emit(message.reply("ovos.intent.list.response", {"ok": True, "intents": results}))
 
     def _on_describe(self, message: Message):
+        bad_field = self._invalid_filter(message.data, "skill_id", "intent_name",
+                                         "lang", "method", "session_id")
+        if bad_field:
+            self.bus.emit(message.reply("ovos.intent.describe.response",
+                                        {"ok": False, "error": f"{bad_field} must be a string"}))
+            return
         skill_id = message.data.get("skill_id")
         intent_name = message.data.get("intent_name")
         lang = message.data.get("lang")
