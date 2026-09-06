@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.4.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.4.0a1) (2026-09-06)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.3.2a1...3.4.0a1)
+
+**Merged pull requests:**
+
+- feat: ship the reference typed-slots transformer with the plugins extra [\#950](https://github.com/OpenVoiceOS/ovos-core/pull/950) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.3.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.3.2a1) (2026-09-06)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.3.1a1...3.3.2a1)
@@ -364,7 +372,6 @@
 **Merged pull requests:**
 
 - fix: padatious is Apache-2.0, drop the lgpl framing and fann2 [\#848](https://github.com/OpenVoiceOS/ovos-core/pull/848) ([JarbasAl](https://github.com/JarbasAl))
-- feat: add skills.installer.upgrade config option to SkillsStore.pip\_install [\#843](https://github.com/OpenVoiceOS/ovos-core/pull/843) ([andlo](https://github.com/andlo))
 
 ## [2.6.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.0a1) (2026-08-02)
 
