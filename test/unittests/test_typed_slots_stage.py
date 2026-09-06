@@ -344,14 +344,64 @@ class TestDeclaredTypesAreComputedLazily(unittest.TestCase):
 class TestClosedTypeSet(unittest.TestCase):
 
     def test_unregistered_key_is_dropped_and_logged(self):
+        from ovos_spec_tools import intent as spec_tools_intent
         svc = _make_service(_make_typed_slots_service(plugins=[_make_plugin(
             "p", result={"number": [_number_entry()],
                          "hotel": [_number_entry()]})]))
         msg = Message("recognizer_loop:utterance", data={"utterances": ["two"]})
-        with patch.object(service_module.LOG, "warning") as warn:
+        with patch.object(spec_tools_intent._log, "warning") as warn:
             svc._run_typed_slots_stage(msg, Session("s"))
         self.assertEqual(list(msg.data["typed_slots"]), ["number"])
-        self.assertIn("'hotel'", warn.call_args[0][0])
+        self.assertIn("hotel", warn.call_args[0][1])
+
+    def test_dropping_an_empty_registered_type_is_not_misreported(self):
+        """A registered type with no entries is dropped by
+        ``drop_unregistered_typed_slots`` itself, which already logs the
+        reason; ovos-core must not additionally claim it "is not a type
+        registered" — that reason is simply false for this case."""
+        color_entry = {"span": [0, 3], "surface": "red",
+                       "value": {"hex": "#ff0000", "name": "red"}}
+        svc = _make_service(_make_typed_slots_service(plugins=[_make_plugin(
+            "p", result={"number": [], "color": [color_entry]})]))
+        msg = Message("recognizer_loop:utterance", data={"utterances": ["red"]})
+        with patch.object(service_module.LOG, "warning") as warn:
+            svc._run_typed_slots_stage(msg, Session("s"))
+        for call in warn.call_args_list:
+            self.assertNotIn("not a type registered", call[0][0])
+
+    def test_empty_typed_list_is_dropped(self):
+        """OVOS-INTENT-1 §5.6: a type computed with nothing of that kind
+        found must be omitted, not carried with an empty list."""
+        color_entry = {"span": [0, 3], "surface": "red",
+                       "value": {"hex": "#ff0000", "name": "red"}}
+        svc = _make_service(_make_typed_slots_service(plugins=[_make_plugin(
+            "p", result={"number": [], "color": [color_entry]})]))
+        msg = Message("recognizer_loop:utterance", data={"utterances": ["red"]})
+        svc._run_typed_slots_stage(msg, Session("s"))
+        self.assertEqual(list(msg.data["typed_slots"]), ["color"])
+
+    def test_a_non_conformant_plugins_empty_type_carries_no_entry(self):
+        """A plugin returning only an empty-list type violates §5.6's "omit
+        rather than list empty" rule, but the stage still filters it: the
+        map that reaches the message carries no ``date`` key."""
+        svc = _make_service(_make_typed_slots_service(
+            plugins=[_make_plugin("p", result={"date": []})]))
+        msg = Message("recognizer_loop:utterance", data={"utterances": ["today"]})
+        svc._run_typed_slots_stage(msg, Session("s"))
+        self.assertNotIn("date", msg.data.get("typed_slots", {}))
+
+    def test_drop_runs_before_validate(self):
+        """Reversing the order would let an empty-list type reach
+        ``validate_typed_slots`` and reject the whole map instead of just
+        that type being dropped."""
+        color_entry = {"span": [0, 3], "surface": "red",
+                       "value": {"hex": "#ff0000", "name": "red"}}
+        svc = _make_service(_make_typed_slots_service(plugins=[_make_plugin(
+            "p", result={"number": [], "color": [color_entry]})]))
+        msg = Message("recognizer_loop:utterance", data={"utterances": ["red"]})
+        svc._run_typed_slots_stage(msg, Session("s"))
+        self.assertIn("typed_slots", msg.data)
+        self.assertEqual(msg.data["typed_slots"], {"color": [color_entry]})
 
     def test_a_malformed_map_is_dropped_rather_than_propagated(self):
         svc = _make_service(_make_typed_slots_service(plugins=[_make_plugin(
