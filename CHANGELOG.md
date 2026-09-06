@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.3.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.3.1a1) (2026-09-06)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.3.0a1...3.3.1a1)
+
+**Merged pull requests:**
+
+- fix: manifest requests with non-string fields get an error reply instead of silence [\#943](https://github.com/OpenVoiceOS/ovos-core/pull/943) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.3.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.3.0a1) (2026-09-06)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.10a2...3.3.0a1)
@@ -167,19 +175,19 @@
 
 ## [3.0.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.12a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.12a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.12a1)
 
 **Merged pull requests:**
 
 - fix: close messagebus client before main\(\) returns on shutdown [\#870](https://github.com/OpenVoiceOS/ovos-core/pull/870) ([JarbasAl](https://github.com/JarbasAl))
 
-## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.11a1)
-
 ## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.10a3)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.10a3)
+
+## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.11a1)
 
 ## [3.0.10a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a2) (2026-08-31)
 
@@ -361,10 +369,6 @@
 ## [2.5.9a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.9a1) (2026-08-01)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.8a3...2.5.9a1)
-
-**Merged pull requests:**
-
-- fix: declare real end-markers for non-utterance e2e scenarios [\#839](https://github.com/OpenVoiceOS/ovos-core/pull/839) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.5.8a3](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.8a3) (2026-07-31)
 
