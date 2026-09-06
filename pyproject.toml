@@ -65,6 +65,7 @@ plugins = [
     "ovos-bidirectional-translation-plugin>=0.1.3a4, <1.0.0",
     "ovos-translate-server-plugin>=0.0.8a1, <1.0.0",
     "ovos-utterance-normalizer>=0.2.5a1, <1.0.0",
+    "ovos-typed-slots-transformer>=0.0.1a2, <1.0.0",
     "ovos-number-parser>=0.19.8a1,<1.0.0",
     "ovos-date-parser>=0.29.0,<1.0.0",
     "ovos-m2v-pipeline>=0.5.4a1,<1.0.0",
