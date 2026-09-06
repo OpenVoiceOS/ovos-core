@@ -708,3 +708,37 @@ class TestFallbackListQuery(unittest.TestCase):
         self.bus.emit(Message("ovos.skills.fallback.list"))
         self.assertEqual(self.replies, [])
         self.service = FallbackService(self.bus)  # tearDown shuts this one down
+
+
+class TestFallbackListQueryMalformedRegistry(unittest.TestCase):
+    """A bad registration elsewhere must not make this query unanswerable.
+
+    `handle_register_fallback` reads skill_id off the message and stores
+    whatever it finds, so a malformed registration puts a None key in the
+    registry. Sorting that against a str raises TypeError *before* the reply is
+    emitted, so the caller waits out its timeout for a query that would
+    otherwise have succeeded.
+    """
+
+    def setUp(self):
+        self.bus = FakeBus()
+        self.service = FallbackService(self.bus)
+        self.replies = []
+        self.bus.on("ovos.skills.fallback.list.response",
+                    lambda message: self.replies.append(message))
+
+    def tearDown(self):
+        self.service.shutdown()
+
+    def test_a_registration_with_no_skill_id_does_not_break_the_query(self):
+        self.service.registered_fallbacks = {None: 101, "real-skill": 101}
+        self.bus.emit(Message("ovos.skills.fallback.list"))
+        self.assertEqual(len(self.replies), 1, "the query must still answer")
+        self.assertEqual(self.replies[0].data["fallbacks"],
+                         [{"skill_id": "real-skill", "priority": 101}])
+
+    def test_an_entry_with_no_name_is_left_out_rather_than_reported(self):
+        """It names nothing a caller could act on."""
+        self.service.registered_fallbacks = {None: 10, "": 20}
+        self.bus.emit(Message("ovos.skills.fallback.list"))
+        self.assertEqual(self.replies[0].data["fallbacks"], [])

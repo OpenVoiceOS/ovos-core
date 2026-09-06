@@ -85,13 +85,21 @@ class FallbackService(ConfidenceMatcherPipeline):
         knowing that a fallback exists is the whole of what can honestly be
         published about it.
         """
+        # `handle_register_fallback` reads skill_id straight off the message and
+        # stores whatever it finds, so the registry can hold a None key. Sorting
+        # that against a str raises TypeError, and it would do so *before* the
+        # reply is emitted -- turning a malformed registration somewhere else
+        # into a query that never answers. An entry with no skill_id also names
+        # nothing a caller could act on, so it is left out rather than reported.
         registry = self._fallback_registry_snapshot()
+        listed = [(skill_id, priority) for skill_id, priority in registry.items()
+                  if isinstance(skill_id, str) and skill_id]
         self.bus.emit(message.reply(
             "ovos.skills.fallback.list.response",
             {"ok": True,
              "fallbacks": [{"skill_id": skill_id, "priority": priority}
                            for skill_id, priority in
-                           sorted(registry.items(), key=lambda kv: (kv[1], kv[0]))]}))
+                           sorted(listed, key=lambda kv: (kv[1], kv[0]))]}))
 
     def _wire_lifecycle(self, skill_id: str) -> None:
         """Translate lifecycle done-signal for a fallback skill.
