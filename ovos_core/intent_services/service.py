@@ -684,8 +684,7 @@ class IntentService:
             message.data.pop("typed_slots")
             return
 
-        # drop_unregistered_typed_slots already logs each dropped key with
-        # its reason (unregistered, or a registered type with no entries)
+        # the library logs the dropped keys itself, in one warning naming them all
         kept = drop_unregistered_typed_slots(typed_slots)
         try:
             validate_typed_slots(kept)
