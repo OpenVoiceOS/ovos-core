@@ -36,6 +36,24 @@ from ovos_utils.metrics import Stopwatch
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
 from ovos_utils.thread_utils import create_daemon
 
+from ovos_core._metrics import (
+    INTENT_ACTIVATION,
+    INTENT_DISPATCH,
+    INTENT_HANDLER_SCHEDULE,
+    INTENT_MATCHED_EMIT,
+    INTENT_MATCHING,
+    INTENT_PIPELINE_BUILD,
+    INTENT_TRANSFORM,
+    LANGUAGE_RESOLUTION,
+    SESSION_STAMP,
+    SESSION_VALIDATION,
+    SKILL_SELECTION,
+    UTTERANCE_DISPATCH,
+    UTTERANCE_FINALIZE,
+    UTTERANCE_PREPROCESS,
+    UTTERANCE_TRANSFORM,
+    pipeline_matching_histogram,
+)
 from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService, IntentTransformersService
 from ovos_core.intent_services.dispatcher import IntentDispatcher, DEFAULT_HANDLER_TIMEOUT
 from ovos_core.intent_services.manifest import IntentManifest
@@ -694,10 +712,11 @@ class IntentService:
                 snapshot, used to tell a mid-round sync apart from an
                 untouched entry when deciding what to decrement.
         """
-        try:
-            match = self.intent_plugins.transform(match)
-        except Exception:
-            LOG.exception("_dispatch_match failed")
+        with INTENT_TRANSFORM.measure():
+            try:
+                match = self.intent_plugins.transform(match)
+            except Exception:
+                LOG.exception("_dispatch_match failed")
 
         reply = None
         # §5.1: a committed ``Match.updated_session`` replaces the working
@@ -746,26 +765,27 @@ class IntentService:
             reply.data["lang"] = lang
 
             # update active skill list
-            if match.skill_id:
-                # ensure skill_id is present in message.context
-                reply.context["skill_id"] = match.skill_id
+            with INTENT_ACTIVATION.measure():
+                if match.skill_id:
+                    # ensure skill_id is present in message.context
+                    reply.context["skill_id"] = match.skill_id
 
-                was_deactivated = match.skill_id in self._deactivations[sess.session_id]
-                # OVOS-PIPELINE-1 §7.1 pushes the skill onto the session's
-                # active-handler recency list; §7.3's registry suppresses that
-                # push per reserved intent_name, keyed on the Match's
-                # `intent_name` and never on the producing pipeline_id.
-                # `_produces_reserved_name` is the transitional second gate for
-                # producers still emitting pre-spec match_types.
-                # `activate_skill` is a back-compat shim over
-                # `add_active_handler` (§7.1) in current bus-client.
-                dispatched_intent = match.match_type.split(":", 1)[-1]
-                if not was_deactivated and \
-                        dispatched_intent not in _ACTIVATION_PUSH_SUPPRESSED and \
-                        not _produces_reserved_name(pipeline_id):
-                    sess.activate_skill(match.skill_id)
-                    # emit event for skills callback -> self.handle_activate
-                    self.bus.emit(reply.forward(f"{match.skill_id}.activate"))
+                    was_deactivated = match.skill_id in self._deactivations[sess.session_id]
+                    # OVOS-PIPELINE-1 §7.1 pushes the skill onto the session's
+                    # active-handler recency list; §7.3's registry suppresses that
+                    # push per reserved intent_name, keyed on the Match's
+                    # `intent_name` and never on the producing pipeline_id.
+                    # `_produces_reserved_name` is the transitional second gate for
+                    # producers still emitting pre-spec match_types.
+                    # `activate_skill` is a back-compat shim over
+                    # `add_active_handler` (§7.1) in current bus-client.
+                    dispatched_intent = match.match_type.split(":", 1)[-1]
+                    if not was_deactivated and \
+                            dispatched_intent not in _ACTIVATION_PUSH_SUPPRESSED and \
+                            not _produces_reserved_name(pipeline_id):
+                        sess.activate_skill(match.skill_id)
+                        # emit event for skills callback -> self.handle_activate
+                        self.bus.emit(reply.forward(f"{match.skill_id}.activate"))
 
                 # OVOS-CONVERSE-1 §3.1 automatic activation on dispatch: "The
                 # orchestrator MUST stamp session.converse_handlers whenever
@@ -805,17 +825,19 @@ class IntentService:
             skill_id = (match.skill_id
                         or (match.match_data or {}).get("skill_id")
                         or reply.msg_type.split(":", 1)[0])
-            self.bus.emit(reply.forward(SpecMessage.INTENT_MATCHED, {
-                "skill_id": skill_id,
-                "intent_name": match.match_type,
-                "lang": lang,
-                "utterance": match.utterance,
-                "slots": dict(match.match_data or {}),
-                "pipeline_id": reply.context.get("pipeline_id"),
-            }))
+            with INTENT_MATCHED_EMIT.measure():
+                self.bus.emit(reply.forward(SpecMessage.INTENT_MATCHED, {
+                    "skill_id": skill_id,
+                    "intent_name": match.match_type,
+                    "lang": lang,
+                    "utterance": match.utterance,
+                    "slots": dict(match.match_data or {}),
+                    "pipeline_id": reply.context.get("pipeline_id"),
+                }))
 
             intent_name = reply.msg_type.split(":", 1)[-1]
-            self.intent_dispatcher.dispatch(reply, skill_id, intent_name)
+            with INTENT_HANDLER_SCHEDULE.measure():
+                self.intent_dispatcher.dispatch(reply, skill_id, intent_name)
 
         else:  # upload intent metrics if enabled
             if self.config.get("open_data", {}).get("intent_urls"):
@@ -900,6 +922,7 @@ class IntentService:
             message.context["utterance_id"] = uid
         return uid
 
+    @UTTERANCE_DISPATCH.timed
     def handle_utterance(self, message: Message):
         """Main entrypoint for handling user utterances, typically generated
         by a spoken interaction but potentially also from a CLI or other
@@ -910,59 +933,63 @@ class IntentService:
         one produces a Match. If none does, ``send_complete_intent_failure``
         is emitted instead.
         """
-        # OVOS-PIPELINE-1 §9.1.1: stamp the lifecycle identifier exactly once,
-        # at lifecycle entry, before anything derives from this Message. A value
-        # already present is never overwritten — regenerating it downstream would
-        # detach every already-derived Message from its lifecycle. Stamped
-        # before the §2.5 carrier check below so the dropped Message's own
-        # end-marker also carries one.
-        uid = self._stamp_utterance_id(message)
+        with UTTERANCE_PREPROCESS.measure():
+            # OVOS-PIPELINE-1 §9.1.1: stamp the lifecycle identifier exactly once,
+            # at lifecycle entry, before anything derives from this Message. A value
+            # already present is never overwritten — regenerating it downstream would
+            # detach every already-derived Message from its lifecycle. Stamped
+            # before the §2.5 carrier check below so the dropped Message's own
+            # end-marker also carries one.
+            uid = self._stamp_utterance_id(message)
 
-        # OVOS-SESSION-1 §2.5: reject a present-but-non-object session carrier
-        # before anything downstream (transformers, lang disambiguation, the
-        # §5.1 arrival) tries to read it through SessionManager and raises.
-        # It is never folded into the default session nor substituted for
-        # it — that would process the utterance under a fabricated identity.
-        # No transformers run and no dispatch happens, but PIPELINE-1 §9.5
-        # still owes exactly one ovos.utterance.handled for this entry-topic
-        # Message, so it is emitted here directly via ``forward`` — carrying
-        # the context (malformed carrier included) unchanged, with no §8
-        # terminal (no trio) since nothing was dispatched.
-        carrier = message.context.get("session")
-        if carrier is not None and not isinstance(carrier, dict):
-            LOG.warning(f"OVOS-SESSION-1 §2.5: malformed session carrier on "
-                        f"{message.msg_type} (got {type(carrier).__name__}, "
-                        f"expected object); dropping utterance")
-            self.bus.emit(message.forward(SpecMessage.UTTERANCE_HANDLED, {}))
-            return
+            # OVOS-SESSION-1 §2.5: reject a present-but-non-object session carrier
+            # before anything downstream (transformers, lang disambiguation, the
+            # §5.1 arrival) tries to read it through SessionManager and raises.
+            # It is never folded into the default session nor substituted for
+            # it — that would process the utterance under a fabricated identity.
+            # No transformers run and no dispatch happens, but PIPELINE-1 §9.5
+            # still owes exactly one ovos.utterance.handled for this entry-topic
+            # Message, so it is emitted here directly via ``forward`` — carrying
+            # the context (malformed carrier included) unchanged, with no §8
+            # terminal (no trio) since nothing was dispatched.
+            carrier = message.context.get("session")
+            if carrier is not None and not isinstance(carrier, dict):
+                LOG.warning(f"OVOS-SESSION-1 §2.5: malformed session carrier on "
+                            f"{message.msg_type} (got {type(carrier).__name__}, "
+                            f"expected object); dropping utterance")
+                self.bus.emit(message.forward(SpecMessage.UTTERANCE_HANDLED, {}))
+                return
 
-        # Get utterance utterance_plugins additional context
-        message = self._handle_transformers(message)
+            # Get utterance utterance_plugins additional context
+            with UTTERANCE_TRANSFORM.measure():
+                message = self._handle_transformers(message)
 
-        # §9.1.1 drop-guard: UtteranceTransformersService/MetadataTransformersService
-        # REPLACE message.context wholesale, so a plugin returning a fresh dict
-        # silently detaches the lifecycle. Re-assert the entry value (same value,
-        # so this is not an overwrite).
-        if message.context.get("utterance_id") != uid:
-            LOG.debug("transformer chain dropped utterance_id; re-asserting")
-            message.context["utterance_id"] = uid
+            # §9.1.1 drop-guard: UtteranceTransformersService/MetadataTransformersService
+            # REPLACE message.context wholesale, so a plugin returning a fresh dict
+            # silently detaches the lifecycle. Re-assert the entry value (same value,
+            # so this is not an overwrite).
+            if message.context.get("utterance_id") != uid:
+                LOG.debug("transformer chain dropped utterance_id; re-asserting")
+                message.context["utterance_id"] = uid
 
-        if message.context.get("canceled"):
-            self.send_cancel_event(message)
-            return
+            if message.context.get("canceled"):
+                self.send_cancel_event(message)
+                return
 
-        # tag language of this utterance
-        lang = self.disambiguate_lang(message)
+            # tag language of this utterance
+            with LANGUAGE_RESOLUTION.measure():
+                lang = self.disambiguate_lang(message)
 
-        utterances = message.data.get('utterances', [])
-        LOG.info(f"Parsing utterance: {utterances}")
+            utterances = message.data.get('utterances', [])
+            LOG.info(f"Parsing utterance: {utterances}")
 
-        stopwatch = Stopwatch()
+            stopwatch = Stopwatch()
 
         # get session: the single arrival of the round (SESSION-2 §5.1). The
         # a malformed carrier was already rejected above, so it is always a
         # JSON object here and this never raises MalformedSession.
-        sess = self._validate_session(message, lang)
+        with SESSION_VALIDATION.measure():
+            sess = self._validate_session(message, lang)
         # §2.2's utterance-scoped cache. Every Message derived from this round
         # can now reach the session the round is running on, which for a named
         # session is the only place it lives.
@@ -989,23 +1016,29 @@ class IntentService:
         pre_match_entries = copy.deepcopy(intent_ctx)
         _replace_intent_context(sess, intent_ctx)
         SessionManager.update(sess)
-        message.context["session"] = sess.serialize()
+        with SESSION_STAMP.measure():
+            message.context["session"] = sess.serialize()
 
         # match
         match = None
         # no_match_lang defers the §9.3/§9.5 emission until after §4.2 decay
         no_match_lang = None
-        with stopwatch:
+        with stopwatch, SKILL_SELECTION.measure() as selection_measurement:
             self._deactivations[sess.session_id] = []
             # Loop through the matching functions until a match is found.
-            for pipeline, match_func in self.get_pipeline(session=sess):
+            with INTENT_PIPELINE_BUILD.measure():
+                pipeline_matchers = self.get_pipeline(session=sess)
+            for pipeline, match_func in pipeline_matchers:
                 langs = [lang]
                 if self.config.get("multilingual_matching"):
                     # if multilingual matching is enabled, attempt to match all user languages if main fails
-                    langs += [l for l in get_valid_languages() if l != lang]
+                    langs += [candidate for candidate in get_valid_languages()
+                              if candidate != lang]
                 for intent_lang in langs:
                     try:
-                        match = match_func(utterances, intent_lang, message)
+                        with (INTENT_MATCHING.measure(),
+                              pipeline_matching_histogram(pipeline).measure()):
+                            match = match_func(utterances, intent_lang, message)
                     except Exception:
                         # a misbehaving pipeline matcher (e.g. a malformed .voc
                         # resource) must not abort the whole utterance — log and
@@ -1050,11 +1083,17 @@ class IntentService:
                                     f"ignoring match, context gate unsatisfied for '{match.match_type}'")
                                 continue
                         try:
-                            self._dispatch_match(
-                                match, message, intent_lang, pipeline_id=pipeline,
-                                pre_match_entries=pre_match_entries)
+                            # FakeBus and the in-process WebSocket bus invoke
+                            # skill handlers synchronously from emit(). That is
+                            # dispatch/handler time, not skill-selection time.
+                            selection_measurement.pause()
+                            with INTENT_DISPATCH.measure():
+                                self._dispatch_match(
+                                    match, message, intent_lang, pipeline_id=pipeline,
+                                    pre_match_entries=pre_match_entries)
                             break
                         except Exception:
+                            selection_measurement.resume()
                             LOG.exception(f"{match_func} returned an invalid match")
                 else:
                     LOG.debug(f"no match from {match_func}")
@@ -1064,6 +1103,7 @@ class IntentService:
                 # Nothing was able to handle the intent. Defer §9.3/§9.5 until
                 # after the §4.2 decrement so the end-marker carries it.
                 no_match_lang = lang
+                selection_measurement.pause()
 
         LOG.debug(f"intent matching took: {stopwatch.time}")
 
@@ -1079,11 +1119,12 @@ class IntentService:
             self.send_complete_intent_failure(message)
             close_round(message)
 
-        # sync any changes made to the default session, eg by ConverseService
-        if sess.session_id == "default":
-            SessionManager.sync(message)
-        elif sess.session_id in self._deactivations:
-            self._deactivations.pop(sess.session_id)
+        with UTTERANCE_FINALIZE.measure():
+            # sync any changes made to the default session, eg by ConverseService
+            if sess.session_id == "default":
+                SessionManager.sync(message)
+            elif sess.session_id in self._deactivations:
+                self._deactivations.pop(sess.session_id)
 
     def send_complete_intent_failure(self, message):
         """Emit the OVOS-PIPELINE-1 §9.3 no-match terminal.
@@ -1334,8 +1375,8 @@ class IntentService:
 
 def launch_standalone():
     from ovos_bus_client import MessageBusClient
-    from ovos_utils import wait_for_exit_signal
     from ovos_config.locale import setup_locale
+    from ovos_utils import wait_for_exit_signal
     from ovos_utils.log import init_service_logger
 
     LOG.info("Launching IntentService in standalone mode")
