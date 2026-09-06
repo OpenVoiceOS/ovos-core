@@ -122,47 +122,77 @@ def test_registration_during_match_does_not_raise():
     assert service.registered_fallbacks.iterations == 1
 
 
-def test_selection_scores_against_the_collection_round_snapshot():
-    """A priority change between poll and selection must not leak a skill in.
+def test_selection_ranks_on_the_round_snapshot_not_the_live_registry():
+    """A priority change between poll and selection must not reorder the round.
 
-    The poll filters by range, records who acknowledged, and selection
-    scores them. Re-reading the registry in between would let a skill that
-    acknowledged while in range be selected on its new, out-of-range
-    priority.
+    Two skills acknowledge: skill_a at 50, skill_b at 75. The bus thread then
+    re-registers skill_a at 999 while the poll is running. Ranking the round's
+    own snapshot still picks skill_a; re-reading the live registry would rank
+    skill_b (75) ahead of skill_a (999) and pick skill_b instead.
     """
     service = _service()
     _register(service, "skill_a", priority=50)
+    _register(service, "skill_b", priority=75)
 
     seen = {}
 
     def poll(message, fb_range=None, registry=None):
-        # the round was handed a snapshot taken before the poll
         seen["round_registry"] = dict(registry or {})
-        # the bus thread re-registers it far out of range, right here
+        # the bus thread re-registers skill_a far out of range, right here
         _register(service, "skill_a", priority=999)
         seen["registry_after"] = dict(service.registered_fallbacks)
-        return ["skill_a"]
+        return ["skill_a", "skill_b"]
 
     service._collect_fallback_skills = poll
-    service._fallback_range(["test"], "en-US", _utterance(),
-                            FallbackRange(0, 100))
+    service._fallback_allowed = lambda skill_id: True
 
-    # the poll scored the pre-poll snapshot...
-    assert seen["round_registry"] == {"skill_a": 50}
-    # ...even though the live registry moved out of range underneath it
+    match = service._fallback_range(["test"], "en-US", _utterance(),
+                                    FallbackRange(0, 100))
+
+    # the live registry really did move underneath the round
     assert seen["registry_after"]["skill_a"] == 999
+    assert seen["round_registry"] == {"skill_a": 50, "skill_b": 75}
+    # and the winner is the one the ROUND ranked first
+    assert match is not None
+    assert match.skill_id == "skill_a"
 
 
-def test_concurrent_registration_is_serialized_by_the_lock():
-    """The registry lock has to actually serialize bus-thread writers."""
+class _CountingLock:
+    """A real lock that records how many times it was entered."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self.entries = 0
+
+    def __enter__(self):
+        self._lock.acquire()
+        self.entries += 1  # under the lock, so the count is exact
+        return self
+
+    def __exit__(self, *exc):
+        self._lock.release()
+        return False
+
+
+def test_every_registry_write_goes_through_the_lock():
+    """Both writers must take the lock, not just one of them.
+
+    Each worker only touches its own keys, so the surviving key set is the
+    same whether or not the writers lock. Counting acquisitions is what
+    makes dropping either writer's lock fail.
+    """
     service = _service()
-    start = threading.Barrier(9)
+    counting = _CountingLock()
+    service._registry_lock = counting
+
+    workers, steps = 8, 50
+    start = threading.Barrier(workers + 1)
     errors = []
 
     def worker(index):
         try:
             start.wait(timeout=5)
-            for step in range(50):
+            for step in range(steps):
                 _register(service, f"worker{index}-{step}")
                 service.handle_deregister_fallback(
                     Message("ovos.skills.fallback.deregister",
@@ -172,7 +202,7 @@ def test_concurrent_registration_is_serialized_by_the_lock():
             errors.append(error)
 
     threads = [threading.Thread(target=worker, args=(i,), daemon=True)
-               for i in range(8)]
+               for i in range(workers)]
     for thread in threads:
         thread.start()
     start.wait(timeout=5)
@@ -180,9 +210,10 @@ def test_concurrent_registration_is_serialized_by_the_lock():
         thread.join(timeout=15)
 
     assert not errors, f"registry writes raised: {errors[0]!r}"
-    # every worker's final registration survived: no lost update
-    assert {f"survivor{i}" for i in range(8)} <= set(service.registered_fallbacks)
-    assert len(service.registered_fallbacks) == 8
+    # 8 workers x (50 registrations + 50 deregistrations + 1 survivor)
+    assert counting.entries == workers * (2 * steps + 1)
+    assert {f"survivor{i}" for i in range(workers)} <= set(service.registered_fallbacks)
+    assert len(service.registered_fallbacks) == workers
 
 
 def test_snapshot_is_a_copy_not_the_live_registry():
