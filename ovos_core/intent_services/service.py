@@ -684,11 +684,9 @@ class IntentService:
             message.data.pop("typed_slots")
             return
 
+        # drop_unregistered_typed_slots already logs each dropped key with
+        # its reason (unregistered, or a registered type with no entries)
         kept = drop_unregistered_typed_slots(typed_slots)
-        for slot_type in typed_slots:
-            if slot_type not in kept:
-                LOG.warning(f"dropping typed_slots key {slot_type!r}: not a "
-                            f"type registered by OVOS-INTENT-1 §5.6")
         try:
             validate_typed_slots(kept)
         except MalformedTypedSlots as e:
