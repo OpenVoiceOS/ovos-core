@@ -30,6 +30,13 @@ class IntentManifest:
     ``ovos.intent.list`` / ``ovos.intent.describe`` pull-queries.
     The manifest is keyed by the quintuple
     ``(session_id, skill_id, intent_name, lang, method)`` per §11.1.
+
+    ``ovos.intent.list`` answers what is loaded and stays small. The stored
+    registration payloads live behind ``ovos.intent.describe``, which takes
+    ``skill_id`` and treats ``intent_name`` and ``lang`` as optional filters,
+    so one query covers a whole skill. A client that wants every intent's
+    sentences asks once per skill instead of once per intent per language,
+    and the reply is still bounded by the skill it named.
     """
 
     def __init__(self, bus: Union[MessageBusClient, FakeBus]):
@@ -232,35 +239,49 @@ class IntentManifest:
         # exact-match filter over the raw index, NOT the §11.2 effective
         # pool used by ovos.intent.list (§10.1).
         session_filter = message.data.get("session_id")
-        if not (skill_id and intent_name and lang):
+        # ``skill_id`` stays REQUIRED: it is what bounds the reply. ``intent_name``
+        # and ``lang`` join ``method`` and ``session_id`` as OPTIONAL filters, so
+        # one describe can cover a whole skill instead of one intent in one
+        # language. A client showing a user what the device understands walks the
+        # skills from ``ovos.intent.list`` and asks once per skill, rather than
+        # once per intent per language; no reply ever exceeds a single skill.
+        if not skill_id:
             self.bus.emit(message.reply("ovos.intent.describe.response",
-                                        {"ok": False,
-                                         "error": "skill_id, intent_name and lang are required"}))
+                                        {"ok": False, "error": "skill_id is required"}))
             return
-        lang = standardize_lang(lang)
+        if lang:
+            lang = standardize_lang(lang)
         definitions = []
         for entry in self._index.values():
-            if entry["skill_id"] != skill_id or entry["intent_name"] != intent_name or entry["lang"] != lang:
+            if entry["skill_id"] != skill_id:
+                continue
+            if intent_name and entry["intent_name"] != intent_name:
+                continue
+            if lang and entry["lang"] != lang:
                 continue
             if method_filter and entry["method"] != method_filter:
                 continue
             if session_filter is not None and entry["session_id"] != session_filter:
                 continue
-            definitions.append({"method": entry["method"],
-                                 "session_id": entry["session_id"],
-                                 "definition": entry["definition"]})
-        # §10.2 RECOMMENDED ordering: "default" first, then by session_id,
-        # then by method (keyword, template).
+            row = {k: entry[k] for k in
+                   ("skill_id", "intent_name", "lang", "method", "session_id")}
+            row["definition"] = entry["definition"]
+            definitions.append(row)
+        # §10.2 RECOMMENDED ordering: "default" first, then by session_id, then by
+        # method (keyword, template). Intent and language sort between the two, so
+        # a single-intent single-language query keeps exactly the old order.
         definitions.sort(key=lambda d: (0 if d["session_id"] == "default" else 1,
                                          d["session_id"],
+                                         d["intent_name"],
+                                         d["lang"],
                                          0 if d["method"] == "keyword" else 1))
         if definitions:
             self.bus.emit(message.reply("ovos.intent.describe.response",
                                         {"ok": True, "definitions": definitions}))
         else:
+            target = f"{skill_id}:{intent_name or '*'}:{lang or '*'}"
             self.bus.emit(message.reply("ovos.intent.describe.response",
-                                        {"ok": False,
-                                         "error": f"unknown intent {skill_id}:{intent_name}:{lang}"}))
+                                        {"ok": False, "error": f"unknown intent {target}"}))
 
     # OVOS-CONTEXT-1: orchestrator lookups for declared context gates / slots
 

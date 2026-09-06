@@ -28,6 +28,10 @@ All events use the OVOS `Message` format: `{type, data, context}`.
 | `intent.service.skills.deactivate` | skill → core | Remove a skill from the active list |
 | `intent.service.active_skills.get` | * → core | Query the current active skill list |
 | `mycroft.intents.is_ready` | * → core | Health-check: is IntentService ready? |
+| `ovos.intent.list` | * → core | Query what the intent manifest holds (INTENT-4 §10.1); optional filters `skill_id`, `lang`, `session_id` |
+| `ovos.intent.list.response` | core → * | Response to `ovos.intent.list`: `{ok, intents: [{skill_id, intent_name, lang, method, enabled, session_id}]}` |
+| `ovos.intent.describe` | * → core | Fetch stored registration payloads (INTENT-4 §10.2); `skill_id` is required and bounds the reply, `intent_name`, `lang`, `method` and `session_id` are optional filters |
+| `ovos.intent.describe.response` | core → * | Response to `ovos.intent.describe`: `{ok, definitions: [{skill_id, intent_name, lang, method, session_id, definition}]}`, ordered `default` session first then by session, intent, language and method, or `{ok: false, error}` |
 
 ## Skill Manager
 
