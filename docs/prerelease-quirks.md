@@ -9,6 +9,17 @@ This file resets at the next stable release. At that point its contents
 become upgrade notes for the `2.1.1 -> next-stable` jump, and a new, empty
 quirks log starts.
 
+## #935 (alpha of 2026-09-06)
+
+The floor on `ovos-bus-client` moves to 2.11.13a1. Core no longer subscribes
+`ovos.session.sync` itself — the handler and its named-session merge into an
+in-flight round are gone, since OVOS-SESSION-2 §2.7 defines no topic on which
+one participant pushes a session at another. A pre-spec peer that still emits
+`ovos.session.sync` for the default session is folded by ovos-bus-client's own
+`SessionManager.handle_session_sync`, a one-cycle compat shim kept there
+rather than in core; a push naming a named session it does not hold is
+ignored. The floor pin is what keeps that shim available.
+
 ## #915 (alpha of 2026-09-03)
 
 Floors moved to `ovos-bus-client` 2.11.1a1 and `ovos-spec-tools` 1.10.1a1,
@@ -30,9 +41,6 @@ treatment; `ovos-workshop`'s `set_context` producer still does.
 
 `ovos.utterance.handled` on the no-match path now carries the decayed
 `intent_context`, which for a named session is the only channel it has.
-`ovos.session.sync` is consumed for its §2.7 whole-session snapshot on
-`Message.data["session"]`, in addition to SessionManager's §5.3
-`intent_context` merge on the same topic.
 
 Core takes one arrival per utterance, but `MessageBusClient` still folds
 every inbound default-session message at the transport layer. Narrowing that
