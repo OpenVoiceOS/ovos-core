@@ -242,3 +242,73 @@ def test_deregister_of_unknown_skill_is_a_noop():
     service.handle_deregister_fallback(
         Message("ovos.skills.fallback.deregister", {"skill_id": "nope"}))
     assert service.registered_fallbacks == {}
+
+
+def test_registry_entry_and_lifecycle_wiring_are_one_critical_section():
+    """The entry and its bus wiring must not be separately observable.
+
+    A deregistration is fired from another thread at the worst moment --
+    registration has written the entry but has not wired it yet. Split into
+    two critical sections it lands in between and leaves callbacks wired for
+    a skill that is no longer registered; as one section it cannot.
+    """
+    service = _service()
+    inside_wiring = threading.Event()
+    deregistered = threading.Event()
+    real_wire = service._wire_lifecycle
+
+    def wire(skill_id):
+        inside_wiring.set()
+        # give the racing deregistration every chance to interleave here
+        deregistered.wait(1.0)
+        return real_wire(skill_id)
+
+    service._wire_lifecycle = wire
+
+    def deregister():
+        assert inside_wiring.wait(5)
+        service.handle_deregister_fallback(
+            Message("ovos.skills.fallback.deregister", {"skill_id": "skill_a"}))
+        deregistered.set()
+
+    racer = threading.Thread(target=deregister, daemon=True)
+    racer.start()
+    _register(service, "skill_a")
+    racer.join(timeout=10)
+
+    assert not racer.is_alive(), "deregistration never completed"
+    # whichever order the two landed in, the registry and the wiring agree
+    assert set(service._lifecycle_handlers) == set(service.registered_fallbacks)
+
+
+def test_concurrent_registrations_wire_a_skill_once():
+    """Two racing registrations must not double-wire the same skill."""
+    service = _service()
+    wired_calls = []
+    real_wire = service._wire_lifecycle
+
+    def counting_wire(skill_id):
+        wired_calls.append(skill_id)
+        return real_wire(skill_id)
+
+    service._wire_lifecycle = counting_wire
+
+    start = threading.Barrier(9)
+
+    def worker():
+        start.wait(timeout=5)
+        for _ in range(25):
+            _register(service, "skill_a")
+
+    threads = [threading.Thread(target=worker, daemon=True) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    start.wait(timeout=5)
+    for thread in threads:
+        thread.join(timeout=15)
+
+    # _wire_lifecycle is called every time, but only the first one wires
+    assert len(wired_calls) == 200
+    assert set(service._lifecycle_handlers) == {"skill_a"}
+    # exactly one pair of handlers, not one per racing registration
+    assert len(service._lifecycle_handlers["skill_a"]) == 2

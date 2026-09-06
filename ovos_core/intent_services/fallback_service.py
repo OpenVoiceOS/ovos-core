@@ -66,7 +66,11 @@ class FallbackService(ConfidenceMatcherPipeline):
             return dict(self.registered_fallbacks)
 
     def _wire_lifecycle(self, skill_id: str) -> None:
-        """Translate lifecycle done-signal for a fallback skill."""
+        """Translate lifecycle done-signal for a fallback skill.
+
+        Called with ``_registry_lock`` held, so the membership check below
+        and the write are atomic with the registry entry they belong to.
+        """
         if skill_id in self._lifecycle_handlers:
             return
 
@@ -86,6 +90,7 @@ class FallbackService(ConfidenceMatcherPipeline):
         self._lifecycle_handlers[skill_id] = (_on_start, _on_response)
 
     def _unwire_lifecycle(self, skill_id: str) -> None:
+        """Remove the wiring. Called with ``_registry_lock`` held."""
         handlers = self._lifecycle_handlers.pop(skill_id, None)
         if not handlers:
             return
@@ -105,19 +110,23 @@ class FallbackService(ConfidenceMatcherPipeline):
             new_priority = priority_overrides.get(skill_id)
             LOG.info(f"forcing {skill_id} fallback priority from {priority} to {new_priority}")
             priority = new_priority
+        # One critical section for the entry AND its lifecycle wiring. Split,
+        # a deregistration landing between them leaves callbacks wired for a
+        # skill that is no longer registered, and two concurrent
+        # registrations both pass _wire_lifecycle's membership check and wire
+        # the same skill twice.
         with self._registry_lock:
             self.registered_fallbacks[skill_id] = priority
-
-        # report this skill's fallback dispatch lifecycle as the framework
-        # done-signal so an orchestrator can resolve it (no skill_id -> skip)
-        if skill_id:
-            self._wire_lifecycle(skill_id)
+            # report this skill's fallback dispatch lifecycle as the framework
+            # done-signal so an orchestrator can resolve it (no skill_id -> skip)
+            if skill_id:
+                self._wire_lifecycle(skill_id)
 
     def handle_deregister_fallback(self, message: Message) -> None:
         skill_id = message.data.get("skill_id")
         with self._registry_lock:
             self.registered_fallbacks.pop(skill_id, None)
-        self._unwire_lifecycle(skill_id)
+            self._unwire_lifecycle(skill_id)
 
     def _fallback_allowed(self, skill_id: str) -> bool:
         """Checks if a skill_id is allowed to fallback
