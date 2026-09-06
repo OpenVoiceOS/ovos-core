@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.3.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.3.2a1) (2026-09-06)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.3.1a1...3.3.2a1)
+
+**Merged pull requests:**
+
+- fix: drop empty typed-slot types with unregistered ones \(INTENT-1 §5.6\) [\#948](https://github.com/OpenVoiceOS/ovos-core/pull/948) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.3.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.3.1a1) (2026-09-06)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.3.0a1...3.3.1a1)
