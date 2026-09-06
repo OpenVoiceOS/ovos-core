@@ -36,11 +36,23 @@ FallbackRange = namedtuple('FallbackRange', ['start', 'stop'])
 class FallbackService(ConfidenceMatcherPipeline):
     """Intent Service handling fallback skills."""
 
+    #: class-level fallback so an instance built without __init__ (tests,
+    #: partial constructions) still has something to lock; __init__ replaces
+    #: it with a per-instance lock.
+    _registry_lock = threading.Lock()
+
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
                  config: Optional[Dict] = None) -> None:
         config = config if config is not None else Configuration().get("skills", {}).get("fallbacks", {})
         super().__init__(bus, config)
         self.registered_fallbacks: Dict[str, int] = {}  # skill_id: priority
+        # ``registered_fallbacks`` is mutated from the bus handler threads
+        # that serve ovos.skills.fallback.register/deregister while a match
+        # is iterating it. Every read below therefore takes a snapshot under
+        # this lock rather than iterating the live dict: a skill loading or
+        # unloading mid-round otherwise raises "dictionary changed size
+        # during iteration" out of the pipeline.
+        self._registry_lock = threading.Lock()
         # skill_id -> (start_handler, response_handler) wired for the
         # done-signal translation, so they can be removed on deregister
         self._lifecycle_handlers: Dict[str, Tuple[Callable, Callable]] = {}
@@ -48,8 +60,17 @@ class FallbackService(ConfidenceMatcherPipeline):
         self.bus.on("ovos.skills.fallback.register", self.handle_register_fallback)
         self.bus.on("ovos.skills.fallback.deregister", self.handle_deregister_fallback)
 
+    def _fallback_registry_snapshot(self) -> Dict[str, int]:
+        """A stable copy of the registry, safe to iterate."""
+        with self._registry_lock:
+            return dict(self.registered_fallbacks)
+
     def _wire_lifecycle(self, skill_id: str) -> None:
-        """Translate lifecycle done-signal for a fallback skill."""
+        """Translate lifecycle done-signal for a fallback skill.
+
+        Called with ``_registry_lock`` held, so the membership check below
+        and the write are atomic with the registry entry they belong to.
+        """
         if skill_id in self._lifecycle_handlers:
             return
 
@@ -69,6 +90,7 @@ class FallbackService(ConfidenceMatcherPipeline):
         self._lifecycle_handlers[skill_id] = (_on_start, _on_response)
 
     def _unwire_lifecycle(self, skill_id: str) -> None:
+        """Remove the wiring. Called with ``_registry_lock`` held."""
         handlers = self._lifecycle_handlers.pop(skill_id, None)
         if not handlers:
             return
@@ -87,20 +109,24 @@ class FallbackService(ConfidenceMatcherPipeline):
         if skill_id in priority_overrides:
             new_priority = priority_overrides.get(skill_id)
             LOG.info(f"forcing {skill_id} fallback priority from {priority} to {new_priority}")
-            self.registered_fallbacks[skill_id] = new_priority
-        else:
+            priority = new_priority
+        # One critical section for the entry AND its lifecycle wiring. Split,
+        # a deregistration landing between them leaves callbacks wired for a
+        # skill that is no longer registered, and two concurrent
+        # registrations both pass _wire_lifecycle's membership check and wire
+        # the same skill twice.
+        with self._registry_lock:
             self.registered_fallbacks[skill_id] = priority
-
-        # report this skill's fallback dispatch lifecycle as the framework
-        # done-signal so an orchestrator can resolve it (no skill_id -> skip)
-        if skill_id:
-            self._wire_lifecycle(skill_id)
+            # report this skill's fallback dispatch lifecycle as the framework
+            # done-signal so an orchestrator can resolve it (no skill_id -> skip)
+            if skill_id:
+                self._wire_lifecycle(skill_id)
 
     def handle_deregister_fallback(self, message: Message) -> None:
         skill_id = message.data.get("skill_id")
-        if skill_id in self.registered_fallbacks:
-            self.registered_fallbacks.pop(skill_id)
-        self._unwire_lifecycle(skill_id)
+        with self._registry_lock:
+            self.registered_fallbacks.pop(skill_id, None)
+            self._unwire_lifecycle(skill_id)
 
     def _fallback_allowed(self, skill_id: str) -> bool:
         """Checks if a skill_id is allowed to fallback
@@ -124,10 +150,17 @@ class FallbackService(ConfidenceMatcherPipeline):
         return True
 
     def _collect_fallback_skills(self, message: Message,
-                                 fb_range: Optional[FallbackRange] = None) -> List[str]:
+                                 fb_range: Optional[FallbackRange] = None,
+                                 registry: Optional[Dict[str, int]] = None) -> List[str]:
         """use the messagebus api to determine which skills have registered fallback handlers
 
         Individual skills respond to this request via the `can_answer` method
+
+        ``registry`` is the round's registry snapshot. Selection has to score
+        against the same one this poll filtered by range -- re-reading it
+        would let a skill re-registered at a new priority mid-round be
+        selected on an acknowledgement it gave while it was still in range.
+        Omitted, the poll takes its own.
         """
         if fb_range is None:
             fb_range = FallbackRange(0, 100)
@@ -137,11 +170,16 @@ class FallbackService(ConfidenceMatcherPipeline):
         sess = SessionManager.get(message)
         if sess is None:
             return fallback_skills
+        # one snapshot for the whole round: the ping list, the "everyone
+        # answered" wait below and the range filter must all agree on which
+        # skills this round is polling, even if a skill (de)registers midway.
+        if registry is None:
+            registry = self._fallback_registry_snapshot()
         # filter skills outside the fallback_range
-        in_range = [s for s, p in self.registered_fallbacks.items()
+        in_range = [s for s, p in registry.items()
                     if fb_range.start < p <= fb_range.stop
                     and s not in (sess.blacklisted_skills or [])]
-        skill_ids += [s for s in self.registered_fallbacks if s not in in_range]
+        skill_ids += [s for s in registry if s not in in_range]
 
         # OVOS-CONVERSE-1 §4.2 round correlation: the round IS the utterance
         # lifecycle, named by context.utterance_id (OVOS-PIPELINE-1 §9.1.1).
@@ -191,7 +229,7 @@ class FallbackService(ConfidenceMatcherPipeline):
             self.bus.emit(message.forward("ovos.skills.fallback.ping",
                                           message.data))
             start = time.time()
-            while not all(s in skill_ids for s in self.registered_fallbacks) \
+            while not all(s in skill_ids for s in registry) \
                     and time.time() - start <= 0.5:
                 self._fallback_response_event.clear()
                 self._fallback_response_event.wait(0.02)
@@ -223,8 +261,12 @@ class FallbackService(ConfidenceMatcherPipeline):
         if sess is None:
             return None
         # new style bus api
-        available_skills = self._collect_fallback_skills(message, fb_range)
-        fallbacks = [(k, v) for k, v in self.registered_fallbacks.items()
+        # taken BEFORE the poll and handed to it, so the range filter that
+        # decided who to ping and the scoring below read the same registry
+        registry = self._fallback_registry_snapshot()
+        available_skills = self._collect_fallback_skills(message, fb_range,
+                                                         registry=registry)
+        fallbacks = [(k, v) for k, v in registry.items()
                      if k in available_skills]
         sorted_handlers = sorted(fallbacks, key=operator.itemgetter(1))
 
