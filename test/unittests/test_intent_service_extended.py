@@ -57,6 +57,11 @@ def _make_service(config=None) -> IntentService:
     it.transform.side_effect = lambda intent: intent
     svc.intent_plugins = it
 
+    # OVOS-TRANSFORM-1 §3.7: no typed-slots transformer loaded
+    ts = MagicMock()
+    ts.transform.return_value = None
+    svc.typed_slots_plugins = ts
+
     # INTENT-4 §10 manifest — indexes registration broadcasts
     svc.intent_manifest = IntentManifest(bus)
 
