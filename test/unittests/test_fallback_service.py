@@ -630,3 +630,81 @@ class TestFallbackHandlerLifecycle(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFallbackListQuery(unittest.TestCase):
+    """`ovos.skills.fallback.list`: what the intent manifest cannot say.
+
+    The manifest enumerates registered intents. A fallback skill registers no
+    intent and no phrasings -- it registers a handler offered whatever nothing
+    else matched -- so it cannot appear there, and until now nothing else on
+    the bus could be asked about it either.
+
+    The consequence was a client that could not tell "no intents match this
+    language" from "this language is answered by fallbacks", which are opposite
+    facts about whether the assistant understands you.
+    """
+
+    def setUp(self):
+        self.bus = FakeBus()
+        self.service = FallbackService(self.bus)
+        self.replies = []
+        self.bus.on("ovos.skills.fallback.list.response",
+                    lambda message: self.replies.append(message))
+
+    def tearDown(self):
+        self.service.shutdown()
+
+    def _ask(self):
+        self.bus.emit(Message("ovos.skills.fallback.list"))
+        self.assertEqual(len(self.replies), 1)
+        return self.replies[-1].data
+
+    def test_an_empty_registry_answers_with_an_empty_list(self):
+        """Not an error, and not silence: nothing is registered, and saying so
+        is the answer a caller needs to distinguish it from a lost query."""
+        data = self._ask()
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["fallbacks"], [])
+
+    def test_registered_fallbacks_are_reported_with_their_priority(self):
+        self.service.registered_fallbacks = {"skill-a": 50, "skill-b": 10}
+        data = self._ask()
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["fallbacks"],
+                         [{"skill_id": "skill-b", "priority": 10},
+                          {"skill_id": "skill-a", "priority": 50}])
+
+    def test_the_order_is_the_order_they_will_be_tried_in(self):
+        """Priority ascending, because that is the order the pipeline uses.
+
+        A caller reading this to explain "what might answer me" is reading a
+        plan, and a plan in an arbitrary order is a worse plan.
+        """
+        self.service.registered_fallbacks = {"c": 30, "a": 10, "b": 20}
+        self.assertEqual([f["skill_id"] for f in self._ask()["fallbacks"]],
+                         ["a", "b", "c"])
+
+    def test_ties_are_broken_by_skill_id_so_the_answer_is_stable(self):
+        self.service.registered_fallbacks = {"z": 5, "a": 5}
+        self.assertEqual([f["skill_id"] for f in self._ask()["fallbacks"]],
+                         ["a", "z"])
+
+    def test_the_reply_is_a_snapshot_and_not_the_live_registry(self):
+        """The registry is mutated from bus handler threads while queries run.
+
+        Every other read in this service takes a snapshot under the lock for
+        that reason; a query that leaked the live dict would be the one place
+        a skill loading mid-read could raise.
+        """
+        self.service.registered_fallbacks = {"skill-a": 50}
+        data = self._ask()
+        self.service.registered_fallbacks["skill-b"] = 10
+        self.assertEqual([f["skill_id"] for f in data["fallbacks"]], ["skill-a"])
+
+    def test_the_handler_is_removed_on_shutdown(self):
+        self.service.shutdown()
+        self.replies.clear()
+        self.bus.emit(Message("ovos.skills.fallback.list"))
+        self.assertEqual(self.replies, [])
+        self.service = FallbackService(self.bus)  # tearDown shuts this one down
