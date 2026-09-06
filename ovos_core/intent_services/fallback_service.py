@@ -141,10 +141,17 @@ class FallbackService(ConfidenceMatcherPipeline):
         return True
 
     def _collect_fallback_skills(self, message: Message,
-                                 fb_range: Optional[FallbackRange] = None) -> List[str]:
+                                 fb_range: Optional[FallbackRange] = None,
+                                 registry: Optional[Dict[str, int]] = None) -> List[str]:
         """use the messagebus api to determine which skills have registered fallback handlers
 
         Individual skills respond to this request via the `can_answer` method
+
+        ``registry`` is the round's registry snapshot. Selection has to score
+        against the same one this poll filtered by range -- re-reading it
+        would let a skill re-registered at a new priority mid-round be
+        selected on an acknowledgement it gave while it was still in range.
+        Omitted, the poll takes its own.
         """
         if fb_range is None:
             fb_range = FallbackRange(0, 100)
@@ -157,7 +164,8 @@ class FallbackService(ConfidenceMatcherPipeline):
         # one snapshot for the whole round: the ping list, the "everyone
         # answered" wait below and the range filter must all agree on which
         # skills this round is polling, even if a skill (de)registers midway.
-        registry = self._fallback_registry_snapshot()
+        if registry is None:
+            registry = self._fallback_registry_snapshot()
         # filter skills outside the fallback_range
         in_range = [s for s, p in registry.items()
                     if fb_range.start < p <= fb_range.stop
@@ -244,8 +252,12 @@ class FallbackService(ConfidenceMatcherPipeline):
         if sess is None:
             return None
         # new style bus api
-        available_skills = self._collect_fallback_skills(message, fb_range)
-        fallbacks = [(k, v) for k, v in self._fallback_registry_snapshot().items()
+        # taken BEFORE the poll and handed to it, so the range filter that
+        # decided who to ping and the scoring below read the same registry
+        registry = self._fallback_registry_snapshot()
+        available_skills = self._collect_fallback_skills(message, fb_range,
+                                                         registry=registry)
+        fallbacks = [(k, v) for k, v in registry.items()
                      if k in available_skills]
         sorted_handlers = sorted(fallbacks, key=operator.itemgetter(1))
 
