@@ -25,10 +25,13 @@ from ovos_bus_client.message import Message
 from ovos_config import Configuration
 from ovos_config import LocalConf, DEFAULT_CONFIG
 from ovos_bus_client.session import SessionManager
-from ovos_spec_tools import SpecMessage
 from ovos_core.skill_manager import (SkillManager, PLUGIN_SKILL_RETRY_BASE_SECONDS,
                                       PLUGIN_SKILL_RETRY_MAX_SECONDS)
 from ovos_workshop.skill_launcher import SkillLoader
+
+# the retired pre-spec push; OVOS-SESSION-2 §2.7 defines no topic on
+# which any participant pushes a session at another
+LEGACY_SESSION_SYNC = "ovos.session.sync"
 
 
 class MessageBusMock:
@@ -136,7 +139,7 @@ class TestSkillManager(TestCase):
                     'recognizer_loop:record_end',
                     'recognizer_loop:audio_output_start',
                     'recognizer_loop:audio_output_end',
-                    SpecMessage.SESSION_SYNC,
+                    LEGACY_SESSION_SYNC,
                 ]
 
                 self.assertListEqual(expected_result, bus_mock.event_handlers)
@@ -658,7 +661,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
                 'recognizer_loop:record_end',
                 'recognizer_loop:audio_output_start',
                 'recognizer_loop:audio_output_end',
-                SpecMessage.SESSION_SYNC,
+                LEGACY_SESSION_SYNC,
             ]
 
             self.assertListEqual(expected_handlers, self.message_bus_mock.event_handlers)
@@ -695,7 +698,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
             'recognizer_loop:record_end',
             'recognizer_loop:audio_output_start',
             'recognizer_loop:audio_output_end',
-            SpecMessage.SESSION_SYNC,
+            LEGACY_SESSION_SYNC,
         ]
 
         self.assertListEqual(expected_handlers, self.message_bus_mock.event_handlers)
@@ -852,9 +855,11 @@ class TestSkillManagerSessionManagerBus(TestCase):
         SessionManager-owned handler per topic is registered, regardless of
         which subsystem connects first.
 
-        Counted by handler owner, not by topic: ``ovos.session.sync`` also
-        carries IntentService's own OVOS-SESSION-2 §2.7 subscriber, which is
-        a different handler doing a different job on the same topic.
+        Counted by handler owner, not by topic: OVOS-SESSION-2 §2.7 defines
+        no topic on which any participant pushes a session at another, so
+        IntentService itself owns no ``ovos.session.sync`` subscriber -- the
+        only listener on that topic is ovos-bus-client's own retired
+        pre-spec shim.
         """
         bus = MessageBusMock()
         SkillManager(bus, enable_intent_service=True, enable_file_watcher=False)
@@ -865,7 +870,7 @@ class TestSkillManagerSessionManagerBus(TestCase):
             "recognizer_loop:record_end",
             "recognizer_loop:audio_output_start",
             "recognizer_loop:audio_output_end",
-            SpecMessage.SESSION_SYNC,
+            LEGACY_SESSION_SYNC,
         ):
             owned = [h for t, h in bus.handlers
                      if t == topic

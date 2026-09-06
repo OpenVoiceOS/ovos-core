@@ -22,6 +22,10 @@ from ovos_core.intent_services.service import IntentService
 
 INTENT_CONTEXT_FIELD = "intent_context"
 
+# the retired pre-spec push; OVOS-SESSION-2 §2.7 defines no topic on
+# which any participant pushes a session at another
+LEGACY_SESSION_SYNC = "ovos.session.sync"
+
 
 def _make_service(bus, match=None) -> IntentService:
     """A real IntentService wired to ``bus``, with the plugin machinery stubbed
@@ -184,7 +188,7 @@ class TestSessionSyncIsRetired(SessionIntakeTestCase):
         ovos-bus-client's own retained shim, by identity -- never one added
         by ``IntentService``."""
         SessionManager.connect_to_bus(self.bus)
-        before = list(self.bus.ee.listeners(SpecMessage.SESSION_SYNC))
+        before = list(self.bus.ee.listeners(LEGACY_SESSION_SYNC))
         self.assertEqual(
             before, [SessionManager.handle_session_sync],
             "sanity check failed: expected only ovos-bus-client's own "
@@ -193,7 +197,7 @@ class TestSessionSyncIsRetired(SessionIntakeTestCase):
 
         IntentService(self.bus, preload_pipelines=False)
 
-        after = list(self.bus.ee.listeners(SpecMessage.SESSION_SYNC))
+        after = list(self.bus.ee.listeners(LEGACY_SESSION_SYNC))
         self.assertEqual(
             after, before,
             "IntentService.__init__ added its own ovos.session.sync "
@@ -237,7 +241,7 @@ class TestSessionSyncIsRetired(SessionIntakeTestCase):
         # a would-be pusher tries to sync a context entry into the open round
         synced = Session("client-1")
         synced.intent_context = {"lights.skill:room": {"value": "kitchen"}}
-        self.bus.emit(Message(SpecMessage.SESSION_SYNC,
+        self.bus.emit(Message(LEGACY_SESSION_SYNC,
                               {"session": synced.serialize()},
                               dict(received[0].context)))
 
