@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.2.10a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.10a2) (2026-09-06)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.10a1...3.2.10a2)
+
+**Merged pull requests:**
+
+- test: name the retired ovos.session.sync push by its literal topic [\#945](https://github.com/OpenVoiceOS/ovos-core/pull/945) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.2.10a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.10a1) (2026-09-06)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.9a3...3.2.10a1)
