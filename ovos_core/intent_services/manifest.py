@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional, Tuple, Union
+from typing import FrozenSet, List, Optional, Tuple, Union
 
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
-from ovos_spec_tools import standardize_lang
+from ovos_spec_tools import REGISTERED_TYPES, standardize_lang
+from ovos_spec_tools import declared_slot_types as template_slot_types
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
 
@@ -127,6 +128,27 @@ class IntentManifest:
                 if slot not in slots:
                     slots.append(slot)
         return slots
+
+    def declared_slot_types(self, session_id: str) -> FrozenSet[str]:
+        """OVOS-TRANSFORM-1 §3.7 — the types registered intents declare.
+
+        The typed-slots stage is handed this set, never the registry, so a
+        transformer computes only the types something will read. Both places
+        a declaration can appear in an OVOS-INTENT-4 §6.1 registration count:
+        the optional ``slot_types`` map, and the ``{type:name}`` placeholders
+        of the ``samples`` it is derived from, since a producer may send
+        either one alone. Unregistered
+        type names are not declarations — they degrade to untyped slots
+        (OVOS-INTENT-1 §3.6) — and are left out.
+        """
+        types = set()
+        for entry in self._effective_pool(session_id):
+            definition = entry.get("definition") or {}
+            for slot_type in (definition.get("slot_types") or {}).values():
+                if slot_type in REGISTERED_TYPES:
+                    types.add(slot_type)
+            types.update(template_slot_types(definition.get("samples") or []).values())
+        return frozenset(types)
 
     # ------------------------------------------------------------------
     # registration broadcasts  §§5–8

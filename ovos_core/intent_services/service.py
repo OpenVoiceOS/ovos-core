@@ -28,7 +28,9 @@ from ovos_bus_client.session import (SessionManager, Session, MalformedSession,
 from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
-from ovos_spec_tools import closest_lang, standardize_lang, SpecMessage
+from ovos_spec_tools import (closest_lang, drop_unregistered_typed_slots,
+                             standardize_lang, validate_typed_slots,
+                             MalformedTypedSlots, SpecMessage)
 from ovos_spec_tools.context import resolve_key
 from ovos_spec_tools.session import resolve_session_id
 from ovos_utils.log import LOG
@@ -36,7 +38,10 @@ from ovos_utils.metrics import Stopwatch
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
 from ovos_utils.thread_utils import create_daemon
 
-from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService, IntentTransformersService
+from ovos_core.transformers import (IntentTransformersService,
+                                    MetadataTransformersService,
+                                    TypedSlotsTransformersService,
+                                    UtteranceTransformersService)
 from ovos_core.intent_services.dispatcher import IntentDispatcher, DEFAULT_HANDLER_TIMEOUT
 from ovos_core.intent_services.manifest import IntentManifest
 from ovos_core.intent_services.working_session import (
@@ -197,6 +202,7 @@ class IntentService:
         self.utterance_plugins: UtteranceTransformersService = UtteranceTransformersService(bus)
         self.metadata_plugins: MetadataTransformersService = MetadataTransformersService(bus)
         self.intent_plugins: IntentTransformersService = IntentTransformersService(bus)
+        self.typed_slots_plugins: TypedSlotsTransformersService = TypedSlotsTransformersService(bus)
 
         handler_timeout = self.config.get("handler_timeout", DEFAULT_HANDLER_TIMEOUT)
         self.intent_dispatcher: IntentDispatcher = IntentDispatcher(
@@ -281,12 +287,22 @@ class IntentService:
         Utterances may be modified by any parser and context overwritten
         """
         lang = get_message_lang(message)  # per query lang or default Configuration lang
-        original = utterances = message.data.get('utterances', [])
+        utterances = message.data.get('utterances', [])
+        # OVOS-TRANSFORM-1 §3.2 makes in-place mutation of the input list
+        # conformant, so the entry text has to be snapshotted: aliasing it
+        # would make the rewrite check below compare a list against itself.
+        original = list(utterances)
         message.context["lang"] = lang
         utterances, message.context = self.utterance_plugins.transform(utterances, message.context)
         if original != utterances:
             message.data["utterances"] = utterances
             LOG.debug(f"utterances transformed: {original} -> {utterances}")
+            # OVOS-TRANSFORM-1 §3.2: a typed-slot entry's span and surface are
+            # anchored to the text they were computed from, so a rewrite
+            # invalidates any map a producer put on the entry Message.
+            if message.data.pop("typed_slots", None) is not None:
+                LOG.debug("discarding producer typed_slots: the utterance "
+                          "chain rewrote the text its spans indexed")
         message.context = self.metadata_plugins.transform(message.context)
         return message
 
@@ -640,6 +656,47 @@ class IntentService:
         SessionManager.update(sess)
         return sess
 
+    def _run_typed_slots_stage(self, message: Message, sess: Session) -> None:
+        """OVOS-TRANSFORM-1 §3.7 typed-slots stage, run before the first matcher.
+
+        Exactly one transformer runs, and the map it returns replaces any map
+        already on the Message. The closed-set drop applies to whatever map
+        survives, the stage's own output and a producer's alike, so a
+        deployment running no transformer still filters what it carries. What
+        remains rides ``message.data`` to dispatch (OVOS-PIPELINE-1 §7.1).
+        """
+        # the declared-type set costs a scan of every registered intent, so it
+        # is only worth computing when a transformer is there to receive it
+        if self.typed_slots_plugins.selected is not None:
+            produced = self.typed_slots_plugins.transform(
+                message.data.get("utterances", []),
+                self.intent_manifest.declared_slot_types(sess.session_id),
+                sess)
+            if produced is not None:
+                message.data["typed_slots"] = produced
+
+        typed_slots = message.data.get("typed_slots")
+        if typed_slots is None:
+            return
+        if not isinstance(typed_slots, dict):
+            LOG.warning(f"discarding malformed typed_slots "
+                        f"(expected a map, got {type(typed_slots).__name__})")
+            message.data.pop("typed_slots")
+            return
+
+        kept = drop_unregistered_typed_slots(typed_slots)
+        for slot_type in typed_slots:
+            if slot_type not in kept:
+                LOG.warning(f"dropping typed_slots key {slot_type!r}: not a "
+                            f"type registered by OVOS-INTENT-1 §5.6")
+        try:
+            validate_typed_slots(kept)
+        except MalformedTypedSlots as e:
+            LOG.warning(f"discarding malformed typed_slots: {e}")
+            message.data.pop("typed_slots")
+            return
+        message.data["typed_slots"] = kept
+
     def _dispatch_match(self, match: IntentHandlerMatch, message: Message, lang: str,
                         pipeline_id: Optional[str] = None,
                         pre_match_entries: Optional[dict] = None) -> None:
@@ -958,6 +1015,8 @@ class IntentService:
         _replace_intent_context(sess, intent_ctx)
         SessionManager.update(sess)
         message.context["session"] = sess.serialize()
+
+        self._run_typed_slots_stage(message, sess)
 
         # match
         match = None
