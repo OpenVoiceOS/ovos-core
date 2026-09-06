@@ -201,7 +201,7 @@ class TestIntentListQuery(unittest.TestCase):
     def _query(self, **kwargs):
         replies = []
         self.m.bus.on("ovos.intent.list.response", lambda msg: replies.append(msg))
-        self.m._on_list(Message("ovos.intent.list", data=kwargs))
+        self.m.bus.emit(Message("ovos.intent.list", data=kwargs))
         return replies[-1].data if replies else None
 
     def test_no_filters_returns_all(self):
@@ -219,6 +219,24 @@ class TestIntentListQuery(unittest.TestCase):
         self.assertEqual(len(resp["intents"]), 1)
         self.assertEqual(resp["intents"][0]["skill_id"], "skill.b")
 
+    def test_list_non_string_lang_returns_error_reply(self):
+        resp = self._query(lang=5)
+        self.assertIsNotNone(resp)
+        self.assertFalse(resp["ok"])
+        self.assertEqual(resp["error"], "lang must be a string")
+
+    def test_list_non_string_skill_id_returns_error_reply(self):
+        resp = self._query(skill_id=[])
+        self.assertIsNotNone(resp)
+        self.assertFalse(resp["ok"])
+        self.assertEqual(resp["error"], "skill_id must be a string")
+
+    def test_list_non_string_session_id_returns_error_reply(self):
+        resp = self._query(session_id=7)
+        self.assertIsNotNone(resp)
+        self.assertFalse(resp["ok"])
+        self.assertEqual(resp["error"], "session_id must be a string")
+
 
 class TestIntentDescribeQuery(unittest.TestCase):
     def setUp(self):
@@ -229,7 +247,7 @@ class TestIntentDescribeQuery(unittest.TestCase):
     def _query(self, **kwargs):
         replies = []
         self.m.bus.on("ovos.intent.describe.response", lambda msg: replies.append(msg))
-        self.m._on_describe(Message("ovos.intent.describe", data=kwargs))
+        self.m.bus.emit(Message("ovos.intent.describe", data=kwargs))
         return replies[-1].data if replies else None
 
     def test_describe_both_methods_ordered(self):
@@ -252,6 +270,45 @@ class TestIntentDescribeQuery(unittest.TestCase):
         resp = self._query(intent_name="play", lang="en-US")
         self.assertFalse(resp["ok"])
         self.assertEqual(resp["error"], "skill_id is required")
+
+    def test_describe_non_string_lang_returns_error_reply(self):
+        resp = self._query(skill_id="skill.a", lang=5)
+        self.assertIsNotNone(resp)
+        self.assertFalse(resp["ok"])
+        self.assertEqual(resp["error"], "lang must be a string")
+
+    def test_describe_none_skill_id_returns_error_reply(self):
+        # caught by the pre-existing "skill_id is required" check, not the
+        # type-validation guard — None never reaches _invalid_filter's
+        # isinstance check because it is treated as "absent".
+        resp = self._query(skill_id=None, intent_name="play")
+        self.assertIsNotNone(resp)
+        self.assertFalse(resp["ok"])
+        self.assertEqual(resp["error"], "skill_id is required")
+
+    def test_describe_non_string_intent_name_returns_error_reply(self):
+        resp = self._query(skill_id="skill.a", intent_name=[])
+        self.assertIsNotNone(resp)
+        self.assertFalse(resp["ok"])
+        self.assertEqual(resp["error"], "intent_name must be a string")
+
+    def test_describe_non_string_session_id_returns_error_reply(self):
+        resp = self._query(skill_id="skill.a", session_id=7)
+        self.assertIsNotNone(resp)
+        self.assertFalse(resp["ok"])
+        self.assertEqual(resp["error"], "session_id must be a string")
+
+    def test_describe_non_string_method_returns_error_reply(self):
+        resp = self._query(skill_id="skill.a", method=1)
+        self.assertIsNotNone(resp)
+        self.assertFalse(resp["ok"])
+        self.assertEqual(resp["error"], "method must be a string")
+
+    def test_describe_all_valid_fields_still_works(self):
+        resp = self._query(skill_id="skill.a", intent_name="play",
+                           lang="en-US", method="keyword", session_id="default")
+        self.assertIsNotNone(resp)
+        self.assertTrue(resp["ok"])
 
 
 class TestIntentDescribeSkillWide(unittest.TestCase):
