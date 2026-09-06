@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.4.0a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.4.0a2) (2026-09-06)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.4.0a1...3.4.0a2)
+
+**Merged pull requests:**
+
+- docs: state what the typed-slots drop actually logs [\#954](https://github.com/OpenVoiceOS/ovos-core/pull/954) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.4.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.4.0a1) (2026-09-06)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.3.2a1...3.4.0a1)
@@ -352,10 +360,6 @@
 ## [2.6.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.3a1) (2026-08-11)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.2a1...2.6.3a1)
-
-**Merged pull requests:**
-
-- fix: let language disambiguation use the shared distance threshold [\#847](https://github.com/OpenVoiceOS/ovos-core/pull/847) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.6.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.2a1) (2026-08-11)
 
