@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.2.9a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.9a2) (2026-09-06)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.9a1...3.2.9a2)
+
+**Merged pull requests:**
+
+- feat\(manifest\): ovos.intent.describe can answer for a whole skill [\#938](https://github.com/OpenVoiceOS/ovos-core/pull/938) ([goldyfruit](https://github.com/goldyfruit))
+
 ## [3.2.9a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.9a1) (2026-09-05)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.8a1...3.2.9a1)
@@ -351,25 +359,13 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.7a1...2.5.8a1)
 
-**Merged pull requests:**
-
-- fix: canonicalize package names before the protected-package check [\#829](https://github.com/OpenVoiceOS/ovos-core/pull/829) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [2.5.7a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.7a1) (2026-07-23)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.6a1...2.5.7a1)
 
-**Merged pull requests:**
-
-- fix: align intent-transformer test with OVOS-TRANSFORM-1 §3.4 identity invariant [\#827](https://github.com/OpenVoiceOS/ovos-core/pull/827) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [2.5.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.6a1) (2026-07-23)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.5.5a4...2.5.6a1)
-
-**Merged pull requests:**
-
-- fix: update e2e intent-name expectations for OVOS-INTENT-2 lowercase rename [\#825](https://github.com/OpenVoiceOS/ovos-core/pull/825) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.5.5a4](https://github.com/OpenVoiceOS/ovos-core/tree/2.5.5a4) (2026-07-23)
 
