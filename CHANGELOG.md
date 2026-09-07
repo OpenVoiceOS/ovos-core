@@ -357,10 +357,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.4a1...3.0.0a1)
 
-**Merged pull requests:**
-
-- fix: connect SessionManager to the bus in the skills process regardless of intent-service [\#855](https://github.com/OpenVoiceOS/ovos-core/pull/855) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [2.6.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.4a1) (2026-08-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.3a2...2.6.4a1)
