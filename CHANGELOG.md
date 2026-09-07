@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.4.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.4.1a1) (2026-09-07)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.4.0a2...3.4.1a1)
+
+**Merged pull requests:**
+
+- fix: registration consumers take skill\_id from the message context [\#956](https://github.com/OpenVoiceOS/ovos-core/pull/956) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.4.0a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.4.0a2) (2026-09-06)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.4.0a1...3.4.0a2)
@@ -372,10 +380,6 @@
 ## [2.6.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.1a1) (2026-08-11)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.0a1...2.6.1a1)
-
-**Merged pull requests:**
-
-- fix: padatious is Apache-2.0, drop the lgpl framing and fann2 [\#848](https://github.com/OpenVoiceOS/ovos-core/pull/848) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.6.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.0a1) (2026-08-02)
 
