@@ -23,6 +23,12 @@ from ovos_utils.log import LOG
 
 from ovos_core.intent_services.working_session import raw_session_id
 
+# OVOS-PIPELINE-1 §7.3 reserved intent_name registry: skills and pipelines
+# MUST NOT register under these names (OVOS-INTENT-4 §5.3/§6.3).
+RESERVED_INTENT_NAMES = frozenset({
+    "converse", "response", "stop", "fallback", "common_query",
+})
+
 
 class IntentManifest:
     """INTENT-4 §10 orchestrator-owned manifest.
@@ -181,15 +187,14 @@ class IntentManifest:
         if not (intent_name and lang):
             LOG.warning(f"malformed intent registration from {skill_id!r}: missing required fields")
             return
-        if intent_name == "stop":
-            # OVOS-STOP-1 §2: "Skills and other pipelines MUST NOT register
-            # `stop`". Such a registration is malformed under OVOS-INTENT-4
-            # §5.3/§6.3 and PIPELINE-1 §7.3 — "log at WARN, do not index".
+        if intent_name in RESERVED_INTENT_NAMES:
+            # OVOS-PIPELINE-1 §7.3 / OVOS-INTENT-4 §5.3/§6.3: a registration
+            # naming a reserved intent_name is malformed — log at WARN, do
+            # not index.
             LOG.warning(
-                f"skill '{skill_id}' registered an intent literally named 'stop' — "
-                f"'stop' is reserved by OVOS-STOP-1 for the '{skill_id}:stop' "
-                "targeted-dispatch topic, so this registration is malformed "
-                "and is not indexed.")
+                f"{message.msg_type}: skill '{skill_id}' registered reserved "
+                f"intent_name '{intent_name}' — malformed per OVOS-PIPELINE-1 "
+                "§7.3, not indexed.")
             return
         session_id = raw_session_id(message)
         if session_id is None:
@@ -222,6 +227,13 @@ class IntentManifest:
         lang = message.data.get("lang")
         session_id = self._session_id_of(message)
         if not intent_name:
+            return
+        if intent_name in RESERVED_INTENT_NAMES:
+            # A reserved name was never indexed (§7.3), so deregistering it
+            # is a no-op — logged rather than silently ignored.
+            LOG.warning(
+                f"{message.msg_type}: skill '{skill_id}' deregistered reserved "
+                f"intent_name '{intent_name}' — ignored per OVOS-PIPELINE-1 §7.3.")
             return
         for method in ("keyword", "template"):
             if lang:

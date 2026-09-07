@@ -18,7 +18,7 @@ from unittest.mock import patch
 from ovos_bus_client.message import Message
 from ovos_utils.fakebus import FakeBus
 
-from ovos_core.intent_services.manifest import IntentManifest
+from ovos_core.intent_services.manifest import IntentManifest, RESERVED_INTENT_NAMES
 
 
 def _manifest() -> IntentManifest:
@@ -70,14 +70,18 @@ class TestManifestRegister(unittest.TestCase):
         key = list(self.m._index.keys())[0]
         self.assertEqual(key[0], "sat-1")
 
-    def test_reserved_stop_intent_name_warns(self):
-        """STOP-1 §2/§9 and PIPELINE-1 §7.3: a registration naming the
-        reserved `stop` is malformed — "log at WARN, do not index"."""
-        with patch("ovos_core.intent_services.manifest.LOG") as mock_log:
-            self.m._on_register(_reg("skill.test", "stop"))
-        mock_log.warning.assert_called_once()
-        self.assertIn("reserved", str(mock_log.warning.call_args))
-        self.assertEqual(self.m._index, {})
+    def test_reserved_intent_names_warn_and_are_not_indexed(self):
+        """OVOS-PIPELINE-1 §7.3 / OVOS-INTENT-4 §5.3/§6.3: a registration
+        naming a reserved intent_name is malformed — "log at WARN, do not
+        index"."""
+        for reserved in RESERVED_INTENT_NAMES:
+            with self.subTest(reserved=reserved):
+                m = _manifest()
+                with patch("ovos_core.intent_services.manifest.LOG") as mock_log:
+                    m._on_register(_reg("skill.test", reserved))
+                mock_log.warning.assert_called_once()
+                self.assertIn("reserved", str(mock_log.warning.call_args))
+                self.assertEqual(m._index, {})
 
     def test_non_reserved_intent_name_does_not_warn(self):
         with patch("ovos_core.intent_services.manifest.LOG") as mock_log:
@@ -160,6 +164,18 @@ class TestManifestDeregister(unittest.TestCase):
                       data={"skill_id": "skill.other", "intent_name": "hello"},
                       context={"skill_id": "skill.test"})
         self.m._on_deregister(msg)
+        self.assertEqual(len(self.m._index), 2)
+
+    def test_deregister_reserved_intent_name_warns_and_is_a_noop(self):
+        # a reserved name was never indexed (§7.3); deregistering it must
+        # not touch the index and must log the ignored mutation.
+        msg = Message("ovos.intent.deregister",
+                      data={"skill_id": "skill.test", "intent_name": "stop"},
+                      context={"skill_id": "skill.test"})
+        with patch("ovos_core.intent_services.manifest.LOG") as mock_log:
+            self.m._on_deregister(msg)
+        mock_log.warning.assert_called_once()
+        self.assertIn("reserved", str(mock_log.warning.call_args))
         self.assertEqual(len(self.m._index), 2)
 
 
