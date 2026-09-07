@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.4.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.4.3a1) (2026-09-07)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.4.2a1...3.4.3a1)
+
+**Merged pull requests:**
+
+- fix: manifest refuses registrations on reserved intent names [\#960](https://github.com/OpenVoiceOS/ovos-core/pull/960) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.4.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.4.2a1) (2026-09-07)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.4.1a1...3.4.2a1)
@@ -241,10 +249,6 @@
 ## [3.0.10a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a1) (2026-08-31)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.9a1...3.0.10a1)
-
-**Merged pull requests:**
-
-- fix: normalize pipeline ids when matching session blacklists [\#854](https://github.com/OpenVoiceOS/ovos-core/pull/854) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [3.0.9a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.9a1) (2026-08-31)
 
