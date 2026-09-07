@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.4.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.4.2a1) (2026-09-07)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.4.1a1...3.4.2a1)
+
+**Merged pull requests:**
+
+- fix: entry stamp replaces supplied utterance\_id; re-impose all deployment-owned policy fields [\#957](https://github.com/OpenVoiceOS/ovos-core/pull/957) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.4.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.4.1a1) (2026-09-07)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.4.0a2...3.4.1a1)
@@ -372,10 +380,6 @@
 ## [2.6.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.2a1) (2026-08-11)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.1a1...2.6.2a1)
-
-**Merged pull requests:**
-
-- fix: padatious belongs in the plugins extra, not its own [\#850](https://github.com/OpenVoiceOS/ovos-core/pull/850) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.6.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.1a1) (2026-08-11)
 
