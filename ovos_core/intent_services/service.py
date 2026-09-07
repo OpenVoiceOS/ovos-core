@@ -86,6 +86,19 @@ _PIPELINE_MIGRATION_MAP = {
 
 _PIPELINE_RE = re.compile(r'-(high|medium|low)$')
 
+# OVOS-PIPELINE-1 §5.5 / SESSION-1 §3: the deployment-owned per-component
+# override fields that a claiming plugin's ``updated_session`` MUST NOT be
+# able to relax or redirect for the stages that run after it: the pipeline
+# preference list, the six OVOS-TRANSFORM-1 §5 transformer-chain lists, the
+# three blacklist denylists, and ``site_id``.
+_DEPLOYMENT_OWNED_SESSION_FIELDS = (
+    "pipeline",
+    "audio_transformers", "utterance_transformers", "metadata_transformers",
+    "intent_transformers", "dialog_transformers", "tts_transformers",
+    "blacklisted_skills", "blacklisted_intents", "blacklisted_pipelines",
+    "site_id",
+)
+
 # OVOS-PIPELINE-1 §7.3 reserved intent_names, with the registry's "activation
 # push" column. §7.1: "Suppression MUST be keyed on the Match's ``intent_name``
 # and its registry row — never on the producing ``pipeline_id``". §7.3 states
@@ -728,6 +741,17 @@ class IntentService:
         sess = round_session(message)
         if match.updated_session is not None:
             updated = match.updated_session
+            # OVOS-PIPELINE-1 §5.5: every deployment-owned per-component
+            # override field (SESSION-1 §3) is re-imposed onto a plugin's
+            # updated_session from the value the orchestrator held before
+            # the plugin ran, so a claiming plugin cannot relax or redirect
+            # policy for the stages after it: `pipeline`, the six
+            # OVOS-TRANSFORM-1 §5 transformer-chain lists, the three
+            # blacklist denylists, and `site_id`.
+            pre_plugin_overrides = {
+                field: getattr(sess, field)
+                for field in _DEPLOYMENT_OWNED_SESSION_FIELDS
+            }
             if updated.resolved_session_id() != sess.resolved_session_id():
                 # §5.1/§4.2: updated_session is defined as the ROUND's session,
                 # updated — never a different session. A pipeline plugin
@@ -743,6 +767,8 @@ class IntentService:
             else:
                 # ``update`` returns the store for the default session, so the
                 # round carries on the one object every co-located view holds.
+                for field, value in pre_plugin_overrides.items():
+                    setattr(updated, field, value)
                 sess = SessionManager.update(updated)
                 open_round(message, sess)
                 SessionManager.bind(message, sess)
@@ -910,16 +936,20 @@ class IntentService:
         else. Every derived Message carries it for free, because
         ``Message.reply``/``Message.forward`` deep-copy ``context``.
 
-        A value already present is kept: a component that opened the lifecycle
-        out-of-band already sat at entry and stamped under this same rule.
+        The orchestrator's stamp replaces any value already present: the
+        no-overwrite rule binds components *after* entry (e.g. the transformer
+        chain re-asserting a value it finds dropped), not the entry stamp
+        itself.
 
         Returns:
             str: the lifecycle identifier now on the Message.
         """
-        uid = message.context.get("utterance_id")
-        if not uid:
-            uid = str(uuid4())
-            message.context["utterance_id"] = uid
+        prior = message.context.get("utterance_id")
+        uid = str(uuid4())
+        if prior:
+            LOG.debug(f"replacing supplied utterance_id '{prior}' with '{uid}' "
+                      f"at lifecycle entry (OVOS-PIPELINE-1 §9.1.1)")
+        message.context["utterance_id"] = uid
         return uid
 
     def handle_utterance(self, message: Message):
@@ -933,11 +963,11 @@ class IntentService:
         is emitted instead.
         """
         # OVOS-PIPELINE-1 §9.1.1: stamp the lifecycle identifier exactly once,
-        # at lifecycle entry, before anything derives from this Message. A value
-        # already present is never overwritten — regenerating it downstream would
-        # detach every already-derived Message from its lifecycle. Stamped
-        # before the §2.5 carrier check below so the dropped Message's own
-        # end-marker also carries one.
+        # at lifecycle entry, before anything derives from this Message. The
+        # entry stamp replaces any value already present, regardless of who
+        # supplied it — this Message is a new lifecycle. Stamped before the
+        # §2.5 carrier check below so the dropped Message's own end-marker
+        # also carries one.
         uid = self._stamp_utterance_id(message)
 
         # OVOS-SESSION-1 §2.5: reject a present-but-non-object session carrier
