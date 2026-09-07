@@ -1386,7 +1386,7 @@ class TestRequiredSlotsBackstop(unittest.TestCase):
             {"skill_id": "test.skill", "intent_name": "intent",
              "lang": "en-US", "samples": ["do it"],
              "required_slots": required_slots},
-            {"session": {"session_id": "default"}}))
+            {"session": {"session_id": "default"}, "skill_id": "test.skill"}))
 
     def test_intent_not_in_manifest_is_noop(self):
         svc = _make_service()
