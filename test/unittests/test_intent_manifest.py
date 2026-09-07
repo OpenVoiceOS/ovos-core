@@ -84,6 +84,43 @@ class TestManifestRegister(unittest.TestCase):
             self.m._on_register(_reg("skill.test", "hello"))
         mock_log.warning.assert_not_called()
 
+    def test_register_without_context_skill_id_is_dropped(self):
+        # OVOS-INTENT-4 §3.2: context["skill_id"] is authoritative; a
+        # registration lacking it MUST be dropped, not fall back to data.
+        msg = Message("ovos.intent.register.keyword",
+                      data={"skill_id": "skill.test", "intent_name": "hello", "lang": "en-US"},
+                      context={})
+        with patch("ovos_core.intent_services.manifest.LOG") as mock_log:
+            self.m._on_register(msg)
+        self.assertEqual(self.m._index, {})
+        mock_log.warning.assert_called_once()
+
+    def test_register_mismatched_payload_skill_id_is_dropped(self):
+        # a payload skill_id differing from context.skill_id would let one
+        # skill register intents under another skill's identity.
+        msg = Message("ovos.intent.register.keyword",
+                      data={"skill_id": "skill.other", "intent_name": "hello", "lang": "en-US"},
+                      context={"skill_id": "skill.test"})
+        with patch("ovos_core.intent_services.manifest.LOG") as mock_log:
+            self.m._on_register(msg)
+        self.assertEqual(self.m._index, {})
+        mock_log.warning.assert_called_once()
+
+    def test_register_matching_payload_skill_id_still_registers(self):
+        msg = Message("ovos.intent.register.keyword",
+                      data={"skill_id": "skill.test", "intent_name": "hello", "lang": "en-US"},
+                      context={"skill_id": "skill.test"})
+        self.m._on_register(msg)
+        self.assertEqual(len(self.m._index), 1)
+
+    def test_register_without_payload_skill_id_uses_context(self):
+        msg = Message("ovos.intent.register.keyword",
+                      data={"intent_name": "hello", "lang": "en-US"},
+                      context={"skill_id": "skill.test"})
+        self.m._on_register(msg)
+        entry = list(self.m._index.values())[0]
+        self.assertEqual(entry["skill_id"], "skill.test")
+
 
 class TestManifestDeregister(unittest.TestCase):
     def setUp(self):
@@ -93,7 +130,8 @@ class TestManifestDeregister(unittest.TestCase):
 
     def test_deregister_specific_lang(self):
         msg = Message("ovos.intent.deregister",
-                      data={"skill_id": "skill.test", "intent_name": "hello", "lang": "en-US"})
+                      data={"skill_id": "skill.test", "intent_name": "hello", "lang": "en-US"},
+                      context={"skill_id": "skill.test"})
         self.m._on_deregister(msg)
         langs = [e["lang"] for e in self.m._index.values()]
         self.assertNotIn("en-US", langs)
@@ -101,9 +139,28 @@ class TestManifestDeregister(unittest.TestCase):
 
     def test_deregister_all_langs(self):
         msg = Message("ovos.intent.deregister",
-                      data={"skill_id": "skill.test", "intent_name": "hello"})
+                      data={"skill_id": "skill.test", "intent_name": "hello"},
+                      context={"skill_id": "skill.test"})
         self.m._on_deregister(msg)
         self.assertEqual(len(self.m._index), 0)
+
+    def test_deregister_without_context_skill_id_is_dropped(self):
+        # OVOS-INTENT-4 §3.2: context["skill_id"] is authoritative; a
+        # deregistration lacking it MUST be dropped, not fall back to data.
+        msg = Message("ovos.intent.deregister",
+                      data={"skill_id": "skill.test", "intent_name": "hello"},
+                      context={})
+        self.m._on_deregister(msg)
+        self.assertEqual(len(self.m._index), 2)
+
+    def test_deregister_mismatched_payload_skill_id_is_dropped(self):
+        # a payload skill_id differing from context.skill_id would let one
+        # skill deregister another skill's intents.
+        msg = Message("ovos.intent.deregister",
+                      data={"skill_id": "skill.other", "intent_name": "hello"},
+                      context={"skill_id": "skill.test"})
+        self.m._on_deregister(msg)
+        self.assertEqual(len(self.m._index), 2)
 
 
 class TestManifestEnableDisable(unittest.TestCase):
@@ -142,7 +199,7 @@ class TestDeregisterSessionScope(unittest.TestCase):
         # attacker runs under session B (context) but claims data.session_id=A
         msg = Message("ovos.intent.deregister",
                       data={"skill_id": "skill.test", "intent_name": "hello", "session_id": "A"},
-                      context={"session": {"session_id": "B"}})
+                      context={"session": {"session_id": "B"}, "skill_id": "skill.test"})
         self.m._on_deregister(msg)
         # session A's entry MUST survive; only B (which has no entry) was touched
         sessions = {e["session_id"] for e in self.m._index.values()}
@@ -152,7 +209,7 @@ class TestDeregisterSessionScope(unittest.TestCase):
         # the true owner of session A deregisters, context-scoped, no data.session_id
         msg = Message("ovos.intent.deregister",
                       data={"skill_id": "skill.test", "intent_name": "hello"},
-                      context={"session": {"session_id": "A"}})
+                      context={"session": {"session_id": "A"}, "skill_id": "skill.test"})
         self.m._on_deregister(msg)
         self.assertEqual(len(self.m._index), 0)
 
@@ -165,10 +222,27 @@ class TestSkillDeregister(unittest.TestCase):
         self.m._on_register(_reg("skill.b", "z"))
 
     def test_removes_only_target_skill(self):
-        msg = Message("ovos.skill.deregister", data={"skill_id": "skill.a"})
+        msg = Message("ovos.skill.deregister", data={"skill_id": "skill.a"},
+                      context={"skill_id": "skill.a"})
         self.m._on_skill_deregister(msg)
         skills = {e["skill_id"] for e in self.m._index.values()}
         self.assertNotIn("skill.a", skills)
+        self.assertIn("skill.b", skills)
+
+    def test_without_context_skill_id_is_dropped(self):
+        msg = Message("ovos.skill.deregister", data={"skill_id": "skill.a"}, context={})
+        self.m._on_skill_deregister(msg)
+        skills = {e["skill_id"] for e in self.m._index.values()}
+        self.assertIn("skill.a", skills)
+
+    def test_mismatched_payload_skill_id_is_dropped(self):
+        # a remote-uninstall attempt: another skill claims to deregister
+        # skill.a while its own context identifies it as skill.b.
+        msg = Message("ovos.skill.deregister", data={"skill_id": "skill.a"},
+                      context={"skill_id": "skill.b"})
+        self.m._on_skill_deregister(msg)
+        skills = {e["skill_id"] for e in self.m._index.values()}
+        self.assertIn("skill.a", skills)
         self.assertIn("skill.b", skills)
 
 

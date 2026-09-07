@@ -472,7 +472,8 @@ class TestOrchestratorGate(unittest.TestCase):
             svc.intent_manifest._on_register(Message(
                 "ovos.intent.register.keyword",
                 {"skill_id": "lights.skill", "intent_name": "on",
-                 "lang": "en-US", "requires_context": list(requires)}, {}))
+                 "lang": "en-US", "requires_context": list(requires)},
+                {"skill_id": "lights.skill"}))
         return svc
 
     def _session(self, intent_context=None):
@@ -533,7 +534,8 @@ class TestOrchestratorSlotFill(unittest.TestCase):
         svc.intent_manifest._on_register(Message(
             "ovos.intent.register.keyword",
             {"skill_id": "lights.skill", "intent_name": "on", "lang": "en-US",
-             "requires_context": list(requires), "required": list(slot_names)}, {}))
+             "requires_context": list(requires), "required": list(slot_names)},
+            {"skill_id": "lights.skill"}))
         return svc
 
     def _session(self, intent_context):
@@ -769,7 +771,8 @@ class TestRequiredSlotFilledFromContext(unittest.TestCase):
              "lang": "en-US",
              "required": ["location"],
              "required_slots": ["location"],
-             "requires_context": [{"key": "location", "scope": "shared"}]}, {}))
+             "requires_context": [{"key": "location", "scope": "shared"}]},
+            {"skill_id": "weather.skill"}))
         match = IntentHandlerMatch(match_type="weather.skill:forecast",
                                    match_data={"conf": 1.0},
                                    skill_id="weather.skill",

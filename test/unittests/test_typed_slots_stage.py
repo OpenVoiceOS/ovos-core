@@ -216,7 +216,8 @@ class TestDeclaredSlotTypes(unittest.TestCase):
                               {"skill_id": "test.skill",
                                "intent_name": intent_name,
                                "lang": "en-US", **payload},
-                              {"session": Session("default").serialize()}))
+                              {"session": Session("default").serialize(),
+                               "skill_id": "test.skill"}))
 
     def test_no_registrations_declare_nothing(self):
         self.assertEqual(self.manifest.declared_slot_types("default"), frozenset())
