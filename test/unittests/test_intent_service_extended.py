@@ -1179,6 +1179,63 @@ class TestEmitMatchMessage(unittest.TestCase):
             svc._dispatch_match(match, msg, "en-US")
         svc.intent_plugins.transform.assert_called_once()
 
+    def test_updated_session_cannot_relax_deployment_owned_policy(self):
+        """OVOS-PIPELINE-1 §5.5: every deployment-owned per-component override
+        field (SESSION-1 §3 - `pipeline`, the six transformer-chain lists,
+        the three blacklist denylists, `site_id`) is re-imposed onto a
+        plugin's `updated_session` from the value the orchestrator held
+        before the plugin ran, so a claiming plugin cannot relax or redirect
+        policy for the stages after it."""
+        sess = Session("s")
+        sess.pipeline = ["ovos-adapt-pipeline-plugin-high"]
+        sess.blacklisted_skills = ["evil.skill"]
+        sess.blacklisted_intents = ["evil.skill:intent"]
+        sess.blacklisted_pipelines = ["ovos-ocp-pipeline-plugin"]
+        sess.site_id = "locked-site"
+        sess.audio_transformers = ["locked-audio-transformer"]
+        sess.utterance_transformers = ["locked-utterance-transformer"]
+        sess.metadata_transformers = ["locked-metadata-transformer"]
+        sess.intent_transformers = ["locked-intent-transformer"]
+        sess.dialog_transformers = ["locked-dialog-transformer"]
+        sess.tts_transformers = ["locked-tts-transformer"]
+
+        tampered = Session.deserialize(sess.serialize())
+        tampered.pipeline = []
+        tampered.blacklisted_skills = []
+        tampered.blacklisted_intents = []
+        tampered.blacklisted_pipelines = []
+        tampered.site_id = "attacker-site"
+        tampered.audio_transformers = []
+        tampered.utterance_transformers = []
+        tampered.metadata_transformers = []
+        tampered.intent_transformers = []
+        tampered.dialog_transformers = []
+        tampered.tts_transformers = []
+
+        svc = _make_service()
+        svc.bus.emit = MagicMock()
+        match = _make_match(session=tampered)
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["hello"]},
+                      context={"session": sess.serialize()})
+        with patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess):
+            svc._dispatch_match(match, msg, "en-US")
+
+        synced = Session.deserialize(
+            svc.bus.emit.call_args_list[-1][0][0].context["session"])
+        self.assertEqual(synced.pipeline, ["ovos-adapt-pipeline-plugin-high"])
+        self.assertEqual(synced.blacklisted_skills, ["evil.skill"])
+        self.assertEqual(synced.blacklisted_intents, ["evil.skill:intent"])
+        self.assertEqual(synced.blacklisted_pipelines, ["ovos-ocp-pipeline-plugin"])
+        self.assertEqual(synced.site_id, "locked-site")
+        self.assertEqual(synced.audio_transformers, ["locked-audio-transformer"])
+        self.assertEqual(synced.utterance_transformers, ["locked-utterance-transformer"])
+        self.assertEqual(synced.metadata_transformers, ["locked-metadata-transformer"])
+        self.assertEqual(synced.intent_transformers, ["locked-intent-transformer"])
+        self.assertEqual(synced.dialog_transformers, ["locked-dialog-transformer"])
+        self.assertEqual(synced.tts_transformers, ["locked-tts-transformer"])
+
 
 # ---------------------------------------------------------------------------
 # handle_utterance (basic wiring)
@@ -1704,12 +1761,23 @@ class TestUtteranceIdStamp(unittest.TestCase):
         b = IntentService._stamp_utterance_id(Message("test"))
         self.assertNotEqual(a, b)
 
-    def test_existing_identifier_is_never_overwritten(self):
-        """A component that opened the lifecycle out of band already stamped."""
-        msg = Message("test", {}, {"utterance_id": "opened-elsewhere"})
+    def test_entry_stamp_replaces_any_supplied_identifier(self):
+        """OVOS-PIPELINE-1 §9.1.1: the orchestrator's entry stamp replaces
+        any value already present on the entry Message; the no-overwrite
+        rule binds components after entry, not the entry stamp itself."""
+        msg = Message("test", {}, {"utterance_id": "supplied-by-caller"})
         uid = IntentService._stamp_utterance_id(msg)
-        self.assertEqual(uid, "opened-elsewhere")
-        self.assertEqual(msg.context["utterance_id"], "opened-elsewhere")
+        self.assertNotEqual(uid, "supplied-by-caller")
+        self.assertEqual(msg.context["utterance_id"], uid)
+
+    def test_stale_pong_carrying_the_replaced_id_is_discarded(self):
+        """A poll pong correlated on the pre-entry id no longer matches the
+        round's (freshly stamped) utterance_id, so it is dropped rather
+        than accepted into the round it does not belong to."""
+        msg = Message("test", {}, {"utterance_id": "pre-entry-id"})
+        uid = IntentService._stamp_utterance_id(msg)
+        pong = Message("some.ping.pong", {}, {"utterance_id": "pre-entry-id"})
+        self.assertNotEqual(pong.context["utterance_id"], uid)
 
     def test_derived_messages_carry_the_identifier(self):
         """`reply` and `forward` deep-copy context, so propagation is free."""
