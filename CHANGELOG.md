@@ -1,5 +1,25 @@
 # Changelog
 
+## [3.5.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.0a1) (2026-09-08)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.4.4a1...3.5.0a1)
+
+**Closed issues:**
+
+- ovos-core has no targeted pip installer, so ovos.pip.install.ovos\_core reaches nobody [\#888](https://github.com/OpenVoiceOS/ovos-core/issues/888)
+
+## [3.4.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.4.4a1) (2026-09-08)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.4.3a2...3.4.4a1)
+
+**Merged pull requests:**
+
+- fix: key manifest entries by the payload skill\_id [\#964](https://github.com/OpenVoiceOS/ovos-core/pull/964) ([JarbasAl](https://github.com/JarbasAl))
+
+## [3.4.3a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.4.3a2) (2026-09-07)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.4.3a1...3.4.3a2)
+
 ## [3.4.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.4.3a1) (2026-09-07)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.4.2a1...3.4.3a1)
@@ -321,10 +341,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.3a2...3.0.4a1)
 
-**Merged pull requests:**
-
-- fix: registry-first session resolution for converse write paths [\#858](https://github.com/OpenVoiceOS/ovos-core/pull/858) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [3.0.3a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.3a2) (2026-08-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.3a1...3.0.3a2)
@@ -345,10 +361,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.1a1...3.0.2a1)
 
-**Merged pull requests:**
-
-- fix: manifest mutations read the context session; describe spans sessions and self-identifies entries [\#856](https://github.com/OpenVoiceOS/ovos-core/pull/856) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [3.0.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.1a1) (2026-08-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.0a1...3.0.1a1)
@@ -361,17 +373,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.3a2...2.6.4a1)
 
-**Merged pull requests:**
-
-- fix: mirror add\_context under the resolved private key when the producer names it [\#857](https://github.com/OpenVoiceOS/ovos-core/pull/857) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [2.6.3a2](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.3a2) (2026-08-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/2.6.3a1...2.6.3a2)
-
-**Merged pull requests:**
-
-- spike: context.utterance\_id — lifecycle identifier + converse round guard \(PIPELINE-1 §9.1.1\) [\#859](https://github.com/OpenVoiceOS/ovos-core/pull/859) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [2.6.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/2.6.3a1) (2026-08-11)
 
