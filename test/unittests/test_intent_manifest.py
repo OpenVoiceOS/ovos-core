@@ -88,27 +88,28 @@ class TestManifestRegister(unittest.TestCase):
             self.m._on_register(_reg("skill.test", "hello"))
         mock_log.warning.assert_not_called()
 
-    def test_register_without_context_skill_id_is_dropped(self):
-        # OVOS-INTENT-4 §3.2: context["skill_id"] is authoritative; a
-        # registration lacking it MUST be dropped, not fall back to data.
+    def test_register_without_context_skill_id_is_indexed(self):
+        # OVOS-INTENT-4 §3.2: a §§5-8 message is complete without
+        # context["skill_id"] and its absence is not malformed.
         msg = Message("ovos.intent.register.keyword",
                       data={"skill_id": "skill.test", "intent_name": "hello", "lang": "en-US"},
                       context={})
-        with patch("ovos_core.intent_services.manifest.LOG") as mock_log:
-            self.m._on_register(msg)
-        self.assertEqual(self.m._index, {})
-        mock_log.warning.assert_called_once()
+        self.m._on_register(msg)
+        self.assertEqual(list(self.m._index),
+                         [("default", "skill.test", "hello", "en-US", "keyword")])
+        self.assertEqual(list(self.m._index.values())[0]["skill_id"], "skill.test")
 
-    def test_register_mismatched_payload_skill_id_is_dropped(self):
-        # a payload skill_id differing from context.skill_id would let one
-        # skill register intents under another skill's identity.
+    def test_register_is_keyed_by_the_payload_skill_id(self):
+        # OVOS-INTENT-4 §3.2: the payload names the target, the context names
+        # the source; a provisioning tool registers on another skill's behalf
+        # and the entry belongs to the target.
         msg = Message("ovos.intent.register.keyword",
-                      data={"skill_id": "skill.other", "intent_name": "hello", "lang": "en-US"},
-                      context={"skill_id": "skill.test"})
-        with patch("ovos_core.intent_services.manifest.LOG") as mock_log:
-            self.m._on_register(msg)
-        self.assertEqual(self.m._index, {})
-        mock_log.warning.assert_called_once()
+                      data={"skill_id": "a.skill", "intent_name": "hello", "lang": "en-US"},
+                      context={"skill_id": "b.skill"})
+        self.m._on_register(msg)
+        self.assertEqual(list(self.m._index),
+                         [("default", "a.skill", "hello", "en-US", "keyword")])
+        self.assertEqual(list(self.m._index.values())[0]["skill_id"], "a.skill")
 
     def test_register_matching_payload_skill_id_still_registers(self):
         msg = Message("ovos.intent.register.keyword",
@@ -148,23 +149,25 @@ class TestManifestDeregister(unittest.TestCase):
         self.m._on_deregister(msg)
         self.assertEqual(len(self.m._index), 0)
 
-    def test_deregister_without_context_skill_id_is_dropped(self):
-        # OVOS-INTENT-4 §3.2: context["skill_id"] is authoritative; a
-        # deregistration lacking it MUST be dropped, not fall back to data.
+    def test_deregister_without_context_skill_id_removes_the_payload_target(self):
+        # OVOS-INTENT-4 §3.2: an absent context["skill_id"] is not malformed.
         msg = Message("ovos.intent.deregister",
                       data={"skill_id": "skill.test", "intent_name": "hello"},
                       context={})
         self.m._on_deregister(msg)
-        self.assertEqual(len(self.m._index), 2)
+        self.assertEqual(list(self.m._index), [])
 
-    def test_deregister_mismatched_payload_skill_id_is_dropped(self):
-        # a payload skill_id differing from context.skill_id would let one
-        # skill deregister another skill's intents.
+    def test_deregister_acts_on_the_payload_skill_id(self):
+        # a conflict-resolving skill retracts on another skill's behalf; the
+        # entry keyed by the payload id goes and the source's stays.
+        self.m._on_register(_reg("b.skill", "hello", lang="en-US"))
+        self.m._on_register(_reg("a.skill", "hello", lang="en-US"))
         msg = Message("ovos.intent.deregister",
-                      data={"skill_id": "skill.other", "intent_name": "hello"},
-                      context={"skill_id": "skill.test"})
+                      data={"skill_id": "a.skill", "intent_name": "hello"},
+                      context={"skill_id": "b.skill"})
         self.m._on_deregister(msg)
-        self.assertEqual(len(self.m._index), 2)
+        self.assertNotIn(("default", "a.skill", "hello", "en-US", "keyword"), self.m._index)
+        self.assertIn(("default", "b.skill", "hello", "en-US", "keyword"), self.m._index)
 
     def test_deregister_reserved_intent_name_warns_and_is_a_noop(self):
         # a reserved name was never indexed (§7.3); deregistering it must
@@ -245,21 +248,22 @@ class TestSkillDeregister(unittest.TestCase):
         self.assertNotIn("skill.a", skills)
         self.assertIn("skill.b", skills)
 
-    def test_without_context_skill_id_is_dropped(self):
+    def test_without_context_skill_id_removes_the_payload_target(self):
+        # OVOS-INTENT-4 §3.2: an absent context["skill_id"] is not malformed.
         msg = Message("ovos.skill.deregister", data={"skill_id": "skill.a"}, context={})
         self.m._on_skill_deregister(msg)
         skills = {e["skill_id"] for e in self.m._index.values()}
-        self.assertIn("skill.a", skills)
+        self.assertNotIn("skill.a", skills)
+        self.assertIn("skill.b", skills)
 
-    def test_mismatched_payload_skill_id_is_dropped(self):
-        # a remote-uninstall attempt: another skill claims to deregister
-        # skill.a while its own context identifies it as skill.b.
+    def test_acts_on_the_payload_skill_id(self):
+        # a provisioning tool retires skill.a while its own context names
+        # skill.b; the payload is the target, the context is provenance.
         msg = Message("ovos.skill.deregister", data={"skill_id": "skill.a"},
                       context={"skill_id": "skill.b"})
         self.m._on_skill_deregister(msg)
-        skills = {e["skill_id"] for e in self.m._index.values()}
-        self.assertIn("skill.a", skills)
-        self.assertIn("skill.b", skills)
+        self.assertEqual({e["skill_id"] for e in self.m._index.values()}, {"skill.b"})
+        self.assertEqual(sorted(k[2] for k in self.m._index), ["z"])
 
 
 class TestEffectivePool(unittest.TestCase):
