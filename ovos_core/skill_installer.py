@@ -29,6 +29,11 @@ class SkillsStore:
     PIP_LOCK = NamedLock("ovos_pip.lock")
     UV = shutil.which("uv")  # use 'uv pip' if available, speeds things up a lot and is the default in raspOVOS
 
+    #: OVOS-INSTALL-1 §2.3: the name a request addresses this service by,
+    #: in ``data.service_name``. The skills service owns skills, solvers,
+    #: personas, pipeline stages and utterance transformers.
+    SERVICE_NAME = "ovos_core"
+
     def __init__(self, bus, config=None):
         self.config = config or Configuration().get("skills", {}).get("installer", {})
         self.bus = bus
@@ -357,8 +362,29 @@ class SkillsStore:
             self.bus.emit(message.reply("ovos.skills.uninstall.failed",
                                         {"error": str(e)}))
 
+    def _addressed_to_us(self, message: Message) -> bool:
+        """Whether this service should act on a pip request.
+
+        OVOS-INSTALL-1 §2.2: ``data.service_name`` names the one service a
+        request is for. Absent, every installer acts. Naming another service,
+        this one installs nothing and answers nothing, because a decline from
+        every other installer would bury the real answer in a burst the
+        client cannot pick it out of.
+
+        The comparison is exact: a service name is an identifier, not a
+        pattern.
+        """
+        target = message.data.get("service_name")
+        if target is None or target == self.SERVICE_NAME:
+            return True
+        LOG.debug(f"{message.msg_type} is addressed to '{target}', "
+                  f"not '{self.SERVICE_NAME}'; ignoring")
+        return False
+
     def handle_install_python(self, message: Message) -> None:
         """Handle a request to install arbitrary Python packages via pip."""
+        if not self._addressed_to_us(message):
+            return
         if not self.config.get("allow_pip"):
             LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()
@@ -383,6 +409,8 @@ class SkillsStore:
 
     def handle_uninstall_python(self, message: Message) -> None:
         """Handle a request to uninstall Python packages via pip."""
+        if not self._addressed_to_us(message):
+            return
         if not self.config.get("allow_pip"):
             LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()

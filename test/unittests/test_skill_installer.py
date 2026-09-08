@@ -389,3 +389,68 @@ def test_handle_install_skill_pip_raises(skills_store):
 
 if __name__ == "__main__":
     pytest.main()
+
+
+# ---------------------------------------------------------------------------
+# OVOS-INSTALL-1 §2.2 — data.service_name addresses one installer
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize('skills_store', [{"allow_pip": True}], indirect=True)
+def test_a_pip_request_for_another_service_is_ignored_in_silence(skills_store):
+    """Naming another service, this one installs nothing and answers
+    nothing: a decline from every installer would bury the real answer."""
+    skills_store.pip_install = Mock(return_value=True)
+    skills_store.handle_install_python(Message(
+        "ovos.pip.install",
+        {"packages": ["some-plugin"], "service_name": "ovos_audio"}))
+    skills_store.pip_install.assert_not_called()
+    assert skills_store.bus.message_types == []
+
+
+@pytest.mark.parametrize('skills_store', [{"allow_pip": True}], indirect=True)
+def test_a_pip_request_naming_the_skills_service_is_acted_on(skills_store):
+    skills_store.pip_install = Mock(return_value=True)
+    skills_store.handle_install_python(Message(
+        "ovos.pip.install",
+        {"packages": ["some-plugin"], "service_name": "ovos_core"}))
+    skills_store.pip_install.assert_called_once()
+    assert skills_store.bus.message_types == ["ovos.pip.install.complete"]
+
+
+@pytest.mark.parametrize('skills_store', [{"allow_pip": True}], indirect=True)
+def test_a_pip_request_naming_nobody_still_reaches_this_service(skills_store):
+    """The guard that this change did not narrow the broadcast."""
+    skills_store.pip_install = Mock(return_value=True)
+    skills_store.handle_install_python(
+        Message("ovos.pip.install", {"packages": ["some-plugin"]}))
+    skills_store.pip_install.assert_called_once()
+    assert skills_store.bus.message_types == ["ovos.pip.install.complete"]
+
+
+@pytest.mark.parametrize('skills_store', [{"allow_pip": True}], indirect=True)
+@pytest.mark.parametrize('near_miss', ["OVOS_CORE", "ovos_core_extra", "ovos"])
+def test_the_service_name_comparison_is_exact(skills_store, near_miss):
+    skills_store.pip_install = Mock(return_value=True)
+    skills_store.handle_install_python(Message(
+        "ovos.pip.install",
+        {"packages": ["p"], "service_name": near_miss}))
+    skills_store.pip_install.assert_not_called()
+    assert skills_store.bus.message_types == []
+
+
+@pytest.mark.parametrize('skills_store', [{"allow_pip": True}], indirect=True)
+def test_pip_uninstall_is_addressed_the_same_way(skills_store):
+    skills_store.pip_uninstall = Mock(return_value=True)
+    skills_store.handle_uninstall_python(Message(
+        "ovos.pip.uninstall",
+        {"packages": ["some-plugin"], "service_name": "ovos_audio"}))
+    skills_store.pip_uninstall.assert_not_called()
+    assert skills_store.bus.message_types == []
+
+
+def test_no_suffixed_pip_topic_is_registered(skills_store):
+    """OVOS-MSG-1 §2.1.1 keeps the target out of the topic, so the skills
+    service never subscribes to a service-suffixed pip topic."""
+    suffixed = [e for e in skills_store.bus.event_handlers
+                if e.startswith("ovos.pip.") and e.count(".") > 2]
+    assert suffixed == []
