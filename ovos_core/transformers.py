@@ -14,13 +14,31 @@ from ovos_plugin_manager.typed_slots_transformers import find_typed_slots_transf
 from ovos_utils.log import LOG
 
 
+def _stage_config(config: Optional[dict], section: str) -> dict:
+    """The configuration for one transformer stage.
+
+    The plugin manager accepts either a whole core configuration or the
+    stage's own section, and when a whole configuration does not carry the
+    section it cannot tell the two apart: every top-level key then reads as
+    an enabled plugin, and the loader warns once per key that the plugin is
+    not installed. Reading the section here keeps a stage that configures
+    itself from the deployment off that path.
+
+    An explicit ``config`` is returned untouched, because a caller that
+    supplies one has already named the mapping it wants used.
+    """
+    if config is not None:
+        return config
+    return Configuration().get(section) or {}
+
+
 class UtteranceTransformersService(_UtteranceTransformersService):
     """Runs utterance transformers in OVOS-TRANSFORM §4 ascending priority
     order: a plugin of priority 1 runs first."""
 
     def __init__(self, bus, config: Optional[dict] = None):
-        config = config or Configuration()
-        super().__init__(bus=bus, config=config)
+        super().__init__(bus=bus,
+                         config=_stage_config(config, self.config_section))
 
     @classmethod
     def find_plugins(cls):
@@ -32,8 +50,8 @@ class MetadataTransformersService(_MetadataTransformersService):
     order: a plugin of priority 1 runs first."""
 
     def __init__(self, bus, config: Optional[dict] = None):
-        config = config or Configuration()
-        super().__init__(bus=bus, config=config)
+        super().__init__(bus=bus,
+                         config=_stage_config(config, self.config_section))
 
     @classmethod
     def find_plugins(cls):
@@ -45,8 +63,8 @@ class IntentTransformersService(_IntentTransformersService):
     order: a plugin of priority 1 runs first."""
 
     def __init__(self, bus, config: Optional[dict] = None):
-        config = config or Configuration()
-        super().__init__(bus=bus, config=config)
+        super().__init__(bus=bus,
+                         config=_stage_config(config, self.config_section))
 
     @classmethod
     def find_plugins(cls):
@@ -67,8 +85,8 @@ class TypedSlotsTransformersService(_TransformersService):
 
     def __init__(self, bus, config: Optional[dict] = None):
         self._selected = None
-        config = config or Configuration()
-        super().__init__(bus=bus, config=config)
+        super().__init__(bus=bus,
+                         config=_stage_config(config, self.config_section))
 
     @classmethod
     def find_plugins(cls):
