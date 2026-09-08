@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.5.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.1a1) (2026-09-08)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.0a1...3.5.1a1)
+
+**Merged pull requests:**
+
+- fix: read each transformer stage's own config section [\#965](https://github.com/OpenVoiceOS/ovos-core/pull/965) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.5.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.0a1) (2026-09-08)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.4.4a1...3.5.0a1)
@@ -243,19 +251,19 @@
 
 ## [3.0.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.12a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.12a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.12a1)
 
 **Merged pull requests:**
 
 - fix: close messagebus client before main\(\) returns on shutdown [\#870](https://github.com/OpenVoiceOS/ovos-core/pull/870) ([JarbasAl](https://github.com/JarbasAl))
 
-## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.10a3)
-
 ## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.11a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.11a1)
+
+## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.10a3)
 
 ## [3.0.10a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a2) (2026-08-31)
 
