@@ -30,6 +30,23 @@ RESERVED_INTENT_NAMES = frozenset({
 })
 
 
+def _target_skill_id(message: Message) -> Optional[str]:
+    """OVOS-INTENT-4 §3.2 — the skill a §§5-8 message acts on.
+
+    The payload ``skill_id`` names the target; ``context.skill_id`` names the
+    source and is provenance only. They differ legitimately when a
+    provisioning tool or a conflict-resolving skill acts on another skill's
+    behalf, so a difference is never grounds for rejection and an absent
+    context ``skill_id`` never makes the message malformed.
+    """
+    payload_skill_id = message.data.get("skill_id")
+    source_skill_id = message.context.get("skill_id")
+    if payload_skill_id and source_skill_id and payload_skill_id != source_skill_id:
+        LOG.debug(f"{message.msg_type}: source {source_skill_id!r} acting on "
+                  f"target {payload_skill_id!r}")
+    return payload_skill_id or source_skill_id
+
+
 class IntentManifest:
     """INTENT-4 §10 orchestrator-owned manifest.
 
@@ -173,18 +190,10 @@ class IntentManifest:
 
     def _on_register(self, message: Message):
         method = "keyword" if message.msg_type == "ovos.intent.register.keyword" else "template"
-        skill_id = message.context.get("skill_id")
-        if not skill_id:
-            LOG.warning(f"dropping {message.msg_type}: no context['skill_id']")
-            return
-        payload_skill_id = message.data.get("skill_id")
-        if payload_skill_id and payload_skill_id != skill_id:
-            LOG.warning(f"dropping {message.msg_type}: payload skill_id "
-                        f"{payload_skill_id!r} differs from context skill_id {skill_id!r}")
-            return
+        skill_id = _target_skill_id(message)
         intent_name = message.data.get("intent_name")
         lang = message.data.get("lang")
-        if not (intent_name and lang):
+        if not (skill_id and intent_name and lang):
             LOG.warning(f"malformed intent registration from {skill_id!r}: missing required fields")
             return
         if intent_name in RESERVED_INTENT_NAMES:
@@ -214,15 +223,7 @@ class IntentManifest:
         }
 
     def _on_deregister(self, message: Message):
-        skill_id = message.context.get("skill_id")
-        if not skill_id:
-            LOG.warning(f"dropping {message.msg_type}: no context['skill_id']")
-            return
-        payload_skill_id = message.data.get("skill_id")
-        if payload_skill_id and payload_skill_id != skill_id:
-            LOG.warning(f"dropping {message.msg_type}: payload skill_id "
-                        f"{payload_skill_id!r} differs from context skill_id {skill_id!r}")
-            return
+        skill_id = _target_skill_id(message)
         intent_name = message.data.get("intent_name")
         lang = message.data.get("lang")
         session_id = self._session_id_of(message)
@@ -258,15 +259,7 @@ class IntentManifest:
             entry["enabled"] = enabled
 
     def _on_skill_deregister(self, message: Message):
-        skill_id = message.context.get("skill_id")
-        if not skill_id:
-            LOG.warning(f"dropping {message.msg_type}: no context['skill_id']")
-            return
-        payload_skill_id = message.data.get("skill_id")
-        if payload_skill_id and payload_skill_id != skill_id:
-            LOG.warning(f"dropping {message.msg_type}: payload skill_id "
-                        f"{payload_skill_id!r} differs from context skill_id {skill_id!r}")
-            return
+        skill_id = _target_skill_id(message)
         session_id = self._session_id_of(message)
         for key in [k for k in self._index if k[0] == session_id and k[1] == skill_id]:
             del self._index[key]
