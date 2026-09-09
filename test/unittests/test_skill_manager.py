@@ -128,6 +128,9 @@ class TestSkillManager(TestCase):
                     'skillmanager.deactivate',
                     'skillmanager.keep',
                     'skillmanager.activate',
+                    'skillmanager.rescan',
+                    'ovos.skills.install.complete',
+                    'ovos.pip.install.complete',
                     #'mycroft.skills.initialized',
                     'mycroft.skills.is_alive',
                     'mycroft.skills.is_ready',
@@ -601,6 +604,94 @@ class TestSkillManager(TestCase):
                          "load attempts grew linearly with scan cycles - backoff is not applied")
         self.assertGreater(load_attempts, 0, "skill should still be retried eventually")
 
+    def _mark_ready(self):
+        """Put the manager where ``run()`` leaves it once the startup load is done."""
+        self.skill_manager.status.set_ready()
+        gui_patch = patch(self.mock_package + 'is_gui_connected', return_value=False)
+        self.addCleanup(gui_patch.stop)
+        gui_patch.start()
+        self.message_bus_mock.message_types = []
+        self.message_bus_mock.message_data = []
+
+    def _discoverable_plugin(self, skill_id, network_before_load=False):
+        """Register a plugin whose loader reports a clean load."""
+        mock_loader = Mock(spec=SkillLoader)
+        mock_loader.skill_id = skill_id
+        mock_loader.load.return_value = True
+        mock_loader.runtime_requirements.network_before_load = network_before_load
+        mock_loader.runtime_requirements.internet_before_load = False
+        self.skill_manager._get_plugin_skill_loader = Mock(return_value=mock_loader)
+        self.skill_manager.plugin_skills = {}
+        return Mock()
+
+    def test_install_complete_loads_the_new_skill_without_waiting_for_the_scan(self):
+        """A skill the installer just made discoverable is loaded on its
+        completion report, not on the next periodic scan."""
+        for topic in ('ovos.skills.install.complete', 'ovos.pip.install.complete'):
+            with self.subTest(topic=topic):
+                skill_id = 'test.installed.skill'
+                plugin = self._discoverable_plugin(skill_id)
+                self._mark_ready()
+
+                with patch(self.mock_package + 'find_skill_plugins',
+                           return_value={skill_id: plugin}):
+                    self.skill_manager.handle_install_complete(Message(topic))
+
+                self.assertIn(skill_id, self.skill_manager.plugin_skills)
+                self.assertIn('mycroft.skill.loaded', self.message_bus_mock.message_types)
+                self.assertIn('mycroft.skills.train', self.message_bus_mock.message_types)
+
+    def test_install_complete_before_ready_leaves_the_load_to_startup(self):
+        """Before the startup load ran, an install report must not load
+        anything: ``run()`` waits for the intent service first."""
+        self.skill_manager._load_new_skills = Mock()
+
+        self.skill_manager.handle_install_complete(Message('ovos.skills.install.complete'))
+
+        self.skill_manager._load_new_skills.assert_not_called()
+
+    def test_install_complete_keeps_the_connectivity_gating(self):
+        """An install report goes through the same network gate as the scan."""
+        skill_id = 'test.network.skill'
+        plugin = self._discoverable_plugin(skill_id, network_before_load=True)
+        self.skill_manager._use_deferred_loading = True
+        self.skill_manager._network_event.clear()
+        self._mark_ready()
+
+        with patch(self.mock_package + 'find_skill_plugins',
+                   return_value={skill_id: plugin}):
+            self.skill_manager.handle_install_complete(Message('ovos.skills.install.complete'))
+
+        self.assertNotIn(skill_id, self.skill_manager.plugin_skills)
+        self.assertNotIn('mycroft.skill.loaded', self.message_bus_mock.message_types)
+
+    def test_rescan_reports_only_the_skills_that_call_loaded(self):
+        """The rescan response names what this pass loaded, so a caller can
+        tell a fresh load from a scan that found nothing new."""
+        skill_id = 'test.rescanned.skill'
+        plugin = self._discoverable_plugin(skill_id)
+        self._mark_ready()
+
+        with patch(self.mock_package + 'find_skill_plugins',
+                   return_value={skill_id: plugin}):
+            self.skill_manager.handle_rescan_request(Message('skillmanager.rescan'))
+            self.skill_manager.handle_rescan_request(Message('skillmanager.rescan'))
+
+        responses = [data for msg_type, data
+                     in zip(self.message_bus_mock.message_types, self.message_bus_mock.message_data)
+                     if msg_type == 'skillmanager.rescan.response']
+        self.assertListEqual([{'loaded': [skill_id]}, {'loaded': []}], responses)
+
+    def test_rescan_before_ready_reports_nothing_loaded(self):
+        self.skill_manager._load_new_skills = Mock()
+
+        self.skill_manager.handle_rescan_request(Message('skillmanager.rescan'))
+
+        self.skill_manager._load_new_skills.assert_not_called()
+        self.assertIn('skillmanager.rescan.response', self.message_bus_mock.message_types)
+        self.assertDictEqual({'loaded': []}, self.message_bus_mock.message_data[-1])
+
+
 class TestDeferredLoadingConfigFlag(TestCase):
     """Test suite for the optional deferred loading config flag."""
 
@@ -654,6 +745,9 @@ class TestDeferredLoadingConfigFlag(TestCase):
                 'skillmanager.deactivate',
                 'skillmanager.keep',
                 'skillmanager.activate',
+                'skillmanager.rescan',
+                'ovos.skills.install.complete',
+                'ovos.pip.install.complete',
                 'mycroft.skills.is_alive',
                 'mycroft.skills.is_ready',
                 'mycroft.skills.all_loaded',
@@ -685,6 +779,9 @@ class TestDeferredLoadingConfigFlag(TestCase):
             'skillmanager.deactivate',
             'skillmanager.keep',
             'skillmanager.activate',
+            'skillmanager.rescan',
+            'ovos.skills.install.complete',
+            'ovos.pip.install.complete',
             'mycroft.network.connected',
             'mycroft.internet.connected',
             'mycroft.gui.available',

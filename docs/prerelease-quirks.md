@@ -22,6 +22,19 @@ ran; `error` is unchanged, so existing consumers keep working. Before this a
 remote caller saw only the `InstallError` string and could not tell "this
 version is not published yet" from "this dependency conflicts".
 
+## #977 (alpha of 2026-09-09)
+
+`SkillManager` subscribes to `ovos.skills.install.complete` and
+`ovos.pip.install.complete` and runs its discovery pass on them, so a skill
+installed through the bus loads when the installer reports completion
+instead of waiting for the next 30 s scan. A new `skillmanager.rescan`
+request runs the same pass on demand and replies with
+`skillmanager.rescan.response` carrying `loaded`, the ids that pass loaded
+(empty when it loaded nothing, whether because discovery turned up nothing
+new or because gating held it back). Both paths keep the scan's connectivity
+gating and do nothing until the manager is ready; the startup load owns
+everything installed before then, and the 30 s scan stays as the backstop.
+
 ## #935 (alpha of 2026-09-06)
 
 The floor on `ovos-bus-client` moves to 2.11.13a1. Core no longer subscribes

@@ -40,6 +40,8 @@ Most classic Mycroft skills also work on OVOS.
 
 When an install or uninstall requested over the bus fails, the `.failed` reply carries the installer's own output in `detail`, so a remote caller can see why without reading the service log. See [docs/skill-installer.md](docs/skill-installer.md).
 
+A completed runtime install through the bus (`ovos.skills.install`) triggers a discovery pass, so an eligible skill loads on that report rather than waiting for the periodic scan; the pass keeps the readiness and connectivity gating the scan applies. `skillmanager.rescan` asks the skill manager for that pass on demand and replies with what it loaded. See [docs/skill-manager.md](docs/skill-manager.md).
+
 ---
 
 ## Persona Support
