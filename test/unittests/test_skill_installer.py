@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch, MagicMock
 import pytest
 
 from ovos_bus_client import Message
-from ovos_core.skill_installer import SkillsStore
+from ovos_core.skill_installer import SkillsStore, FAILURE_DETAIL_CHARS
 
 
 def _make_github_response(status_code: int = 200, file_names: list = None,
@@ -229,7 +229,7 @@ def test_handle_install_skill_not_allowed(skills_store):
     skills_store.handle_install_skill(Message(msg_type="test", data={}))
     skills_store.play_error_sound.assert_called_once()
     assert skills_store.bus.message_types[-1] == "ovos.skills.install.failed"
-    assert skills_store.bus.message_data[-1] == {"error": "pip disabled in mycroft.conf"}
+    assert skills_store.bus.message_data[-1] == {"error": "pip disabled in mycroft.conf", "detail": ""}
     skills_store.validate_skill.assert_not_called()
 
 
@@ -239,7 +239,7 @@ def test_handle_install_skill_not_from_github(skills_store):
     skills_store.handle_install_skill(Message(msg_type="test", data={"url": "beautifulsoup4"}))
     skills_store.play_error_sound.assert_called_once()
     assert skills_store.bus.message_types[-1] == "ovos.skills.install.failed"
-    assert skills_store.bus.message_data[-1] == {"error": "skill url validation failed"}
+    assert skills_store.bus.message_data[-1] == {"error": "skill url validation failed", "detail": ""}
 
 
 @pytest.mark.parametrize('skills_store', [{"allow_pip": True}], indirect=True)
@@ -273,7 +273,7 @@ def test_handle_uninstall_skill_not_allowed(skills_store):
     skills_store.handle_uninstall_skill(Message(msg_type="test", data={}))
     skills_store.play_error_sound.assert_called_once()
     assert skills_store.bus.message_types[-1] == "ovos.skills.uninstall.failed"
-    assert skills_store.bus.message_data[-1] == {"error": "pip disabled in mycroft.conf"}
+    assert skills_store.bus.message_data[-1] == {"error": "pip disabled in mycroft.conf", "detail": ""}
 
 
 @pytest.mark.parametrize('skills_store', [{"allow_pip": True}], indirect=True)
@@ -293,7 +293,7 @@ def test_handle_install_python_not_allowed(skills_store):
     skills_store.handle_install_python(Message(msg_type="test", data={}))
     skills_store.play_error_sound.assert_called_once()
     assert skills_store.bus.message_types[-1] == "ovos.pip.install.failed"
-    assert skills_store.bus.message_data[-1] == {"error": "pip disabled in mycroft.conf"}
+    assert skills_store.bus.message_data[-1] == {"error": "pip disabled in mycroft.conf", "detail": ""}
     skills_store.pip_install.assert_not_called()
 
 
@@ -302,7 +302,7 @@ def test_handle_install_python_no_packages(skills_store):
     skills_store.pip_install = Mock()
     skills_store.handle_install_python(Message(msg_type="test", data={}))
     assert skills_store.bus.message_types[-1] == "ovos.pip.install.failed"
-    assert skills_store.bus.message_data[-1] == {"error": "no packages to install"}
+    assert skills_store.bus.message_data[-1] == {"error": "no packages to install", "detail": ""}
     skills_store.pip_install.assert_not_called()
 
 
@@ -325,7 +325,7 @@ def test_handle_uninstall_python_not_allowed(skills_store):
     skills_store.handle_uninstall_python(Message(msg_type="test", data={}))
     skills_store.play_error_sound.assert_called_once()
     assert skills_store.bus.message_types[-1] == "ovos.pip.uninstall.failed"
-    assert skills_store.bus.message_data[-1] == {"error": "pip disabled in mycroft.conf"}
+    assert skills_store.bus.message_data[-1] == {"error": "pip disabled in mycroft.conf", "detail": ""}
     skills_store.pip_uninstall.assert_not_called()
 
 
@@ -334,7 +334,7 @@ def test_handle_uninstall_python_no_packages(skills_store):
     skills_store.pip_uninstall = Mock()
     skills_store.handle_uninstall_python(Message(msg_type="test", data={}))
     assert skills_store.bus.message_types[-1] == "ovos.pip.uninstall.failed"
-    assert skills_store.bus.message_data[-1] == {"error": "no packages to install"}
+    assert skills_store.bus.message_data[-1] == {"error": "no packages to install", "detail": ""}
     skills_store.pip_uninstall.assert_not_called()
 
 
@@ -361,7 +361,8 @@ def test_handle_install_python_pip_raises(skills_store):
     skills_store.handle_install_python(Message(msg_type="test", data={"packages": packages}))
     skills_store.pip_install.assert_called_once_with(packages)
     assert skills_store.bus.message_types[-1] == "ovos.pip.install.failed"
-    assert skills_store.bus.message_data[-1] == {"error": "error in pip subprocess"}
+    assert skills_store.bus.message_data[-1] == {"error": "error in pip subprocess",
+                                                 "detail": "pip exited with status 1"}
 
 
 @pytest.mark.parametrize('skills_store', [{"allow_pip": True}], indirect=True)
@@ -372,7 +373,8 @@ def test_handle_uninstall_python_pip_raises(skills_store):
     skills_store.handle_uninstall_python(Message(msg_type="test", data={"packages": packages}))
     skills_store.pip_uninstall.assert_called_once_with(packages)
     assert skills_store.bus.message_types[-1] == "ovos.pip.uninstall.failed"
-    assert skills_store.bus.message_data[-1] == {"error": "error in pip subprocess"}
+    assert skills_store.bus.message_data[-1] == {"error": "error in pip subprocess",
+                                                 "detail": "pip exited with status 1"}
 
 
 @pytest.mark.parametrize('skills_store', [{"allow_pip": True}], indirect=True)
@@ -384,7 +386,108 @@ def test_handle_install_skill_pip_raises(skills_store):
         Message(msg_type="test", data={"url": "https://github.com/OpenVoiceOS/skill-foo"}))
     skills_store.pip_install.assert_called_once_with(["git+https://github.com/OpenVoiceOS/skill-foo"])
     assert skills_store.bus.message_types[-1] == "ovos.skills.install.failed"
-    assert skills_store.bus.message_data[-1] == {"error": "error in pip subprocess"}
+    assert skills_store.bus.message_data[-1] == {"error": "error in pip subprocess",
+                                                 "detail": "pip exited with status 1"}
+
+
+# ---------------------------------------------------------------------------
+# the installer's output reaches the .failed reply
+# ---------------------------------------------------------------------------
+
+def _fake_uv(tmp_path, stderr_text: str, exit_code: int = 1) -> str:
+    """A stand-in for the uv binary that prints ``stderr_text`` and exits."""
+    script = tmp_path / "uv"
+    script.write_text("#!/usr/bin/env python3\n"
+                      "import sys\n"
+                      f"sys.stderr.write({stderr_text!r})\n"
+                      f"sys.exit({exit_code})\n")
+    script.chmod(0o755)
+    return str(script)
+
+
+def _store_with_fake_uv(tmp_path, monkeypatch, stderr_text: str) -> SkillsStore:
+    """A store whose pip backend is a failing fake uv and whose constraints file exists."""
+    monkeypatch.setattr(SkillsStore, "UV", _fake_uv(tmp_path, stderr_text))
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text("")
+    store = SkillsStore(bus=MessageBusMock(), config={"allow_pip": True, "constraints": str(constraints)})
+    store.play_error_sound = Mock()
+    return store
+
+
+UNPUBLISHED = ("error: No solution found when resolving dependencies:\n"
+               "  Because ovos-skill-foo==9.9.9 was not found in the package registry")
+
+
+def test_failed_reply_carries_the_installers_output(tmp_path, monkeypatch):
+    """A remote caller can tell "not published yet" from "conflict" only if the
+    reply carries what pip or uv actually said."""
+    store = _store_with_fake_uv(tmp_path, monkeypatch, UNPUBLISHED)
+
+    store.handle_install_python(Message("ovos.pip.install", {"packages": ["ovos-skill-foo==9.9.9"]}))
+
+    assert store.bus.message_types[-1] == "ovos.pip.install.failed"
+    reply = store.bus.message_data[-1]
+    assert reply["error"] == "error in pip subprocess"
+    assert "ovos-skill-foo==9.9.9 was not found" in reply["detail"]
+    store.play_error_sound.assert_called_once()
+
+
+def test_every_pip_backed_failed_reply_carries_detail(tmp_path, monkeypatch):
+    store = _store_with_fake_uv(tmp_path, monkeypatch, UNPUBLISHED)
+    store.validate_skill = Mock(return_value=True)
+
+    store.handle_install_skill(Message("ovos.skills.install", {"url": "https://github.com/OpenVoiceOS/skill-foo"}))
+    store.handle_uninstall_python(Message("ovos.pip.uninstall", {"packages": ["ovos-skill-foo"]}))
+    store.handle_uninstall_skill(Message("ovos.skills.uninstall", {"skill": "skill-foo.openvoiceos"}))
+
+    assert store.bus.message_types[-3:] == ["ovos.skills.install.failed",
+                                            "ovos.pip.uninstall.failed",
+                                            "ovos.skills.uninstall.failed"]
+    for reply in store.bus.message_data[-3:]:
+        assert "ovos-skill-foo" in reply["detail"]
+        assert reply["error"]
+
+
+def test_refusals_before_pip_runs_carry_an_empty_detail():
+    """The reply shape is stable: ``detail`` is present and empty when pip never ran."""
+    store = SkillsStore(bus=MessageBusMock(), config={"allow_pip": True})
+    store.play_error_sound = Mock()
+
+    store.handle_install_python(Message("ovos.pip.install", {"packages": []}))
+
+    assert store.bus.message_types[-1] == "ovos.pip.install.failed"
+    assert store.bus.message_data[-1] == {"error": "no packages to install", "detail": ""}
+
+
+def test_pip_output_is_still_logged_when_print_logs_is_true(tmp_path, monkeypatch):
+    store = _store_with_fake_uv(tmp_path, monkeypatch, "first line\nsecond line\n")
+
+    with patch("ovos_core.skill_installer.LOG") as log:
+        with pytest.raises(RuntimeError) as raised:
+            store.pip_install(["ovos-skill-foo"], print_logs=True)
+    logged = [call.args[0] for call in log.info.call_args_list]
+    assert "(pip) first line" in logged
+    assert "(pip) second line" in logged
+    assert str(raised.value) == "first line\nsecond line"
+
+    with patch("ovos_core.skill_installer.LOG") as log:
+        with pytest.raises(RuntimeError):
+            store.pip_install(["ovos-skill-foo"], print_logs=False)
+    assert not [call for call in log.info.call_args_list if "first line" in call.args[0]]
+
+
+def test_detail_is_bounded_to_the_tail_of_the_output(tmp_path, monkeypatch):
+    """A long resolver trace must not turn a bus reply into a multi-kilobyte
+    payload; the end of the output is the part that explains the failure."""
+    marker = "the reason is at the end"
+    store = _store_with_fake_uv(tmp_path, monkeypatch, "x" * (3 * FAILURE_DETAIL_CHARS) + marker)
+
+    store.handle_install_python(Message("ovos.pip.install", {"packages": ["ovos-skill-foo"]}))
+
+    detail = store.bus.message_data[-1]["detail"]
+    assert len(detail) == FAILURE_DETAIL_CHARS
+    assert detail.endswith(marker)
 
 
 if __name__ == "__main__":

@@ -38,6 +38,8 @@ Browse OVOS-compatible skills on [PyPI](https://pypi.org/search/?q=ovos-skill-) 
 
 Most classic Mycroft skills also work on OVOS.
 
+When an install or uninstall requested over the bus fails, the `.failed` reply carries the installer's own output in `detail`, so a remote caller can see why without reading the service log. See [docs/skill-installer.md](docs/skill-installer.md).
+
 ---
 
 ## Persona Support
