@@ -52,6 +52,25 @@ mycroft.skills.train  →  (pipeline plugins train)  →  mycroft.skills.trained
 
 Training has a 60-second timeout. On failure, an error is logged but the manager continues.
 
+## Unloading After an Uninstall
+
+`SkillsStore` reloads `ovos-plugin-manager` before it reports a completed uninstall, so `find_skill_plugins()` no longer returns the removed package. On that report the manager compares the loaded plugin skills with what is still discoverable and shuts down every one that is gone:
+
+```
+ovos.skills.uninstall.complete  →  _unload_undiscoverable_plugin_skills()
+ovos.pip.uninstall.complete     →  _unload_undiscoverable_plugin_skills()
+```
+
+The unloaded id is also dropped from the load-retry bookkeeping, so a later reinstall loads again on the next pass. Discovery is not trusted unconditionally: if it raises, nothing is unloaded and no bookkeeping is cleared.
+
+An empty result needs a second question. `find_skill_plugins()` reports what it could *import* and swallows the error when an import fails, so nothing coming back means either every skill package is gone or none of them would import this time. What the installed packages still *declare* separates the two, and it is read from entry point metadata without importing anything. Entry points still declared means the packages are there and something else is wrong, so every skill and its bookkeeping are kept and a warning is logged; none declared is a real removal and the skills are unloaded. Metadata that cannot be read at all is "cannot tell", and nothing is unloaded.
+
+Counting loaded skills cannot answer that question, because one distribution may expose several skill entry points: uninstalling a single package can legitimately empty discovery with several skills loaded.
+
+The removal list and the loader instances behind it are taken under the same lock, and each shutdown runs outside it, so a replacement loaded for one of those ids by an overlapping pass is never the one shut down.
+
+A skill still inside `loader.load()` when the report lands is not tracked yet, so the pass has no loader to detach for it. It records the verdict against that id instead, and the load honours it on the way out: the loader is shut down and never tracked, rather than the finished load reviving a package that is already gone. Such a load is never announced on `mycroft.skill.loaded` either, since it was never available. The verdict is spent on the one load it was recorded against, so a reinstall that reserves the id afresh loads normally. `skillmanager.deactivate` only silences a skill; this is what removes it.
+
 ## Settings File Watcher
 
 When enabled, a `FileWatcher` monitors `~/.config/ovos/skills/*/settings.json`. Any change emits:
@@ -68,6 +87,8 @@ ovos.skills.settings_changed  {skill_id: "..."}
 | `skillmanager.activate` | `activate_skill` |
 | `skillmanager.deactivate` | `deactivate_skill` |
 | `skillmanager.keep` | `deactivate_except` |
+| `ovos.skills.uninstall.complete` | `handle_uninstall_complete` |
+| `ovos.pip.uninstall.complete` | `handle_uninstall_complete` |
 | `mycroft.network.connected` | `handle_network_connected` |
 | `mycroft.internet.connected` | `handle_internet_connected` |
 | `mycroft.gui.available` | `handle_gui_connected` |

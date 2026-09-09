@@ -40,6 +40,8 @@ Most classic Mycroft skills also work on OVOS.
 
 When an install or uninstall requested over the bus fails, the `.failed` reply carries the installer's own output in `detail`, so a remote caller can see why without reading the service log. See [docs/skill-installer.md](docs/skill-installer.md).
 
+A skill uninstalled at runtime through the bus (`ovos.skills.uninstall`) is unloaded as soon as the installer reports completion, so it stops answering without a restart. See [docs/skill-manager.md](docs/skill-manager.md).
+
 ---
 
 ## Persona Support

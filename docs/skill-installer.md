@@ -88,7 +88,7 @@ Every `.failed` reply carries two fields. `error` is the `InstallError` value na
 
 pip's stdout and stderr are always captured as one stream, whichever backend runs; with `print_logs` (the default) each line is also echoed through the service log as it arrives, prefixed `(pip)`. A non-zero exit raises `RuntimeError` carrying the full captured output.
 
-After a successful skill install, `ovos-plugin-manager`'s entry point cache is reloaded so the new skill is discovered on the next `SkillManager` scan cycle (every 30 s).
+After a successful skill install, `ovos-plugin-manager`'s entry point cache is reloaded so the new skill is discovered on the next `SkillManager` scan cycle (every 30 s). After a successful uninstall the same reload happens before the `.complete` message, and `SkillManager` unloads the skills that are no longer discoverable on that message.
 
 ## Error Types
 
