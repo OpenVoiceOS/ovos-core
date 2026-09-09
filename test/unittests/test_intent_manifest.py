@@ -204,6 +204,34 @@ class TestManifestEnableDisable(unittest.TestCase):
         entry = list(self.m._index.values())[0]
         self.assertTrue(entry["enabled"])
 
+    def test_bridged_legacy_toggle_resolves_from_context(self):
+        # ovos-spec-tools bridges mycroft.skill.disable_intent onto the spec
+        # topic, and _toggle_legacy_to_spec has no skill_id field to carry, so
+        # the emitter is named only in the context. Resolving payload-only
+        # would make every bridged toggle a silent no-op.
+        msg = Message("ovos.intent.disable",
+                      data={"intent_name": "hello", "lang": "en-US"},
+                      context={"skill_id": "skill.test"})
+        with patch("ovos_core.intent_services.manifest.LOG.warning") as warn:
+            self.m._on_enable_disable(msg)
+        entry = list(self.m._index.values())[0]
+        self.assertFalse(entry["enabled"])
+        warned = " ".join(str(c.args[0]) for c in warn.call_args_list)
+        self.assertIn("§3.2", warned)
+        self.assertIn("skill.test", warned)
+
+    def test_payload_target_wins_over_a_differing_source(self):
+        # §3.2: the payload names the target, the context is provenance. A
+        # provisioning tool acting on another skill must not retarget itself.
+        self.m._on_register(_reg("skill.other", "hello", lang="en-US"))
+        msg = Message("ovos.intent.disable",
+                      data={"skill_id": "skill.other", "intent_name": "hello",
+                            "lang": "en-US"},
+                      context={"skill_id": "provisioner"})
+        self.m._on_enable_disable(msg)
+        by_skill = {k[1]: v["enabled"] for k, v in self.m._index.items()}
+        self.assertEqual(by_skill, {"skill.test": True, "skill.other": False})
+
 
 class TestDeregisterSessionScope(unittest.TestCase):
     """§11.1/§11.3 — deregistration MUST key off context.session.session_id,

@@ -38,13 +38,29 @@ def _target_skill_id(message: Message) -> Optional[str]:
     provisioning tool or a conflict-resolving skill acts on another skill's
     behalf, so a difference is never grounds for rejection and an absent
     context ``skill_id`` never makes the message malformed.
+
+    Substituting the source for an absent target contradicts §3.2 and is kept
+    only for the migration window. ``ovos-spec-tools`` bridges the legacy
+    ``mycroft.skill.{enable,disable}_intent`` onto the spec topics, and the
+    legacy payload has no ``skill_id`` field to carry, so a bridged toggle
+    arrives with the emitter named in its context and nothing else. Resolving
+    payload-only makes every such toggle a silent no-op. The substitution is
+    logged so that a spec-native producer omitting the target is visible rather
+    than silently retargeted, and it goes away with the mirror.
     """
     payload_skill_id = message.data.get("skill_id")
     source_skill_id = message.context.get("skill_id")
-    if payload_skill_id and source_skill_id and payload_skill_id != source_skill_id:
-        LOG.debug(f"{message.msg_type}: source {source_skill_id!r} acting on "
-                  f"target {payload_skill_id!r}")
-    return payload_skill_id or source_skill_id
+    if payload_skill_id:
+        if source_skill_id and payload_skill_id != source_skill_id:
+            LOG.debug(f"{message.msg_type}: source {source_skill_id!r} acting on "
+                      f"target {payload_skill_id!r}")
+        return payload_skill_id
+    if source_skill_id:
+        LOG.warning(f"{message.msg_type}: no target skill_id in the payload; "
+                    f"acting on the source {source_skill_id!r} instead. "
+                    "OVOS-INTENT-4 §3.2 names the target in `data`; this "
+                    "substitution serves the pre-spec bridge only.")
+    return source_skill_id
 
 
 class IntentManifest:
@@ -247,7 +263,7 @@ class IntentManifest:
 
     def _on_enable_disable(self, message: Message):
         enabled = message.msg_type == "ovos.intent.enable"
-        skill_id = message.data.get("skill_id") or message.context.get("skill_id")
+        skill_id = _target_skill_id(message)
         intent_name = message.data.get("intent_name")
         lang = message.data.get("lang")
         session_id = self._session_id_of(message)
