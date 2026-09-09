@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.5.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.2a1) (2026-09-09)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.1a1...3.5.2a1)
+
+**Merged pull requests:**
+
+- fix: report the enable/disable target substitution [\#969](https://github.com/OpenVoiceOS/ovos-core/pull/969) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.5.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.1a1) (2026-09-08)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.0a1...3.5.1a1)
@@ -251,19 +259,19 @@
 
 ## [3.0.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.12a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.12a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.12a1)
 
 **Merged pull requests:**
 
 - fix: close messagebus client before main\(\) returns on shutdown [\#870](https://github.com/OpenVoiceOS/ovos-core/pull/870) ([JarbasAl](https://github.com/JarbasAl))
 
-## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.11a1)
-
 ## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.10a3)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.10a3)
+
+## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.11a1)
 
 ## [3.0.10a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a2) (2026-08-31)
 
@@ -342,8 +350,6 @@
 
 - fix: mutate session intent context under the context lock [\#868](https://github.com/OpenVoiceOS/ovos-core/pull/868) ([JarbasAl](https://github.com/JarbasAl))
 - docs+test: mark add\_context/remove\_context as legacy-compat, prove idempotency [\#865](https://github.com/OpenVoiceOS/ovos-core/pull/865) ([JarbasAl](https://github.com/JarbasAl))
-- feat\(converse\): broadcast contest poll \(OVOS-CONVERSE-1 §4.2\) [\#863](https://github.com/OpenVoiceOS/ovos-core/pull/863) ([JarbasAl](https://github.com/JarbasAl))
-- fix: extend \#859 round guard to fallback/stop ping-pong \(PIPELINE-1 §9.1.1\) [\#862](https://github.com/OpenVoiceOS/ovos-core/pull/862) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [3.0.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.4a1) (2026-08-14)
 
