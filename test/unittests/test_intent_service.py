@@ -24,7 +24,6 @@ from ovos_bus_client.session import Session, SessionManager
 from ovos_bus_client.util import get_message_lang
 from ovos_config import Configuration
 from ovos_config import LocalConf, DEFAULT_CONFIG
-from ovos_config.locale import setup_locale
 from ovos_core.intent_services import IntentService
 from ovos_core.intent_services import service as intent_service_module
 from ovos_core.intent_services.working_session import close_round, open_round
@@ -70,10 +69,10 @@ class TestLanguageExtraction(TestCase):
     @mock.patch.dict(Configuration._Configuration__patch, BASE_CONF)
     def test_no_lang_in_message(self):
         """No lang in message should result in lang from active locale."""
-        setup_locale("it-it")
+        Configuration()["lang"] = "it-it"
         msg = Message('test msg', data={})
         self.assertEqual(get_message_lang(msg), 'it-IT')
-        setup_locale("en-US")
+        Configuration()["lang"] = "en-US"
         self.assertEqual(get_message_lang(msg), 'en-US')
 
     @mock.patch.dict(Configuration._Configuration__patch, BASE_CONF)

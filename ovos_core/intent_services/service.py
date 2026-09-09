@@ -1389,12 +1389,10 @@ class IntentService:
 def launch_standalone():
     from ovos_bus_client import MessageBusClient
     from ovos_utils import wait_for_exit_signal
-    from ovos_config.locale import setup_locale
     from ovos_utils.log import init_service_logger
 
     LOG.info("Launching IntentService in standalone mode")
     init_service_logger("intents")
-    setup_locale()
 
     bus = MessageBusClient()
     bus.run_in_thread()
