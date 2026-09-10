@@ -16,6 +16,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch
+from ovos_plugin_manager.templates.transformers import UtteranceTransformer
 from ovos_utils.fakebus import FakeBus
 
 from ovos_core.transformers import (
@@ -129,6 +130,41 @@ class TestUtteranceTransformersServiceInit(unittest.TestCase):
             svc = UtteranceTransformersService(FakeBus(), config=cfg)
         self.assertNotIn("bad_plug", svc.loaded_plugins)
 
+    def test_bus_is_stored(self):
+        """The service exposes the exact bus it was constructed with."""
+        bus = FakeBus()
+        with patch("ovos_core.transformers.find_utterance_transformer_plugins",
+                   return_value={}), \
+             patch("ovos_core.transformers.Configuration", return_value={}):
+            svc = UtteranceTransformersService(bus)
+        self.assertEqual(svc.bus, bus)
+
+    def test_has_loaded_true_after_init(self):
+        """The service reports has_loaded True once construction finishes."""
+        with patch("ovos_core.transformers.find_utterance_transformer_plugins",
+                   return_value={}), \
+             patch("ovos_core.transformers.Configuration", return_value={}):
+            svc = UtteranceTransformersService(FakeBus())
+        self.assertTrue(svc.has_loaded)
+
+
+class TestUtteranceTransformersServiceRealDiscovery(unittest.TestCase):
+    """Tests that exercise real, unmocked plugin discovery against the
+    installed environment. Every other case in this file patches
+    find_utterance_transformer_plugins away; this one does not, so it is
+    the only case that would catch a plugin failing to load for real."""
+
+    def test_real_plugins_are_utterance_transformer_instances(self):
+        """Every plugin discovered and loaded from the installed
+        environment is a real UtteranceTransformer instance."""
+        bus = FakeBus()
+        service = UtteranceTransformersService(bus)
+        self.assertTrue(service.loaded_plugins)
+        for plugin in service.loaded_plugins:
+            self.assertIsInstance(service.loaded_plugins[plugin],
+                                  UtteranceTransformer)
+        service.shutdown()
+
 
 class TestUtteranceTransformersServicePluginsProperty(unittest.TestCase):
     """Tests for the plugins property (priority ordering)."""
@@ -157,6 +193,14 @@ class TestUtteranceTransformersServicePluginsProperty(unittest.TestCase):
                    return_value={}):
             svc.load_plugins()
         self.assertIsNone(svc._sorted_plugins)
+
+    def test_loaded_plugins_and_plugins_same_length(self):
+        """loaded_plugins (the mapping) and plugins (the ordered list)
+        hold the same number of plugins."""
+        p1 = _make_mock_plugin("p1", priority=10)
+        p2 = _make_mock_plugin("p2", priority=20)
+        svc = _make_utterance_service(plugins=[p1, p2])
+        self.assertEqual(len(svc.loaded_plugins), len(svc.plugins))
 
 
 class TestUtteranceTransformersServiceTransform(unittest.TestCase):
@@ -214,6 +258,26 @@ class TestUtteranceTransformersServiceTransform(unittest.TestCase):
         svc = _make_utterance_service(plugins=[])
         utt, ctx = svc.transform(["hi"])
         self.assertEqual(ctx, {})
+
+    def test_transform_context_precedence_follows_run_order(self):
+        """When two plugins write the same context key, the last one to
+        run wins, and that winner tracks priority order rather than a
+        fixed plugin."""
+        p1 = _make_mock_plugin("p1", priority=2)
+        p1.transform.return_value = (["hello"], {"parser_context": "mod_1"})
+        p2 = _make_mock_plugin("p2", priority=1)
+        p2.transform.return_value = (["hello"], {"parser_context": "mod_2"})
+        svc = _make_utterance_service(plugins=[p1, p2])
+
+        _, ctx = svc.transform(["hello"], {})
+        self.assertEqual(ctx["parser_context"], "mod_1")
+
+        # Swap priorities and invalidate the sorted-plugin cache, or the
+        # service keeps using the stale run order.
+        p2.priority = 100
+        svc._sorted_plugins = None
+        _, ctx = svc.transform(["hello"], {})
+        self.assertEqual(ctx["parser_context"], "mod_2")
 
     def test_session_key_excluded_from_log(self):
         """The 'session' key is stripped before logging (no exception raised)."""
