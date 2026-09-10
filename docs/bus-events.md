@@ -71,12 +71,16 @@ All events use the OVOS `Message` format: `{type, data, context}`.
 |---|---|---|
 | `ovos.skills.install` | * → core | Install skill packages via pip |
 | `ovos.skills.install.complete` | core → * | Install succeeded |
-| `ovos.skills.install.failed` | core → * | Install failed |
+| `ovos.skills.install.failed` | core → * | Install failed: `{error, detail}`, `detail` being the tail of the installer's output |
 | `ovos.skills.uninstall` | * → core | Uninstall skill packages |
 | `ovos.skills.uninstall.complete` | core → * | Uninstall succeeded |
-| `ovos.skills.uninstall.failed` | core → * | Uninstall failed |
+| `ovos.skills.uninstall.failed` | core → * | Uninstall failed: `{error, detail}` |
 | `ovos.pip.install` | * → core | Install arbitrary pip packages |
 | `ovos.pip.uninstall` | * → core | Uninstall arbitrary pip packages |
+| `ovos.pip.install.complete` | core → * | Install succeeded |
+| `ovos.pip.install.failed` | core → * | Install failed: `{error, detail}` |
+| `ovos.pip.uninstall.complete` | core → * | Uninstall succeeded |
+| `ovos.pip.uninstall.failed` | core → * | Uninstall failed: `{error, detail}` |
 
 ## Connectivity / Network
 

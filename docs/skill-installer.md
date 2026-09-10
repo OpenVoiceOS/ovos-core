@@ -52,7 +52,7 @@ ovos.skills.install
     "constraints": "https://..."      # optional override
   }
   → ovos.skills.install.complete  (success)
-  → ovos.skills.install.failed    (error)
+  → ovos.skills.install.failed    {"error": "...", "detail": "..."}
 ```
 
 ### Uninstall a skill
@@ -61,7 +61,7 @@ ovos.skills.install
 ovos.skills.uninstall
   data: {"packages": ["ovos-skill-foo"]}
   → ovos.skills.uninstall.complete
-  → ovos.skills.uninstall.failed
+  → ovos.skills.uninstall.failed  {"error": "...", "detail": "..."}
 ```
 
 ### Install arbitrary Python packages
@@ -69,6 +69,8 @@ ovos.skills.uninstall
 ```
 ovos.pip.install
   data: {"packages": ["some-lib>=1.0"]}
+  → ovos.pip.install.complete
+  → ovos.pip.install.failed  {"error": "...", "detail": "..."}
 ```
 
 ### Uninstall arbitrary Python packages
@@ -76,7 +78,15 @@ ovos.pip.install
 ```
 ovos.pip.uninstall
   data: {"packages": ["some-lib"]}
+  → ovos.pip.uninstall.complete
+  → ovos.pip.uninstall.failed  {"error": "...", "detail": "..."}
 ```
+
+### Failure replies
+
+Every `.failed` reply carries two fields. `error` is the `InstallError` value naming the failure (see below); `detail` is the last `FAILURE_DETAIL_CHARS` (2000) characters of what pip or uv printed, so a caller can tell "this version is not published yet" from "this dependency conflicts" without reading the service log. `detail` is an empty string when pip never ran (disabled installer, bad URL, empty package list, protected package).
+
+pip's stdout and stderr are always captured as one stream, whichever backend runs; with `print_logs` (the default) each line is also echoed through the service log as it arrives, prefixed `(pip)`. A non-zero exit raises `RuntimeError` carrying the full captured output.
 
 After a successful skill install, `ovos-plugin-manager`'s entry point cache is reloaded so the new skill is discovered on the next `SkillManager` scan cycle (every 30 s).
 

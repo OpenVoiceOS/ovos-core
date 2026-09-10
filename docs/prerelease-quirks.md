@@ -9,6 +9,19 @@ This file resets at the next stable release. At that point its contents
 become upgrade notes for the `2.1.1 -> next-stable` jump, and a new, empty
 quirks log starts.
 
+## #979 (alpha of 2026-09-09)
+
+`SkillsStore` always captures pip/uv output now (stdout and stderr as one
+stream), echoing it through the log line by line when `print_logs` is set
+instead of letting the subprocess inherit the service's stdout. A failed run
+still raises `RuntimeError`, which now carries the captured text. Every
+`.failed` reply (`ovos.skills.install.failed`, `ovos.skills.uninstall.failed`,
+`ovos.pip.install.failed`, `ovos.pip.uninstall.failed`) gains a `detail`
+field holding the last 2000 characters of that output, empty when pip never
+ran; `error` is unchanged, so existing consumers keep working. Before this a
+remote caller saw only the `InstallError` string and could not tell "this
+version is not published yet" from "this dependency conflicts".
+
 ## #935 (alpha of 2026-09-06)
 
 The floor on `ovos-bus-client` moves to 2.11.13a1. Core no longer subscribes
