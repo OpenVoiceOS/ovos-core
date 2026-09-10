@@ -994,11 +994,13 @@ class TestStopSelectionDeterministic(unittest.TestCase):
         svc = _make_service()
 
         ack_handler = None
+        registered = Event()
 
         def capture_on(event, handler):
             nonlocal ack_handler
             if event == SpecMessage.STOP_PONG.value:
                 ack_handler = handler
+                registered.set()
 
         svc.bus.on = capture_on
         svc.bus.remove = MagicMock()
@@ -1008,8 +1010,6 @@ class TestStopSelectionDeterministic(unittest.TestCase):
         # holder); older_skill is a less-recent active_handlers entry.
         with patch.object(svc, "_stop_candidates",
                           return_value=["holder_skill", "older_skill"]):
-            import threading
-            import time
             result_holder = []
 
             def run():
@@ -1017,7 +1017,8 @@ class TestStopSelectionDeterministic(unittest.TestCase):
 
             t = threading.Thread(target=run)
             t.start()
-            time.sleep(0.05)  # let the thread register the handler
+            self.assertTrue(registered.wait(timeout=5),
+                            "the collector never subscribed to the pong")
 
             # inverted arrival order: the OLDER (less-recent) skill answers
             # FIRST -- this is exactly the race the live auditor reproduced
