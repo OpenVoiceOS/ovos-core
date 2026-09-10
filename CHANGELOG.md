@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.5.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.3a1) (2026-09-10)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.2a1...3.5.3a1)
+
+**Merged pull requests:**
+
+- fix: wait for the stop collector to subscribe instead of sleeping [\#973](https://github.com/OpenVoiceOS/ovos-core/pull/973) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.5.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.2a1) (2026-09-09)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.1a1...3.5.2a1)
@@ -349,7 +357,6 @@
 **Merged pull requests:**
 
 - fix: mutate session intent context under the context lock [\#868](https://github.com/OpenVoiceOS/ovos-core/pull/868) ([JarbasAl](https://github.com/JarbasAl))
-- docs+test: mark add\_context/remove\_context as legacy-compat, prove idempotency [\#865](https://github.com/OpenVoiceOS/ovos-core/pull/865) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [3.0.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.4a1) (2026-08-14)
 
