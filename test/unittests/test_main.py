@@ -15,14 +15,12 @@ from ovos_bus_client import MessageBusClient
 
 class TestMainShutdown(unittest.TestCase):
 
-    @patch('ovos_core.__main__.setup_locale')
     @patch('ovos_core.__main__.init_service_logger')
     @patch('ovos_core.__main__.wait_for_exit_signal')
     @patch('ovos_core.__main__.SkillManager')
     @patch('ovos_core.__main__.MessageBusClient')
     def test_bus_is_closed_before_main_returns(self, mock_bus_cls, mock_manager_cls,
-                                               mock_wait, mock_init_logger,
-                                               mock_setup_locale):
+                                               mock_wait, mock_init_logger):
         """After the exit signal arrives and the skill manager has been
         shut down, `main()` must close the bus's websocket connection and
         join the receiver thread so the background dispatch thread stops
