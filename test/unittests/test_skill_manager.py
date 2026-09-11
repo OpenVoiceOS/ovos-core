@@ -761,8 +761,12 @@ class TestSkillManager(TestCase):
         mock_loader.load.assert_called_once()
 
     def test_uninstall_complete_keeps_everything_when_discovery_returns_nothing(self):
-        """An empty discovery result with several skills loaded is a hiccup,
-        not a mass removal: warn, keep every skill, clear no bookkeeping."""
+        """An empty discovery result is a hiccup when the entry points are still
+        declared: warn and keep every loaded skill.
+
+        The backoff record for `test.third.skill` is a separate matter. It is not
+        declared, so that package really is gone, and leaving its record behind
+        would make a reinstall wait out a backoff it no longer owes."""
         self.skill_manager.plugin_skills = {}
         loaders = [self._tracked_loader('test.first.skill'), self._tracked_loader('test.second.skill')]
         self.skill_manager._plugin_skill_failures = {'test.third.skill': (2, 0.0)}
@@ -776,7 +780,7 @@ class TestSkillManager(TestCase):
         for loader in loaders:
             loader.instance.shutdown.assert_not_called()
             loader.instance.default_shutdown.assert_not_called()
-        self.assertDictEqual({'test.third.skill': (2, 0.0)}, self.skill_manager._plugin_skill_failures)
+        self.assertDictEqual({}, self.skill_manager._plugin_skill_failures)
         self.assertSetEqual({'test.first.skill'}, self.skill_manager._logged_skill_warnings)
         self.log_mock.warning.assert_called_once()
         self.assertIn('keeping them', self.log_mock.warning.call_args[0][0])
@@ -913,6 +917,57 @@ class TestSkillManager(TestCase):
         self.assertIn('test.kept.skill', self.skill_manager.plugin_skills)
         self.log_mock.warning.assert_called_once()
         self.assertIn('keeping them', self.log_mock.warning.call_args[0][0])
+
+    def test_a_skill_that_would_not_import_is_not_treated_as_removed(self):
+        """A partial discovery result must not unload a still-installed skill.
+
+        `find_skill_plugins()` swallows the error when one entry point fails to
+        import, so that skill is missing from the result exactly like an uninstalled
+        one. Its entry point is still declared, and that is what separates the two:
+        it stays tracked, keeps its loader, keeps its retry record, and a load in
+        flight for it is not marked for discard.
+        """
+        self.skill_manager.plugin_skills = {}
+        good = self._tracked_loader('test.imports.skill')
+        broken = self._tracked_loader('test.broken.skill')
+        self.skill_manager._plugin_skill_failures = {'test.broken.skill': (1, 0.0)}
+        self.skill_manager._loading_plugin_skills = {'test.inflight.skill'}
+        self.skill_manager._plugin_skill_unload_pending = set()
+
+        # Only the healthy one imports; all three are still declared.
+        with patch(self.mock_package + 'find_skill_plugins',
+                   return_value={'test.imports.skill': object()}), \
+                self._declared('test.imports.skill', 'test.broken.skill',
+                               'test.inflight.skill'):
+            removed = self.skill_manager._unload_undiscoverable_plugin_skills()
+
+        self.assertEqual([], removed)
+        self.assertIn('test.broken.skill', self.skill_manager.plugin_skills)
+        broken.instance.shutdown.assert_not_called()
+        good.instance.shutdown.assert_not_called()
+        self.assertIn('test.broken.skill', self.skill_manager._plugin_skill_failures)
+        self.assertSetEqual(set(), self.skill_manager._plugin_skill_unload_pending)
+
+    def test_a_skill_that_is_neither_importable_nor_declared_is_removed(self):
+        """The counterpart: gone from both is a real uninstall, even alongside a
+        healthy skill, so a partial result still removes what actually went away."""
+        self.skill_manager.plugin_skills = {}
+        self._tracked_loader('test.imports.skill')
+        gone = self._tracked_loader('test.gone.skill')
+        self.skill_manager._plugin_skill_failures = {'test.gone.skill': (1, 0.0)}
+        self.skill_manager._loading_plugin_skills = {'test.gone.inflight'}
+        self.skill_manager._plugin_skill_unload_pending = set()
+
+        with patch(self.mock_package + 'find_skill_plugins',
+                   return_value={'test.imports.skill': object()}), \
+                self._declared('test.imports.skill'):
+            removed = self.skill_manager._unload_undiscoverable_plugin_skills()
+
+        self.assertEqual(['test.gone.skill'], removed)
+        gone.instance.shutdown.assert_called_once_with()
+        self.assertNotIn('test.gone.skill', self.skill_manager._plugin_skill_failures)
+        self.assertSetEqual({'test.gone.inflight'},
+                            self.skill_manager._plugin_skill_unload_pending)
 
     def test_one_package_can_own_every_loaded_skill(self):
         """A distribution may expose several skill entry points, so uninstalling one

@@ -813,30 +813,26 @@ class SkillManager(Thread):
         except Exception:
             LOG.exception("Plugin skill discovery failed, keeping the loaded skills")
             return []
+        # `find_skill_plugins()` reports what it could import and swallows the error
+        # when an import fails, so a skill whose package is present but whose import
+        # broke is missing from `discoverable` exactly like an uninstalled one. Only
+        # the entry points the installed packages declare tell those apart, and that
+        # is read without importing anything, so it is read on every pass rather than
+        # only when nothing imported at all. Unloading on an import failure would shut
+        # a still-installed skill down and discard its loader.
+        declared = self._declared_skill_plugins()
+        if declared is None:
+            LOG.warning("The installed skill entry points could not be read, so a "
+                        "missing plugin skill cannot be told from one that would not "
+                        "import; keeping the loaded skills")
+            return []
+        installed = discoverable | declared
+        if not discoverable and declared:
+            LOG.warning(f"Plugin skill discovery returned nothing while {len(declared)} "
+                        f"skill entry points are still installed; keeping them")
         with self._plugin_skills_lock:
-            # an uninstall of one package cannot make every other package
-            # vanish, so an empty result with several skills loaded is a
-            # discovery hiccup (metadata race, a half-written dist-info during
-            # a concurrent install), not a mass removal; with a single skill
-            # loaded, empty is the legitimate "the last skill was removed"
-            if not discoverable:
-                # nothing imported: either every skill package is gone, or none of them
-                # would import this time (a metadata race, a half-written dist-info during
-                # a concurrent install, a dependency that broke). How many skills are
-                # loaded cannot tell those apart - one distribution can expose several
-                # skill entry points, so removing a single package can legitimately empty
-                # this - but what the installed packages still declare can.
-                declared = self._declared_skill_plugins()
-                if declared is None:
-                    LOG.warning("Plugin skill discovery returned nothing and the installed "
-                                "entry points could not be read; keeping the loaded skills")
-                    return []
-                if declared:
-                    LOG.warning(f"Plugin skill discovery returned nothing while {len(declared)} "
-                                f"skill entry points are still installed; keeping them")
-                    return []
             removed = [skill_id for skill_id in self.plugin_skills
-                       if skill_id not in discoverable]
+                       if skill_id not in installed]
             # detach under the lock that decided the removal, and keep the
             # loader instance rather than the id: once an id stops being
             # tracked an overlapping pass is free to load a replacement for
@@ -847,14 +843,14 @@ class SkillManager(Thread):
             # a failed load leaves a backoff record and no loader; without
             # this a reinstall of that package would wait out the backoff
             stale_failures = [skill_id for skill_id in self._plugin_skill_failures
-                              if skill_id not in discoverable]
+                              if skill_id not in installed]
             # a load in flight holds the reservation and is not in
             # `plugin_skills` yet, so there is nothing to detach for it here.
             # Record the verdict instead: `_load_plugin_skill` discards the
             # loader it is about to track rather than reviving a dead package.
             self._plugin_skill_unload_pending.update(
                 skill_id for skill_id in self._loading_plugin_skills
-                if skill_id not in discoverable)
+                if skill_id not in installed)
         for skill_id, skill_loader in detached:
             LOG.info('Unloading plugin skill: ' + skill_id)
             self._shutdown_skill_loader(skill_loader)

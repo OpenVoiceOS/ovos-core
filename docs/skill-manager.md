@@ -80,9 +80,11 @@ ovos.pip.uninstall.complete     →  _unload_undiscoverable_plugin_skills()
 
 The unloaded id is also dropped from the load-retry bookkeeping, so a later reinstall loads again on the next pass. Discovery is not trusted unconditionally: if it raises, nothing is unloaded and no bookkeeping is cleared.
 
-An empty result needs a second question. `find_skill_plugins()` reports what it could *import* and swallows the error when an import fails, so nothing coming back means either every skill package is gone or none of them would import this time. What the installed packages still *declare* separates the two, and it is read from entry point metadata without importing anything. Entry points still declared means the packages are there and something else is wrong, so every skill and its bookkeeping are kept and a warning is logged; none declared is a real removal and the skills are unloaded. Metadata that cannot be read at all is "cannot tell", and nothing is unloaded.
+`find_skill_plugins()` reports what it could *import* and swallows the error when an import fails, so a skill whose package is present but whose import broke is missing from the result in exactly the same way as an uninstalled one. What the installed packages still *declare* separates those two, and it is read from entry point metadata without importing anything, so it is read on every pass and the two sets are used together: a skill is gone only when it is neither importable nor declared. Unloading on an import failure would shut a still-installed skill down and discard its loader, and the next pass would load it again.
 
-Counting loaded skills cannot answer that question, because one distribution may expose several skill entry points: uninstalling a single package can legitimately empty discovery with several skills loaded.
+Metadata that cannot be read at all is "cannot tell", and nothing is unloaded. When nothing imports but entry points are still declared, every skill is kept and a warning is logged.
+
+Counting loaded skills cannot answer this, because one distribution may expose several skill entry points: uninstalling a single package can legitimately empty discovery with several skills loaded.
 
 The removal list and the loader instances behind it are taken under the same lock, and each shutdown runs outside it, so a replacement loaded for one of those ids by an overlapping pass is never the one shut down.
 

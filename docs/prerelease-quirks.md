@@ -48,13 +48,13 @@ skill. A skill still inside `loader.load()` when the report lands is not tracked
 yet, so the pass records the verdict against its id and the load shuts the
 loader down instead of tracking it; without that, the finished load revived a
 package that was already gone and only the next uninstall removed it again.
-A discovery failure unloads nothing. An empty discovery result is decided by
-what the installed packages still declare in their entry point metadata, read
-without importing: entry points still declared means the packages are there
-and something else is wrong, so everything is kept and a warning is logged;
-none declared is a real removal. Counting loaded skills could not decide this,
-because one distribution may expose several skill entry points and removing it
-can legitimately empty discovery.
+A discovery failure unloads nothing. A skill is treated as removed only when
+it is neither importable nor declared in the installed entry point metadata,
+which is read on every pass without importing anything: an import that breaks
+leaves the skill declared, so it keeps its loader instead of being shut down.
+Metadata that cannot be read at all unloads nothing. Counting loaded skills
+could not decide this, because one distribution may expose several skill entry
+points and removing it can legitimately empty discovery.
 
 ## #935 (alpha of 2026-09-06)
 
