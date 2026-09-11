@@ -52,6 +52,11 @@ def _make_service(bus, match) -> IntentService:
         plugins.transform.side_effect = transform
         setattr(svc, attr, plugins)
 
+    # OVOS-TRANSFORM-1 §3.7: no typed-slots transformer loaded
+    typed_slots = MagicMock()
+    typed_slots.transform.return_value = None
+    svc.typed_slots_plugins = typed_slots
+
     svc.disambiguate_lang = lambda m: "en-US"
     svc.intent_manifest = IntentManifest(bus)
     svc.intent_dispatcher = IntentDispatcher(

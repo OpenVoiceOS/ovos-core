@@ -16,13 +16,14 @@ dependencies = [
     "python-dateutil>=2.6, <3.0",
     "combo-lock>=0.2.2, <0.4",
     "ovos-utils>=0.13.9a1,<1.0.0",
-    # OVOS-SESSION-2 §5.1 arrival merge: SessionManager.fold_inbound / handle_sync
-    "ovos_bus_client>=2.11.1a1,<3.0.0",
-    "ovos-plugin-manager>=2.11.1a1,<3.0.0",
+    # OVOS-SESSION-2 §5.1 arrival merge (SessionManager.fold_inbound) plus the
+    # one-cycle ovos.session.sync compat shim (SessionManager.handle_session_sync)
+    "ovos_bus_client>=2.11.13a1,<3.0.0",
+    "ovos-plugin-manager>=2.12.0a1,<3.0.0",
     "ovos-config>=2.1.4a5,<4.0.0",
     "ovos-workshop>=9.6.9a1,<10.0.0",
     "rapidfuzz>=3.6,<4.0",
-    "ovos-spec-tools[langcodes]>=1.10.4a1,<2.0.0",
+    "ovos-spec-tools[langcodes]>=1.11.1a1,<2.0.0",
 ]
 
 [project.urls]
@@ -64,6 +65,7 @@ plugins = [
     "ovos-bidirectional-translation-plugin>=0.1.3a4, <1.0.0",
     "ovos-translate-server-plugin>=0.0.8a1, <1.0.0",
     "ovos-utterance-normalizer>=0.2.5a1, <1.0.0",
+    "ovos-typed-slots-transformer>=0.0.1a2, <1.0.0",
     "ovos-number-parser>=0.19.8a1,<1.0.0",
     "ovos-date-parser>=0.29.0,<1.0.0",
     "ovos-m2v-pipeline>=0.5.4a1,<1.0.0",

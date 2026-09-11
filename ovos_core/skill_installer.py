@@ -3,7 +3,7 @@ import shutil
 import sys
 from importlib import reload
 from os.path import exists
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, STDOUT
 from typing import Optional
 
 import requests
@@ -23,11 +23,20 @@ class InstallError(str, enum.Enum):
     NO_PKGS = "no packages to install"
 
 
+#: how much of the installer's output a ``.failed`` reply carries in ``detail``
+FAILURE_DETAIL_CHARS = 2000
+
+
 class SkillsStore:
     # default constraints to use if none are given
     DEFAULT_CONSTRAINTS = 'https://raw.githubusercontent.com/OpenVoiceOS/ovos-releases/refs/heads/main/constraints-stable.txt'
     PIP_LOCK = NamedLock("ovos_pip.lock")
     UV = shutil.which("uv")  # use 'uv pip' if available, speeds things up a lot and is the default in raspOVOS
+
+    #: OVOS-INSTALL-1 §2.3: the name a request addresses this service by,
+    #: in ``data.service_name``. The skills service owns skills, solvers,
+    #: personas, pipeline stages and utterance transformers.
+    SERVICE_NAME = "ovos_core"
 
     def __init__(self, bus, config=None):
         self.config = config or Configuration().get("skills", {}).get("installer", {})
@@ -53,6 +62,61 @@ class SkillsStore:
         """Emit a message to play the configured success sound."""
         snd = self.config.get("sounds", {}).get("pip_success", "snd/acknowledge.mp3")
         self.bus.emit(Message("mycroft.audio.play_sound", {"uri": snd}))
+
+    @staticmethod
+    def failure_detail(output) -> str:
+        """The tail of an installer run's output, sized for a bus reply.
+
+        Args:
+            output: The captured output, or the ``RuntimeError`` carrying it.
+
+        Returns:
+            str: At most ``FAILURE_DETAIL_CHARS`` characters, taken from the end,
+                since that is where pip and uv explain why a run failed.
+        """
+        return str(output or "")[-FAILURE_DETAIL_CHARS:]
+
+    def _reply_failed(self, message: Message, topic: str, error: str, detail: str = "") -> None:
+        """Reply to a request with a ``.failed`` message.
+
+        Args:
+            message (Message): The request being answered.
+            topic (str): The ``.failed`` topic.
+            error (str): The ``InstallError`` value (or exception text) naming the failure.
+            detail (str): The installer's output tail, empty when pip did not run.
+        """
+        self.bus.emit(message.reply(topic, {"error": error, "detail": detail}))
+
+    @staticmethod
+    def _run_pip(pip_command: list, print_logs: bool) -> str:
+        """Run one pip/uv command and return what it printed.
+
+        stdout and stderr are captured as a single stream: uv writes everything
+        to stderr, pip splits progress and errors across the two, and the last
+        lines of the merged stream are the ones that say why a run failed. With
+        ``print_logs`` every line is also echoed through ``LOG`` as it arrives.
+
+        Args:
+            pip_command (list): The full command line.
+            print_logs (bool): Whether to echo the output to the log.
+
+        Returns:
+            str: The captured output.
+
+        Raises:
+            RuntimeError: On a non-zero exit, carrying the captured output.
+        """
+        lines = []
+        with Popen(pip_command, stdout=PIPE, stderr=STDOUT, text=True, errors="replace") as proc:
+            for line in proc.stdout or []:
+                line = line.rstrip("\n")
+                lines.append(line)
+                if print_logs:
+                    LOG.info(f"(pip) {line}")
+        output = "\n".join(lines)
+        if proc.returncode != 0:
+            raise RuntimeError(output)
+        return output
 
     @staticmethod
     def validate_constraints(constraints: str) -> bool:
@@ -91,7 +155,7 @@ class SkillsStore:
         Args:
             packages (list): List of package specifiers to install.
             constraints (str): Optional constraints file path or URL.
-            print_logs (bool): Whether to print pip output to stdout.
+            print_logs (bool): Whether to echo pip output to the log.
 
         Returns:
             bool: True if all packages were installed successfully, False otherwise.
@@ -131,17 +195,11 @@ class SkillsStore:
                 LOG.info("(pip) Installing " + dependent_python_package)
                 pip_command = pip_args + [dependent_python_package]
                 LOG.debug(" ".join(pip_command))
-                if print_logs:
-                    proc = Popen(pip_command)
-                else:
-                    proc = Popen(pip_command, stdout=PIPE, stderr=PIPE)
-                pip_code = proc.wait()
-                if pip_code != 0:
-                    stderr = proc.stderr
-                    if stderr:
-                        stderr = stderr.read().decode()
+                try:
+                    self._run_pip(pip_command, print_logs)
+                except RuntimeError:
                     self.play_error_sound()
-                    raise RuntimeError(stderr)
+                    raise
 
         reload(ovos_plugin_manager)  # force core to pick new entry points
         self.play_success_sound()
@@ -157,7 +215,7 @@ class SkillsStore:
         Args:
             packages (list): List of package names to uninstall.
             constraints (str): Optional constraints file path or URL used to identify protected packages.
-            print_logs (bool): Whether to print pip output to stdout.
+            print_logs (bool): Whether to echo pip output to the log.
 
         Returns:
             bool: True if all packages were uninstalled successfully, False otherwise.
@@ -215,15 +273,11 @@ class SkillsStore:
                 LOG.info("(pip) Uninstalling " + dependent_python_package)
                 pip_command = pip_args + [dependent_python_package]
                 LOG.debug(" ".join(pip_command))
-                if print_logs:
-                    proc = Popen(pip_command)
-                else:
-                    proc = Popen(pip_command, stdout=PIPE, stderr=PIPE)
-                pip_code = proc.wait()
-                if pip_code != 0:
-                    stderr = proc.stderr.read().decode()
+                try:
+                    self._run_pip(pip_command, print_logs)
+                except RuntimeError:
                     self.play_error_sound()
-                    raise RuntimeError(stderr)
+                    raise
 
         reload(ovos_plugin_manager)  # force core to pick new entry points
         self.play_success_sound()
@@ -297,27 +351,26 @@ class SkillsStore:
         if not self.config.get("allow_pip"):
             LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()
-            self.bus.emit(message.reply("ovos.skills.install.failed",
-                                        {"error": InstallError.DISABLED.value}))
+            self._reply_failed(message, "ovos.skills.install.failed", InstallError.DISABLED.value)
             return
 
         url = message.data["url"]
         if self.validate_skill(url):
+            detail = ""
             try:
                 success = self.pip_install([f"git+{url}"])
             except RuntimeError as e:
                 LOG.error(f"pip failed: {e}")
                 success = False
+                detail = self.failure_detail(e)
             if success:
                 self.bus.emit(message.reply("ovos.skills.install.complete"))
             else:
-                self.bus.emit(message.reply("ovos.skills.install.failed",
-                                            {"error": InstallError.PIP_ERROR.value}))
+                self._reply_failed(message, "ovos.skills.install.failed", InstallError.PIP_ERROR.value, detail)
         else:
             LOG.error("invalid skill url, does not appear to be a github skill")
             self.play_error_sound()
-            self.bus.emit(message.reply("ovos.skills.install.failed",
-                                        {"error": InstallError.BAD_URL.value}))
+            self._reply_failed(message, "ovos.skills.install.failed", InstallError.BAD_URL.value)
 
     def handle_uninstall_skill(self, message: Message) -> None:
         """Handle a request to uninstall a skill.
@@ -328,16 +381,14 @@ class SkillsStore:
         if not self.config.get("allow_pip"):
             LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()
-            self.bus.emit(message.reply("ovos.skills.uninstall.failed",
-                                        {"error": InstallError.DISABLED.value}))
+            self._reply_failed(message, "ovos.skills.uninstall.failed", InstallError.DISABLED.value)
             return
 
         skill = message.data.get("skill")
         if not skill:
             LOG.error("no skill specified for uninstall")
             self.play_error_sound()
-            self.bus.emit(message.reply("ovos.skills.uninstall.failed",
-                                        {"error": InstallError.NO_PKGS.value}))
+            self._reply_failed(message, "ovos.skills.uninstall.failed", InstallError.NO_PKGS.value)
             return
 
         # Treat skill_id as a package name (e.g., 'skill-name.author' -> 'skill-name-author')
@@ -350,60 +401,79 @@ class SkillsStore:
                 self.bus.emit(message.reply("ovos.skills.uninstall.complete"))
             else:
                 LOG.error(f"Failed to uninstall skill: {skill}")
-                self.bus.emit(message.reply("ovos.skills.uninstall.failed",
-                                            {"error": InstallError.PIP_ERROR.value}))
+                self._reply_failed(message, "ovos.skills.uninstall.failed", InstallError.PIP_ERROR.value)
         except Exception as e:
             LOG.exception(f"Error uninstalling skill {skill}: {e}")
-            self.bus.emit(message.reply("ovos.skills.uninstall.failed",
-                                        {"error": str(e)}))
+            self._reply_failed(message, "ovos.skills.uninstall.failed", str(e), self.failure_detail(e))
+
+    def _addressed_to_us(self, message: Message) -> bool:
+        """Whether this service should act on a pip request.
+
+        OVOS-INSTALL-1 §2.2: ``data.service_name`` names the one service a
+        request is for. Absent, every installer acts. Naming another service,
+        this one installs nothing and answers nothing, because a decline from
+        every other installer would bury the real answer in a burst the
+        client cannot pick it out of.
+
+        The comparison is exact: a service name is an identifier, not a
+        pattern.
+        """
+        target = message.data.get("service_name")
+        if target is None or target == self.SERVICE_NAME:
+            return True
+        LOG.debug(f"{message.msg_type} is addressed to '{target}', "
+                  f"not '{self.SERVICE_NAME}'; ignoring")
+        return False
 
     def handle_install_python(self, message: Message) -> None:
         """Handle a request to install arbitrary Python packages via pip."""
+        if not self._addressed_to_us(message):
+            return
         if not self.config.get("allow_pip"):
             LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()
-            self.bus.emit(message.reply("ovos.pip.install.failed",
-                                        {"error": InstallError.DISABLED.value}))
+            self._reply_failed(message, "ovos.pip.install.failed", InstallError.DISABLED.value)
             return
         pkgs = message.data.get("packages")
         if pkgs:
+            detail = ""
             try:
                 success = self.pip_install(pkgs)
             except RuntimeError as e:
                 LOG.error(f"pip failed: {e}")
                 success = False
+                detail = self.failure_detail(e)
             if success:
                 self.bus.emit(message.reply("ovos.pip.install.complete"))
             else:
-                self.bus.emit(message.reply("ovos.pip.install.failed",
-                                            {"error": InstallError.PIP_ERROR.value}))
+                self._reply_failed(message, "ovos.pip.install.failed", InstallError.PIP_ERROR.value, detail)
         else:
-            self.bus.emit(message.reply("ovos.pip.install.failed",
-                                        {"error": InstallError.NO_PKGS.value}))
+            self._reply_failed(message, "ovos.pip.install.failed", InstallError.NO_PKGS.value)
 
     def handle_uninstall_python(self, message: Message) -> None:
         """Handle a request to uninstall Python packages via pip."""
+        if not self._addressed_to_us(message):
+            return
         if not self.config.get("allow_pip"):
             LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()
-            self.bus.emit(message.reply("ovos.pip.uninstall.failed",
-                                        {"error": InstallError.DISABLED.value}))
+            self._reply_failed(message, "ovos.pip.uninstall.failed", InstallError.DISABLED.value)
             return
         pkgs = message.data.get("packages")
         if pkgs:
+            detail = ""
             try:
                 success = self.pip_uninstall(pkgs)
             except RuntimeError as e:
                 LOG.error(f"pip failed: {e}")
                 success = False
+                detail = self.failure_detail(e)
             if success:
                 self.bus.emit(message.reply("ovos.pip.uninstall.complete"))
             else:
-                self.bus.emit(message.reply("ovos.pip.uninstall.failed",
-                                            {"error": InstallError.PIP_ERROR.value}))
+                self._reply_failed(message, "ovos.pip.uninstall.failed", InstallError.PIP_ERROR.value, detail)
         else:
-            self.bus.emit(message.reply("ovos.pip.uninstall.failed",
-                                        {"error": InstallError.NO_PKGS.value}))
+            self._reply_failed(message, "ovos.pip.uninstall.failed", InstallError.NO_PKGS.value)
 
 
 def launch_standalone():

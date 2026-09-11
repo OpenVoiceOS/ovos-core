@@ -19,7 +19,6 @@ The executable gets added to the bin directory when installed
 """
 
 from ovos_bus_client import MessageBusClient
-from ovos_config.locale import setup_locale
 from ovos_utils import wait_for_exit_signal
 from ovos_utils.log import LOG, init_service_logger
 
@@ -40,8 +39,6 @@ def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
         SkillManager instance or None if it couldn't be initialized
     """
     init_service_logger("skills")
-
-    setup_locale()
 
     # Opt-in scrape endpoint for the runtime stage histograms; a no-op
     # unless OVOS_METRICS_ENABLED is set (see ovos_core._prometheus).

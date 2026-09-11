@@ -20,8 +20,6 @@ import unittest
 from collections import defaultdict
 from unittest.mock import MagicMock
 
-import pytest
-
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import DEFAULT_SESSION_ID, Session, SessionManager
 from ovos_utils.fakebus import FakeBus
@@ -32,21 +30,9 @@ from ovos_spec_tools.context import (
     normalize_declaration,
     gate_satisfied,
     context_supplied_slots,
-    decrement,
     INTENT_CONTEXT_FIELD,
 )
 from ovos_core.intent_services.service import IntentService
-
-
-# OVOS-SESSION-2 §2.7: the session snapshot's PRIMARY carrier is
-# ``Message.data["session"]``; ``Message.context["session"]`` is the legacy
-# carrier, accepted as a fallback. ovos-bus-client#278 teaches
-# ``SessionManager.handle_session_sync`` to read the data carrier (preferring
-# it when both are present); until it ships, the data-carrier path is a
-# no-match on the fallback-only handler in bus-client dev.
-_NEEDS_BUS_CLIENT_278 = (
-    "requires ovos-bus-client#278 (SESSION-2 §2.7 data carrier); XPASS means "
-    "#278 shipped - drop the marker and bump the floor pin")
 
 
 def _sync_msg(snap: dict, carrier: str = "data") -> Message:
@@ -84,6 +70,13 @@ def _make_service(config=None) -> IntentService:
     it = MagicMock()
     it.transform.side_effect = lambda intent: intent
     svc.intent_plugins = it
+
+    # OVOS-TRANSFORM-1 §3.7: no typed-slots transformer loaded
+    ts = MagicMock()
+    ts.transform.return_value = None
+    svc.typed_slots_plugins = ts
+
+    svc.intent_manifest = IntentManifest(bus)
     svc.status = MagicMock()
     return svc
 
@@ -227,11 +220,12 @@ class TestSlotFill(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# live FakeBus integration through the REAL SessionManager
+# live FakeBus integration through the REAL SessionManager and IntentService
 # ---------------------------------------------------------------------------
 
-class TestLiveSessionManagerSync(unittest.TestCase):
-    """Drive ``ovos.session.sync`` through the real SessionManager (§5.3)."""
+class TestLiveIntentServiceRound(unittest.TestCase):
+    """Drive a real ``IntentService`` round over a ``FakeBus`` against the
+    real ``SessionManager`` (§4.2 decay, §5 working-session binding)."""
 
     def setUp(self):
         # isolate the singleton between tests
@@ -241,24 +235,6 @@ class TestLiveSessionManagerSync(unittest.TestCase):
     def tearDown(self):
         SessionManager.sessions = {"default": Session("default")}
         SessionManager.bus = None
-
-    @pytest.mark.xfail(strict=True, reason=_NEEDS_BUS_CLIENT_278)
-    def test_real_sessionmanager_merges_sync(self):
-        sess = Session("live-sess")
-        sess.intent_context = {"keep": {"value": "k"}}
-        SessionManager.update(sess)
-
-        # a skill emits ovos.session.sync with an updated session snapshot
-        snap = sess.serialize()
-        snap[INTENT_CONTEXT_FIELD] = {
-            "tea.skill:confirming_milk": {"value": None, "turns_remaining": 1},
-            "keep": None,  # delete
-        }
-        SessionManager.handle_session_sync(_sync_msg(snap))
-
-        merged = SessionManager.sessions["live-sess"].intent_context
-        self.assertIn("tea.skill:confirming_milk", merged)
-        self.assertNotIn("keep", merged)
 
     def test_orchestrator_decays_a_named_session_over_the_wire(self):
         """§4.2 decay on a named session, which the orchestrator holds no
@@ -345,66 +321,6 @@ class TestLiveSessionManagerSync(unittest.TestCase):
         svc.handle_utterance(msg)
         self.assertIs(seen["bound"], SessionManager.get_default_session())
 
-    @pytest.mark.xfail(strict=True, reason=_NEEDS_BUS_CLIENT_278)
-    def test_midispatch_sync_survives_decay(self):
-        # §4.1: a mid-dispatch entry is not decremented by the round it arrived in
-        sess = Session("mid-sess")
-        sess.intent_context = {"old.skill:flag": {"value": None,
-                                                  "turns_remaining": 1}}
-        SessionManager.update(sess)
-
-        pre_match_keys = set(sess.intent_context.keys())
-
-        # mid-dispatch sync merges a disjoint new key
-        snap = sess.serialize()
-        snap[INTENT_CONTEXT_FIELD] = {
-            "new.skill:flag": {"value": None, "turns_remaining": 1}}
-        SessionManager.handle_session_sync(_sync_msg(snap))
-
-        managed = SessionManager.sessions["mid-sess"]
-        post_ctx = dict(managed.intent_context or {})
-        decrement(post_ctx, only_keys=pre_match_keys)
-        managed.intent_context = post_ctx or None
-        SessionManager.update(managed)
-
-        ctx = SessionManager.sessions["mid-sess"].intent_context
-        self.assertEqual(ctx["old.skill:flag"]["turns_remaining"], 0)
-        self.assertEqual(ctx["new.skill:flag"]["turns_remaining"], 1)
-
-    @pytest.mark.xfail(strict=True, reason=_NEEDS_BUS_CLIENT_278)
-    def test_midispatch_sync_refresh_of_existing_key_not_decremented(self):
-        # §4.1: a mid-dispatch sync refreshing an existing key must be
-        # compared by entry value, not key presence, to avoid decrementing it
-        bus = FakeBus()
-        SessionManager.connect_to_bus(bus)
-        svc = _make_service()
-        svc.bus = bus
-
-        sess = Session("refresh-sess")
-        sess.intent_context = {"tea.skill:flag": {"value": "a",
-                                                  "turns_remaining": 1}}
-        SessionManager.update(sess)
-
-        def _mid_dispatch_refresh(utterances, lang, message):
-            # a skill refreshes the SAME key mid-dispatch via a real sync
-            snap = SessionManager.sessions["refresh-sess"].serialize()
-            snap[INTENT_CONTEXT_FIELD] = {
-                "tea.skill:flag": {"value": "b", "turns_remaining": 5}}
-            SessionManager.handle_session_sync(_sync_msg(snap))
-            return None  # no match, decay still runs to completion
-
-        svc.get_pipeline = lambda session: [("fake", _mid_dispatch_refresh)]
-
-        msg = Message("recognizer_loop:utterance",
-                      data={"utterances": ["hello"]},
-                      context={"session":
-                               SessionManager.sessions["refresh-sess"].serialize()})
-        svc.handle_utterance(msg)
-
-        ctx = SessionManager.sessions["refresh-sess"].intent_context
-        self.assertEqual(ctx["tea.skill:flag"]["turns_remaining"], 5)
-        self.assertEqual(ctx["tea.skill:flag"]["value"], "b")
-
 
 class TestDispatchMatchRejectsMismatchedUpdatedSession(unittest.TestCase):
     """OVOS-PIPELINE-1 §4.2 / OVOS-SESSION-2 §5.1: ``updated_session`` is
@@ -462,9 +378,13 @@ class TestSessionSyncCarrier(unittest.TestCase):
     tearDown = setUp
 
     def _tracked(self, sid):
+        # OVOS-SESSION-2 §2.2: the registry holds only the default session;
+        # SessionManager.update() on a named session is a no-op by contract
+        # (§2.5) and never records it. Seed the registry directly instead,
+        # the pattern ovos-bus-client's own tests use.
         sess = Session(sid)
         sess.intent_context = {"keep": {"value": "k"}}
-        SessionManager.update(sess)
+        SessionManager.sessions[sid] = sess
         return sess
 
     def _snap(self, sess, entries):
@@ -484,26 +404,6 @@ class TestSessionSyncCarrier(unittest.TestCase):
         SessionManager.handle_session_sync(_sync_msg(snap, carrier="context"))
         merged = SessionManager.get_default_session().intent_context
         self.assertEqual(merged.get("from.ctx"), {"value": "ctx"})
-
-    @pytest.mark.xfail(strict=True, reason=_NEEDS_BUS_CLIENT_278)
-    def test_data_carrier_is_honoured(self):
-        """§2.7 primary carrier: the snapshot rides ``data['session']``."""
-        sess = self._tracked("carrier-data")
-        snap = self._snap(sess, {"from.data": {"value": "data"}})
-        SessionManager.handle_session_sync(_sync_msg(snap))
-        merged = SessionManager.sessions["carrier-data"].intent_context
-        self.assertEqual(merged.get("from.data"), {"value": "data"})
-
-    @pytest.mark.xfail(strict=True, reason=_NEEDS_BUS_CLIENT_278)
-    def test_data_carrier_wins_over_context_carrier(self):
-        """§2.7: when both carriers are present, ``data`` is authoritative;
-        the ``context`` decoy must not be merged."""
-        sess = self._tracked("carrier-both")
-        snap = self._snap(sess, {"from.data": {"value": "data"}})
-        SessionManager.handle_session_sync(_sync_msg(snap, carrier="both"))
-        merged = SessionManager.sessions["carrier-both"].intent_context
-        self.assertEqual(merged.get("from.data"), {"value": "data"})
-        self.assertNotIn("carrier.probe", merged)
 
 
 class TestDecayIgnoresUnknownSession(unittest.TestCase):
@@ -553,6 +453,7 @@ from unittest.mock import patch  # noqa: E402
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch  # noqa: E402
 from ovos_core.intent_services.manifest import IntentManifest  # noqa: E402
 from ovos_core.intent_services.dispatcher import IntentDispatcher  # noqa: E402
+from ovos_core.intent_services.working_session import working_session  # noqa: E402
 
 
 class TestOrchestratorGate(unittest.TestCase):
@@ -571,7 +472,8 @@ class TestOrchestratorGate(unittest.TestCase):
             svc.intent_manifest._on_register(Message(
                 "ovos.intent.register.keyword",
                 {"skill_id": "lights.skill", "intent_name": "on",
-                 "lang": "en-US", "requires_context": list(requires)}, {}))
+                 "lang": "en-US", "requires_context": list(requires)},
+                {"skill_id": "lights.skill"}))
         return svc
 
     def _session(self, intent_context=None):
@@ -632,7 +534,8 @@ class TestOrchestratorSlotFill(unittest.TestCase):
         svc.intent_manifest._on_register(Message(
             "ovos.intent.register.keyword",
             {"skill_id": "lights.skill", "intent_name": "on", "lang": "en-US",
-             "requires_context": list(requires), "required": list(slot_names)}, {}))
+             "requires_context": list(requires), "required": list(slot_names)},
+            {"skill_id": "lights.skill"}))
         return svc
 
     def _session(self, intent_context):
@@ -789,25 +692,13 @@ class TestDecayPropagatesToTerminalEmissions(unittest.TestCase):
         self.assertEqual(
             turn2_session[INTENT_CONTEXT_FIELD]["person"]["turns_remaining"], 1)
 
-    @pytest.mark.xfail(strict=True, reason=_NEEDS_BUS_CLIENT_278)
-    def test_same_dispatch_exemption_still_holds(self):
-        # A key synced mid-round must not be decremented by the very round
-        # that produced it.
-        sess = Session("exempt-sess")
-        sess.intent_context = {"person": {"value": "Bob", "turns_remaining": 3}}
-        SessionManager.update(sess)
-
-        def _mid_round_sync(utts, lang, msg):
-            snap = SessionManager.sessions["exempt-sess"].serialize()
-            snap[INTENT_CONTEXT_FIELD] = {
-                "new.skill:flag": {"value": None, "turns_remaining": 1}}
-            SessionManager.handle_session_sync(_sync_msg(snap))
-            return None  # this matcher itself does not match
-
-        match = IntentHandlerMatch(match_type="lights.skill:on",
-                                   match_data={"conf": 1.0},
-                                   skill_id="lights.skill", utterance="turn on")
-
+    def test_key_written_in_round_is_not_decremented_by_that_round(self):
+        """§4.1: an entry a pipeline plugin writes onto the round's own
+        working session mid-dispatch is compared by value against its
+        pre-match snapshot, so this round's decay does not touch it -- an
+        entry it plants fresh and one whose value it changes are both
+        exempt. The write goes through ``working_session``, the §2.6-legal
+        in-round mutation path, not a bus push."""
         bus = FakeBus()
         SessionManager.connect_to_bus(bus)
         svc = _make_service()
@@ -817,33 +708,41 @@ class TestDecayPropagatesToTerminalEmissions(unittest.TestCase):
         svc.intent_manifest = IntentManifest(bus)
         svc.intent_dispatcher = IntentDispatcher(
             bus, timeout=0, on_terminal=svc._emit_utterance_handled)
+
+        match = IntentHandlerMatch(match_type="lights.skill:on",
+                                   match_data={"conf": 1.0},
+                                   skill_id="lights.skill", utterance="turn on")
+
+        def _writer(utts, lang, msg):
+            sess = working_session(msg)
+            sess.intent_context["new.skill:flag"] = {"value": None,
+                                                     "turns_remaining": 1}
+            sess.intent_context["person"] = {"value": "Ann", "turns_remaining": 3}
+            return None
+
         svc.get_pipeline = lambda session: [
-            ("mid-round-sync", _mid_round_sync),
-            ("fake-high", lambda utts, lang, msg: match)]
+            ("writer", _writer), ("fake-high", lambda u, l, m: match)]
 
-        handled_frames = []
-        bus.on("ovos.utterance.handled", handled_frames.append)
+        received, handled = [], []
+        bus.on("lights.skill:on", received.append)
+        bus.on("ovos.utterance.handled", handled.append)
 
-        received = []
-
-        def _fake_handler(message):
-            SessionManager.get(message)
-            received.append(message)
-        bus.on("lights.skill:on", _fake_handler)
-
-        msg = Message("recognizer_loop:utterance",
-                      data={"utterances": ["turn on"]},
-                      context={"session": SessionManager.sessions["exempt-sess"].serialize()})
-        svc.handle_utterance(msg)
-
+        carrier = Session("exempt-sess")
+        carrier.intent_context = {"person": {"value": "Bob", "turns_remaining": 3}}
+        svc.handle_utterance(Message("recognizer_loop:utterance",
+                                     {"utterances": ["turn on"]},
+                                     {"session": carrier.serialize()}))
         self.assertEqual(len(received), 1, "handler was never dispatched")
-        bus.emit(Message("mycroft.skill.handler.complete",
-                         {}, {"skill_id": "lights.skill",
-                              "session": received[0].context.get("session")}))
+        bus.emit(Message("mycroft.skill.handler.complete", {},
+                         {"skill_id": "lights.skill",
+                          "session": received[0].context.get("session")}))
 
-        ctx = handled_frames[0].context["session"][INTENT_CONTEXT_FIELD]
-        self.assertEqual(ctx["person"]["turns_remaining"], 2)
+        ctx = handled[0].context["session"][INTENT_CONTEXT_FIELD]
+        # written during the round -> exempt from this round's decay
         self.assertEqual(ctx["new.skill:flag"]["turns_remaining"], 1)
+        # value CHANGED during the round -> also exempt (value comparison)
+        self.assertEqual(ctx["person"]["turns_remaining"], 3)
+        self.assertEqual(ctx["person"]["value"], "Ann")
 
 
 # ---------------------------------------------------------------------------
@@ -872,7 +771,8 @@ class TestRequiredSlotFilledFromContext(unittest.TestCase):
              "lang": "en-US",
              "required": ["location"],
              "required_slots": ["location"],
-             "requires_context": [{"key": "location", "scope": "shared"}]}, {}))
+             "requires_context": [{"key": "location", "scope": "shared"}]},
+            {"skill_id": "weather.skill"}))
         match = IntentHandlerMatch(match_type="weather.skill:forecast",
                                    match_data={"conf": 1.0},
                                    skill_id="weather.skill",

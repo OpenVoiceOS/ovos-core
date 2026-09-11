@@ -28,9 +28,11 @@ from ovos_bus_client.session import (SessionManager, Session, MalformedSession,
 from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_config.locale import get_valid_languages
-from ovos_spec_tools import closest_lang, standardize_lang, SpecMessage
+from ovos_spec_tools import (closest_lang, drop_unregistered_typed_slots,
+                             standardize_lang, validate_typed_slots,
+                             MalformedTypedSlots, SpecMessage)
 from ovos_spec_tools.context import resolve_key
-from ovos_spec_tools.session import merge_carrier, resolve_session_id
+from ovos_spec_tools.session import resolve_session_id
 from ovos_utils.log import LOG
 from ovos_utils.metrics import Stopwatch
 from ovos_utils.process_utils import ProcessStatus, StatusCallbackMap
@@ -54,11 +56,14 @@ from ovos_core._metrics import (
     UTTERANCE_TRANSFORM,
     pipeline_matching_histogram,
 )
-from ovos_core.transformers import MetadataTransformersService, UtteranceTransformersService, IntentTransformersService
+from ovos_core.transformers import (IntentTransformersService,
+                                    MetadataTransformersService,
+                                    TypedSlotsTransformersService,
+                                    UtteranceTransformersService)
 from ovos_core.intent_services.dispatcher import IntentDispatcher, DEFAULT_HANDLER_TIMEOUT
 from ovos_core.intent_services.manifest import IntentManifest
 from ovos_core.intent_services.working_session import (
-    close_round, open_round, pruned_entries, record_pruned, round_session, working_session,
+    close_round, open_round, pruned_entries, record_pruned, round_session,
 )
 from ovos_core.version import OVOS_VERSION_STR, VERSION_MAJOR
 from ovos_plugin_manager.pipeline import OVOSPipelineFactory
@@ -98,6 +103,19 @@ _PIPELINE_MIGRATION_MAP = {
 }
 
 _PIPELINE_RE = re.compile(r'-(high|medium|low)$')
+
+# OVOS-PIPELINE-1 §5.5 / SESSION-1 §3: the deployment-owned per-component
+# override fields that a claiming plugin's ``updated_session`` MUST NOT be
+# able to relax or redirect for the stages that run after it: the pipeline
+# preference list, the six OVOS-TRANSFORM-1 §5 transformer-chain lists, the
+# three blacklist denylists, and ``site_id``.
+_DEPLOYMENT_OWNED_SESSION_FIELDS = (
+    "pipeline",
+    "audio_transformers", "utterance_transformers", "metadata_transformers",
+    "intent_transformers", "dialog_transformers", "tts_transformers",
+    "blacklisted_skills", "blacklisted_intents", "blacklisted_pipelines",
+    "site_id",
+)
 
 # OVOS-PIPELINE-1 §7.3 reserved intent_names, with the registry's "activation
 # push" column. §7.1: "Suppression MUST be keyed on the Match's ``intent_name``
@@ -154,9 +172,8 @@ def _replace_intent_context(sess, new_ctx: dict) -> None:
 
     ``Session.intent_context`` dict identity must be preserved; see the
     ovos-bus-client ``_CONTEXT_LOCK`` contract (every live view — the adapt
-    frame-stack projection, a mid-round ``ovos.session.sync`` merge — holds
-    the same map object). It also stays a dict, never ``None``: an empty
-    context is an empty dict.
+    frame-stack projection among them — holds the same map object). It also
+    stays a dict, never ``None``: an empty context is an empty dict.
     """
     with _CONTEXT_LOCK:
         if sess.intent_context is None:
@@ -216,6 +233,7 @@ class IntentService:
         self.utterance_plugins: UtteranceTransformersService = UtteranceTransformersService(bus)
         self.metadata_plugins: MetadataTransformersService = MetadataTransformersService(bus)
         self.intent_plugins: IntentTransformersService = IntentTransformersService(bus)
+        self.typed_slots_plugins: TypedSlotsTransformersService = TypedSlotsTransformersService(bus)
 
         handler_timeout = self.config.get("handler_timeout", DEFAULT_HANDLER_TIMEOUT)
         self.intent_dispatcher: IntentDispatcher = IntentDispatcher(
@@ -238,11 +256,6 @@ class IntentService:
 
         self.bus.on(SpecMessage.UTTERANCE, self.handle_utterance)
 
-        # OVOS-SESSION-2 §6.2: honour a synced session snapshot. The §5.3
-        # intent_context half of this topic is SessionManager's and is already
-        # subscribed there; this handler takes the whole-session snapshot.
-        self.bus.on(SpecMessage.SESSION_SYNC, self.handle_session_sync)
-
         # Context related handlers
         self.bus.on('add_context', self.handle_add_context)
         self.bus.on('remove_context', self.handle_remove_context)
@@ -259,32 +272,6 @@ class IntentService:
         self.status.set_alive()
         if preload_pipelines:
             self.bus.emit(Message('intent.service.pipelines.reload'))
-
-    def handle_session_sync(self, message: Message):
-        """OVOS-SESSION-2 §2.7 — take a synced session snapshot into the
-        session it is for.
-
-        §2.7 puts the snapshot in ``Message.data["session"]`` and leaves
-        ``Message.context["session"]`` as the ambient carrier saying *which*
-        session the sync is about, so the content comes from the data and the
-        identity from the context. The merge is §5.1's: a field the snapshot
-        carries replaces, a field it omits leaves the current value alone.
-
-        For the default session the merge lands in the store, which
-        ``SessionManager`` owns. For a named session there is no store (§2.2)
-        and §2.7 directs the update at the session of the utterance in
-        progress — so it applies while that round is open, and a sync arriving
-        outside one has no session to revise and is dropped.
-        """
-        payload = message.data.get("session") or {}
-        if not payload:
-            return
-        sess = working_session(message)
-        if sess is not None and not sess.is_default:
-            sess.update_from(
-                Session.deserialize(merge_carrier(sess, payload)))
-            return
-        SessionManager.handle_sync(message)
 
     def handle_reload_pipelines(self, message: Message) -> None:
         pipeline_plugins = OVOSPipelineFactory.get_installed_pipeline_ids()
@@ -331,12 +318,22 @@ class IntentService:
         Utterances may be modified by any parser and context overwritten
         """
         lang = get_message_lang(message)  # per query lang or default Configuration lang
-        original = utterances = message.data.get('utterances', [])
+        utterances = message.data.get('utterances', [])
+        # OVOS-TRANSFORM-1 §3.2 makes in-place mutation of the input list
+        # conformant, so the entry text has to be snapshotted: aliasing it
+        # would make the rewrite check below compare a list against itself.
+        original = list(utterances)
         message.context["lang"] = lang
         utterances, message.context = self.utterance_plugins.transform(utterances, message.context)
         if original != utterances:
             message.data["utterances"] = utterances
             LOG.debug(f"utterances transformed: {original} -> {utterances}")
+            # OVOS-TRANSFORM-1 §3.2: a typed-slot entry's span and surface are
+            # anchored to the text they were computed from, so a rewrite
+            # invalidates any map a producer put on the entry Message.
+            if message.data.pop("typed_slots", None) is not None:
+                LOG.debug("discarding producer typed_slots: the utterance "
+                          "chain rewrote the text its spans indexed")
         message.context = self.metadata_plugins.transform(message.context)
         return message
 
@@ -690,6 +687,44 @@ class IntentService:
         SessionManager.update(sess)
         return sess
 
+    def _run_typed_slots_stage(self, message: Message, sess: Session) -> None:
+        """OVOS-TRANSFORM-1 §3.7 typed-slots stage, run before the first matcher.
+
+        Exactly one transformer runs, and the map it returns replaces any map
+        already on the Message. The closed-set drop applies to whatever map
+        survives, the stage's own output and a producer's alike, so a
+        deployment running no transformer still filters what it carries. What
+        remains rides ``message.data`` to dispatch (OVOS-PIPELINE-1 §7.1).
+        """
+        # the declared-type set costs a scan of every registered intent, so it
+        # is only worth computing when a transformer is there to receive it
+        if self.typed_slots_plugins.selected is not None:
+            produced = self.typed_slots_plugins.transform(
+                message.data.get("utterances", []),
+                self.intent_manifest.declared_slot_types(sess.session_id),
+                sess)
+            if produced is not None:
+                message.data["typed_slots"] = produced
+
+        typed_slots = message.data.get("typed_slots")
+        if typed_slots is None:
+            return
+        if not isinstance(typed_slots, dict):
+            LOG.warning(f"discarding malformed typed_slots "
+                        f"(expected a map, got {type(typed_slots).__name__})")
+            message.data.pop("typed_slots")
+            return
+
+        # the library logs the dropped keys itself, in one warning naming them all
+        kept = drop_unregistered_typed_slots(typed_slots)
+        try:
+            validate_typed_slots(kept)
+        except MalformedTypedSlots as e:
+            LOG.warning(f"discarding malformed typed_slots: {e}")
+            message.data.pop("typed_slots")
+            return
+        message.data["typed_slots"] = kept
+
     def _dispatch_match(self, match: IntentHandlerMatch, message: Message, lang: str,
                         pipeline_id: Optional[str] = None,
                         pre_match_entries: Optional[dict] = None) -> None:
@@ -725,6 +760,17 @@ class IntentService:
         sess = round_session(message)
         if match.updated_session is not None:
             updated = match.updated_session
+            # OVOS-PIPELINE-1 §5.5: every deployment-owned per-component
+            # override field (SESSION-1 §3) is re-imposed onto a plugin's
+            # updated_session from the value the orchestrator held before
+            # the plugin ran, so a claiming plugin cannot relax or redirect
+            # policy for the stages after it: `pipeline`, the six
+            # OVOS-TRANSFORM-1 §5 transformer-chain lists, the three
+            # blacklist denylists, and `site_id`.
+            pre_plugin_overrides = {
+                field: getattr(sess, field)
+                for field in _DEPLOYMENT_OWNED_SESSION_FIELDS
+            }
             if updated.resolved_session_id() != sess.resolved_session_id():
                 # §5.1/§4.2: updated_session is defined as the ROUND's session,
                 # updated — never a different session. A pipeline plugin
@@ -740,6 +786,8 @@ class IntentService:
             else:
                 # ``update`` returns the store for the default session, so the
                 # round carries on the one object every co-located view holds.
+                for field, value in pre_plugin_overrides.items():
+                    setattr(updated, field, value)
                 sess = SessionManager.update(updated)
                 open_round(message, sess)
                 SessionManager.bind(message, sess)
@@ -800,8 +848,8 @@ class IntentService:
                 sess.add_converse_handler(match.skill_id)
 
             # OVOS-CONTEXT-1 §5.1: matcher-captured entries reach the session
-            # via ``match.updated_session`` + the §5.3 ``ovos.session.sync``
-            # merge — IntentHandlerMatch carries no ``intent_context`` field.
+            # only via ``match.updated_session`` — IntentHandlerMatch carries
+            # no ``intent_context`` field of its own.
 
             # OVOS-CONTEXT-1 §7: fill unfilled slots from live context
             self._apply_context_slots(match, sess, reply)
@@ -910,16 +958,20 @@ class IntentService:
         else. Every derived Message carries it for free, because
         ``Message.reply``/``Message.forward`` deep-copy ``context``.
 
-        A value already present is kept: a component that opened the lifecycle
-        out-of-band already sat at entry and stamped under this same rule.
+        The orchestrator's stamp replaces any value already present: the
+        no-overwrite rule binds components *after* entry (e.g. the transformer
+        chain re-asserting a value it finds dropped), not the entry stamp
+        itself.
 
         Returns:
             str: the lifecycle identifier now on the Message.
         """
-        uid = message.context.get("utterance_id")
-        if not uid:
-            uid = str(uuid4())
-            message.context["utterance_id"] = uid
+        prior = message.context.get("utterance_id")
+        uid = str(uuid4())
+        if prior:
+            LOG.debug(f"replacing supplied utterance_id '{prior}' with '{uid}' "
+                      f"at lifecycle entry (OVOS-PIPELINE-1 §9.1.1)")
+        message.context["utterance_id"] = uid
         return uid
 
     @UTTERANCE_DISPATCH.timed
@@ -935,11 +987,11 @@ class IntentService:
         """
         with UTTERANCE_PREPROCESS.measure():
             # OVOS-PIPELINE-1 §9.1.1: stamp the lifecycle identifier exactly once,
-            # at lifecycle entry, before anything derives from this Message. A value
-            # already present is never overwritten — regenerating it downstream would
-            # detach every already-derived Message from its lifecycle. Stamped
-            # before the §2.5 carrier check below so the dropped Message's own
-            # end-marker also carries one.
+            # at lifecycle entry, before anything derives from this Message. The
+            # entry stamp replaces any value already present, regardless of who
+            # supplied it — this Message is a new lifecycle. Stamped before the
+            # §2.5 carrier check below so the dropped Message's own end-marker
+            # also carries one.
             uid = self._stamp_utterance_id(message)
 
             # OVOS-SESSION-1 §2.5: reject a present-but-non-object session carrier
@@ -1018,6 +1070,8 @@ class IntentService:
         SessionManager.update(sess)
         with SESSION_STAMP.measure():
             message.context["session"] = sess.serialize()
+
+        self._run_typed_slots_stage(message, sess)
 
         # match
         match = None
@@ -1375,13 +1429,11 @@ class IntentService:
 
 def launch_standalone():
     from ovos_bus_client import MessageBusClient
-    from ovos_config.locale import setup_locale
     from ovos_utils import wait_for_exit_signal
     from ovos_utils.log import init_service_logger
 
     LOG.info("Launching IntentService in standalone mode")
     init_service_logger("intents")
-    setup_locale()
 
     bus = MessageBusClient()
     bus.run_in_thread()

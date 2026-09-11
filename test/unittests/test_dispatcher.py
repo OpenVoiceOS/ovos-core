@@ -245,6 +245,11 @@ class TestDispatchFromMatch(unittest.TestCase):
         svc.metadata_plugins = mt
         it = MagicMock(); it.transform.side_effect = lambda i: i
         svc.intent_plugins = it
+
+        # OVOS-TRANSFORM-1 §3.7: no typed-slots transformer loaded
+        ts = MagicMock()
+        ts.transform.return_value = None
+        svc.typed_slots_plugins = ts
         svc.status = MagicMock()
         svc.intent_manifest = IntentManifest(bus)
         # mirror IntentService.__init__: the dispatcher notifies the orchestrator on

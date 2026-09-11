@@ -29,7 +29,7 @@ class TestTrainRequestNonBlocking(TestCase):
         self.manager._use_deferred_loading = False
         self.manager._gui_event = Event()
         self.manager._gui_event.set()  # skip the is_gui_connected round-trip
-        self.manager.load_plugin_skills = Mock(return_value=True)
+        self.manager._load_untracked_plugin_skills = Mock(return_value=["skill-a"])
 
     def test_train_request_emitted_after_load(self):
         self.manager._load_new_skills(network=True, internet=True, gui=False)
@@ -49,6 +49,6 @@ class TestTrainRequestNonBlocking(TestCase):
         mock_log.exception.assert_not_called()
 
     def test_no_train_request_when_nothing_loaded(self):
-        self.manager.load_plugin_skills = Mock(return_value=False)
+        self.manager._load_untracked_plugin_skills = Mock(return_value=[])
         self.manager._load_new_skills(network=True, internet=True, gui=False)
         self.assertEqual(self.train_requests, [])

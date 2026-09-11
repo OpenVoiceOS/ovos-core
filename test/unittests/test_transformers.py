@@ -22,6 +22,7 @@ from ovos_core.transformers import (
     UtteranceTransformersService,
     MetadataTransformersService,
     IntentTransformersService,
+    TypedSlotsTransformersService,
 )
 
 
@@ -500,3 +501,76 @@ class TestIntentTransformersServiceTransform(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestStageConfigResolution(unittest.TestCase):
+    """A stage reads its own config section.
+
+    The plugin manager accepts either a whole core configuration or a
+    stage's section, and cannot tell them apart when the whole
+    configuration does not carry the section: every top-level key then
+    reads as an enabled plugin and the loader warns once per key.
+    """
+
+    # a core configuration shaped like the shipped one, carrying none of
+    # the transformer sections
+    FULL_CONFIG = {
+        "lang": "en-US",
+        "listener": {"sample_rate": 16000},
+        "websocket": {"host": "127.0.0.1"},
+        "skills": {"blacklisted_skills": []},
+        "tts": {"module": "ovos-tts-plugin-server"},
+        "stt": {"module": "ovos-stt-plugin-server"},
+    }
+
+    SERVICES = (
+        ("ovos_core.transformers.find_utterance_transformer_plugins",
+         UtteranceTransformersService),
+        ("ovos_core.transformers.find_metadata_transformer_plugins",
+         MetadataTransformersService),
+        ("ovos_core.transformers.find_intent_transformer_plugins",
+         IntentTransformersService),
+        ("ovos_core.transformers.find_typed_slots_transformer_plugins",
+         TypedSlotsTransformersService),
+    )
+
+    def _warnings_at_boot(self, finder, cls):
+        with patch(finder, return_value={}), \
+             patch("ovos_core.transformers.Configuration",
+                   return_value=dict(self.FULL_CONFIG)), \
+             patch("ovos_plugin_manager.transformer_services.LOG.warning") as w:
+            cls(FakeBus())
+        return [c.args[0] for c in w.call_args_list]
+
+    def test_a_stage_whose_section_is_absent_warns_about_nothing(self):
+        for finder, cls in self.SERVICES:
+            with self.subTest(service=cls.__name__):
+                warnings = self._warnings_at_boot(finder, cls)
+                self.assertEqual(
+                    warnings, [],
+                    f"{cls.__name__} treated top-level config keys as "
+                    f"plugins: {warnings}")
+
+    def test_a_configured_but_missing_plugin_is_still_reported(self):
+        """The guard that silencing the spurious warnings kept the real one."""
+        cfg = dict(self.FULL_CONFIG)
+        cfg["utterance_transformers"] = {"ovos-utterance-plugin-cancel": {}}
+        with patch("ovos_core.transformers.find_utterance_transformer_plugins",
+                   return_value={}), \
+             patch("ovos_core.transformers.Configuration", return_value=cfg), \
+             patch("ovos_plugin_manager.transformer_services.LOG.warning") as w:
+            UtteranceTransformersService(FakeBus())
+        warnings = [c.args[0] for c in w.call_args_list]
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("ovos-utterance-plugin-cancel", warnings[0])
+
+    def test_an_explicit_config_is_passed_through_untouched(self):
+        """A caller that supplies a mapping has named what it wants used."""
+        section = {"some-plugin": {"active": True}}
+        with patch("ovos_core.transformers.find_utterance_transformer_plugins",
+                   return_value={}), \
+             patch("ovos_plugin_manager.transformer_services.LOG.warning") as w:
+            svc = UtteranceTransformersService(FakeBus(), config=section)
+        self.assertEqual(svc.config, section)
+        self.assertEqual(len(w.call_args_list), 1)
+        self.assertIn("some-plugin", w.call_args_list[0].args[0])

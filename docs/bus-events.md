@@ -28,6 +28,10 @@ All events use the OVOS `Message` format: `{type, data, context}`.
 | `intent.service.skills.deactivate` | skill → core | Remove a skill from the active list |
 | `intent.service.active_skills.get` | * → core | Query the current active skill list |
 | `mycroft.intents.is_ready` | * → core | Health-check: is IntentService ready? |
+| `ovos.intent.list` | * → core | Query what the intent manifest holds (INTENT-4 §10.1); optional filters `skill_id`, `lang`, `session_id` |
+| `ovos.intent.list.response` | core → * | Response to `ovos.intent.list`: `{ok, intents: [{skill_id, intent_name, lang, method, enabled, session_id}]}` |
+| `ovos.intent.describe` | * → core | Fetch stored registration payloads (INTENT-4 §10.2); `skill_id` is required and bounds the reply, `intent_name`, `lang`, `method` and `session_id` are optional filters |
+| `ovos.intent.describe.response` | core → * | Response to `ovos.intent.describe`: `{ok, definitions: [{skill_id, intent_name, lang, method, session_id, definition}]}`, ordered `default` session first then by session, intent, language and method, or `{ok: false, error}` |
 
 ## Skill Manager
 
@@ -43,6 +47,8 @@ All events use the OVOS `Message` format: `{type, data, context}`.
 | `skillmanager.activate` | * → core | Activate (load) a skill by ID |
 | `skillmanager.deactivate` | * → core | Deactivate (unload) a skill by ID |
 | `skillmanager.keep` | * → core | Deactivate all skills except one |
+| `skillmanager.rescan` | * → core | Scan for newly installed skills now instead of waiting for the periodic scan |
+| `skillmanager.rescan.response` | core → * | Response to `skillmanager.rescan`: `{loaded: [skill_id, ...]}`, the ids that pass loaded; empty when it loaded nothing |
 | `ovos.skills.settings_changed` | core → * | A skill's `settings.json` file changed |
 
 ## Converse
@@ -66,13 +72,17 @@ All events use the OVOS `Message` format: `{type, data, context}`.
 | Event | Direction | Description |
 |---|---|---|
 | `ovos.skills.install` | * → core | Install skill packages via pip |
-| `ovos.skills.install.complete` | core → * | Install succeeded |
-| `ovos.skills.install.failed` | core → * | Install failed |
+| `ovos.skills.install.complete` | core → * | Install succeeded; `SkillManager` runs a discovery pass on this report |
+| `ovos.skills.install.failed` | core → * | Install failed: `{error, detail}`, `detail` being the tail of the installer's output |
 | `ovos.skills.uninstall` | * → core | Uninstall skill packages |
 | `ovos.skills.uninstall.complete` | core → * | Uninstall succeeded |
-| `ovos.skills.uninstall.failed` | core → * | Uninstall failed |
+| `ovos.skills.uninstall.failed` | core → * | Uninstall failed: `{error, detail}` |
 | `ovos.pip.install` | * → core | Install arbitrary pip packages |
+| `ovos.pip.install.complete` | core → * | Install succeeded; `SkillManager` runs a discovery pass on this report |
+| `ovos.pip.install.failed` | core → * | Install failed: `{error, detail}` |
 | `ovos.pip.uninstall` | * → core | Uninstall arbitrary pip packages |
+| `ovos.pip.uninstall.complete` | core → * | Uninstall succeeded |
+| `ovos.pip.uninstall.failed` | core → * | Uninstall failed: `{error, detail}` |
 
 ## Connectivity / Network
 

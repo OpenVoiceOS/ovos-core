@@ -52,7 +52,7 @@ ovos.skills.install
     "constraints": "https://..."      # optional override
   }
   → ovos.skills.install.complete  (success)
-  → ovos.skills.install.failed    (error)
+  → ovos.skills.install.failed    {"error": "...", "detail": "..."}
 ```
 
 ### Uninstall a skill
@@ -61,7 +61,7 @@ ovos.skills.install
 ovos.skills.uninstall
   data: {"packages": ["ovos-skill-foo"]}
   → ovos.skills.uninstall.complete
-  → ovos.skills.uninstall.failed
+  → ovos.skills.uninstall.failed  {"error": "...", "detail": "..."}
 ```
 
 ### Install arbitrary Python packages
@@ -69,6 +69,8 @@ ovos.skills.uninstall
 ```
 ovos.pip.install
   data: {"packages": ["some-lib>=1.0"]}
+  → ovos.pip.install.complete
+  → ovos.pip.install.failed  {"error": "...", "detail": "..."}
 ```
 
 ### Uninstall arbitrary Python packages
@@ -76,9 +78,17 @@ ovos.pip.install
 ```
 ovos.pip.uninstall
   data: {"packages": ["some-lib"]}
+  → ovos.pip.uninstall.complete
+  → ovos.pip.uninstall.failed  {"error": "...", "detail": "..."}
 ```
 
-After a successful skill install, `ovos-plugin-manager`'s entry point cache is reloaded so the new skill is discovered on the next `SkillManager` scan cycle (every 30 s).
+### Failure replies
+
+Every `.failed` reply carries two fields. `error` is the `InstallError` value naming the failure (see below); `detail` is the last `FAILURE_DETAIL_CHARS` (2000) characters of what pip or uv printed, so a caller can tell "this version is not published yet" from "this dependency conflicts" without reading the service log. `detail` is an empty string when pip never ran (disabled installer, bad URL, empty package list, protected package).
+
+pip's stdout and stderr are always captured as one stream, whichever backend runs; with `print_logs` (the default) each line is also echoed through the service log as it arrives, prefixed `(pip)`. A non-zero exit raises `RuntimeError` carrying the full captured output.
+
+After a successful install, `ovos-plugin-manager`'s entry point cache is reloaded before the `.complete` message is sent, and `SkillManager` runs a discovery pass on that message, loading the new skill once it passes the same readiness and connectivity gating the periodic scan applies. The periodic scan (every 30 s) remains the backstop.
 
 ## Error Types
 
@@ -97,7 +107,7 @@ After a successful skill install, `ovos-plugin-manager`'s entry point cache is r
 Default constraints are served from **`ovos-releases`** — the workspace repo that manages stable/testing/alpha constraint channels. See [`ovos-releases`](../../ovos-releases) for the constraints file format. Custom constraints can point to any HTTP URL or local path (`skills.installer.constraints` in `mycroft.conf`).
 
 ### Entry point cache reload
-After a successful install, `ovos_plugin_manager` is reloaded via `importlib.reload(ovos_plugin_manager)` to pick up new entry points. The `SkillManager` scan loop (every 30 s) then discovers and loads the new skill. See [`ovos-plugin-manager/docs/index.md`](../../ovos-plugin-manager/docs/index.md).
+After a successful install, `ovos_plugin_manager` is reloaded via `importlib.reload(ovos_plugin_manager)` to pick up new entry points. `SkillManager` runs a discovery pass on `ovos.skills.install.complete` / `ovos.pip.install.complete` (or on request via `skillmanager.rescan`), and its scan loop (every 30 s) is the backstop. See [`skill-manager.md`](skill-manager.md). See [`ovos-plugin-manager/docs/index.md`](../../ovos-plugin-manager/docs/index.md).
 
 ### `uv` acceleration
 `uv` is a fast pip-compatible installer. It is the default in **raspOVOS**. If `uv` is on `$PATH`, `SkillsStore.UV` is set and `uv pip install` is used instead of `pip`. See the [uv documentation](https://github.com/astral-sh/uv) for setup.
