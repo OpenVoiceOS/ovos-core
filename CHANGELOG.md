@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.5.4a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.4a2) (2026-09-11)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.4a1...3.5.4a2)
+
+**Merged pull requests:**
+
+- revert: drop ovos.skills.fallback.list; the fallback registry is not served on the bus [\#988](https://github.com/OpenVoiceOS/ovos-core/pull/988) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- fix: include the installer's error output in the failure reply [\#979](https://github.com/OpenVoiceOS/ovos-core/pull/979) ([goldyfruit](https://github.com/goldyfruit))
+- feat: load newly installed plugin skills as soon as the installer reports completion [\#977](https://github.com/OpenVoiceOS/ovos-core/pull/977) ([goldyfruit](https://github.com/goldyfruit))
+- feat\(fallback\): ovos.skills.fallback.list, so a client can see what has no phrases [\#951](https://github.com/OpenVoiceOS/ovos-core/pull/951) ([goldyfruit](https://github.com/goldyfruit))
+
 ## [3.5.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.4a1) (2026-09-10)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.3a2...3.5.4a1)
@@ -283,15 +294,15 @@
 
 ## [3.0.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.12a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.12a1)
-
-## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.10a3)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.12a1)
 
 ## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.11a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.11a1)
+
+## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.10a3)
 
 ## [3.0.10a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a2) (2026-08-31)
 
@@ -374,17 +385,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.3a1...3.0.3a2)
 
-**Merged pull requests:**
-
-- docs: rewrite review-campaign comment narration as plain invariants [\#873](https://github.com/OpenVoiceOS/ovos-core/pull/873) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [3.0.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.3a1) (2026-08-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.2a1...3.0.3a1)
-
-**Merged pull requests:**
-
-- fix: update stale legacy-dispatch e2e golden to the current bridge contract [\#871](https://github.com/OpenVoiceOS/ovos-core/pull/871) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [3.0.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.2a1) (2026-08-13)
 
