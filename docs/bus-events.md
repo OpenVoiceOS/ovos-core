@@ -47,6 +47,8 @@ All events use the OVOS `Message` format: `{type, data, context}`.
 | `skillmanager.activate` | * → core | Activate (load) a skill by ID |
 | `skillmanager.deactivate` | * → core | Deactivate (unload) a skill by ID |
 | `skillmanager.keep` | * → core | Deactivate all skills except one |
+| `skillmanager.rescan` | * → core | Scan for newly installed skills now instead of waiting for the periodic scan |
+| `skillmanager.rescan.response` | core → * | Response to `skillmanager.rescan`: `{loaded: [skill_id, ...]}`, the ids that pass loaded; empty when it loaded nothing |
 | `ovos.skills.settings_changed` | core → * | A skill's `settings.json` file changed |
 
 ## Converse
@@ -70,15 +72,15 @@ All events use the OVOS `Message` format: `{type, data, context}`.
 | Event | Direction | Description |
 |---|---|---|
 | `ovos.skills.install` | * → core | Install skill packages via pip |
-| `ovos.skills.install.complete` | core → * | Install succeeded |
+| `ovos.skills.install.complete` | core → * | Install succeeded; `SkillManager` runs a discovery pass on this report |
 | `ovos.skills.install.failed` | core → * | Install failed: `{error, detail}`, `detail` being the tail of the installer's output |
 | `ovos.skills.uninstall` | * → core | Uninstall skill packages |
 | `ovos.skills.uninstall.complete` | core → * | Uninstall succeeded |
 | `ovos.skills.uninstall.failed` | core → * | Uninstall failed: `{error, detail}` |
 | `ovos.pip.install` | * → core | Install arbitrary pip packages |
-| `ovos.pip.uninstall` | * → core | Uninstall arbitrary pip packages |
-| `ovos.pip.install.complete` | core → * | Install succeeded |
+| `ovos.pip.install.complete` | core → * | Install succeeded; `SkillManager` runs a discovery pass on this report |
 | `ovos.pip.install.failed` | core → * | Install failed: `{error, detail}` |
+| `ovos.pip.uninstall` | * → core | Uninstall arbitrary pip packages |
 | `ovos.pip.uninstall.complete` | core → * | Uninstall succeeded |
 | `ovos.pip.uninstall.failed` | core → * | Uninstall failed: `{error, detail}` |
 
