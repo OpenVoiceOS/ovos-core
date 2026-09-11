@@ -1121,7 +1121,14 @@ class TestConverseHandlerLifecycle(unittest.TestCase):
                                          "utterances": ["hello"]})
         with patch("ovos_core.intent_services.converse_service.CONVERSE_HANDLER_TIMEOUT", 0.05):
             svc.handle_converse(msg)
-            time.sleep(0.2)
+            # the timeout fires on a background Timer thread; poll instead of a
+            # single fixed sleep so a loaded runner scheduling that thread late
+            # does not flake a test that would otherwise pass.
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                if any(m.msg_type == "mycroft.skill.handler.error" for m in captured):
+                    break
+                time.sleep(0.01)
         topics = [m.msg_type for m in captured]
         self.assertIn("mycroft.skill.handler.error", topics)
         err = next(m for m in captured
