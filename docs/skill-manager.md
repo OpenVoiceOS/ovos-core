@@ -52,6 +52,23 @@ mycroft.skills.train  →  (pipeline plugins train)  →  mycroft.skills.trained
 
 Training has a 60-second timeout. On failure, an error is logged but the manager continues.
 
+## Loading After an Install
+
+The periodic scan is not the only way a newly installed skill gets loaded. `SkillsStore` reloads `ovos-plugin-manager` before it reports a completed install, so the manager runs the same discovery pass as soon as it sees that report:
+
+```
+ovos.skills.install.complete  →  _load_new_skills()
+ovos.pip.install.complete     →  _load_new_skills()
+```
+
+A caller that wants to drive this explicitly sends `skillmanager.rescan`; the response names what that pass loaded, so a caller can tell a fresh load from a pass that loaded nothing:
+
+```
+skillmanager.rescan  →  skillmanager.rescan.response  {"loaded": ["skill-id", ...]}
+```
+
+Both paths apply the same connectivity gating as the scan, and both wait until the manager is ready: before the startup load has run, they do nothing and leave the new skill to that load. The 30 s scan remains the backstop.
+
 ## Unloading After an Uninstall
 
 `SkillsStore` reloads `ovos-plugin-manager` before it reports a completed uninstall, so `find_skill_plugins()` no longer returns the removed package. On that report the manager compares the loaded plugin skills with what is still discoverable and shuts down every one that is gone:
@@ -87,6 +104,9 @@ ovos.skills.settings_changed  {skill_id: "..."}
 | `skillmanager.activate` | `activate_skill` |
 | `skillmanager.deactivate` | `deactivate_skill` |
 | `skillmanager.keep` | `deactivate_except` |
+| `skillmanager.rescan` | `handle_rescan_request` |
+| `ovos.skills.install.complete` | `handle_install_complete` |
+| `ovos.pip.install.complete` | `handle_install_complete` |
 | `ovos.skills.uninstall.complete` | `handle_uninstall_complete` |
 | `ovos.pip.uninstall.complete` | `handle_uninstall_complete` |
 | `mycroft.network.connected` | `handle_network_connected` |

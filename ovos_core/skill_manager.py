@@ -236,6 +236,13 @@ class SkillManager(Thread):
         self.bus.on('skillmanager.deactivate', self.deactivate_skill)
         self.bus.on('skillmanager.keep', self.deactivate_except)
         self.bus.on('skillmanager.activate', self.activate_skill)
+        self.bus.on('skillmanager.rescan', self.handle_rescan_request)
+
+        # The installer reloads the plugin manager before it reports a
+        # completed install, so a scan issued on that report already sees the
+        # new entry points; without it the package waited for the periodic scan
+        self.bus.on('ovos.skills.install.complete', self.handle_install_complete)
+        self.bus.on('ovos.pip.install.complete', self.handle_install_complete)
 
         # The installer reloads the plugin manager before it reports a
         # completed uninstall, so discovery no longer returns the removed
@@ -413,7 +420,20 @@ class SkillManager(Thread):
         Returns:
             bool: True if new skills were loaded, False otherwise.
         """
-        loaded_new = False
+        return bool(self._load_untracked_plugin_skills(network=network, internet=internet))
+
+    def _load_untracked_plugin_skills(self, network: Optional[bool] = None,
+                                      internet: Optional[bool] = None) -> List[str]:
+        """Load every discoverable plugin skill that is not yet tracked.
+
+        Args:
+            network (bool): Network connection status.
+            internet (bool): Internet connection status.
+
+        Returns:
+            List[str]: Ids of the skills this call loaded, in discovery order.
+        """
+        loaded: List[str] = []
         if network is None:
             network = self._network_event.is_set()
         if internet is None:
@@ -441,8 +461,8 @@ class SkillManager(Thread):
             if not self._reserve_plugin_skill_load(skill_id):
                 continue
             if self._load_plugin_skill(skill_id, plug, reserved=True) is not None:
-                loaded_new = True
-        return loaded_new
+                loaded.append(skill_id)
+        return loaded
 
     def _get_internal_skill_bus(self) -> MessageBusClient:
         """Get a dedicated skill bus connection per skill.
@@ -640,13 +660,16 @@ class SkillManager(Thread):
 
     def _load_new_skills(self, network: Optional[bool] = None,
                           internet: Optional[bool] = None,
-                          gui: Optional[bool] = None) -> None:
+                          gui: Optional[bool] = None) -> List[str]:
         """Handle loading of skills installed since startup.
 
         Args:
             network (bool): Network connection status.
             internet (bool): Internet connection status.
             gui (bool): GUI connection status.
+
+        Returns:
+            List[str]: Ids of the skills this call loaded.
         """
         if self._use_deferred_loading:
             # When deferred loading is enabled, check event flags for gating
@@ -664,9 +687,9 @@ class SkillManager(Thread):
         if gui is None:
             gui = self._gui_event.is_set() or is_gui_connected(self.bus)
 
-        loaded_new = self.load_plugin_skills(network=network, internet=internet)
+        loaded = self._load_untracked_plugin_skills(network=network, internet=internet)
 
-        if loaded_new:
+        if loaded:
             # Pipeline engines consume intent registrations as they arrive;
             # engines with a deferred training step (e.g. padatious) train on
             # this request. It is fire-and-forget: no reply topic is part of
@@ -676,6 +699,47 @@ class SkillManager(Thread):
             # deferred-training engine.
             LOG.debug("Requesting pipeline intent training")
             self.bus.emit(Message("mycroft.skills.train"))
+        return loaded
+
+    def _rescan_plugin_skills(self) -> List[str]:
+        """Run one discovery pass now instead of waiting for the periodic scan.
+
+        Until the manager is ready, ``run()`` owns the first load: it waits
+        for the intent service so no registration is lost, and anything that
+        became discoverable before then is picked up by that load or by the
+        periodic scan that follows it.
+
+        Returns:
+            List[str]: Ids of the skills this pass loaded.
+        """
+        if not self.is_all_loaded():
+            LOG.debug("Skill manager is not ready yet, leaving the new skills to the startup load")
+            return []
+        try:
+            return self._load_new_skills()
+        except Exception:
+            LOG.exception("Failed to load newly installed skills")
+            return []
+
+    def handle_install_complete(self, message: Message) -> None:
+        """Load the plugin skills an installer run just made discoverable.
+
+        Args:
+            message: ``ovos.skills.install.complete`` or ``ovos.pip.install.complete``.
+        """
+        loaded = self._rescan_plugin_skills()
+        if loaded:
+            LOG.info(f"Loaded skills reported by the installer: {loaded}")
+
+    def handle_rescan_request(self, message: Message) -> None:
+        """Scan for newly installed plugin skills and report what was loaded.
+
+        Args:
+            message: ``skillmanager.rescan``; the response carries ``loaded``,
+                the ids this scan loaded, empty when it loaded nothing.
+        """
+        loaded = self._rescan_plugin_skills()
+        self.bus.emit(message.response({"loaded": loaded}))
 
     def _unload_plugin_skill(self, skill_id: str) -> None:
         """Unload a plugin skill.

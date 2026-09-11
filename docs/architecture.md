@@ -33,6 +33,7 @@ ovos-messagebus  (WebSocket pub/sub)
    c. Query PHAL for network/internet status → load network/internet skills
    d. Emit `mycroft.skills.initialized`
    e. Loop every 30 s: scan for newly installed skills, call watchdog
+      (an installer completion report or `skillmanager.rescan` runs the same scan immediately)
 4. On exit: unload all skills gracefully, shutdown subsystems
 
 ## Subsystem Enable Flags

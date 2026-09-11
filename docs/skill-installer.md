@@ -88,7 +88,7 @@ Every `.failed` reply carries two fields. `error` is the `InstallError` value na
 
 pip's stdout and stderr are always captured as one stream, whichever backend runs; with `print_logs` (the default) each line is also echoed through the service log as it arrives, prefixed `(pip)`. A non-zero exit raises `RuntimeError` carrying the full captured output.
 
-After a successful skill install, `ovos-plugin-manager`'s entry point cache is reloaded so the new skill is discovered on the next `SkillManager` scan cycle (every 30 s). After a successful uninstall the same reload happens before the `.complete` message, and `SkillManager` unloads the skills that are no longer discoverable on that message.
+After a successful install, `ovos-plugin-manager`'s entry point cache is reloaded before the `.complete` message is sent, and `SkillManager` runs a discovery pass on that message, loading the new skill once it passes the same readiness and connectivity gating the periodic scan applies. The periodic scan (every 30 s) remains the backstop. After a successful uninstall the same reload happens before the `.complete` message, and `SkillManager` unloads the skills that are no longer discoverable on that message.
 
 ## Error Types
 
@@ -107,7 +107,7 @@ After a successful skill install, `ovos-plugin-manager`'s entry point cache is r
 Default constraints are served from **`ovos-releases`** — the workspace repo that manages stable/testing/alpha constraint channels. See [`ovos-releases`](../../ovos-releases) for the constraints file format. Custom constraints can point to any HTTP URL or local path (`skills.installer.constraints` in `mycroft.conf`).
 
 ### Entry point cache reload
-After a successful install, `ovos_plugin_manager` is reloaded via `importlib.reload(ovos_plugin_manager)` to pick up new entry points. The `SkillManager` scan loop (every 30 s) then discovers and loads the new skill. See [`ovos-plugin-manager/docs/index.md`](../../ovos-plugin-manager/docs/index.md).
+After a successful install, `ovos_plugin_manager` is reloaded via `importlib.reload(ovos_plugin_manager)` to pick up new entry points. `SkillManager` runs a discovery pass on `ovos.skills.install.complete` / `ovos.pip.install.complete` (or on request via `skillmanager.rescan`), and its scan loop (every 30 s) is the backstop. See [`skill-manager.md`](skill-manager.md). See [`ovos-plugin-manager/docs/index.md`](../../ovos-plugin-manager/docs/index.md).
 
 ### `uv` acceleration
 `uv` is a fast pip-compatible installer. It is the default in **raspOVOS**. If `uv` is on `$PATH`, `SkillsStore.UV` is set and `uv pip install` is used instead of `pip`. See the [uv documentation](https://github.com/astral-sh/uv) for setup.
