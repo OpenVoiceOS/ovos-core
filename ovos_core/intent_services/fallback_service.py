@@ -46,6 +46,11 @@ class FallbackService(ConfidenceMatcherPipeline):
         config = config if config is not None else Configuration().get("skills", {}).get("fallbacks", {})
         super().__init__(bus, config)
         self.registered_fallbacks: Dict[str, int] = {}  # skill_id: priority
+        # FALLBACK-1 3.4: registration is session-scoped. ``registered_fallbacks``
+        # is the "default" scope every session inherits (INTENT-4 11.2); this
+        # holds the per-session extensions, keyed by the registering Message's
+        # ``context.session.session_id``, and a session sees the two merged.
+        self._session_fallbacks: Dict[str, Dict[str, int]] = {}
         # ``registered_fallbacks`` is mutated from the bus handler threads
         # that serve ovos.skills.fallback.register/deregister while a match
         # is iterating it. Every read below therefore takes a snapshot under
@@ -61,10 +66,25 @@ class FallbackService(ConfidenceMatcherPipeline):
         self.bus.on("ovos.skills.fallback.deregister", self.handle_deregister_fallback)
         self.bus.on("ovos.skills.fallback.list", self.handle_list_fallbacks)
 
-    def _fallback_registry_snapshot(self) -> Dict[str, int]:
-        """A stable copy of the registry, safe to iterate."""
+    @staticmethod
+    def _registration_session(message: Message) -> str:
+        """FALLBACK-1 10: key by ``context.session.session_id``, never by a
+        ``session_id`` in ``Message.data``."""
+        session = (message.context or {}).get("session") or {}
+        return session.get("session_id") or "default"
+
+    def _fallback_registry_snapshot(self, session_id: str = "default") -> Dict[str, int]:
+        """The pool one session sees: the shared scope, then its own.
+
+        A session inherits "default" and extends it, so a skill registered
+        under a specific session is invisible to every other session. The
+        session's own entry wins where both scopes name the same skill.
+        """
         with self._registry_lock:
-            return dict(self.registered_fallbacks)
+            pool = dict(self.registered_fallbacks)
+            if session_id != "default":
+                pool.update(self._session_fallbacks.get(session_id, {}))
+            return pool
 
     def handle_list_fallbacks(self, message: Message) -> None:
         """Answer which skills are registered as fallbacks, and at what priority.
@@ -91,7 +111,8 @@ class FallbackService(ConfidenceMatcherPipeline):
         # reply is emitted -- turning a malformed registration somewhere else
         # into a query that never answers. An entry with no skill_id also names
         # nothing a caller could act on, so it is left out rather than reported.
-        registry = self._fallback_registry_snapshot()
+        registry = self._fallback_registry_snapshot(
+            self._registration_session(message))
         listed = [(skill_id, priority) for skill_id, priority in registry.items()
                   if isinstance(skill_id, str) and skill_id]
         self.bus.emit(message.reply(
@@ -151,8 +172,12 @@ class FallbackService(ConfidenceMatcherPipeline):
         # skill that is no longer registered, and two concurrent
         # registrations both pass _wire_lifecycle's membership check and wire
         # the same skill twice.
+        session_id = self._registration_session(message)
         with self._registry_lock:
-            self.registered_fallbacks[skill_id] = priority
+            if session_id == "default":
+                self.registered_fallbacks[skill_id] = priority
+            else:
+                self._session_fallbacks.setdefault(session_id, {})[skill_id] = priority
             # report this skill's fallback dispatch lifecycle as the framework
             # done-signal so an orchestrator can resolve it (no skill_id -> skip)
             if skill_id:
@@ -160,8 +185,12 @@ class FallbackService(ConfidenceMatcherPipeline):
 
     def handle_deregister_fallback(self, message: Message) -> None:
         skill_id = message.data.get("skill_id")
+        session_id = self._registration_session(message)
         with self._registry_lock:
-            self.registered_fallbacks.pop(skill_id, None)
+            if session_id == "default":
+                self.registered_fallbacks.pop(skill_id, None)
+            else:
+                self._session_fallbacks.get(session_id, {}).pop(skill_id, None)
             self._unwire_lifecycle(skill_id)
 
     def _fallback_allowed(self, skill_id: str) -> bool:
@@ -210,7 +239,7 @@ class FallbackService(ConfidenceMatcherPipeline):
         # answered" wait below and the range filter must all agree on which
         # skills this round is polling, even if a skill (de)registers midway.
         if registry is None:
-            registry = self._fallback_registry_snapshot()
+            registry = self._fallback_registry_snapshot(sess.session_id)
         # filter skills outside the fallback_range
         in_range = [s for s, p in registry.items()
                     if fb_range.start < p <= fb_range.stop
@@ -299,7 +328,7 @@ class FallbackService(ConfidenceMatcherPipeline):
         # new style bus api
         # taken BEFORE the poll and handed to it, so the range filter that
         # decided who to ping and the scoring below read the same registry
-        registry = self._fallback_registry_snapshot()
+        registry = self._fallback_registry_snapshot(sess.session_id)
         available_skills = self._collect_fallback_skills(message, fb_range,
                                                          registry=registry)
         fallbacks = [(k, v) for k, v in registry.items()
