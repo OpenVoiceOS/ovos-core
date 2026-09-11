@@ -10,35 +10,8 @@ on:
 
 jobs:
   license_tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install Build Tools
-        run: |
-          python -m pip install build wheel uv
-      - name: Install System Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt install python3-dev swig libssl-dev libfann-dev portaudio19-dev libpulse-dev
-      - name: Install core repo
-        run: |
-          uv pip install --system .[mycroft,lgpl,skills-essential]
-      - name: Get explicit and transitive dependencies
-        run: |
-          uv pip freeze > requirements-all.txt
-      - name: Check python
-        id: license_check_report
-        uses: pilosus/action-pip-license-checker@v0.5.0
-        with:
-          requirements: 'requirements-all.txt'
-          fail: 'Copyleft,Other,Error'
-          fails-only: true
-          exclude: '^(precise-runner|fann2|ovos-adapt-parser|ovos-padatious|tqdm|bs4|sonopy|caldav|recurring-ical-events|x-wr-timezone|zeroconf|mutagen|attrs).*'
-          exclude-license: '^(Mozilla).*$'
-      - name: Print report
-        if: ${{ always() }}
-        run: echo "${{ steps.license_check_report.outputs.report }}"
+    uses: OpenVoiceOS/gh-automations/.github/workflows/license-check.yml@dev
+    with:
+      install_extras: '[mycroft,plugins,skills-essential]'
+      system_deps: 'portaudio19-dev libpulse-dev'
+      exclude_packages: '^(precise-runner|ovos-adapt-parser|tqdm|bs4|sonopy|caldav|recurring-ical-events|x-wr-timezone|zeroconf|mutagen|attrs|phoonnx).*'

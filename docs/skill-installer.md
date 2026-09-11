@@ -1,0 +1,125 @@
+
+# Skill Installer (SkillsStore)
+
+**Module:** `ovos_core.skill_installer.SkillsStore`
+
+`SkillsStore` provides runtime skill and package management via the MessageBus. It is enabled by default in `ovos-core` but can be disabled with `--disable-installer`.
+
+## pip Backend
+
+`SkillsStore` uses `uv pip` if `uv` is on `$PATH` (default in raspOVOS); otherwise falls back to `pip`. A named lock (`ovos_pip.lock`) prevents concurrent installs.
+
+```python
+SkillsStore.UV = shutil.which("uv")  # None if not available
+```
+
+## Constraints
+
+All installs use a constraints file to avoid dependency conflicts. The default constraints file is fetched from:
+
+```
+https://raw.githubusercontent.com/OpenVoiceOS/ovos-releases/refs/heads/main/constraints-stable.txt
+```
+
+A custom URL can be set in config under `skills.installer.constraints`.
+
+## Configuration
+
+```json
+{
+  "skills": {
+    "installer": {
+      "constraints": "https://...",
+      "sounds": {
+        "pip_error": "snd/error.mp3",
+        "pip_success": "snd/acknowledge.mp3"
+      }
+    }
+  }
+}
+```
+
+Pip installs can be disabled entirely by not enabling the installer subsystem (default in `--disable-installer` mode).
+
+## Bus Events
+
+### Install a skill
+
+```
+ovos.skills.install
+  data: {
+    "packages": ["ovos-skill-foo"],   # pip package names or URLs
+    "constraints": "https://..."      # optional override
+  }
+  → ovos.skills.install.complete  (success)
+  → ovos.skills.install.failed    {"error": "...", "detail": "..."}
+```
+
+### Uninstall a skill
+
+```
+ovos.skills.uninstall
+  data: {"packages": ["ovos-skill-foo"]}
+  → ovos.skills.uninstall.complete
+  → ovos.skills.uninstall.failed  {"error": "...", "detail": "..."}
+```
+
+### Install arbitrary Python packages
+
+```
+ovos.pip.install
+  data: {"packages": ["some-lib>=1.0"]}
+  → ovos.pip.install.complete
+  → ovos.pip.install.failed  {"error": "...", "detail": "..."}
+```
+
+### Uninstall arbitrary Python packages
+
+```
+ovos.pip.uninstall
+  data: {"packages": ["some-lib"]}
+  → ovos.pip.uninstall.complete
+  → ovos.pip.uninstall.failed  {"error": "...", "detail": "..."}
+```
+
+### Failure replies
+
+Every `.failed` reply carries two fields. `error` is the `InstallError` value naming the failure (see below); `detail` is the last `FAILURE_DETAIL_CHARS` (2000) characters of what pip or uv printed, so a caller can tell "this version is not published yet" from "this dependency conflicts" without reading the service log. `detail` is an empty string when pip never ran (disabled installer, bad URL, empty package list, protected package).
+
+pip's stdout and stderr are always captured as one stream, whichever backend runs; with `print_logs` (the default) each line is also echoed through the service log as it arrives, prefixed `(pip)`. A non-zero exit raises `RuntimeError` carrying the full captured output.
+
+After a successful install, `ovos-plugin-manager`'s entry point cache is reloaded before the `.complete` message is sent, and `SkillManager` runs a discovery pass on that message, loading the new skill once it passes the same readiness and connectivity gating the periodic scan applies. The periodic scan (every 30 s) remains the backstop.
+
+## Error Types
+
+| `InstallError` | Meaning |
+|---|---|
+| `DISABLED` | pip disabled in config |
+| `PIP_ERROR` | subprocess returned non-zero |
+| `BAD_URL` | URL validation failed |
+| `NO_PKGS` | empty package list |
+
+---
+
+## Cross-References
+
+### Constraints file source
+Default constraints are served from **`ovos-releases`** — the workspace repo that manages stable/testing/alpha constraint channels. See [`ovos-releases`](../../ovos-releases) for the constraints file format. Custom constraints can point to any HTTP URL or local path (`skills.installer.constraints` in `mycroft.conf`).
+
+### Entry point cache reload
+After a successful install, `ovos_plugin_manager` is reloaded via `importlib.reload(ovos_plugin_manager)` to pick up new entry points. `SkillManager` runs a discovery pass on `ovos.skills.install.complete` / `ovos.pip.install.complete` (or on request via `skillmanager.rescan`), and its scan loop (every 30 s) is the backstop. See [`skill-manager.md`](skill-manager.md). See [`ovos-plugin-manager/docs/index.md`](../../ovos-plugin-manager/docs/index.md).
+
+### `uv` acceleration
+`uv` is a fast pip-compatible installer. It is the default in **raspOVOS**. If `uv` is on `$PATH`, `SkillsStore.UV` is set and `uv pip install` is used instead of `pip`. See the [uv documentation](https://github.com/astral-sh/uv) for setup.
+
+### Configuration
+Config is read from `mycroft.conf` via `ovos_config.config.Configuration` → [`ovos-config/docs/configuration.md`](../../ovos-config/docs/configuration.md).
+
+### Security note
+`validate_skill()` currently only checks for the `https://github.com/` prefix. See [`SUGGESTIONS.md`](../SUGGESTIONS.md) entry S-003 for the proposed full validation (class compatibility, legacy Mycroft checks).
+
+### Full bus events list
+See [`bus-events.md`](bus-events.md) for the complete SkillsStore event reference.
+
+---
+[← Converse & Fallback](converse-fallback.md) · [Home](index.md) · [Next →](bus-events.md)

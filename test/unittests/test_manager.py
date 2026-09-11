@@ -3,6 +3,7 @@ from os.path import join, dirname
 from unittest.mock import MagicMock, patch
 
 from ovos_bus_client.message import Message
+from ovos_bus_client.session import SessionManager
 
 from ovos_core.skill_manager import SkillManager
 
@@ -10,8 +11,18 @@ from ovos_core.skill_manager import SkillManager
 class TestSkillManager(unittest.TestCase):
 
     def setUp(self):
+        SessionManager.bus = None
         self.bus = MagicMock()
         self.skill_manager = SkillManager(self.bus)
+        # SkillManager.__init__ now wires SessionManager.connect_to_bus(),
+        # which emits an "ovos.session.update_default" broadcast on
+        # construction; reset the mock so tests only observe emits from the
+        # code under test, not this setup side effect
+        self.bus.reset_mock()
+
+    def tearDown(self):
+        self.skill_manager.shutdown()
+        SessionManager.bus = None
 
     def test_blacklist_property(self):
         blacklist = self.skill_manager.blacklist
@@ -34,6 +45,7 @@ class TestSkillManager(unittest.TestCase):
     @patch('ovos_core.skill_manager.is_gui_connected', return_value=True)
     def test_handle_gui_connected(self, mock_is_gui_connected):
         self.skill_manager._allow_state_reloads = True
+        self.skill_manager._startup_complete_event.set()
         self.skill_manager._gui_event.clear()
         self.skill_manager._load_new_skills = MagicMock()
         self.skill_manager.handle_gui_connected(Message("", data={"permanent": False}))
@@ -51,6 +63,7 @@ class TestSkillManager(unittest.TestCase):
 
     @patch('ovos_core.skill_manager.is_connected_http', return_value=True)
     def test_handle_internet_connected(self, mock_is_connected):
+        self.skill_manager._startup_complete_event.set()
         self.skill_manager._connected_event.clear()
         self.skill_manager._network_event.clear()
         self.skill_manager._network_loaded.set()
@@ -72,6 +85,7 @@ class TestSkillManager(unittest.TestCase):
 
     @patch('ovos_core.skill_manager.is_connected_http', return_value=True)
     def test_handle_network_connected(self, mock_is_connected):
+        self.skill_manager._startup_complete_event.set()
         self.skill_manager._network_event.clear()
         self.skill_manager._load_on_network = MagicMock()
         self.skill_manager.handle_network_connected(Message(""))

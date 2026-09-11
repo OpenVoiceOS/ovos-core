@@ -1,0 +1,13 @@
+name: Docs Check
+
+on:
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+jobs:
+  docs_check:
+    uses: OpenVoiceOS/gh-automations/.github/workflows/docs-check.yml@dev
+    secrets: inherit
+    with:
+      pr_comment: true
