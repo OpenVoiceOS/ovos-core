@@ -112,6 +112,15 @@ class TestSkillManager(TestCase):
             str(self.skill_dir): self.skill_loader_mock
         }
 
+    def _warnings_mentioning(self, text):
+        """The warnings logged that say `text`. Counted by content, not in
+        total: `SkillManager.__init__` warns when no skill package is
+        installed at all, so the total depends on the environment the tests
+        run in -- a bare venv logs one more than CI, which installs
+        skills-essential."""
+        return [call.args[0] for call in self.log_mock.warning.call_args_list
+                if text in call.args[0]]
+
     def test_instantiate(self):
         # With default config (deferred_loading: false), connectivity handlers are NOT registered
         # Ensure deferred_loading is explicitly False to isolate from other tests
@@ -782,8 +791,7 @@ class TestSkillManager(TestCase):
             loader.instance.default_shutdown.assert_not_called()
         self.assertDictEqual({}, self.skill_manager._plugin_skill_failures)
         self.assertSetEqual({'test.first.skill'}, self.skill_manager._logged_skill_warnings)
-        self.log_mock.warning.assert_called_once()
-        self.assertIn('keeping them', self.log_mock.warning.call_args[0][0])
+        self.assertEqual(1, len(self._warnings_mentioning('keeping them')))
 
     def test_uninstall_complete_unloads_the_last_skill_on_empty_discovery(self):
         """With exactly one skill loaded, an empty discovery is the legitimate
@@ -797,7 +805,7 @@ class TestSkillManager(TestCase):
         self.assertDictEqual({}, self.skill_manager.plugin_skills)
         loader.instance.shutdown.assert_called_once_with()
         loader.instance.default_shutdown.assert_called_once_with()
-        self.log_mock.warning.assert_not_called()
+        self.assertEqual([], self._warnings_mentioning('keeping'))
 
     def test_uninstall_complete_shuts_down_only_the_loader_it_detached(self):
         """A pass detaches the loader instances it decided to remove, so a
@@ -915,8 +923,7 @@ class TestSkillManager(TestCase):
 
         self.assertSetEqual(set(), self.skill_manager._plugin_skill_unload_pending)
         self.assertIn('test.kept.skill', self.skill_manager.plugin_skills)
-        self.log_mock.warning.assert_called_once()
-        self.assertIn('keeping them', self.log_mock.warning.call_args[0][0])
+        self.assertEqual(1, len(self._warnings_mentioning('keeping them')))
 
     def test_a_skill_that_would_not_import_is_not_treated_as_removed(self):
         """A partial discovery result must not unload a still-installed skill.
