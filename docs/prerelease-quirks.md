@@ -35,6 +35,27 @@ new or because gating held it back). Both paths keep the scan's connectivity
 gating and do nothing until the manager is ready; the startup load owns
 everything installed before then, and the 30 s scan stays as the backstop.
 
+## #978 (alpha of 2026-09-09)
+
+`SkillManager` subscribes to `ovos.skills.uninstall.complete` and
+`ovos.pip.uninstall.complete`. On either it compares the loaded plugin
+skills with what `find_skill_plugins()` still returns (the installer reloads
+the plugin manager before it reports) and shuts down every skill whose
+package is gone, dropping it from the load-retry bookkeeping so a later
+reinstall loads again. Before this the uninstalled skill stayed loaded, and
+answering, until the next restart; `skillmanager.deactivate` only silences a
+skill. A skill still inside `loader.load()` when the report lands is not tracked
+yet, so the pass records the verdict against its id and the load shuts the
+loader down instead of tracking it; without that, the finished load revived a
+package that was already gone and only the next uninstall removed it again.
+A discovery failure unloads nothing. A skill is treated as removed only when
+it is neither importable nor declared in the installed entry point metadata,
+which is read on every pass without importing anything: an import that breaks
+leaves the skill declared, so it keeps its loader instead of being shut down.
+Metadata that cannot be read at all unloads nothing. Counting loaded skills
+could not decide this, because one distribution may expose several skill entry
+points and removing it can legitimately empty discovery.
+
 ## #935 (alpha of 2026-09-06)
 
 The floor on `ovos-bus-client` moves to 2.11.13a1. Core no longer subscribes
