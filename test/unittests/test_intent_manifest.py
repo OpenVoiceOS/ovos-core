@@ -677,3 +677,96 @@ class TestReservedStopIsNotIndexed(unittest.TestCase):
             m = _manifest()
             m._on_register(_reg("skill.test", "stop", method=method))
             self.assertEqual(m._index, {}, method)
+
+
+def _loaded(skill_id, session_id="default", capabilities=None):
+    """An ``ovos.skill.loaded`` announcement (OVOS-INTENT-4 §8.6)."""
+    return Message("ovos.skill.loaded",
+                   data={"skill_id": skill_id, "capabilities": capabilities or []},
+                   context={"session": {"session_id": session_id}, "skill_id": skill_id})
+
+
+def _list(session_id=None):
+    data = {}
+    if session_id is not None:
+        data["session_id"] = session_id
+    return Message("ovos.skills.list", data=data, context={})
+
+
+def _deregister_skill(skill_id, session_id="default"):
+    return Message("ovos.skill.deregister",
+                   data={"skill_id": skill_id},
+                   context={"session": {"session_id": session_id}, "skill_id": skill_id})
+
+
+class TestSkillsListManifest(unittest.TestCase):
+    """OVOS-INTENT-4 §8.6 / §10.3 — ``ovos.skill.loaded`` announcement index
+    and the ``ovos.skills.list`` query it serves."""
+
+    def setUp(self):
+        self.m = _manifest()
+
+    def _query(self, session_id=None):
+        replies = []
+        self.m.bus.on("ovos.skills.list.response", lambda msg: replies.append(msg))
+        self.m._on_skills_list(_list(session_id))
+        return replies[-1].data
+
+    def test_empty_manifest_answers_empty_list(self):
+        data = self._query()
+        self.assertEqual(data, {"ok": True, "skills": []})
+
+    def test_unfiltered_list_returns_all_announced_skills(self):
+        self.m._on_skill_loaded(_loaded("skill.a", "default", ["fallback"]))
+        self.m._on_skill_loaded(_loaded("skill.b", "default", ["converse"]))
+        self.m._on_skill_loaded(_loaded("skill.c", "S", ["common_query"]))
+        self.m._on_register(_reg("skill.a", "hello", session_id="default"))
+
+        data = self._query()
+        self.assertTrue(data["ok"])
+        by_id = {(s["session_id"], s["skill_id"]): s for s in data["skills"]}
+        self.assertEqual(len(data["skills"]), 3)
+        self.assertEqual(by_id[("default", "skill.a")]["capabilities"], ["fallback"])
+        self.assertEqual(by_id[("default", "skill.a")]["intents"], 1)
+        self.assertEqual(by_id[("default", "skill.b")]["capabilities"], ["converse"])
+        self.assertEqual(by_id[("default", "skill.b")]["intents"], 0)
+        self.assertEqual(by_id[("S", "skill.c")]["capabilities"], ["common_query"])
+        self.assertEqual(by_id[("S", "skill.c")]["intents"], 0)
+
+    def test_ordering_default_first_then_skill_id(self):
+        self.m._on_skill_loaded(_loaded("skill.z", "S", []))
+        self.m._on_skill_loaded(_loaded("skill.b", "default", []))
+        self.m._on_skill_loaded(_loaded("skill.a", "default", []))
+        data = self._query()
+        order = [(s["session_id"], s["skill_id"]) for s in data["skills"]]
+        self.assertEqual(order, [("default", "skill.a"), ("default", "skill.b"), ("S", "skill.z")])
+
+    def test_session_filter_returns_default_plus_named_session_only(self):
+        self.m._on_skill_loaded(_loaded("skill.a", "default", []))
+        self.m._on_skill_loaded(_loaded("skill.s", "S", []))
+        self.m._on_skill_loaded(_loaded("skill.t", "T", []))
+
+        data = self._query("S")
+        ids = {(s["session_id"], s["skill_id"]) for s in data["skills"]}
+        self.assertEqual(ids, {("default", "skill.a"), ("S", "skill.s")})
+
+    def test_deregister_removes_skill_from_list(self):
+        self.m._on_skill_loaded(_loaded("skill.a", "default", ["fallback"]))
+        self.m._on_skill_loaded(_loaded("skill.b", "default", []))
+        self.m._on_skill_deregister(_deregister_skill("skill.a"))
+
+        data = self._query()
+        ids = {s["skill_id"] for s in data["skills"]}
+        self.assertEqual(ids, {"skill.b"})
+
+    def test_unknown_capability_is_dropped_without_error(self):
+        self.m._on_skill_loaded(_loaded("skill.a", "default", ["fallback", "telepathy"]))
+        data = self._query()
+        self.assertEqual(data["skills"][0]["capabilities"], ["fallback"])
+
+    def test_reannouncement_replaces_entry(self):
+        self.m._on_skill_loaded(_loaded("skill.a", "default", ["fallback"]))
+        self.m._on_skill_loaded(_loaded("skill.a", "default", ["converse"]))
+        data = self._query()
+        self.assertEqual(len(data["skills"]), 1)
+        self.assertEqual(data["skills"][0]["capabilities"], ["converse"])

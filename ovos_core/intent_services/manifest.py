@@ -29,6 +29,9 @@ RESERVED_INTENT_NAMES = frozenset({
     "converse", "response", "stop", "fallback", "common_query",
 })
 
+# OVOS-INTENT-4 §8.6 capability vocabulary; names outside this set are ignored.
+KNOWN_CAPABILITIES = frozenset({"fallback", "common_query", "converse"})
+
 
 def _target_skill_id(message: Message) -> Optional[str]:
     """OVOS-INTENT-4 §3.2 — the skill a §§5-8 message acts on.
@@ -83,6 +86,8 @@ class IntentManifest:
         self.bus = bus
         # (session_id, skill_id, intent_name, lang, method) → entry dict
         self._index: dict = {}
+        # (session_id, skill_id) → capabilities list, §8.6 announcement index
+        self._announcements: dict = {}
 
         bus.on("ovos.intent.register.keyword", self._on_register)
         bus.on("ovos.intent.register.template", self._on_register)
@@ -92,6 +97,8 @@ class IntentManifest:
         bus.on("ovos.skill.deregister", self._on_skill_deregister)
         bus.on("ovos.intent.list", self._on_list)
         bus.on("ovos.intent.describe", self._on_describe)
+        bus.on("ovos.skill.loaded", self._on_skill_loaded)
+        bus.on("ovos.skills.list", self._on_skills_list)
 
     def shutdown(self):
         self.bus.remove("ovos.intent.register.keyword", self._on_register)
@@ -102,6 +109,8 @@ class IntentManifest:
         self.bus.remove("ovos.skill.deregister", self._on_skill_deregister)
         self.bus.remove("ovos.intent.list", self._on_list)
         self.bus.remove("ovos.intent.describe", self._on_describe)
+        self.bus.remove("ovos.skill.loaded", self._on_skill_loaded)
+        self.bus.remove("ovos.skills.list", self._on_skills_list)
 
     # ------------------------------------------------------------------
     # internal helpers
@@ -279,6 +288,45 @@ class IntentManifest:
         session_id = self._session_id_of(message)
         for key in [k for k in self._index if k[0] == session_id and k[1] == skill_id]:
             del self._index[key]
+        self._announcements.pop((session_id, skill_id), None)
+
+    def _on_skill_loaded(self, message: Message):
+        """OVOS-INTENT-4 §8.6 — ``ovos.skill.loaded`` announcement.
+
+        Re-announcement replaces the ``(session_id, skill_id)`` entry.
+        Unknown capability names are ignored rather than rejected.
+        """
+        skill_id = message.data.get("skill_id")
+        session_id = self._session_id_of(message)
+        if not (skill_id and session_id):
+            return
+        capabilities = [c for c in (message.data.get("capabilities") or [])
+                        if c in KNOWN_CAPABILITIES]
+        self._announcements[(session_id, skill_id)] = capabilities
+
+    def _on_skills_list(self, message: Message):
+        """OVOS-INTENT-4 §10.3 — ``ovos.skills.list`` / ``.response``.
+
+        ``session_id`` is an optional filter: present, the effective scope
+        is "default" plus the named session (§11.2); absent, every
+        announced skill in every session is returned.
+        """
+        f_session = message.data.get("session_id")
+        skills = []
+        for (session_id, skill_id), capabilities in self._announcements.items():
+            if f_session and session_id not in ("default", f_session):
+                continue
+            intents = sum(1 for key in self._index
+                          if key[0] == session_id and key[1] == skill_id)
+            skills.append({
+                "skill_id": skill_id,
+                "session_id": session_id,
+                "capabilities": capabilities,
+                "intents": intents,
+            })
+        skills.sort(key=lambda s: (0 if s["session_id"] == "default" else 1,
+                                    s["session_id"], s["skill_id"]))
+        self.bus.emit(message.response({"ok": True, "skills": skills}))
 
     # ------------------------------------------------------------------
     # introspection queries  §10
