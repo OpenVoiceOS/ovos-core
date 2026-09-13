@@ -33,11 +33,13 @@ Each scenario is exercised on BOTH bus namespaces (see ``namespace_e2e`` helpers
   re-dispatches it as ``ovos.utterance.handle`` so the (spec-only) intent listener
   still handles it. This proves legacy back-compat reaches the spec listener.
 """
+import time
 from copy import deepcopy
 from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
+from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch
 from ovos_spec_tools import SpecMessage, migration_counterpart
 from ovos_utils.log import LOG
 
@@ -353,3 +355,110 @@ class TestIntentPipelineRouting(TestCase):
         for namespace in NAMESPACE_PATHS:
             with self.subTest(namespace=namespace):
                 self._run_blacklisted_skill_falls_through_to_failure(namespace)
+
+    # ------------------------------------------------------------------
+    # Scenario 5: OVOS-PIPELINE-1 §4.4 — a plugin whose match call outlives
+    # its bound is skipped; the next plugin claims the utterance and it is
+    # handled exactly once.
+    # ------------------------------------------------------------------
+    def _run_slow_pipeline_stage_is_skipped(self, namespace: str) -> None:
+        """A pipeline stage registered ahead of padatious sleeps past its
+        ``match_timeout`` bound; the orchestrator skips it (§4.4) and
+        padatious-high, listed next, handles the utterance normally — with
+        exactly one ``ovos.utterance.handled``."""
+        utt_topic = utterance_topic(namespace)
+        message, session = self._source_message(
+            namespace, "count to 3",
+            ["slow-test-pipeline-plugin", "ovos-padatious-pipeline-plugin-high"],
+            "pipeline-test-5")
+
+        final_session = deepcopy(session)
+        final_session.active_skills = [(self.skill_id, 0.0)]
+
+        mc = self._make_minicroft(namespace)
+        # IntentService.config is the process-wide Configuration()["intents"]
+        # dict; give this instance its own copy so the short bound cannot
+        # leak into every minicroft built later in the same process
+        mc.intents.config = dict(mc.intents.config, match_timeout=0.2)
+
+        class SlowPipeline:
+            def match(self, utterances, lang, msg):
+                time.sleep(1.0)
+                # a real Match, produced only after the round should have
+                # moved on - OVOS-PIPELINE-1 §4.4 forbids dispatching it
+                return IntentHandlerMatch(
+                    match_type="slow.skill:late_intent",
+                    match_data={},
+                    skill_id="slow.skill",
+                    utterance="count to 3",
+                )
+
+        mc.intents.pipeline_plugins["slow-test-pipeline-plugin"] = SlowPipeline()
+
+        test = End2EndTest(
+            minicroft=mc,
+            skill_ids=[self.skill_id],
+            eof_msgs=[SpecMessage.UTTERANCE_HANDLED],
+            flip_points=[utt_topic],
+            entry_points=[utt_topic],
+            ignore_messages=self.ignore_messages,
+            source_message=message,
+            final_session=final_session,
+            activation_points=[f"{self.skill_id}:count_to_n"],
+            expected_messages=[
+                message,
+                Message(
+                    f"{self.skill_id}.activate",
+                    data={},
+                    context={"skill_id": self.skill_id},
+                ),
+                Message(
+                    SpecMessage.INTENT_MATCHED,
+                    data={"skill_id": self.skill_id,
+                          "intent_name": f"{self.skill_id}:count_to_n",
+                          "utterance": "count to 3", "lang": session.lang},
+                    context={"skill_id": self.skill_id},
+                ),
+                Message(
+                    SpecMessage.INTENT_HANDLER_START,
+                    data={"skill_id": self.skill_id,
+                          "intent_name": "count_to_n"},
+                    context={"skill_id": self.skill_id},
+                ),
+                Message(
+                    f"{self.skill_id}:count_to_n",
+                    data={"utterance": "count to 3", "lang": session.lang},
+                    context={"skill_id": self.skill_id},
+                ),
+                Message(
+                    "mycroft.skill.handler.start",
+                    data={"name": "CountSkill.handle_how_are_you_intent"},
+                    context={"skill_id": self.skill_id},
+                ),
+                Message(
+                    "mycroft.skill.handler.complete",
+                    data={"name": "CountSkill.handle_how_are_you_intent"},
+                    context={"skill_id": self.skill_id},
+                ),
+                Message(
+                    SpecMessage.INTENT_HANDLER_COMPLETE,
+                    data={"skill_id": self.skill_id,
+                          "intent_name": "count_to_n"},
+                    context={"skill_id": self.skill_id},
+                ),
+                Message(
+                    SpecMessage.UTTERANCE_HANDLED,
+                    data={},
+                    context={"skill_id": self.skill_id},
+                ),
+            ],
+        )
+        test.execute(timeout=15)
+        # the abandoned slow-plugin call is still running in the background;
+        # let it finish and confirm it produced no second dispatch/terminal
+        time.sleep(1.2)
+
+    def test_slow_pipeline_stage_is_skipped(self) -> None:
+        for namespace in NAMESPACE_PATHS:
+            with self.subTest(namespace=namespace):
+                self._run_slow_pipeline_stage_is_skipped(namespace)

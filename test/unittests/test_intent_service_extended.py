@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import threading
 import time
 import unittest
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock, patch
 
 from ovos_bus_client.message import Message
@@ -66,6 +68,9 @@ def _make_service(config=None) -> IntentService:
     svc.intent_manifest = IntentManifest(bus)
 
     svc.status = MagicMock()
+    # OVOS-PIPELINE-1 §4.4 match-timeout bound
+    svc._match_executor = ThreadPoolExecutor(thread_name_prefix="test-pipeline-match")
+    svc._match_inflight = {}
     return svc
 
 
@@ -1332,6 +1337,346 @@ class TestHandleUtterance(unittest.TestCase):
         # session's active_handlers must be exactly as before.
         self.assertEqual(sess.active_handlers, before)
         svc.send_complete_intent_failure.assert_called_once()
+
+
+class TestMatchTimeout(unittest.TestCase):
+    """Tests for the OVOS-PIPELINE-1 §4.4 per-plugin match-call bound."""
+
+    @staticmethod
+    def _run(svc, matchers, bound_wait=0.0):
+        sess = Session("s")
+        sess.pipeline = [m[0] for m in matchers]
+        msg = Message("recognizer_loop:utterance",
+                      data={"utterances": ["hello"]},
+                      context={"session": sess.serialize()})
+        with patch.object(svc, "get_pipeline", return_value=matchers), \
+             patch("ovos_core.intent_services.service.SessionManager.get",
+                   return_value=sess), \
+             patch("ovos_core.intent_services.service.SessionManager.sync"), \
+             patch("ovos_core.intent_services.service.get_message_lang",
+                   return_value="en-US"), \
+             patch("ovos_core.intent_services.service.get_valid_languages",
+                   return_value=["en-US"]):
+            svc.handle_utterance(msg)
+        if bound_wait:
+            # let the abandoned worker thread actually finish before we
+            # assert it never triggered a second dispatch
+            time.sleep(bound_wait)
+
+    def test_slow_plugin_skipped_next_plugin_claims_session_unchanged(self):
+        """A plugin whose match call outlives the bound is skipped (logged,
+        treated as a decline); the next plugin in the pipeline claims the
+        utterance and the inbound session is unchanged by the abandoned
+        call."""
+        svc = _make_service(config={"match_timeout": 0.05})
+        svc._dispatch_match = MagicMock()
+        svc.send_complete_intent_failure = MagicMock()
+
+        slow_match = _make_match(match_type="slow:intent", skill_id="slow.skill")
+        fast_match = _make_match(match_type="fast:intent", skill_id="fast.skill")
+
+        def slow(utterances, lang, message):
+            time.sleep(0.3)
+            return slow_match
+
+        def fast(utterances, lang, message):
+            return fast_match
+
+        self._run(svc, [("slow-plugin", slow), ("fast-plugin", fast)],
+                  bound_wait=0.4)
+
+        svc._dispatch_match.assert_called_once()
+        dispatched = svc._dispatch_match.call_args.args[0]
+        self.assertEqual(dispatched.match_type, "fast:intent")
+        svc.send_complete_intent_failure.assert_not_called()
+        # the slow plugin's abandoned call has long since returned by now
+        # (bound_wait > its sleep) yet it triggered no second dispatch
+        svc._dispatch_match.assert_called_once()
+
+    def test_plugin_within_bound_dispatched_normally(self):
+        """A plugin that returns just under the bound is dispatched as
+        usual."""
+        svc = _make_service(config={"match_timeout": 1})
+        svc._dispatch_match = MagicMock()
+
+        match = _make_match(match_type="ok:intent", skill_id="ok.skill")
+
+        def quick(utterances, lang, message):
+            time.sleep(0.01)
+            return match
+
+        self._run(svc, [("quick-plugin", quick)])
+
+        svc._dispatch_match.assert_called_once()
+        dispatched = svc._dispatch_match.call_args.args[0]
+        self.assertEqual(dispatched.match_type, "ok:intent")
+
+    def test_per_plugin_timeout_overrides_global_default(self):
+        """``intents.<pipe_id>.match_timeout`` overrides the deployment-wide
+        ``intents.match_timeout``."""
+        svc = _make_service(config={
+            "match_timeout": 10,
+            "slow-plugin": {"match_timeout": 0.05},
+        })
+        svc._dispatch_match = MagicMock()
+
+        fast_match = _make_match(match_type="fast:intent", skill_id="fast.skill")
+
+        def slow(utterances, lang, message):
+            time.sleep(0.3)
+            return _make_match(match_type="slow:intent")
+
+        def fast(utterances, lang, message):
+            return fast_match
+
+        self._run(svc, [("slow-plugin", slow), ("fast-plugin", fast)],
+                  bound_wait=0.4)
+
+        svc._dispatch_match.assert_called_once()
+        dispatched = svc._dispatch_match.call_args.args[0]
+        self.assertEqual(dispatched.match_type, "fast:intent")
+
+    def test_concurrent_sessions_do_not_discard_each_others_ontime_match(self):
+        """OVOS-PIPELINE-1 §4.4 only closes the round whose OWN bound
+        expired. A session's on-time match (well under the bound) must be
+        honored even if a second, unrelated session's round starts while
+        the first call is still in flight - a single counter shared across
+        sessions would otherwise mistake the second round starting for the
+        first one having moved on."""
+        svc = _make_service(config={"match_timeout": 10})
+        dispatched = []
+        svc._dispatch_match = MagicMock(side_effect=lambda m, *a, **kw: dispatched.append(m))
+        svc.send_complete_intent_failure = MagicMock()
+
+        match_a = _make_match(match_type="a:intent", skill_id="a.skill")
+        match_b = _make_match(match_type="b:intent", skill_id="b.skill")
+
+        # the SAME plugin serves both sessions: single-flight keyed on the
+        # plugin id alone would see session-a's in-flight call and skip
+        # session-b's round outright
+        def shared_plugin(utterances, lang, message):
+            if message.context["session"]["session_id"] == "session-a":
+                time.sleep(0.3)  # well under the 10s bound
+                return match_a
+            return match_b
+
+        pipeline = [("shared-plugin", shared_plugin)]
+
+        def fake_get_pipeline(session=None):
+            return pipeline
+
+        def make_message(session_id):
+            sess = Session(session_id)
+            sess.pipeline = [m[0] for m in pipeline]
+            return Message("recognizer_loop:utterance",
+                           data={"utterances": ["hello"]},
+                           context={"session": sess.serialize()})
+
+        with patch.object(svc, "get_pipeline", side_effect=fake_get_pipeline), \
+             patch("ovos_core.intent_services.service.SessionManager.sync"), \
+             patch("ovos_core.intent_services.service.get_message_lang",
+                   return_value="en-US"), \
+             patch("ovos_core.intent_services.service.get_valid_languages",
+                   return_value=["en-US"]):
+            ta = threading.Thread(target=svc.handle_utterance,
+                                  args=(make_message("session-a"),))
+            tb = threading.Thread(target=svc.handle_utterance,
+                                  args=(make_message("session-b"),))
+            ta.start()
+            time.sleep(0.1)
+            tb.start()
+            ta.join()
+            tb.join()
+
+        dispatched_types = {m.match_type for m in dispatched}
+        self.assertEqual(dispatched_types, {"a:intent", "b:intent"})
+        svc.send_complete_intent_failure.assert_not_called()
+
+    def test_hung_plugin_does_not_saturate_pool_for_healthy_plugins(self):
+        """OVOS-PIPELINE-1 §6.2: a plugin that hangs on every round must not
+        exhaust the shared executor and take healthy plugins down with it.
+        One in-flight call per plugin id is enough to reproduce the pool
+        exhaustion with a tiny ``max_workers`` instead of needing the
+        default ``min(32, cpu_count + 4)`` rounds."""
+        svc = _make_service(config={"match_timeout": 0.1})
+        svc._match_executor = ThreadPoolExecutor(max_workers=2,
+                                                  thread_name_prefix="test-pool")
+        svc._dispatch_match = MagicMock()
+        svc.send_complete_intent_failure = MagicMock()
+
+        release = threading.Event()
+
+        def hung(utterances, lang, message):
+            # hangs past the 0.1s bound until the test releases it, so an
+            # unbounded round would block here instead of moving on
+            release.wait(5)
+
+        healthy_match = _make_match(match_type="healthy:intent", skill_id="healthy.skill")
+
+        def healthy(utterances, lang, message):
+            return healthy_match
+
+        # more rounds than max_workers - each round used to submit a new
+        # worker for the hung plugin, so this alone exhausts a 2-worker pool
+        started = time.monotonic()
+        try:
+            for _ in range(3):
+                self._run(svc, [("hung-plugin", hung)])
+
+            self._run(svc, [("healthy-plugin", healthy)])
+            elapsed = time.monotonic() - started
+        finally:
+            release.set()
+
+        # every hung round returned at its bound, not when the plugin did
+        self.assertLess(elapsed, 2.0)
+        svc._dispatch_match.assert_called_once()
+        dispatched = svc._dispatch_match.call_args.args[0]
+        self.assertEqual(dispatched.match_type, "healthy:intent")
+
+    def test_same_session_overlapping_rounds_both_honor_ontime_matches(self):
+        """OVOS-PIPELINE-1 §4.4 only closes a round once its OWN bound has
+        expired AND iteration has moved on - the two conditions are joined
+        by AND. A call whose bound never expired must be honored even if
+        the SAME session starts a second round while the first is still in
+        flight: ``future.result()`` only returns without raising once the
+        call has finished inside the bound, so by construction that call's
+        bound never expired and closing it anyway would violate the AND."""
+        svc = _make_service(config={"match_timeout": 10})
+        dispatched = []
+        svc._dispatch_match = MagicMock(side_effect=lambda m, *a, **kw: dispatched.append(m))
+        svc.send_complete_intent_failure = MagicMock()
+
+        match_1 = _make_match(match_type="round1:intent", skill_id="r1.skill")
+        match_2 = _make_match(match_type="round2:intent", skill_id="r2.skill")
+
+        def slow_but_on_time(utterances, lang, message):
+            time.sleep(0.3)  # well under the 10s bound
+            return match_1
+
+        def fast(utterances, lang, message):
+            return match_2
+
+        # each round uses its own plugin id so round 2's single-flight guard
+        # cannot itself skip round 1 - this isolates the identity-compare
+        # behavior from the §6.2 single-flight guard tested elsewhere.
+        # get_pipeline is called once per handle_utterance invocation, so
+        # a call-order counter hands round 1's pipeline to the first caller
+        # and round 2's to the second, regardless of which thread that is.
+        pipelines = [("slow-plugin", slow_but_on_time), ("fast-plugin", fast)]
+        call_order = []
+        order_lock = threading.Lock()
+
+        def fake_get_pipeline(session=None):
+            with order_lock:
+                call_order.append(1)
+                idx = len(call_order) - 1
+            return [pipelines[idx]]
+
+        def make_message():
+            sess = Session("shared-session")
+            sess.pipeline = [m[0] for m in pipelines]
+            return Message("recognizer_loop:utterance",
+                           data={"utterances": ["hello"]},
+                           context={"session": sess.serialize()})
+
+        with patch.object(svc, "get_pipeline", side_effect=fake_get_pipeline), \
+             patch("ovos_core.intent_services.service.SessionManager.sync"), \
+             patch("ovos_core.intent_services.service.get_message_lang",
+                   return_value="en-US"), \
+             patch("ovos_core.intent_services.service.get_valid_languages",
+                   return_value=["en-US"]):
+            t1 = threading.Thread(target=svc.handle_utterance, args=(make_message(),))
+            t1.start()
+            time.sleep(0.1)
+            t2 = threading.Thread(target=svc.handle_utterance, args=(make_message(),))
+            t2.start()
+            t1.join()
+            t2.join()
+
+        dispatched_types = {m.match_type for m in dispatched}
+        self.assertEqual(dispatched_types, {"round1:intent", "round2:intent"})
+        svc.send_complete_intent_failure.assert_not_called()
+
+    def test_single_flight_is_scoped_per_session(self):
+        """OVOS-PIPELINE-1 §6.2 single-flight must not let one session's
+        hung call starve an unrelated session calling the same plugin id -
+        each session gets its own worker budget for that plugin."""
+        svc = _make_service(config={"match_timeout": 0.1})
+        svc._match_executor = ThreadPoolExecutor(max_workers=4,
+                                                  thread_name_prefix="test-pool")
+        dispatched = []
+        svc._dispatch_match = MagicMock(side_effect=lambda m, *a, **kw: dispatched.append(m))
+        svc.send_complete_intent_failure = MagicMock()
+
+        healthy_match = _make_match(match_type="healthy:intent", skill_id="healthy.skill")
+
+        def hung(utterances, lang, message):
+            time.sleep(2)  # finite so it does not block process exit
+
+        def healthy(utterances, lang, message):
+            return healthy_match
+
+        def make_message(session_id, matcher):
+            sess = Session(session_id)
+            sess.pipeline = ["shared-plugin"]
+            msg = Message("recognizer_loop:utterance",
+                          data={"utterances": ["hello"]},
+                          context={"session": sess.serialize()})
+            return msg, [("shared-plugin", matcher)]
+
+        msg_h, matchers_h = make_message("session-hung", hung)
+        msg_a, matchers_a = make_message("session-a", healthy)
+        msg_b, matchers_b = make_message("session-b", healthy)
+
+        def by_session(session=None):
+            return {"session-hung": matchers_h,
+                    "session-a": matchers_a,
+                    "session-b": matchers_b}[session.session_id]
+
+        with patch.object(svc, "get_pipeline", side_effect=by_session), \
+             patch("ovos_core.intent_services.service.SessionManager.sync"), \
+             patch("ovos_core.intent_services.service.get_message_lang",
+                   return_value="en-US"), \
+             patch("ovos_core.intent_services.service.get_valid_languages",
+                   return_value=["en-US"]):
+            t_hung = threading.Thread(target=svc.handle_utterance, args=(msg_h,))
+            t_hung.start()
+            time.sleep(0.05)
+            t_a = threading.Thread(target=svc.handle_utterance, args=(msg_a,))
+            t_b = threading.Thread(target=svc.handle_utterance, args=(msg_b,))
+            t_a.start()
+            t_b.start()
+            t_hung.join()
+            t_a.join()
+            t_b.join()
+
+        dispatched_types = {m.match_type for m in dispatched}
+        self.assertEqual(dispatched_types, {"healthy:intent"})
+        self.assertEqual(len(dispatched), 2,
+                         "both unrelated sessions must be dispatched despite "
+                         "session-hung's call to the same plugin id")
+
+    def test_match_inflight_does_not_leak_completed_sessions(self):
+        """§6.2 single-flight bookkeeping (``_match_inflight``) must not grow
+        forever: once a session's call has finished, its entry is dropped at
+        the end of that session's round, not kept for the life of the
+        process. A HiveMind hub that mints a fresh session per message would
+        otherwise leak one entry per utterance."""
+        svc = _make_service(config={"match_timeout": 10})
+        svc._dispatch_match = MagicMock()
+        svc.send_complete_intent_failure = MagicMock()
+
+        match = _make_match(match_type="ok:intent", skill_id="ok.skill")
+
+        def quick(utterances, lang, message):
+            return match
+
+        self._run(svc, [("quick-plugin", quick)])
+
+        self.assertEqual(svc._match_inflight, {},
+                         "the completed round's entry must be pruned, not "
+                         "kept around for the life of the process")
 
 
 # ---------------------------------------------------------------------------
