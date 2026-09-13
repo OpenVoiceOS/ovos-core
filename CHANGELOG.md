@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.5.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.5a1) (2026-09-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.4a2...3.5.5a1)
+
+**Closed issues:**
+
+- Race condition in SkillManager causes every plugin skill to be loaded \(instantiated\) twice at startup [\#887](https://github.com/OpenVoiceOS/ovos-core/issues/887)
+
+**Merged pull requests:**
+
+- fix: an unknown pipeline matcher warns once, not an error per utterance [\#993](https://github.com/OpenVoiceOS/ovos-core/pull/993) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- fix: unload plugin skills whose package was uninstalled [\#978](https://github.com/OpenVoiceOS/ovos-core/pull/978) ([goldyfruit](https://github.com/goldyfruit))
+
 ## [3.5.4a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.4a2) (2026-09-11)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.4a1...3.5.4a2)
@@ -344,10 +357,6 @@
 ## [3.0.7a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.7a3) (2026-08-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.7a2...3.0.7a3)
-
-**Merged pull requests:**
-
-- chore: kill queued deprecation-warning hot-path reads [\#879](https://github.com/OpenVoiceOS/ovos-core/pull/879) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [3.0.7a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.7a2) (2026-08-14)
 
