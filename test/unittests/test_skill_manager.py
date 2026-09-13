@@ -909,6 +909,93 @@ class TestSkillManager(TestCase):
         self.assertIn(skill_id, self.skill_manager.plugin_skills)
         self.assertNotIn(skill_id, self.skill_manager._plugin_skill_unload_pending)
 
+    def test_uninstall_sweep_leaves_a_reinstall_reserved_after_its_reading_alone(self):
+        """The verdict speaks only for the attempt the sweep read.
+
+        Between reading the packages and recording its verdicts the sweep
+        holds no lock, and a reinstall can reserve the same id in that gap.
+        That load started from a package the reading knows nothing about;
+        marking it would have `_load_plugin_skill` discard a good loader and
+        leave the skill out until the next scan."""
+        skill_id = 'test.reinstalled.skill'
+        self.skill_manager.plugin_skills = {}
+        self.skill_manager._loading_plugin_skills = set()
+        self.skill_manager._plugin_skill_unload_pending = set()
+        self.assertTrue(self.skill_manager._reserve_plugin_skill_load(skill_id))
+        read_serial = self.skill_manager._plugin_skill_serials[skill_id]
+
+        def reinstall_while_the_packages_are_read():
+            # the load the sweep read ends without a loader, and the
+            # reinstall's load takes the id before the verdicts land
+            self.skill_manager._release_plugin_skill_load(skill_id)
+            self.assertTrue(self.skill_manager._reserve_plugin_skill_load(skill_id))
+            return {}
+
+        with patch(self.mock_package + 'find_skill_plugins',
+                   side_effect=reinstall_while_the_packages_are_read), self._declared():
+            removed = self.skill_manager._unload_undiscoverable_plugin_skills()
+
+        self.assertEqual([], removed)
+        self.assertSetEqual(set(), self.skill_manager._plugin_skill_unload_pending)
+        self.assertIn(skill_id, self.skill_manager._loading_plugin_skills)
+        self.assertNotEqual(read_serial, self.skill_manager._plugin_skill_serials[skill_id])
+
+    def test_uninstall_sweep_detaches_the_load_it_read_even_when_it_finishes_first(self):
+        """The counterpart: the load the sweep read may finish and track its
+        loader before the verdicts land. Its package was gone when the packages
+        were read, so that loader is the sweep's to detach, reservation or not."""
+        skill_id = 'test.finished.skill'
+        self.skill_manager.plugin_skills = {}
+        self.skill_manager._loading_plugin_skills = set()
+        self.assertTrue(self.skill_manager._reserve_plugin_skill_load(skill_id))
+        mock_loader = Mock(spec=SkillLoader)
+        mock_loader.skill_id = skill_id
+        mock_loader.instance = Mock()
+
+        def finish_while_the_packages_are_read():
+            # what `_load_plugin_skill` does when its verdict is not in yet
+            with self.skill_manager._plugin_skills_lock:
+                self.skill_manager.plugin_skills[skill_id] = mock_loader
+                self.skill_manager._loading_plugin_skills.discard(skill_id)
+            return {}
+
+        with patch(self.mock_package + 'find_skill_plugins',
+                   side_effect=finish_while_the_packages_are_read), self._declared():
+            removed = self.skill_manager._unload_undiscoverable_plugin_skills()
+
+        self.assertEqual([skill_id], removed)
+        self.assertNotIn(skill_id, self.skill_manager.plugin_skills)
+        self.assertNotIn(skill_id, self.skill_manager._plugin_skill_serials)
+        mock_loader.instance.shutdown.assert_called_once_with()
+
+    def test_uninstall_sweep_keeps_a_loader_that_replaced_the_one_it_read(self):
+        """A loader tracked under an id after the reading came from a later
+        attempt, whatever the reading said about that id."""
+        skill_id = 'test.replaced.skill'
+        self.skill_manager.plugin_skills = {}
+        self.skill_manager._loading_plugin_skills = set()
+        old = self._tracked_loader(skill_id)
+        new = Mock(spec=SkillLoader)
+        new.skill_id = skill_id
+        new.instance = Mock()
+
+        def replace_while_the_packages_are_read():
+            self.skill_manager._unload_plugin_skill(skill_id)
+            self.assertTrue(self.skill_manager._reserve_plugin_skill_load(skill_id))
+            with self.skill_manager._plugin_skills_lock:
+                self.skill_manager.plugin_skills[skill_id] = new
+                self.skill_manager._loading_plugin_skills.discard(skill_id)
+            return {}
+
+        with patch(self.mock_package + 'find_skill_plugins',
+                   side_effect=replace_while_the_packages_are_read), self._declared():
+            removed = self.skill_manager._unload_undiscoverable_plugin_skills()
+
+        self.assertEqual([], removed)
+        self.assertIs(new, self.skill_manager.plugin_skills[skill_id])
+        new.instance.shutdown.assert_not_called()
+        old.instance.shutdown.assert_called_once_with()
+
     def test_uninstall_keeps_a_loading_skill_when_the_packages_are_installed(self):
         """A skill still loading is kept by the same reasoning as a loaded one: the
         entry points are still declared, so nothing importing is a hiccup."""

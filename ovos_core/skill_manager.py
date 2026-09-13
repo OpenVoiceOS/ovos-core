@@ -18,7 +18,7 @@ import threading
 import time
 from importlib.metadata import entry_points
 from threading import Thread, Event
-from typing import Callable, List, Optional, Set
+from typing import Callable, Dict, List, Optional, Set
 
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
@@ -137,6 +137,11 @@ class SkillManager(Thread):
         self.plugin_skills = {}
         self._plugin_skills_lock = threading.RLock()
         self._loading_plugin_skills = set()
+        # the serial of the attempt behind each tracked loader or reserved load,
+        # so that a pass judging a snapshot can tell the attempt it read from a
+        # later one under the same id
+        self._plugin_skill_serials: Dict[str, int] = {}
+        self._plugin_skill_last_serial = 0
         # ids whose package went undiscoverable while their load held the
         # reservation. The sweep that noticed had no loader to detach yet, so
         # it leaves the verdict here for `_load_plugin_skill` to honour.
@@ -280,6 +285,8 @@ class SkillManager(Thread):
             if skill_id in self.plugin_skills or skill_id in self._loading_plugin_skills:
                 return False
             self._loading_plugin_skills.add(skill_id)
+            self._plugin_skill_last_serial += 1
+            self._plugin_skill_serials[skill_id] = self._plugin_skill_last_serial
             # a verdict can only speak for the reservation it was recorded
             # against; clearing here keeps an older one from discarding this
             # attempt, which starts from a package that is discoverable again
@@ -290,6 +297,7 @@ class SkillManager(Thread):
         """Clear the in-progress marker for a skill load attempt."""
         with self._plugin_skills_lock:
             self._loading_plugin_skills.discard(skill_id)
+            self._plugin_skill_serials.pop(skill_id, None)
 
     def _should_retry_plugin_skill(self, skill_id: str) -> bool:
         """Check whether enough time has passed to retry a previously failed load."""
@@ -531,7 +539,10 @@ class SkillManager(Thread):
                 abandoned = skill_id in self._plugin_skill_unload_pending
                 self._plugin_skill_unload_pending.discard(skill_id)
                 if skill_loader is not None and not abandoned:
+                    # the loader keeps the attempt's serial while it is tracked
                     self.plugin_skills[skill_id] = skill_loader
+                else:
+                    self._plugin_skill_serials.pop(skill_id, None)
                 self._loading_plugin_skills.discard(skill_id)
             if abandoned:
                 # the package is gone, so this is not a failure to back off
@@ -754,6 +765,7 @@ class SkillManager(Thread):
             if skill_id in self.plugin_skills:
                 LOG.info('Unloading plugin skill: ' + skill_id)
                 skill_loader = self.plugin_skills.pop(skill_id)
+                self._plugin_skill_serials.pop(skill_id, None)
 
         self._shutdown_skill_loader(skill_loader)
 
@@ -808,6 +820,14 @@ class SkillManager(Thread):
         Returns:
             List[str]: Ids of the skills this call unloaded.
         """
+        # What this pass judges is read before the packages are. A loader
+        # tracked or a load reserved after this point started from a package
+        # installed after the reading below, so it is not this pass's to
+        # remove, however stale that reading is by the time the verdicts
+        # land; each attempt's serial tells it from the one read here.
+        with self._plugin_skills_lock:
+            judged = {skill_id: self._plugin_skill_serials.get(skill_id)
+                      for skill_id in set(self.plugin_skills) | self._loading_plugin_skills}
         try:
             discoverable = set(find_skill_plugins())
         except Exception:
@@ -831,8 +851,10 @@ class SkillManager(Thread):
             LOG.warning(f"Plugin skill discovery returned nothing while {len(declared)} "
                         f"skill entry points are still installed; keeping them")
         with self._plugin_skills_lock:
-            removed = [skill_id for skill_id in self.plugin_skills
-                       if skill_id not in installed]
+            gone = [skill_id for skill_id, serial in judged.items()
+                    if skill_id not in installed
+                    and self._plugin_skill_serials.get(skill_id) == serial]
+            removed = [skill_id for skill_id in gone if skill_id in self.plugin_skills]
             # detach under the lock that decided the removal, and keep the
             # loader instance rather than the id: once an id stops being
             # tracked an overlapping pass is free to load a replacement for
@@ -840,6 +862,8 @@ class SkillManager(Thread):
             # that replacement instead of the loader this pass chose
             detached = [(skill_id, self.plugin_skills.pop(skill_id))
                         for skill_id in removed]
+            for skill_id in removed:
+                self._plugin_skill_serials.pop(skill_id, None)
             # a failed load leaves a backoff record and no loader; without
             # this a reinstall of that package would wait out the backoff
             stale_failures = [skill_id for skill_id in self._plugin_skill_failures
@@ -848,9 +872,12 @@ class SkillManager(Thread):
             # `plugin_skills` yet, so there is nothing to detach for it here.
             # Record the verdict instead: `_load_plugin_skill` discards the
             # loader it is about to track rather than reviving a dead package.
+            # Only the reservation read above gets it: one made since belongs
+            # to a reinstall, and `_reserve_plugin_skill_load` already cleared
+            # whatever an older pass had left for that id.
             self._plugin_skill_unload_pending.update(
-                skill_id for skill_id in self._loading_plugin_skills
-                if skill_id not in installed)
+                skill_id for skill_id in gone
+                if skill_id in self._loading_plugin_skills)
         for skill_id, skill_loader in detached:
             LOG.info('Unloading plugin skill: ' + skill_id)
             self._shutdown_skill_loader(skill_loader)
