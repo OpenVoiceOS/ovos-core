@@ -63,6 +63,29 @@ def _target_skill_id(message: Message) -> Optional[str]:
     return source_skill_id
 
 
+def _deregister_target_skill_id(message: Message) -> Optional[str]:
+    """OVOS-INTENT-4 §3.2 — the skill a deregistration removes: the payload
+    ``skill_id`` only.
+
+    A deregistration without a payload ``skill_id`` names no target, so it
+    removes nothing. Falling back to ``context.skill_id`` here would make a
+    malformed deregistration delete the emitter's own entries. Unlike
+    enable/disable, no pre-spec bridge delivers a deregistration without the
+    payload field, so no substitution is kept for this path.
+    """
+    payload_skill_id = message.data.get("skill_id")
+    if not payload_skill_id:
+        LOG.warning(f"{message.msg_type}: no `skill_id` in the payload; "
+                    "OVOS-INTENT-4 §3.2 names the target there, so nothing "
+                    "is removed.")
+        return None
+    source_skill_id = message.context.get("skill_id")
+    if source_skill_id and payload_skill_id != source_skill_id:
+        LOG.debug(f"{message.msg_type}: source {source_skill_id!r} acting on "
+                  f"target {payload_skill_id!r}")
+    return payload_skill_id
+
+
 class IntentManifest:
     """INTENT-4 §10 orchestrator-owned manifest.
 
@@ -239,7 +262,9 @@ class IntentManifest:
         }
 
     def _on_deregister(self, message: Message):
-        skill_id = _target_skill_id(message)
+        skill_id = _deregister_target_skill_id(message)
+        if not skill_id:
+            return
         intent_name = message.data.get("intent_name")
         lang = message.data.get("lang")
         session_id = self._session_id_of(message)
@@ -275,7 +300,9 @@ class IntentManifest:
             entry["enabled"] = enabled
 
     def _on_skill_deregister(self, message: Message):
-        skill_id = _target_skill_id(message)
+        skill_id = _deregister_target_skill_id(message)
+        if not skill_id:
+            return
         session_id = self._session_id_of(message)
         for key in [k for k in self._index if k[0] == session_id and k[1] == skill_id]:
             del self._index[key]

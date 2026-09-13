@@ -169,6 +169,32 @@ class TestManifestDeregister(unittest.TestCase):
         self.assertNotIn(("default", "a.skill", "hello", "en-US", "keyword"), self.m._index)
         self.assertIn(("default", "b.skill", "hello", "en-US", "keyword"), self.m._index)
 
+    def test_deregister_without_payload_skill_id_removes_nothing(self):
+        # OVOS-INTENT-4 §3.2: the payload names the target. A malformed
+        # deregistration must not fall back to the emitter in the context.
+        msg = Message("ovos.intent.deregister",
+                      data={"intent_name": "hello"},
+                      context={"skill_id": "skill.test"})
+        with patch("ovos_core.intent_services.manifest.LOG") as log:
+            self.m._on_deregister(msg)
+        self.assertEqual(len(self.m._index), 2)
+        self.assertIn("skill_id", log.warning.call_args[0][0])
+
+    def test_skill_deregister_without_payload_skill_id_removes_nothing(self):
+        msg = Message("ovos.skill.deregister", data={},
+                      context={"skill_id": "skill.test"})
+        with patch("ovos_core.intent_services.manifest.LOG") as log:
+            self.m._on_skill_deregister(msg)
+        self.assertEqual(len(self.m._index), 2)
+        self.assertIn("skill_id", log.warning.call_args[0][0])
+
+    def test_skill_deregister_acts_on_the_payload_skill_id(self):
+        self.m._on_register(_reg("b.skill", "hello", lang="en-US"))
+        msg = Message("ovos.skill.deregister", data={"skill_id": "skill.test"},
+                      context={"skill_id": "b.skill"})
+        self.m._on_skill_deregister(msg)
+        self.assertEqual([k[1] for k in self.m._index], ["b.skill"])
+
     def test_deregister_reserved_intent_name_warns_and_is_a_noop(self):
         # a reserved name was never indexed (§7.3); deregistering it must
         # not touch the index and must log the ignored mutation.
