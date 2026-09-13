@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.5.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.6a1) (2026-09-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.5a1...3.5.6a1)
+
+**Merged pull requests:**
+
+- fix: a deregistration without a payload skill\_id removes nothing from the manifest [\#991](https://github.com/OpenVoiceOS/ovos-core/pull/991) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [3.5.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.5a1) (2026-09-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.4a2...3.5.5a1)
@@ -307,15 +315,15 @@
 
 ## [3.0.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.12a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.12a1)
-
-## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.11a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.12a1)
 
 ## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.10a3)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.10a3)
+
+## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.11a1)
 
 ## [3.0.10a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a2) (2026-08-31)
 
@@ -350,10 +358,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.7a3...3.0.7a4)
 
-**Merged pull requests:**
-
-- docs: prerelease-quirks changelog [\#881](https://github.com/OpenVoiceOS/ovos-core/pull/881) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [3.0.7a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.7a3) (2026-08-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.7a2...3.0.7a3)
@@ -361,10 +365,6 @@
 ## [3.0.7a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.7a2) (2026-08-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.7a1...3.0.7a2)
-
-**Merged pull requests:**
-
-- test: account for ovos.converse.pong broadcast answer in e2e expectations [\#880](https://github.com/OpenVoiceOS/ovos-core/pull/880) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [3.0.7a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.7a1) (2026-08-14)
 
