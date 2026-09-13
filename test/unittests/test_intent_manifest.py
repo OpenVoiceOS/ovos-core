@@ -118,13 +118,16 @@ class TestManifestRegister(unittest.TestCase):
         self.m._on_register(msg)
         self.assertEqual(len(self.m._index), 1)
 
-    def test_register_without_payload_skill_id_uses_context(self):
+    def test_register_without_payload_skill_id_is_not_indexed(self):
+        # OVOS-INTENT-4 §3.2: the context skill_id is provenance only and is
+        # never substituted for a missing payload skill_id.
         msg = Message("ovos.intent.register.keyword",
                       data={"intent_name": "hello", "lang": "en-US"},
                       context={"skill_id": "skill.test"})
-        self.m._on_register(msg)
-        entry = list(self.m._index.values())[0]
-        self.assertEqual(entry["skill_id"], "skill.test")
+        with patch("ovos_core.intent_services.manifest.LOG") as log:
+            self.m._on_register(msg)
+        self.assertEqual(self.m._index, {})
+        self.assertIn("skill_id", log.warning.call_args[0][0])
 
 
 class TestManifestDeregister(unittest.TestCase):
