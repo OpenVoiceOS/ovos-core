@@ -363,7 +363,19 @@ class IntentService:
         pipe_id = _PIPELINE_RE.sub('', matcher_id)
         plugin = self.pipeline_plugins.get(pipe_id)
         if not plugin:
-            LOG.error(f"Unknown pipeline matcher '{matcher_id}': no installed plugin provides it. A bare ovos-core install ships no matchers - install ovos-core[plugins] or add the specific plugin to your environment.")
+            # OVOS-PIPELINE-1 §5.1: an unknown pipeline_id is skipped and
+            # SHOULD log a warning. The default pipeline is resolved on every
+            # utterance and a bare install lacks most of its matchers, so
+            # each id warns once per process and later lookups log at debug.
+            warned = self.__dict__.setdefault("_warned_unknown_matchers", set())
+            if matcher_id in warned:
+                LOG.debug(f"Skipping unknown pipeline matcher '{matcher_id}'")
+            else:
+                warned.add(matcher_id)
+                LOG.warning(f"Unknown pipeline matcher '{matcher_id}': no installed plugin provides it, "
+                            f"so it is skipped. Loaded pipeline plugins: {sorted(self.pipeline_plugins)}. "
+                            f"Install ovos-core[plugins] or the plugin that provides it, "
+                            f"or remove it from the configured pipeline.")
             return None
 
         if isinstance(plugin, ConfidenceMatcherPipeline):

@@ -220,15 +220,47 @@ class TestGetPipelineMatcher(unittest.TestCase):
 
     @patch("ovos_core.intent_services.service.LOG")
     def test_returns_none_for_unknown_plugin(self, mock_log):
-        """An unknown matcher_id returns None and logs an error."""
+        """An unknown matcher_id returns None and logs a warning (PIPELINE-1 §5.1)."""
         svc = _make_service()
         result = svc.get_pipeline_matcher("nonexistent-pipeline-plugin")
         self.assertIsNone(result)
-        # Verify error was logged with helpful message
-        self.assertTrue(mock_log.error.called)
-        error_msg = " ".join(str(c) for c in mock_log.error.call_args_list)
-        self.assertIn("nonexistent-pipeline-plugin", error_msg)
-        self.assertIn("no installed plugin provides it", error_msg)
+        self.assertFalse(mock_log.error.called)
+        self.assertEqual(mock_log.warning.call_count, 1)
+        warning_msg = str(mock_log.warning.call_args)
+        self.assertIn("nonexistent-pipeline-plugin", warning_msg)
+        self.assertIn("no installed plugin provides it", warning_msg)
+        self.assertIn("ovos-core[plugins]", warning_msg)
+
+    @patch("ovos_core.intent_services.service.LOG")
+    def test_unknown_plugin_warns_once_per_id(self, mock_log):
+        """A bare install resolves the same unknown ids on every utterance.
+
+        §5.1 asks for a warning when an unknown pipeline_id is skipped. The
+        default pipeline names seven matchers a bare install does not have,
+        so one line per id per utterance buries the startup log. Each id
+        warns once; later lookups log at debug.
+        """
+        svc = _make_service()
+        for _ in range(3):
+            self.assertIsNone(svc.get_pipeline_matcher("ovos-adapt-pipeline-plugin-high"))
+            self.assertIsNone(svc.get_pipeline_matcher("ovos-adapt-pipeline-plugin-medium"))
+        self.assertFalse(mock_log.error.called)
+        warned = [str(c) for c in mock_log.warning.call_args_list]
+        self.assertEqual(len(warned), 2)
+        self.assertIn("ovos-adapt-pipeline-plugin-high", warned[0])
+        self.assertIn("ovos-adapt-pipeline-plugin-medium", warned[1])
+
+    @patch("ovos_core.intent_services.service.LOG")
+    def test_unknown_plugin_message_does_not_claim_no_matchers(self, mock_log):
+        """A bare install loads stop, converse and fallback matchers.
+
+        The old text said a bare install "ships no matchers", which is false.
+        """
+        svc = _make_service()
+        svc.get_pipeline_matcher("ovos-m2v-pipeline-high")
+        logged = " ".join(str(c) for c in mock_log.mock_calls)
+        self.assertIn("ovos-m2v-pipeline-high", logged)
+        self.assertNotIn("ships no matchers", logged)
 
     def test_returns_match_high_for_high_suffix(self):
         """A ConfidenceMatcherPipeline plugin with -high suffix returns match_high."""
