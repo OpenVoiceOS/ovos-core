@@ -75,13 +75,13 @@ All events use the OVOS `Message` format: `{type, data, context}`.
 | `ovos.skills.install.complete` | core → * | Install succeeded; `SkillManager` runs a discovery pass on this report |
 | `ovos.skills.install.failed` | core → * | Install failed: `{error, detail}`, `detail` being the tail of the installer's output |
 | `ovos.skills.uninstall` | * → core | Uninstall skill packages |
-| `ovos.skills.uninstall.complete` | core → * | Uninstall succeeded |
+| `ovos.skills.uninstall.complete` | core → * | Uninstall succeeded; `SkillManager` unloads the skills that are no longer discoverable |
 | `ovos.skills.uninstall.failed` | core → * | Uninstall failed: `{error, detail}` |
 | `ovos.pip.install` | * → core | Install arbitrary pip packages |
 | `ovos.pip.install.complete` | core → * | Install succeeded; `SkillManager` runs a discovery pass on this report |
 | `ovos.pip.install.failed` | core → * | Install failed: `{error, detail}` |
 | `ovos.pip.uninstall` | * → core | Uninstall arbitrary pip packages |
-| `ovos.pip.uninstall.complete` | core → * | Uninstall succeeded |
+| `ovos.pip.uninstall.complete` | core → * | Uninstall succeeded; `SkillManager` unloads the skills that are no longer discoverable |
 | `ovos.pip.uninstall.failed` | core → * | Uninstall failed: `{error, detail}` |
 
 ## Connectivity / Network

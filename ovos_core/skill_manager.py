@@ -16,8 +16,9 @@
 import os
 import threading
 import time
+from importlib.metadata import entry_points
 from threading import Thread, Event
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional, Set
 
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
@@ -36,6 +37,7 @@ from ovos_core.intent_services import IntentService
 from ovos_workshop.skills.api import SkillApi
 
 from ovos_plugin_manager.skills import find_skill_plugins
+from ovos_plugin_manager.utils import DEPRECATED_ENTRYPOINTS, PluginTypes
 
 # Backoff schedule for retrying a plugin skill whose load raised before a
 # `PluginSkillLoader` instance existed (eg. an error in the skill's own
@@ -135,6 +137,15 @@ class SkillManager(Thread):
         self.plugin_skills = {}
         self._plugin_skills_lock = threading.RLock()
         self._loading_plugin_skills = set()
+        # the serial of the attempt behind each tracked loader or reserved load,
+        # so that a pass judging a snapshot can tell the attempt it read from a
+        # later one under the same id
+        self._plugin_skill_serials: Dict[str, int] = {}
+        self._plugin_skill_last_serial = 0
+        # ids whose package went undiscoverable while their load held the
+        # reservation. The sweep that noticed had no loader to detach yet, so
+        # it leaves the verdict here for `_load_plugin_skill` to honour.
+        self._plugin_skill_unload_pending = set()
         # skill_id -> (attempt_count, last_attempt_time) for plugin skills whose
         # load raised before a loader object existed (see _load_plugin_skill).
         # These are retried with an exponential backoff instead of every scan.
@@ -238,6 +249,12 @@ class SkillManager(Thread):
         self.bus.on('ovos.skills.install.complete', self.handle_install_complete)
         self.bus.on('ovos.pip.install.complete', self.handle_install_complete)
 
+        # The installer reloads the plugin manager before it reports a
+        # completed uninstall, so discovery no longer returns the removed
+        # package; drop the loaded skills that went with it
+        self.bus.on('ovos.skills.uninstall.complete', self.handle_uninstall_complete)
+        self.bus.on('ovos.pip.uninstall.complete', self.handle_uninstall_complete)
+
         # Load skills waiting for connectivity (only if deferred loading is enabled)
         if self._use_deferred_loading:
             self.bus.on("mycroft.network.connected", self.handle_network_connected)
@@ -268,12 +285,19 @@ class SkillManager(Thread):
             if skill_id in self.plugin_skills or skill_id in self._loading_plugin_skills:
                 return False
             self._loading_plugin_skills.add(skill_id)
+            self._plugin_skill_last_serial += 1
+            self._plugin_skill_serials[skill_id] = self._plugin_skill_last_serial
+            # a verdict can only speak for the reservation it was recorded
+            # against; clearing here keeps an older one from discarding this
+            # attempt, which starts from a package that is discoverable again
+            self._plugin_skill_unload_pending.discard(skill_id)
             return True
 
     def _release_plugin_skill_load(self, skill_id):
         """Clear the in-progress marker for a skill load attempt."""
         with self._plugin_skills_lock:
             self._loading_plugin_skills.discard(skill_id)
+            self._plugin_skill_serials.pop(skill_id, None)
 
     def _should_retry_plugin_skill(self, skill_id: str) -> bool:
         """Check whether enough time has passed to retry a previously failed load."""
@@ -504,17 +528,37 @@ class SkillManager(Thread):
         try:
             skill_loader = self._get_plugin_skill_loader(skill_id, skill_class=skill_plugin)
             load_status = skill_loader.load(skill_plugin)
-            if load_status:
-                self.bus.emit(Message("mycroft.skill.loaded", {"skill_id": skill_id}))
         except Exception:
             LOG.exception(f'Load of skill {skill_id} failed!')
             load_status = False
         finally:
-            if skill_loader is not None:
-                with self._plugin_skills_lock:
+            with self._plugin_skills_lock:
+                # read the verdict and drop the reservation in one step, so a
+                # sweep either lands before this (and is honoured here) or
+                # after (and detaches the loader itself)
+                abandoned = skill_id in self._plugin_skill_unload_pending
+                self._plugin_skill_unload_pending.discard(skill_id)
+                if skill_loader is not None and not abandoned:
+                    # the loader keeps the attempt's serial while it is tracked
                     self.plugin_skills[skill_id] = skill_loader
+                else:
+                    self._plugin_skill_serials.pop(skill_id, None)
+                self._loading_plugin_skills.discard(skill_id)
+            if abandoned:
+                # the package is gone, so this is not a failure to back off
+                # from: a reinstall should load on the next scan
+                self._clear_plugin_skill_failure(skill_id)
+                self._logged_skill_warnings.discard(skill_id)
+                LOG.info(f"Discarding {skill_id}: its package was uninstalled "
+                         f"while the skill was loading")
+                self._shutdown_skill_loader(skill_loader)
+            elif skill_loader is not None:
                 if load_status:
                     self._clear_plugin_skill_failure(skill_id)
+                    # announced once the loader is tracked, and never for a load the
+                    # uninstall abandoned: a consumer acting on this finds the skill
+                    # present, and is not told about one that was just shut down
+                    self.bus.emit(Message("mycroft.skill.loaded", {"skill_id": skill_id}))
             else:
                 # `_get_plugin_skill_loader`/`.load()` raised before a loader
                 # object existed - there is nothing to track in
@@ -522,8 +566,9 @@ class SkillManager(Thread):
                 # this skill would look "never attempted" and get retried
                 # (and its intents re-registered) on every 30s scan forever.
                 self._record_plugin_skill_failure(skill_id)
-            self._release_plugin_skill_load(skill_id)
 
+        if abandoned:
+            return None
         return skill_loader if load_status else None
 
     def wait_for_intent_service(self) -> None:
@@ -720,17 +765,136 @@ class SkillManager(Thread):
             if skill_id in self.plugin_skills:
                 LOG.info('Unloading plugin skill: ' + skill_id)
                 skill_loader = self.plugin_skills.pop(skill_id)
+                self._plugin_skill_serials.pop(skill_id, None)
 
-        # Call shutdown methods outside the lock to prevent deadlocks
-        if skill_loader is not None and skill_loader.instance is not None:
-            try:
-                skill_loader.instance.shutdown()
-            except Exception:
-                LOG.exception('Failed to run skill specific shutdown code: ' + skill_loader.skill_id)
-            try:
-                skill_loader.instance.default_shutdown()
-            except Exception:
-                LOG.exception('Failed to shutdown skill: ' + skill_loader.skill_id)
+        self._shutdown_skill_loader(skill_loader)
+
+    def _shutdown_skill_loader(self, skill_loader: Optional[PluginSkillLoader]) -> None:
+        """Run the shutdown hooks of a loader already detached from tracking.
+
+        The caller holds no lock here: skill shutdown code may re-enter
+        ``_plugin_skills_lock`` and running it under that lock deadlocks.
+
+        Args:
+            skill_loader: The detached loader, or None when nothing was detached.
+        """
+        if skill_loader is None or skill_loader.instance is None:
+            return
+        try:
+            skill_loader.instance.shutdown()
+        except Exception:
+            LOG.exception('Failed to run skill specific shutdown code: ' + skill_loader.skill_id)
+        try:
+            skill_loader.instance.default_shutdown()
+        except Exception:
+            LOG.exception('Failed to shutdown skill: ' + skill_loader.skill_id)
+
+    @staticmethod
+    def _declared_skill_plugins() -> Optional[Set[str]]:
+        """The skill entry points installed packages declare, without importing any of them.
+
+        `find_skill_plugins()` reports what it could import and swallows the error when an
+        import fails, so an empty result means either "every skill package is gone" or
+        "nothing would import this time". Only package metadata separates those two, and
+        they call for opposite answers.
+
+        Returns:
+            The declared entry point names, or None when the metadata could not be read -
+            which is "cannot tell", not "nothing is installed".
+        """
+        try:
+            groups = [PluginTypes.SKILL.value]
+            groups += [old for old, new in DEPRECATED_ENTRYPOINTS.items()
+                       if new == PluginTypes.SKILL.value]
+            declared = set()
+            for group in groups:
+                declared.update(point.name for point in entry_points(group=group))
+            return declared
+        except Exception:
+            LOG.exception("Could not read the declared skill entry points")
+            return None
+
+    def _unload_undiscoverable_plugin_skills(self) -> List[str]:
+        """Unload the tracked plugin skills whose package is no longer discoverable.
+
+        Returns:
+            List[str]: Ids of the skills this call unloaded.
+        """
+        # What this pass judges is read before the packages are. A loader
+        # tracked or a load reserved after this point started from a package
+        # installed after the reading below, so it is not this pass's to
+        # remove, however stale that reading is by the time the verdicts
+        # land; each attempt's serial tells it from the one read here.
+        with self._plugin_skills_lock:
+            judged = {skill_id: self._plugin_skill_serials.get(skill_id)
+                      for skill_id in set(self.plugin_skills) | self._loading_plugin_skills}
+        try:
+            discoverable = set(find_skill_plugins())
+        except Exception:
+            LOG.exception("Plugin skill discovery failed, keeping the loaded skills")
+            return []
+        # `find_skill_plugins()` reports what it could import and swallows the error
+        # when an import fails, so a skill whose package is present but whose import
+        # broke is missing from `discoverable` exactly like an uninstalled one. Only
+        # the entry points the installed packages declare tell those apart, and that
+        # is read without importing anything, so it is read on every pass rather than
+        # only when nothing imported at all. Unloading on an import failure would shut
+        # a still-installed skill down and discard its loader.
+        declared = self._declared_skill_plugins()
+        if declared is None:
+            LOG.warning("The installed skill entry points could not be read, so a "
+                        "missing plugin skill cannot be told from one that would not "
+                        "import; keeping the loaded skills")
+            return []
+        installed = discoverable | declared
+        if not discoverable and declared:
+            LOG.warning(f"Plugin skill discovery returned nothing while {len(declared)} "
+                        f"skill entry points are still installed; keeping them")
+        with self._plugin_skills_lock:
+            gone = [skill_id for skill_id, serial in judged.items()
+                    if skill_id not in installed
+                    and self._plugin_skill_serials.get(skill_id) == serial]
+            removed = [skill_id for skill_id in gone if skill_id in self.plugin_skills]
+            # detach under the lock that decided the removal, and keep the
+            # loader instance rather than the id: once an id stops being
+            # tracked an overlapping pass is free to load a replacement for
+            # it, and a detach that named only the id would pop and shut down
+            # that replacement instead of the loader this pass chose
+            detached = [(skill_id, self.plugin_skills.pop(skill_id))
+                        for skill_id in removed]
+            for skill_id in removed:
+                self._plugin_skill_serials.pop(skill_id, None)
+            # a failed load leaves a backoff record and no loader; without
+            # this a reinstall of that package would wait out the backoff
+            stale_failures = [skill_id for skill_id in self._plugin_skill_failures
+                              if skill_id not in installed]
+            # a load in flight holds the reservation and is not in
+            # `plugin_skills` yet, so there is nothing to detach for it here.
+            # Record the verdict instead: `_load_plugin_skill` discards the
+            # loader it is about to track rather than reviving a dead package.
+            # Only the reservation read above gets it: one made since belongs
+            # to a reinstall, and `_reserve_plugin_skill_load` already cleared
+            # whatever an older pass had left for that id.
+            self._plugin_skill_unload_pending.update(
+                skill_id for skill_id in gone
+                if skill_id in self._loading_plugin_skills)
+        for skill_id, skill_loader in detached:
+            LOG.info('Unloading plugin skill: ' + skill_id)
+            self._shutdown_skill_loader(skill_loader)
+        for skill_id in set(removed) | set(stale_failures):
+            self._clear_plugin_skill_failure(skill_id)
+            self._logged_skill_warnings.discard(skill_id)
+        return removed
+
+    def handle_uninstall_complete(self, message: Message) -> None:
+        """Unload the plugin skills an installer run just removed.
+
+        Args:
+            message: ``ovos.skills.uninstall.complete`` or ``ovos.pip.uninstall.complete``.
+        """
+        removed = self._unload_undiscoverable_plugin_skills()
+        if removed:
+            LOG.info(f"Unloaded skills removed by the installer: {removed}")
 
     def is_alive(self, message: Optional[Message] = None) -> bool:
         """Respond to is_alive status request."""

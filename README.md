@@ -42,6 +42,8 @@ When an install or uninstall requested over the bus fails, the `.failed` reply c
 
 A completed runtime install through the bus (`ovos.skills.install`) triggers a discovery pass, so an eligible skill loads on that report rather than waiting for the periodic scan; the pass keeps the readiness and connectivity gating the scan applies. `skillmanager.rescan` asks the skill manager for that pass on demand and replies with what it loaded. See [docs/skill-manager.md](docs/skill-manager.md).
 
+A skill uninstalled at runtime through the bus (`ovos.skills.uninstall`) is unloaded as soon as the installer reports completion, so it stops answering without a restart. See [docs/skill-manager.md](docs/skill-manager.md).
+
 ---
 
 ## Persona Support
