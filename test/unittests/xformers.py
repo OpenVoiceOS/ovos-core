@@ -34,7 +34,7 @@ class TextTransformersTests(unittest.TestCase):
         service = UtteranceTransformersService(bus)
         self.assertIsInstance(service.config, dict)
         self.assertEqual(service.bus, bus)
-        self.assertFalse(service.has_loaded)
+        self.assertTrue(service.has_loaded)
         self.assertIsInstance(service.loaded_plugins, dict)
         for plugin in service.loaded_plugins:
             self.assertIsInstance(service.loaded_plugins[plugin],
@@ -47,6 +47,7 @@ class TextTransformersTests(unittest.TestCase):
         bus = FakeBus()
         service = UtteranceTransformersService(bus)
         service.loaded_plugins = {"mock_transformer": MockTransformer()}
+        service._sorted_plugins = None
         utterances = ["test", "utterance"]
         context = {"old_context": True,
                    "new_context": False}
@@ -56,6 +57,7 @@ class TextTransformersTests(unittest.TestCase):
                                    "new_context": False})
 
         service.loaded_plugins["mock_context_adder"] = MockContextAdder()
+        service._sorted_plugins = None
         utterances, context = service.transform(utterances, context)
         self.assertEqual(utterances, ["test", "utterance",
                                       "transformer", "transformer"])
@@ -90,20 +92,22 @@ class TextTransformersTests(unittest.TestCase):
         service.loaded_plugins = \
             {"test_mod_1": mod_1,
              "test_mod_2": mod_2}
+        service._sorted_plugins = None
 
         # Check transformers adding utterances
         new_utterances, context = service.transform(deepcopy(utterances),
                                                     {'lang': lang})
-        self.assertEqual(context["parser_context"], "mod_2")
+        self.assertEqual(context["parser_context"], "mod_1")
         self.assertNotEqual(new_utterances, utterances)
         self.assertEqual(len(new_utterances),
                          len(utterances) + 2)
 
         # Check context change on priority swap
         mod_2.priority = 100
+        service._sorted_plugins = None
         _, context = service.transform(deepcopy(utterances),
                                        {'lang': lang})
-        self.assertEqual(context["parser_context"], "mod_1")
+        self.assertEqual(context["parser_context"], "mod_2")
 
 
 if __name__ == "__main__":
