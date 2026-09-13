@@ -13,11 +13,12 @@
 # limitations under the License.
 
 import unittest
+from importlib.metadata import entry_points
 from unittest.mock import MagicMock, patch
 
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch
 from ovos_plugin_manager.templates.transformers import UtteranceTransformer
-from ovos_plugin_manager.text_transformers import find_utterance_transformer_plugins
+from ovos_plugin_manager.utils import DEPRECATED_ENTRYPOINTS, PluginTypes
 from ovos_utils.fakebus import FakeBus
 
 from ovos_core.transformers import (
@@ -158,18 +159,24 @@ class TestUtteranceTransformersServiceRealDiscovery(unittest.TestCase):
     def test_real_plugins_are_utterance_transformer_instances(self):
         """Every plugin discovered and loaded from the installed
         environment is a real UtteranceTransformer instance."""
-        discovered = find_utterance_transformer_plugins()
-        if not discovered:
+        # Decide the skip from the DECLARED entry points, which imports
+        # nothing. OPM's discovery imports each plugin and drops one that
+        # fails to import, so a broken plugin would look like no plugin.
+        group = PluginTypes.UTTERANCE_TRANSFORMER.value
+        groups = {group} | {old for old, new in DEPRECATED_ENTRYPOINTS.items()
+                            if new == group}
+        declared = sorted(ep.name for g in groups for ep in entry_points(group=g))
+        if not declared:
             # a bare ovos-core install has no utterance transformer; the
             # plugins extra brings ovos-utterance-normalizer and others
             self.skipTest("no utterance transformer plugin is installed; "
                           "install ovos-core[plugins] to run this test")
         bus = FakeBus()
         service = UtteranceTransformersService(bus)
-        # a plugin that is installed but does not load still fails here
+        # a declared plugin that does not import or construct fails here
         self.assertTrue(service.loaded_plugins,
-                        f"utterance transformer plugins are installed "
-                        f"({sorted(discovered)}) but none loaded")
+                        f"utterance transformer plugins are declared "
+                        f"({declared}) but none loaded")
         for plugin in service.loaded_plugins:
             self.assertIsInstance(service.loaded_plugins[plugin],
                                   UtteranceTransformer)
