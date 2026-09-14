@@ -22,6 +22,7 @@ from ovos_bus_client import MessageBusClient
 from ovos_utils import wait_for_exit_signal
 from ovos_utils.log import LOG, init_service_logger
 
+from ovos_core._prometheus import start_metrics_server, stop_metrics_server
 from ovos_core.skill_manager import SkillManager, on_error, on_stopping, on_ready, on_alive, on_started
 
 
@@ -38,6 +39,10 @@ def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
         SkillManager instance or None if it couldn't be initialized
     """
     init_service_logger("skills")
+
+    # Opt-in scrape endpoint for the runtime stage histograms; a no-op
+    # unless OVOS_METRICS_ENABLED is set (see ovos_core._prometheus).
+    metrics_server = start_metrics_server()
 
     # Connect this process to the OpenVoiceOS message bus
     bus = MessageBusClient()
@@ -61,6 +66,8 @@ def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
     wait_for_exit_signal()
 
     skill_manager.shutdown()
+
+    stop_metrics_server(metrics_server)
 
     # Stop the messagebus websocket thread and its event dispatcher before
     # the interpreter starts tearing down. `bus.run_in_thread()` spawns a
