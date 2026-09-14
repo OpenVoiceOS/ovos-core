@@ -229,7 +229,18 @@ class IntentManifest:
 
     def _on_register(self, message: Message):
         method = "keyword" if message.msg_type == "ovos.intent.register.keyword" else "template"
-        skill_id = _target_skill_id(message)
+        # OVOS-INTENT-4 §3.2: the payload skill_id names the target; the
+        # context skill_id is never substituted for a missing one.
+        skill_id = message.data.get("skill_id")
+        if not skill_id:
+            LOG.warning(f"{message.msg_type}: no `skill_id` in the payload; "
+                        "OVOS-INTENT-4 §3.2 names the target there, so the "
+                        "registration is not indexed.")
+            return
+        source_skill_id = message.context.get("skill_id")
+        if source_skill_id and source_skill_id != skill_id:
+            LOG.debug(f"{message.msg_type}: source {source_skill_id!r} acting on "
+                      f"target {skill_id!r}")
         intent_name = message.data.get("intent_name")
         lang = message.data.get("lang")
         if not (skill_id and intent_name and lang):
