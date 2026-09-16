@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.5.6a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.6a3) (2026-09-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.6a1...3.5.6a3)
+
+**Merged pull requests:**
+
+- test: cover StopService real locale matching [\#986](https://github.com/OpenVoiceOS/ovos-core/pull/986) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- test: port unique xformers.py coverage into test\_transformers.py [\#984](https://github.com/OpenVoiceOS/ovos-core/pull/984) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [3.5.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.6a1) (2026-09-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.5a1...3.5.6a1)
@@ -369,10 +378,6 @@
 ## [3.0.7a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.7a1) (2026-08-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.6a1...3.0.7a1)
-
-**Merged pull requests:**
-
-- fix: shut down test-created SkillManager instances to stop leaked watcher threads [\#882](https://github.com/OpenVoiceOS/ovos-core/pull/882) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [3.0.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.6a1) (2026-08-14)
 
