@@ -1,8 +1,21 @@
 # Changelog
 
+## [3.6.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.6.0a1) (2026-09-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.6a3...3.6.0a1)
+
+**Merged pull requests:**
+
+- fix: raise ovoscope test-extra floor to 1.8.2a1 [\#985](https://github.com/OpenVoiceOS/ovos-core/pull/985) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- feat: manifest side of ovos.skills.list \(OVOS-INTENT-4 §8.6/§10.3\) [\#970](https://github.com/OpenVoiceOS/ovos-core/pull/970) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [3.5.6a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.6a3) (2026-09-16)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.6a1...3.5.6a3)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.6a2...3.5.6a3)
+
+## [3.5.6a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.6a2) (2026-09-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.6a1...3.5.6a2)
 
 **Merged pull requests:**
 
@@ -20,10 +33,6 @@
 ## [3.5.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.5a1) (2026-09-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.4a2...3.5.5a1)
-
-**Closed issues:**
-
-- Race condition in SkillManager causes every plugin skill to be loaded \(instantiated\) twice at startup [\#887](https://github.com/OpenVoiceOS/ovos-core/issues/887)
 
 **Merged pull requests:**
 
@@ -84,10 +93,6 @@
 ## [3.5.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.0a1) (2026-09-08)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.4.4a1...3.5.0a1)
-
-**Closed issues:**
-
-- ovos-core has no targeted pip installer, so ovos.pip.install.ovos\_core reaches nobody [\#888](https://github.com/OpenVoiceOS/ovos-core/issues/888)
 
 ## [3.4.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.4.4a1) (2026-09-08)
 
@@ -297,10 +302,6 @@
 ## [3.2.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.0a1) (2026-09-01)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.1.2a1...3.2.0a1)
-
-**Merged pull requests:**
-
-- feat: add Kabyle \(kab-dz\) global stop vocabulary [\#889](https://github.com/OpenVoiceOS/ovos-core/pull/889) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [3.1.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.1.2a1) (2026-09-01)
 
