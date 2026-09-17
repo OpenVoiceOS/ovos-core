@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.6.2a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.6.2a2) (2026-09-17)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.6.2a1...3.6.2a2)
+
+**Merged pull requests:**
+
+- test: the fallback floor guard counts SpecMessage poll members [\#994](https://github.com/OpenVoiceOS/ovos-core/pull/994) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [3.6.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.6.2a1) (2026-09-17)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.6.1a1...3.6.2a1)
@@ -337,15 +345,15 @@
 
 ## [3.0.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.12a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.12a1)
-
-## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.11a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.12a1)
 
 ## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.10a3)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.10a3)
+
+## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.11a1)
 
 ## [3.0.10a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a2) (2026-08-31)
 
@@ -366,10 +374,6 @@
 ## [3.0.8a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.8a1) (2026-08-31)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.7a4...3.0.8a1)
-
-**Merged pull requests:**
-
-- fix: invalidate ovos-config merge cache in deferred-loading config-flag tests [\#892](https://github.com/OpenVoiceOS/ovos-core/pull/892) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [3.0.7a4](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.7a4) (2026-08-14)
 
