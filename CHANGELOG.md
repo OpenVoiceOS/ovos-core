@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.6.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.6.2a1) (2026-09-17)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.6.1a1...3.6.2a1)
+
+**Merged pull requests:**
+
+- fix: an intent registration without a payload skill\_id is not indexed [\#992](https://github.com/OpenVoiceOS/ovos-core/pull/992) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [3.6.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.6.1a1) (2026-09-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.6.0a1...3.6.1a1)
+
 ## [3.6.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.6.0a1) (2026-09-16)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.6a3...3.6.0a1)
@@ -325,24 +337,19 @@
 
 ## [3.0.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.12a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.12a1)
-
-## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.10a3)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.12a1)
 
 ## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.11a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.11a1)
+
+## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.10a3)
 
 ## [3.0.10a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a2) (2026-08-31)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a1...3.0.10a2)
-
-**Merged pull requests:**
-
-- fix: emit bus reply when pip install/uninstall raises RuntimeError [\#891](https://github.com/OpenVoiceOS/ovos-core/pull/891) ([JarbasAl](https://github.com/JarbasAl))
-- docs: add AGENTS.md with the conventions for coding agents [\#890](https://github.com/OpenVoiceOS/ovos-core/pull/890) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [3.0.10a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a1) (2026-08-31)
 
