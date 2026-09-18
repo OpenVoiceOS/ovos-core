@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.7.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.0a1) (2026-09-18)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.6.2a3...3.7.0a1)
+
+**Merged pull requests:**
+
+- feat: bound each pipeline match call and give each plugin its own workers [\#1003](https://github.com/OpenVoiceOS/ovos-core/pull/1003) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [3.6.2a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.6.2a3) (2026-09-18)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.6.2a2...3.6.2a3)
