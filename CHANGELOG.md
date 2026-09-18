@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.6.2a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.6.2a3) (2026-09-18)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.6.2a2...3.6.2a3)
+
+**Merged pull requests:**
+
+- test: follow the hello-world greetings.intent rename in the e2e suites [\#1004](https://github.com/OpenVoiceOS/ovos-core/pull/1004) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [3.6.2a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.6.2a2) (2026-09-17)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.6.2a1...3.6.2a2)
@@ -366,10 +374,6 @@
 ## [3.0.9a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.9a1) (2026-08-31)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.8a1...3.0.9a1)
-
-**Merged pull requests:**
-
-- fix: make skill\_manager tests hermetic against config cache state [\#894](https://github.com/OpenVoiceOS/ovos-core/pull/894) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [3.0.8a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.8a1) (2026-08-31)
 
