@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import sys
 import tempfile
 import time as time_module
 from copy import deepcopy
@@ -1439,3 +1440,204 @@ class TestSkillManagerSessionManagerBus(TestCase):
                 f"got {len(owned)}"
             )
 
+
+
+class TestUpgradedPluginSkillReload(TestCase):
+    """An installer that upgrades a running skill must land the new code.
+
+    Discovery only ever loads what is *new*, so upgrading a skill already
+    loaded made nothing newly discoverable and the scan returned empty. The
+    files on disk were the new version and the process kept answering from
+    the old one, which is invisible: the skill reports the version it was
+    upgraded to while running the one before it, until something restarts
+    the process.
+    """
+
+    def setUp(self):
+        self.bus = Mock()
+        self.manager = SkillManager(self.bus)
+
+    def _track(self, skill_id, version, module="fake_skill_pkg.core"):
+        loader = Mock()
+        loader.skill_class = Mock(__module__=module)
+        loader.instance = None
+        self.manager.plugin_skills[skill_id] = loader
+        self.manager._plugin_skill_versions[skill_id] = version
+
+    def test_an_unchanged_version_is_left_alone(self):
+        self._track("demo.skill", "1.0.0")
+        with patch.object(SkillManager, "_declared_skill_versions",
+                          staticmethod(lambda: {"demo.skill": "1.0.0"})):
+            self.assertEqual(self.manager._reload_upgraded_plugin_skills(), [])
+
+    def test_an_upgraded_skill_is_unloaded_and_loaded_again(self):
+        self._track("demo.skill", "1.0.0")
+        plug = Mock()
+        with patch.object(SkillManager, "_declared_skill_versions",
+                          staticmethod(lambda: {"demo.skill": "2.0.0"})), \
+             patch("ovos_core.skill_manager.find_skill_plugins",
+                   return_value={"demo.skill": plug}), \
+             patch.object(self.manager, "_unload_plugin_skill",
+                          side_effect=lambda sid: self.manager.plugin_skills.pop(sid, None)) as unload, \
+             patch.object(self.manager, "_load_plugin_skill", return_value=Mock()) as load:
+            reloaded = self.manager._reload_upgraded_plugin_skills()
+        self.assertEqual(reloaded, ["demo.skill"])
+        unload.assert_called_once_with("demo.skill")
+        load.assert_called_once_with("demo.skill", plug, reserved=True, version="2.0.0")
+
+    def test_the_import_cache_is_cleared_or_the_reload_reads_the_old_code(self):
+        """The crux: pip replaced the files, sys.modules still holds the old
+        module, and an entry point loaded again hands back that same object."""
+        self._track("demo.skill", "1.0.0", module="fake_skill_pkg.core")
+        sentinel = Mock()
+        sys.modules["fake_skill_pkg"] = sentinel
+        sys.modules["fake_skill_pkg.core"] = sentinel
+        try:
+            self.manager._forget_skill_modules("demo.skill")
+            self.assertNotIn("fake_skill_pkg", sys.modules)
+            self.assertNotIn("fake_skill_pkg.core", sys.modules)
+        finally:
+            sys.modules.pop("fake_skill_pkg", None)
+            sys.modules.pop("fake_skill_pkg.core", None)
+
+    def test_a_skill_that_stopped_being_discoverable_is_left_unloaded(self):
+        self._track("demo.skill", "1.0.0")
+        with patch.object(SkillManager, "_declared_skill_versions",
+                          staticmethod(lambda: {"demo.skill": "2.0.0"})), \
+             patch("ovos_core.skill_manager.find_skill_plugins", return_value={}), \
+             patch.object(self.manager, "_unload_plugin_skill",
+                          side_effect=lambda sid: self.manager.plugin_skills.pop(sid, None)), \
+             patch.object(self.manager, "_load_plugin_skill") as load:
+            reloaded = self.manager._reload_upgraded_plugin_skills()
+        self.assertEqual(reloaded, [])
+        load.assert_not_called()
+        self.assertNotIn("demo.skill", self.manager._plugin_skill_versions)
+
+    def test_unreadable_metadata_reloads_nothing(self):
+        self._track("demo.skill", "1.0.0")
+        with patch.object(SkillManager, "_declared_skill_versions", staticmethod(dict)), \
+             patch.object(self.manager, "_load_plugin_skill") as load:
+            self.assertEqual(self.manager._reload_upgraded_plugin_skills(), [])
+        load.assert_not_called()
+
+    def test_install_complete_reloads_an_upgrade(self):
+        with patch.object(self.manager, "_rescan_plugin_skills", return_value=[]), \
+             patch.object(self.manager, "_reload_upgraded_plugin_skills",
+                          return_value=["demo.skill"]) as reload_upgraded:
+            self.manager.handle_install_complete(Message("ovos.pip.install.complete"))
+        reload_upgraded.assert_called_once()
+
+    def test_upgrades_are_reloaded_before_new_entry_points_are_scanned(self):
+        """Discovery imports what it finds. A rescan run first would build a
+        newly declared skill from the old modules still in sys.modules and
+        record it against the new version, leaving nothing to tell apart."""
+        order = []
+        with patch.object(self.manager, "_reload_upgraded_plugin_skills",
+                          side_effect=lambda: order.append("reload") or []), \
+             patch.object(self.manager, "_rescan_plugin_skills",
+                          side_effect=lambda: order.append("rescan") or []):
+            self.manager.handle_install_complete(Message("ovos.pip.install.complete"))
+        self.assertEqual(order, ["reload", "rescan"])
+
+    def test_a_reload_trains_the_deferred_engines(self):
+        """_load_new_skills() trains after a load; a reload registers intents
+        just the same, and an upgrade that changed them would otherwise leave
+        padatious on the previous set."""
+        with patch.object(self.manager, "_reload_upgraded_plugin_skills",
+                          return_value=["demo.skill"]), \
+             patch.object(self.manager, "_rescan_plugin_skills", return_value=[]):
+            self.manager.handle_install_complete(Message("ovos.pip.install.complete"))
+        trained = [c for c in self.bus.emit.call_args_list
+                   if c.args and getattr(c.args[0], "msg_type", None) == "mycroft.skills.train"]
+        self.assertEqual(len(trained), 1)
+
+    def test_a_reload_that_loads_nothing_does_not_train(self):
+        with patch.object(self.manager, "_reload_upgraded_plugin_skills", return_value=[]), \
+             patch.object(self.manager, "_rescan_plugin_skills", return_value=[]):
+            self.manager.handle_install_complete(Message("ovos.pip.install.complete"))
+        trained = [c for c in self.bus.emit.call_args_list
+                   if c.args and getattr(c.args[0], "msg_type", None) == "mycroft.skills.train"]
+        self.assertEqual(trained, [])
+
+    def test_a_failed_reload_is_detached_so_a_later_scan_retries_it(self):
+        """_load_plugin_skill() tracks the loader it built even when the load
+        failed. Left alone the skill is tracked - so every scan skips it -
+        with no version for the upgrade check to match on either."""
+        self._track("demo.skill", "1.0.0")
+        with patch.object(SkillManager, "_declared_skill_versions",
+                          staticmethod(lambda: {"demo.skill": "2.0.0"})), \
+             patch("ovos_core.skill_manager.find_skill_plugins",
+                   return_value={"demo.skill": Mock()}), \
+             patch.object(self.manager, "_unload_plugin_skill",
+                          side_effect=lambda sid: self.manager.plugin_skills.pop(sid, None)) as unload, \
+             patch.object(self.manager, "_load_plugin_skill", return_value=None), \
+             patch.object(self.manager, "_record_plugin_skill_failure") as failed:
+            reloaded = self.manager._reload_upgraded_plugin_skills()
+        self.assertEqual(reloaded, [])
+        # once to swap it out, once to detach the loader the failed load left
+        self.assertEqual(unload.call_count, 2)
+        failed.assert_called_once_with("demo.skill")
+
+    def test_the_version_is_read_before_the_load_not_after(self):
+        """An upgrade that lands during a load must not be recorded against
+        the code that was loaded, or the check compares it with itself."""
+        recorded = {}
+        with patch.object(SkillManager, "_declared_skill_versions",
+                          staticmethod(lambda: {"demo.skill": "1.0.0"})), \
+             patch.object(self.manager, "_get_plugin_skill_loader") as get_loader, \
+             patch.object(self.manager, "_record_plugin_skill_version",
+                          side_effect=lambda sid, ver=None: recorded.update({sid: ver})):
+            loader = Mock()
+            loader.load.return_value = True
+            get_loader.return_value = loader
+            self.manager._load_plugin_skill("demo.skill", Mock())
+        self.assertEqual(recorded, {"demo.skill": "1.0.0"})
+
+    def test_a_load_another_attempt_owns_is_left_alone(self):
+        """`_load_plugin_skill()` answers None both when a reservation failed
+        and when this attempt's load failed. Detaching on the first would
+        throw away a loader a concurrent scan owns and had already loaded."""
+        self._track("demo.skill", "1.0.0")
+        with patch.object(SkillManager, "_declared_skill_versions",
+                          staticmethod(lambda: {"demo.skill": "2.0.0"})), \
+             patch.object(self.manager, "_reserve_plugin_skill_load", return_value=False) as reserve, \
+             patch("ovos_core.skill_manager.find_skill_plugins") as discover, \
+             patch.object(self.manager, "_load_plugin_skill") as load, \
+             patch.object(self.manager, "_record_plugin_skill_failure") as failed:
+            reloaded = self.manager._reload_upgraded_plugin_skills()
+        self.assertEqual(reloaded, [])
+        reserve.assert_called_once_with("demo.skill")
+        # nothing is loaded, nothing is detached, and no backoff is recorded
+        # against a skill this pass never owned
+        discover.assert_not_called()
+        load.assert_not_called()
+        failed.assert_not_called()
+
+    def test_the_reservation_is_released_when_the_package_vanished(self):
+        self._track("demo.skill", "1.0.0")
+        with patch.object(SkillManager, "_declared_skill_versions",
+                          staticmethod(lambda: {"demo.skill": "2.0.0"})), \
+             patch("ovos_core.skill_manager.find_skill_plugins", return_value={}), \
+             patch.object(self.manager, "_unload_plugin_skill",
+                          side_effect=lambda sid: self.manager.plugin_skills.pop(sid, None)), \
+             patch.object(self.manager, "_release_plugin_skill_load") as release:
+            self.manager._reload_upgraded_plugin_skills()
+        release.assert_called_once_with("demo.skill")
+
+    def test_one_training_event_when_the_scan_also_loaded(self):
+        """`_load_new_skills()` trains only when it loaded something, so the
+        guard here yields exactly one event however the work splits -- never
+        two, and never none."""
+        for reloaded, loaded in ((["a"], []), ([], ["b"]), (["a"], ["b"])):
+            with self.subTest(reloaded=reloaded, loaded=loaded):
+                bus = Mock()
+                manager = SkillManager(bus)
+                with patch.object(manager, "_reload_upgraded_plugin_skills", return_value=reloaded), \
+                     patch.object(manager, "_rescan_plugin_skills", return_value=loaded):
+                    manager.handle_install_complete(Message("ovos.pip.install.complete"))
+                trained = [c for c in bus.emit.call_args_list
+                           if c.args and getattr(c.args[0], "msg_type", None) == "mycroft.skills.train"]
+                # the scan emits its own when it loaded; this only covers the
+                # case where a reload was the only work done
+                expected = 1 if (reloaded and not loaded) else 0
+                self.assertEqual(len(trained), expected)
