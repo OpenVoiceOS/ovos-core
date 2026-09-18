@@ -13,7 +13,9 @@
 # limitations under the License.
 #
 """Load, update and manage skills on this device."""
+import importlib
 import os
+import sys
 import threading
 import time
 from importlib.metadata import entry_points
@@ -146,6 +148,9 @@ class SkillManager(Thread):
         # reservation. The sweep that noticed had no loader to detach yet, so
         # it leaves the verdict here for `_load_plugin_skill` to honour.
         self._plugin_skill_unload_pending = set()
+        #: The installed version each loaded plugin skill was built from,
+        #: so an upgrade in place can be told from the version running.
+        self._plugin_skill_versions: Dict[str, str] = {}
         # skill_id -> (attempt_count, last_attempt_time) for plugin skills whose
         # load raised before a loader object existed (see _load_plugin_skill).
         # These are retried with an exponential backoff instead of every scan.
@@ -298,6 +303,27 @@ class SkillManager(Thread):
         with self._plugin_skills_lock:
             self._loading_plugin_skills.discard(skill_id)
             self._plugin_skill_serials.pop(skill_id, None)
+
+    def _record_plugin_skill_version(self, skill_id: str,
+                                     version: Optional[str] = None) -> None:
+        """Remember the installed version a freshly loaded skill was read from.
+
+        The version belongs to the class that was loaded, so the caller passes
+        the one it read beside that class. Reading it here instead would let
+        an upgrade landing *during* the load be recorded against the previous
+        code, and the upgrade check would then find the versions agree and
+        leave the old code answering.
+
+        Args:
+            skill_id (str): The skill that was loaded.
+            version (str): The version read with the class, when known.
+        """
+        if version is None:
+            version = self._declared_skill_versions().get(skill_id)
+        if version is None:
+            return
+        with self._plugin_skills_lock:
+            self._plugin_skill_versions[skill_id] = version
 
     def _should_retry_plugin_skill(self, skill_id: str) -> bool:
         """Check whether enough time has passed to retry a previously failed load."""
@@ -509,7 +535,8 @@ class SkillManager(Thread):
             loader.skill_class = skill_class
         return loader
 
-    def _load_plugin_skill(self, skill_id: str, skill_plugin: type, reserved: bool = False) -> Optional[PluginSkillLoader]:
+    def _load_plugin_skill(self, skill_id: str, skill_plugin: type, reserved: bool = False,
+                           version: Optional[str] = None) -> Optional[PluginSkillLoader]:
         """Load a plugin skill.
 
         Args:
@@ -523,6 +550,14 @@ class SkillManager(Thread):
         if not reserved and not self._reserve_plugin_skill_load(skill_id):
             LOG.debug(f"Skipping duplicate load attempt for {skill_id}; load already in progress")
             return None
+
+        # Read before the load, so it belongs to `skill_plugin` -- the class
+        # the caller discovered -- and not to an upgrade that lands while
+        # this load is running. Recording the later one would leave the
+        # upgrade check comparing the new version against itself and the old
+        # code still answering.
+        if version is None:
+            version = self._declared_skill_versions().get(skill_id)
 
         skill_loader = None
         try:
@@ -555,6 +590,9 @@ class SkillManager(Thread):
             elif skill_loader is not None:
                 if load_status:
                     self._clear_plugin_skill_failure(skill_id)
+                    # what this load read from disk, so a later upgrade in
+                    # place can be told from the version now running
+                    self._record_plugin_skill_version(skill_id, version)
                     # announced once the loader is tracked, and never for a load the
                     # uninstall abandoned: a consumer acting on this finds the skill
                     # present, and is not told about one that was just shut down
@@ -738,9 +776,23 @@ class SkillManager(Thread):
         Args:
             message: ``ovos.skills.install.complete`` or ``ovos.pip.install.complete``.
         """
+        # Upgrades first, and the order matters. Discovery imports the entry
+        # points it finds, so a rescan run before the upgraded packages are
+        # forgotten would build any newly declared skill from the *old*
+        # modules still in `sys.modules`, record it against the new version,
+        # and leave the upgrade check with nothing to tell apart.
+        reloaded = self._reload_upgraded_plugin_skills()
+        if reloaded:
+            LOG.info(f"Reloaded skills the installer upgraded: {reloaded}")
         loaded = self._rescan_plugin_skills()
         if loaded:
             LOG.info(f"Loaded skills reported by the installer: {loaded}")
+        if reloaded and not loaded:
+            # `_load_new_skills()` trains the deferred engines after a load;
+            # a reload registers intents just the same, and an upgrade that
+            # changed them leaves padatious on the previous set otherwise.
+            # Only when the scan did not already do it.
+            self.bus.emit(Message("mycroft.skills.train"))
 
     def handle_rescan_request(self, message: Message) -> None:
         """Scan for newly installed plugin skills and report what was loaded.
@@ -766,6 +818,7 @@ class SkillManager(Thread):
                 LOG.info('Unloading plugin skill: ' + skill_id)
                 skill_loader = self.plugin_skills.pop(skill_id)
                 self._plugin_skill_serials.pop(skill_id, None)
+                self._plugin_skill_versions.pop(skill_id, None)
 
         self._shutdown_skill_loader(skill_loader)
 
@@ -788,6 +841,126 @@ class SkillManager(Thread):
             skill_loader.instance.default_shutdown()
         except Exception:
             LOG.exception('Failed to shutdown skill: ' + skill_loader.skill_id)
+
+    @staticmethod
+    def _declared_skill_versions() -> Dict[str, str]:
+        """The installed version behind every declared skill entry point.
+
+        Read from package metadata without importing anything, the same way
+        `_declared_skill_plugins()` reads the names beside them.
+
+        Returns:
+            Entry point name to distribution version. A skill whose metadata
+            cannot be read is left out rather than guessed at.
+        """
+        versions: Dict[str, str] = {}
+        try:
+            groups = [PluginTypes.SKILL.value]
+            groups += [old for old, new in DEPRECATED_ENTRYPOINTS.items()
+                       if new == PluginTypes.SKILL.value]
+            for group in groups:
+                for point in entry_points(group=group):
+                    dist = getattr(point, "dist", None)
+                    version = getattr(dist, "version", None)
+                    if version:
+                        versions[point.name] = version
+        except Exception:
+            LOG.exception("Could not read the declared skill versions")
+        return versions
+
+    def _forget_skill_modules(self, skill_id: str) -> None:
+        """Drop a skill's package from the import cache so it is read again.
+
+        pip replaces the files on disk; `sys.modules` still holds the module
+        objects built from the previous ones, and an entry point loaded again
+        hands back that same cached module. Without this the manager unloads
+        and reloads a skill and gets the version it already had.
+
+        Args:
+            skill_id (str): The skill whose package should be forgotten.
+        """
+        loader = self.plugin_skills.get(skill_id)
+        skill_class = getattr(loader, "skill_class", None) if loader else None
+        module = getattr(skill_class, "__module__", "") or ""
+        package = module.split(".")[0]
+        if not package:
+            LOG.debug(f"No module recorded for {skill_id}, leaving the import cache alone")
+            return
+        for name in [n for n in list(sys.modules)
+                     if n == package or n.startswith(f"{package}.")]:
+            sys.modules.pop(name, None)
+        importlib.invalidate_caches()
+
+    def _reload_upgraded_plugin_skills(self) -> List[str]:
+        """Reload the loaded plugin skills whose installed version changed.
+
+        An installer that upgrades a skill already running leaves the new
+        files on disk and the old code in memory: discovery only ever loads
+        what is *new*, so an upgrade in place is silently a no-op and the
+        runtime keeps answering from the previous version until the process
+        restarts. Seen in the wild as a skill reporting the version it had
+        just been upgraded to while still running the one before it.
+
+        Returns:
+            List[str]: Ids of the skills this call reloaded.
+        """
+        installed = self._declared_skill_versions()
+        if not installed:
+            return []
+        with self._plugin_skills_lock:
+            loaded = dict(self._plugin_skill_versions)
+        upgraded = [skill_id for skill_id, was in loaded.items()
+                    if skill_id in installed and installed[skill_id] != was]
+        reloaded: List[str] = []
+        for skill_id in upgraded:
+            now = installed[skill_id]
+            LOG.info(f"{skill_id} was upgraded {loaded[skill_id]} -> {now}, reloading it")
+            self._forget_skill_modules(skill_id)
+            self._unload_plugin_skill(skill_id)
+            # Reserve before loading, and keep the reservation for the whole
+            # attempt. Without it this pass cannot tell "my load failed" from
+            # "a scan got there first": `_load_plugin_skill()` answers None to
+            # both, and the detach below would then throw away a loader that
+            # the other attempt owns and had already loaded. The modules are
+            # forgotten either way, so an attempt that beat us here builds the
+            # new code too and there is nothing to redo.
+            if not self._reserve_plugin_skill_load(skill_id):
+                LOG.debug(f"{skill_id} is already being loaded, leaving its upgrade to that attempt")
+                continue
+            try:
+                plugins = find_skill_plugins()
+            except Exception:
+                LOG.exception(f"Could not rediscover {skill_id} after its upgrade")
+                self._release_plugin_skill_load(skill_id)
+                continue
+            # read again after the purge: this is the version behind the
+            # class discovery just handed back
+            now = self._declared_skill_versions().get(skill_id, now)
+            plug = plugins.get(skill_id)
+            if plug is None:
+                # The package went away between the upgrade and here, or its
+                # import broke. The undiscoverable pass owns that case.
+                LOG.warning(f"{skill_id} is not discoverable after its upgrade, leaving it unloaded")
+                with self._plugin_skills_lock:
+                    self._plugin_skill_versions.pop(skill_id, None)
+                self._release_plugin_skill_load(skill_id)
+                continue
+            # `_load_plugin_skill()` releases the reservation itself, and a
+            # load that succeeded keeps its serial on the tracked loader --
+            # releasing again here would take that serial away.
+            if self._load_plugin_skill(skill_id, plug, reserved=True, version=now):
+                reloaded.append(skill_id)
+            else:
+                # `_load_plugin_skill()` tracks the loader it built even when
+                # the load failed, and records neither a version nor a retry
+                # for it. Left alone, the skill is tracked - so every later
+                # scan skips it - with nothing for the upgrade check to match
+                # on either, and it never loads again. This attempt held the
+                # reservation throughout, so the loader to detach is its own.
+                LOG.warning(f"{skill_id} failed to load after its upgrade, detaching it for retry")
+                self._unload_plugin_skill(skill_id)
+                self._record_plugin_skill_failure(skill_id)
+        return reloaded
 
     @staticmethod
     def _declared_skill_plugins() -> Optional[Set[str]]:
