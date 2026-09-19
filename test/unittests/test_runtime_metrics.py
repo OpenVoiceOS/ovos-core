@@ -1,5 +1,8 @@
 """Tests for the opt-in process-local OVOS runtime metrics endpoint."""
 
+import inspect
+import re
+import time
 from urllib.request import urlopen
 
 import pytest
@@ -237,3 +240,37 @@ def test_service_entrypoint_starts_and_stops_the_metrics_server():
     source = inspect.getsource(service_main.main)
     assert "start_metrics_server()" in source
     assert "stop_metrics_server(" in source
+
+
+def test_stage_histograms_wrap_the_bounded_match_call():
+    """A bound the utterance waited out is latency it paid.
+
+    OVOS-PIPELINE-1 §4.4 runs each plugin ``match`` through
+    ``_call_match_bounded``, which returns ``None`` on timeout and on a
+    §6.2 single-flight skip rather than raising. The stage histograms wrap
+    that bounded call, not the plugin call inside it, so a slow entry
+    records the time the round actually spent on it and a declined entry
+    records ~0. Measuring inside the bound would make a timed-out pipeline
+    look free.
+    """
+    import ovos_core.intent_services.service as service
+
+    source = inspect.getsource(service.IntentService.handle_utterance)
+    wrapped = re.search(
+        r"with \(INTENT_MATCHING\.measure\(\),\s*"
+        r"pipeline_matching_histogram\(pipeline\)\.measure\(\)\):\s*"
+        r"match = self\._call_match_bounded\(",
+        source,
+    )
+    assert wrapped, (
+        "the stage histograms no longer wrap _call_match_bounded; a timed-out "
+        "or declined pipeline entry would be recorded as free"
+    )
+
+    histogram = LatencyHistogram("test_bounded_ms", buckets_ms=(10, 50))
+    before = histogram.snapshot()["count"]
+    with histogram.measure():
+        time.sleep(0.05)
+    snapshot = histogram.snapshot()
+    assert snapshot["count"] == before + 1
+    assert snapshot["sum_ms"] >= 50
