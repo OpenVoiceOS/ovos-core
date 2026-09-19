@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import sys
 import tempfile
 import time as time_module
 from copy import deepcopy
@@ -112,6 +113,15 @@ class TestSkillManager(TestCase):
             str(self.skill_dir): self.skill_loader_mock
         }
 
+    def _warnings_mentioning(self, text):
+        """The warnings logged that say `text`. Counted by content, not in
+        total: `SkillManager.__init__` warns when no skill package is
+        installed at all, so the total depends on the environment the tests
+        run in -- a bare venv logs one more than CI, which installs
+        skills-essential."""
+        return [call.args[0] for call in self.log_mock.warning.call_args_list
+                if text in call.args[0]]
+
     def test_instantiate(self):
         # With default config (deferred_loading: false), connectivity handlers are NOT registered
         # Ensure deferred_loading is explicitly False to isolate from other tests
@@ -131,6 +141,8 @@ class TestSkillManager(TestCase):
                     'skillmanager.rescan',
                     'ovos.skills.install.complete',
                     'ovos.pip.install.complete',
+                    'ovos.skills.uninstall.complete',
+                    'ovos.pip.uninstall.complete',
                     #'mycroft.skills.initialized',
                     'mycroft.skills.is_alive',
                     'mycroft.skills.is_ready',
@@ -690,6 +702,452 @@ class TestSkillManager(TestCase):
         self.skill_manager._load_new_skills.assert_not_called()
         self.assertIn('skillmanager.rescan.response', self.message_bus_mock.message_types)
         self.assertDictEqual({'loaded': []}, self.message_bus_mock.message_data[-1])
+    def _declared(self, *names):
+        """Patch what installed packages declare, separately from what imports.
+
+        `find_skill_plugins()` answers "what imported"; the entry point metadata answers
+        "what is installed". Only together do they say whether an empty discovery result
+        is a removal or a hiccup, so a test that stubs one states the other too.
+        """
+        return patch.object(self.skill_manager, '_declared_skill_plugins',
+                            return_value=set(names))
+
+    def _tracked_loader(self, skill_id):
+        """A loaded plugin skill as `_load_plugin_skill` leaves it in `plugin_skills`."""
+        loader = Mock(spec=SkillLoader)
+        loader.skill_id = skill_id
+        loader.instance = Mock()
+        self.skill_manager.plugin_skills[skill_id] = loader
+        return loader
+
+    def test_uninstall_complete_unloads_the_skill_whose_package_is_gone(self):
+        """A loaded skill whose package the installer removed is shut down on
+        the completion report; the ones still discoverable are untouched."""
+        for topic in ('ovos.skills.uninstall.complete', 'ovos.pip.uninstall.complete'):
+            with self.subTest(topic=topic):
+                self.skill_manager.plugin_skills = {}
+                gone = self._tracked_loader('test.gone.skill')
+                kept = self._tracked_loader('test.kept.skill')
+                self.skill_manager._plugin_skill_failures = {'test.gone.skill': (2, 0.0)}
+
+                with patch(self.mock_package + 'find_skill_plugins',
+                           return_value={'test.kept.skill': Mock()}):
+                    self.skill_manager.handle_uninstall_complete(Message(topic))
+
+                self.assertNotIn('test.gone.skill', self.skill_manager.plugin_skills)
+                self.assertIn('test.kept.skill', self.skill_manager.plugin_skills)
+                gone.instance.shutdown.assert_called_once_with()
+                gone.instance.default_shutdown.assert_called_once_with()
+                kept.instance.shutdown.assert_not_called()
+                kept.instance.default_shutdown.assert_not_called()
+                self.assertNotIn('test.gone.skill', self.skill_manager._plugin_skill_failures)
+
+    def test_uninstall_complete_lets_a_reinstall_load_again(self):
+        """After the package is removed and reinstalled, the next pass loads it
+        again instead of treating it as tracked or waiting out a backoff."""
+        skill_id = 'test.reinstalled.skill'
+        self.skill_manager.plugin_skills = {}
+        self._tracked_loader(skill_id)
+        # the shape a load that raised before a loader existed leaves behind:
+        # no loader, a backoff record that would hold a fresh attempt for a while
+        self.skill_manager._plugin_skill_failures = {skill_id: (6, time_module.time())}
+
+        with patch(self.mock_package + 'find_skill_plugins', return_value={}), self._declared():
+            self.skill_manager.handle_uninstall_complete(Message('ovos.skills.uninstall.complete'))
+
+        self.assertDictEqual({}, self.skill_manager.plugin_skills)
+        self.assertDictEqual({}, self.skill_manager._plugin_skill_failures)
+
+        mock_loader = Mock(spec=SkillLoader)
+        mock_loader.skill_id = skill_id
+        mock_loader.load.return_value = True
+        mock_loader.runtime_requirements.network_before_load = False
+        mock_loader.runtime_requirements.internet_before_load = False
+        self.skill_manager._get_plugin_skill_loader = Mock(return_value=mock_loader)
+        with patch(self.mock_package + 'find_skill_plugins', return_value={skill_id: Mock()}):
+            self.skill_manager._load_new_skills(network=True, internet=True, gui=False)
+
+        self.assertIn(skill_id, self.skill_manager.plugin_skills)
+        mock_loader.load.assert_called_once()
+
+    def test_uninstall_complete_keeps_everything_when_discovery_returns_nothing(self):
+        """An empty discovery result is a hiccup when the entry points are still
+        declared: warn and keep every loaded skill.
+
+        The backoff record for `test.third.skill` is a separate matter. It is not
+        declared, so that package really is gone, and leaving its record behind
+        would make a reinstall wait out a backoff it no longer owes."""
+        self.skill_manager.plugin_skills = {}
+        loaders = [self._tracked_loader('test.first.skill'), self._tracked_loader('test.second.skill')]
+        self.skill_manager._plugin_skill_failures = {'test.third.skill': (2, 0.0)}
+        self.skill_manager._logged_skill_warnings = {'test.first.skill'}
+
+        with patch(self.mock_package + 'find_skill_plugins', return_value={}), \
+                self._declared('test.first.skill', 'test.second.skill'):
+            self.skill_manager.handle_uninstall_complete(Message('ovos.skills.uninstall.complete'))
+
+        self.assertCountEqual(['test.first.skill', 'test.second.skill'], self.skill_manager.plugin_skills)
+        for loader in loaders:
+            loader.instance.shutdown.assert_not_called()
+            loader.instance.default_shutdown.assert_not_called()
+        self.assertDictEqual({}, self.skill_manager._plugin_skill_failures)
+        self.assertSetEqual({'test.first.skill'}, self.skill_manager._logged_skill_warnings)
+        self.assertEqual(1, len(self._warnings_mentioning('keeping them')))
+
+    def test_uninstall_complete_unloads_the_last_skill_on_empty_discovery(self):
+        """With exactly one skill loaded, an empty discovery is the legitimate
+        removal of the last skill and it is unloaded."""
+        self.skill_manager.plugin_skills = {}
+        loader = self._tracked_loader('test.last.skill')
+
+        with patch(self.mock_package + 'find_skill_plugins', return_value={}), self._declared():
+            self.skill_manager.handle_uninstall_complete(Message('ovos.skills.uninstall.complete'))
+
+        self.assertDictEqual({}, self.skill_manager.plugin_skills)
+        loader.instance.shutdown.assert_called_once_with()
+        loader.instance.default_shutdown.assert_called_once_with()
+        self.assertEqual([], self._warnings_mentioning('keeping'))
+
+    def test_uninstall_complete_shuts_down_only_the_loader_it_detached(self):
+        """A pass detaches the loader instances it decided to remove, so a
+        replacement loaded for one of those ids in the meantime survives.
+
+        Two overlapping completion reports can both see the same untracked-yet
+        id in their removal list. The moment the first detaches it, a scan or
+        an install report is free to load a replacement under that id; the
+        second pass must not shut that replacement down."""
+        self.skill_manager.plugin_skills = {}
+        first = self._tracked_loader('test.first.skill')
+        self._tracked_loader('test.second.skill')
+        self._tracked_loader('test.kept.skill')
+
+        replacement = Mock(spec=SkillLoader)
+        replacement.skill_id = 'test.second.skill'
+        replacement.instance = Mock()
+
+        def reload_second():
+            # the interleaved load: legitimate, because the id is untracked
+            self.skill_manager.plugin_skills['test.second.skill'] = replacement
+
+        first.instance.shutdown.side_effect = reload_second
+
+        with patch(self.mock_package + 'find_skill_plugins',
+                   return_value={'test.kept.skill': Mock()}):
+            self.skill_manager._unload_undiscoverable_plugin_skills()
+
+        self.assertIs(replacement, self.skill_manager.plugin_skills.get('test.second.skill'))
+        replacement.instance.shutdown.assert_not_called()
+        replacement.instance.default_shutdown.assert_not_called()
+
+    def test_uninstall_during_load_discards_the_skill_that_was_loading(self):
+        """A load in flight when the uninstall lands must not revive the package.
+
+        The loading skill holds the reservation and is not in `plugin_skills`
+        yet, so the completion pass finds nothing to detach for it. Without a
+        verdict left behind, the load finishes and tracks a skill whose package
+        is gone - and since only an uninstall report unloads, nothing removes
+        it again."""
+        skill_id = 'test.loading.skill'
+        self.skill_manager.plugin_skills = {}
+        blocked = Event()
+        loading = Event()
+
+        mock_loader = Mock(spec=SkillLoader)
+        mock_loader.skill_id = skill_id
+        mock_loader.instance = Mock()
+
+        def block_until_released(_):
+            loading.set()
+            blocked.wait(timeout=10)
+            return True
+
+        mock_loader.load.side_effect = block_until_released
+        self.skill_manager._get_plugin_skill_loader = Mock(return_value=mock_loader)
+
+        loader_thread = Thread(
+            target=self.skill_manager._load_plugin_skill,
+            args=(skill_id, Mock()), daemon=True)
+        loader_thread.start()
+        self.assertTrue(loading.wait(timeout=10), "the load never started")
+        self.assertIn(skill_id, self.skill_manager._loading_plugin_skills)
+
+        # the package goes away while the load sits inside loader.load()
+        with patch(self.mock_package + 'find_skill_plugins', return_value={}), self._declared():
+            self.skill_manager.handle_uninstall_complete(
+                Message('ovos.skills.uninstall.complete'))
+
+        blocked.set()
+        loader_thread.join(timeout=10)
+        self.assertFalse(loader_thread.is_alive(), "the load never finished")
+
+        self.assertNotIn(skill_id, self.skill_manager.plugin_skills)
+        self.assertNotIn(skill_id, self.skill_manager._loading_plugin_skills)
+        mock_loader.instance.shutdown.assert_called_once_with()
+        mock_loader.instance.default_shutdown.assert_called_once_with()
+        # the package is gone, not broken: a reinstall must not wait out a backoff
+        self.assertNotIn(skill_id, self.skill_manager._plugin_skill_failures)
+
+    def test_uninstall_during_load_lets_a_later_reinstall_load(self):
+        """The verdict is spent on the load it was recorded against.
+
+        A reinstall reserves the id afresh, so the discarded attempt must not
+        leave anything behind that discards the new one too."""
+        skill_id = 'test.reloaded.skill'
+        self.skill_manager.plugin_skills = {}
+        self.skill_manager._loading_plugin_skills = set()
+        self.skill_manager._plugin_skill_unload_pending = {skill_id}
+
+        mock_loader = Mock(spec=SkillLoader)
+        mock_loader.skill_id = skill_id
+        mock_loader.load.return_value = True
+        mock_loader.runtime_requirements.network_before_load = False
+        mock_loader.runtime_requirements.internet_before_load = False
+        self.skill_manager._get_plugin_skill_loader = Mock(return_value=mock_loader)
+
+        with patch(self.mock_package + 'find_skill_plugins', return_value={skill_id: Mock()}):
+            self.skill_manager.load_plugin_skills(network=True, internet=True)
+
+        self.assertIn(skill_id, self.skill_manager.plugin_skills)
+        self.assertNotIn(skill_id, self.skill_manager._plugin_skill_unload_pending)
+
+    def test_uninstall_sweep_leaves_a_reinstall_reserved_after_its_reading_alone(self):
+        """The verdict speaks only for the attempt the sweep read.
+
+        Between reading the packages and recording its verdicts the sweep
+        holds no lock, and a reinstall can reserve the same id in that gap.
+        That load started from a package the reading knows nothing about;
+        marking it would have `_load_plugin_skill` discard a good loader and
+        leave the skill out until the next scan."""
+        skill_id = 'test.reinstalled.skill'
+        self.skill_manager.plugin_skills = {}
+        self.skill_manager._loading_plugin_skills = set()
+        self.skill_manager._plugin_skill_unload_pending = set()
+        self.assertTrue(self.skill_manager._reserve_plugin_skill_load(skill_id))
+        read_serial = self.skill_manager._plugin_skill_serials[skill_id]
+
+        def reinstall_while_the_packages_are_read():
+            # the load the sweep read ends without a loader, and the
+            # reinstall's load takes the id before the verdicts land
+            self.skill_manager._release_plugin_skill_load(skill_id)
+            self.assertTrue(self.skill_manager._reserve_plugin_skill_load(skill_id))
+            return {}
+
+        with patch(self.mock_package + 'find_skill_plugins',
+                   side_effect=reinstall_while_the_packages_are_read), self._declared():
+            removed = self.skill_manager._unload_undiscoverable_plugin_skills()
+
+        self.assertEqual([], removed)
+        self.assertSetEqual(set(), self.skill_manager._plugin_skill_unload_pending)
+        self.assertIn(skill_id, self.skill_manager._loading_plugin_skills)
+        self.assertNotEqual(read_serial, self.skill_manager._plugin_skill_serials[skill_id])
+
+    def test_uninstall_sweep_detaches_the_load_it_read_even_when_it_finishes_first(self):
+        """The counterpart: the load the sweep read may finish and track its
+        loader before the verdicts land. Its package was gone when the packages
+        were read, so that loader is the sweep's to detach, reservation or not."""
+        skill_id = 'test.finished.skill'
+        self.skill_manager.plugin_skills = {}
+        self.skill_manager._loading_plugin_skills = set()
+        self.assertTrue(self.skill_manager._reserve_plugin_skill_load(skill_id))
+        mock_loader = Mock(spec=SkillLoader)
+        mock_loader.skill_id = skill_id
+        mock_loader.instance = Mock()
+
+        def finish_while_the_packages_are_read():
+            # what `_load_plugin_skill` does when its verdict is not in yet
+            with self.skill_manager._plugin_skills_lock:
+                self.skill_manager.plugin_skills[skill_id] = mock_loader
+                self.skill_manager._loading_plugin_skills.discard(skill_id)
+            return {}
+
+        with patch(self.mock_package + 'find_skill_plugins',
+                   side_effect=finish_while_the_packages_are_read), self._declared():
+            removed = self.skill_manager._unload_undiscoverable_plugin_skills()
+
+        self.assertEqual([skill_id], removed)
+        self.assertNotIn(skill_id, self.skill_manager.plugin_skills)
+        self.assertNotIn(skill_id, self.skill_manager._plugin_skill_serials)
+        mock_loader.instance.shutdown.assert_called_once_with()
+
+    def test_uninstall_sweep_keeps_a_loader_that_replaced_the_one_it_read(self):
+        """A loader tracked under an id after the reading came from a later
+        attempt, whatever the reading said about that id."""
+        skill_id = 'test.replaced.skill'
+        self.skill_manager.plugin_skills = {}
+        self.skill_manager._loading_plugin_skills = set()
+        old = self._tracked_loader(skill_id)
+        new = Mock(spec=SkillLoader)
+        new.skill_id = skill_id
+        new.instance = Mock()
+
+        def replace_while_the_packages_are_read():
+            self.skill_manager._unload_plugin_skill(skill_id)
+            self.assertTrue(self.skill_manager._reserve_plugin_skill_load(skill_id))
+            with self.skill_manager._plugin_skills_lock:
+                self.skill_manager.plugin_skills[skill_id] = new
+                self.skill_manager._loading_plugin_skills.discard(skill_id)
+            return {}
+
+        with patch(self.mock_package + 'find_skill_plugins',
+                   side_effect=replace_while_the_packages_are_read), self._declared():
+            removed = self.skill_manager._unload_undiscoverable_plugin_skills()
+
+        self.assertEqual([], removed)
+        self.assertIs(new, self.skill_manager.plugin_skills[skill_id])
+        new.instance.shutdown.assert_not_called()
+        old.instance.shutdown.assert_called_once_with()
+
+    def test_uninstall_keeps_a_loading_skill_when_the_packages_are_installed(self):
+        """A skill still loading is kept by the same reasoning as a loaded one: the
+        entry points are still declared, so nothing importing is a hiccup."""
+        self.skill_manager.plugin_skills = {}
+        self._tracked_loader('test.kept.skill')
+        self.skill_manager._loading_plugin_skills = {'test.loading.skill'}
+
+        with patch(self.mock_package + 'find_skill_plugins', return_value={}), \
+                self._declared('test.kept.skill', 'test.loading.skill'):
+            self.skill_manager.handle_uninstall_complete(
+                Message('ovos.skills.uninstall.complete'))
+
+        self.assertSetEqual(set(), self.skill_manager._plugin_skill_unload_pending)
+        self.assertIn('test.kept.skill', self.skill_manager.plugin_skills)
+        self.assertEqual(1, len(self._warnings_mentioning('keeping them')))
+
+    def test_a_skill_that_would_not_import_is_not_treated_as_removed(self):
+        """A partial discovery result must not unload a still-installed skill.
+
+        `find_skill_plugins()` swallows the error when one entry point fails to
+        import, so that skill is missing from the result exactly like an uninstalled
+        one. Its entry point is still declared, and that is what separates the two:
+        it stays tracked, keeps its loader, keeps its retry record, and a load in
+        flight for it is not marked for discard.
+        """
+        self.skill_manager.plugin_skills = {}
+        good = self._tracked_loader('test.imports.skill')
+        broken = self._tracked_loader('test.broken.skill')
+        self.skill_manager._plugin_skill_failures = {'test.broken.skill': (1, 0.0)}
+        self.skill_manager._loading_plugin_skills = {'test.inflight.skill'}
+        self.skill_manager._plugin_skill_unload_pending = set()
+
+        # Only the healthy one imports; all three are still declared.
+        with patch(self.mock_package + 'find_skill_plugins',
+                   return_value={'test.imports.skill': object()}), \
+                self._declared('test.imports.skill', 'test.broken.skill',
+                               'test.inflight.skill'):
+            removed = self.skill_manager._unload_undiscoverable_plugin_skills()
+
+        self.assertEqual([], removed)
+        self.assertIn('test.broken.skill', self.skill_manager.plugin_skills)
+        broken.instance.shutdown.assert_not_called()
+        good.instance.shutdown.assert_not_called()
+        self.assertIn('test.broken.skill', self.skill_manager._plugin_skill_failures)
+        self.assertSetEqual(set(), self.skill_manager._plugin_skill_unload_pending)
+
+    def test_a_skill_that_is_neither_importable_nor_declared_is_removed(self):
+        """The counterpart: gone from both is a real uninstall, even alongside a
+        healthy skill, so a partial result still removes what actually went away."""
+        self.skill_manager.plugin_skills = {}
+        self._tracked_loader('test.imports.skill')
+        gone = self._tracked_loader('test.gone.skill')
+        self.skill_manager._plugin_skill_failures = {'test.gone.skill': (1, 0.0)}
+        self.skill_manager._loading_plugin_skills = {'test.gone.inflight'}
+        self.skill_manager._plugin_skill_unload_pending = set()
+
+        with patch(self.mock_package + 'find_skill_plugins',
+                   return_value={'test.imports.skill': object()}), \
+                self._declared('test.imports.skill'):
+            removed = self.skill_manager._unload_undiscoverable_plugin_skills()
+
+        self.assertEqual(['test.gone.skill'], removed)
+        gone.instance.shutdown.assert_called_once_with()
+        self.assertNotIn('test.gone.skill', self.skill_manager._plugin_skill_failures)
+        self.assertSetEqual({'test.gone.inflight'},
+                            self.skill_manager._plugin_skill_unload_pending)
+
+    def test_one_package_can_own_every_loaded_skill(self):
+        """A distribution may expose several skill entry points, so uninstalling one
+        package can legitimately empty discovery with several skills loaded.
+
+        Counting loaded skills read that as a hiccup and kept every one of them
+        registered; what the installed packages declare says it was a real removal."""
+        self.skill_manager.plugin_skills = {}
+        loaders = [self._tracked_loader(f'bundle.skill.{n}') for n in ('one', 'two', 'three')]
+
+        with patch(self.mock_package + 'find_skill_plugins', return_value={}), self._declared():
+            removed = self.skill_manager._unload_undiscoverable_plugin_skills()
+
+        self.assertCountEqual(['bundle.skill.one', 'bundle.skill.two', 'bundle.skill.three'],
+                              removed)
+        self.assertDictEqual({}, self.skill_manager.plugin_skills)
+        for loader in loaders:
+            loader.instance.shutdown.assert_called_once_with()
+
+    def test_unreadable_entry_point_metadata_unloads_nothing(self):
+        """`_declared_skill_plugins` returning None is "cannot tell", and that must not
+        read as "nothing is installed" and shut every skill down."""
+        self.skill_manager.plugin_skills = {}
+        loader = self._tracked_loader('test.kept.skill')
+
+        with patch(self.mock_package + 'find_skill_plugins', return_value={}), \
+                patch.object(self.skill_manager, '_declared_skill_plugins', return_value=None):
+            removed = self.skill_manager._unload_undiscoverable_plugin_skills()
+
+        self.assertEqual([], removed)
+        self.assertIn('test.kept.skill', self.skill_manager.plugin_skills)
+        loader.instance.shutdown.assert_not_called()
+
+    def test_an_abandoned_load_is_never_announced_as_loaded(self):
+        """`mycroft.skill.loaded` says a skill is available. A load the uninstall
+        abandoned is shut down and never tracked, so it was never available."""
+        skill_id = 'test.announced.skill'
+        self.skill_manager.plugin_skills = {}
+        self.skill_manager._plugin_skill_unload_pending = {skill_id}
+        self.skill_manager._loading_plugin_skills = {skill_id}
+        self.skill_manager.bus.message_types = []
+
+        mock_loader = Mock(spec=SkillLoader)
+        mock_loader.skill_id = skill_id
+        mock_loader.instance = Mock()
+        mock_loader.load.return_value = True
+        self.skill_manager._get_plugin_skill_loader = Mock(return_value=mock_loader)
+
+        self.assertIsNone(self.skill_manager._load_plugin_skill(skill_id, Mock(), reserved=True))
+
+        self.assertNotIn('mycroft.skill.loaded', self.skill_manager.bus.message_types)
+        self.assertNotIn(skill_id, self.skill_manager.plugin_skills)
+        mock_loader.instance.shutdown.assert_called_once_with()
+
+    def test_a_completed_load_is_announced(self):
+        """The counterpart: a load nothing abandoned still announces itself."""
+        skill_id = 'test.normal.skill'
+        self.skill_manager.plugin_skills = {}
+        self.skill_manager._plugin_skill_unload_pending = set()
+        self.skill_manager._loading_plugin_skills = {skill_id}
+        self.skill_manager.bus.message_types = []
+
+        mock_loader = Mock(spec=SkillLoader)
+        mock_loader.skill_id = skill_id
+        mock_loader.instance = Mock()
+        mock_loader.load.return_value = True
+        self.skill_manager._get_plugin_skill_loader = Mock(return_value=mock_loader)
+
+        self.skill_manager._load_plugin_skill(skill_id, Mock(), reserved=True)
+
+        self.assertIn('mycroft.skill.loaded', self.skill_manager.bus.message_types)
+        self.assertIn(skill_id, self.skill_manager.plugin_skills)
+        mock_loader.instance.shutdown.assert_not_called()
+
+    def test_uninstall_complete_keeps_everything_when_discovery_fails(self):
+        """A discovery error must not read as "every package is gone"."""
+        self.skill_manager.plugin_skills = {}
+        loader = self._tracked_loader('test.kept.skill')
+
+        with patch(self.mock_package + 'find_skill_plugins', side_effect=RuntimeError("boom")):
+            self.skill_manager.handle_uninstall_complete(Message('ovos.skills.uninstall.complete'))
+
+        self.assertIn('test.kept.skill', self.skill_manager.plugin_skills)
+        loader.instance.shutdown.assert_not_called()
+        self.log_mock.exception.assert_called_once()
 
 
 class TestDeferredLoadingConfigFlag(TestCase):
@@ -748,6 +1206,8 @@ class TestDeferredLoadingConfigFlag(TestCase):
                 'skillmanager.rescan',
                 'ovos.skills.install.complete',
                 'ovos.pip.install.complete',
+                'ovos.skills.uninstall.complete',
+                'ovos.pip.uninstall.complete',
                 'mycroft.skills.is_alive',
                 'mycroft.skills.is_ready',
                 'mycroft.skills.all_loaded',
@@ -782,6 +1242,8 @@ class TestDeferredLoadingConfigFlag(TestCase):
             'skillmanager.rescan',
             'ovos.skills.install.complete',
             'ovos.pip.install.complete',
+            'ovos.skills.uninstall.complete',
+            'ovos.pip.uninstall.complete',
             'mycroft.network.connected',
             'mycroft.internet.connected',
             'mycroft.gui.available',
@@ -978,3 +1440,204 @@ class TestSkillManagerSessionManagerBus(TestCase):
                 f"got {len(owned)}"
             )
 
+
+
+class TestUpgradedPluginSkillReload(TestCase):
+    """An installer that upgrades a running skill must land the new code.
+
+    Discovery only ever loads what is *new*, so upgrading a skill already
+    loaded made nothing newly discoverable and the scan returned empty. The
+    files on disk were the new version and the process kept answering from
+    the old one, which is invisible: the skill reports the version it was
+    upgraded to while running the one before it, until something restarts
+    the process.
+    """
+
+    def setUp(self):
+        self.bus = Mock()
+        self.manager = SkillManager(self.bus)
+
+    def _track(self, skill_id, version, module="fake_skill_pkg.core"):
+        loader = Mock()
+        loader.skill_class = Mock(__module__=module)
+        loader.instance = None
+        self.manager.plugin_skills[skill_id] = loader
+        self.manager._plugin_skill_versions[skill_id] = version
+
+    def test_an_unchanged_version_is_left_alone(self):
+        self._track("demo.skill", "1.0.0")
+        with patch.object(SkillManager, "_declared_skill_versions",
+                          staticmethod(lambda: {"demo.skill": "1.0.0"})):
+            self.assertEqual(self.manager._reload_upgraded_plugin_skills(), [])
+
+    def test_an_upgraded_skill_is_unloaded_and_loaded_again(self):
+        self._track("demo.skill", "1.0.0")
+        plug = Mock()
+        with patch.object(SkillManager, "_declared_skill_versions",
+                          staticmethod(lambda: {"demo.skill": "2.0.0"})), \
+             patch("ovos_core.skill_manager.find_skill_plugins",
+                   return_value={"demo.skill": plug}), \
+             patch.object(self.manager, "_unload_plugin_skill",
+                          side_effect=lambda sid: self.manager.plugin_skills.pop(sid, None)) as unload, \
+             patch.object(self.manager, "_load_plugin_skill", return_value=Mock()) as load:
+            reloaded = self.manager._reload_upgraded_plugin_skills()
+        self.assertEqual(reloaded, ["demo.skill"])
+        unload.assert_called_once_with("demo.skill")
+        load.assert_called_once_with("demo.skill", plug, reserved=True, version="2.0.0")
+
+    def test_the_import_cache_is_cleared_or_the_reload_reads_the_old_code(self):
+        """The crux: pip replaced the files, sys.modules still holds the old
+        module, and an entry point loaded again hands back that same object."""
+        self._track("demo.skill", "1.0.0", module="fake_skill_pkg.core")
+        sentinel = Mock()
+        sys.modules["fake_skill_pkg"] = sentinel
+        sys.modules["fake_skill_pkg.core"] = sentinel
+        try:
+            self.manager._forget_skill_modules("demo.skill")
+            self.assertNotIn("fake_skill_pkg", sys.modules)
+            self.assertNotIn("fake_skill_pkg.core", sys.modules)
+        finally:
+            sys.modules.pop("fake_skill_pkg", None)
+            sys.modules.pop("fake_skill_pkg.core", None)
+
+    def test_a_skill_that_stopped_being_discoverable_is_left_unloaded(self):
+        self._track("demo.skill", "1.0.0")
+        with patch.object(SkillManager, "_declared_skill_versions",
+                          staticmethod(lambda: {"demo.skill": "2.0.0"})), \
+             patch("ovos_core.skill_manager.find_skill_plugins", return_value={}), \
+             patch.object(self.manager, "_unload_plugin_skill",
+                          side_effect=lambda sid: self.manager.plugin_skills.pop(sid, None)), \
+             patch.object(self.manager, "_load_plugin_skill") as load:
+            reloaded = self.manager._reload_upgraded_plugin_skills()
+        self.assertEqual(reloaded, [])
+        load.assert_not_called()
+        self.assertNotIn("demo.skill", self.manager._plugin_skill_versions)
+
+    def test_unreadable_metadata_reloads_nothing(self):
+        self._track("demo.skill", "1.0.0")
+        with patch.object(SkillManager, "_declared_skill_versions", staticmethod(dict)), \
+             patch.object(self.manager, "_load_plugin_skill") as load:
+            self.assertEqual(self.manager._reload_upgraded_plugin_skills(), [])
+        load.assert_not_called()
+
+    def test_install_complete_reloads_an_upgrade(self):
+        with patch.object(self.manager, "_rescan_plugin_skills", return_value=[]), \
+             patch.object(self.manager, "_reload_upgraded_plugin_skills",
+                          return_value=["demo.skill"]) as reload_upgraded:
+            self.manager.handle_install_complete(Message("ovos.pip.install.complete"))
+        reload_upgraded.assert_called_once()
+
+    def test_upgrades_are_reloaded_before_new_entry_points_are_scanned(self):
+        """Discovery imports what it finds. A rescan run first would build a
+        newly declared skill from the old modules still in sys.modules and
+        record it against the new version, leaving nothing to tell apart."""
+        order = []
+        with patch.object(self.manager, "_reload_upgraded_plugin_skills",
+                          side_effect=lambda: order.append("reload") or []), \
+             patch.object(self.manager, "_rescan_plugin_skills",
+                          side_effect=lambda: order.append("rescan") or []):
+            self.manager.handle_install_complete(Message("ovos.pip.install.complete"))
+        self.assertEqual(order, ["reload", "rescan"])
+
+    def test_a_reload_trains_the_deferred_engines(self):
+        """_load_new_skills() trains after a load; a reload registers intents
+        just the same, and an upgrade that changed them would otherwise leave
+        padatious on the previous set."""
+        with patch.object(self.manager, "_reload_upgraded_plugin_skills",
+                          return_value=["demo.skill"]), \
+             patch.object(self.manager, "_rescan_plugin_skills", return_value=[]):
+            self.manager.handle_install_complete(Message("ovos.pip.install.complete"))
+        trained = [c for c in self.bus.emit.call_args_list
+                   if c.args and getattr(c.args[0], "msg_type", None) == "mycroft.skills.train"]
+        self.assertEqual(len(trained), 1)
+
+    def test_a_reload_that_loads_nothing_does_not_train(self):
+        with patch.object(self.manager, "_reload_upgraded_plugin_skills", return_value=[]), \
+             patch.object(self.manager, "_rescan_plugin_skills", return_value=[]):
+            self.manager.handle_install_complete(Message("ovos.pip.install.complete"))
+        trained = [c for c in self.bus.emit.call_args_list
+                   if c.args and getattr(c.args[0], "msg_type", None) == "mycroft.skills.train"]
+        self.assertEqual(trained, [])
+
+    def test_a_failed_reload_is_detached_so_a_later_scan_retries_it(self):
+        """_load_plugin_skill() tracks the loader it built even when the load
+        failed. Left alone the skill is tracked - so every scan skips it -
+        with no version for the upgrade check to match on either."""
+        self._track("demo.skill", "1.0.0")
+        with patch.object(SkillManager, "_declared_skill_versions",
+                          staticmethod(lambda: {"demo.skill": "2.0.0"})), \
+             patch("ovos_core.skill_manager.find_skill_plugins",
+                   return_value={"demo.skill": Mock()}), \
+             patch.object(self.manager, "_unload_plugin_skill",
+                          side_effect=lambda sid: self.manager.plugin_skills.pop(sid, None)) as unload, \
+             patch.object(self.manager, "_load_plugin_skill", return_value=None), \
+             patch.object(self.manager, "_record_plugin_skill_failure") as failed:
+            reloaded = self.manager._reload_upgraded_plugin_skills()
+        self.assertEqual(reloaded, [])
+        # once to swap it out, once to detach the loader the failed load left
+        self.assertEqual(unload.call_count, 2)
+        failed.assert_called_once_with("demo.skill")
+
+    def test_the_version_is_read_before_the_load_not_after(self):
+        """An upgrade that lands during a load must not be recorded against
+        the code that was loaded, or the check compares it with itself."""
+        recorded = {}
+        with patch.object(SkillManager, "_declared_skill_versions",
+                          staticmethod(lambda: {"demo.skill": "1.0.0"})), \
+             patch.object(self.manager, "_get_plugin_skill_loader") as get_loader, \
+             patch.object(self.manager, "_record_plugin_skill_version",
+                          side_effect=lambda sid, ver=None: recorded.update({sid: ver})):
+            loader = Mock()
+            loader.load.return_value = True
+            get_loader.return_value = loader
+            self.manager._load_plugin_skill("demo.skill", Mock())
+        self.assertEqual(recorded, {"demo.skill": "1.0.0"})
+
+    def test_a_load_another_attempt_owns_is_left_alone(self):
+        """`_load_plugin_skill()` answers None both when a reservation failed
+        and when this attempt's load failed. Detaching on the first would
+        throw away a loader a concurrent scan owns and had already loaded."""
+        self._track("demo.skill", "1.0.0")
+        with patch.object(SkillManager, "_declared_skill_versions",
+                          staticmethod(lambda: {"demo.skill": "2.0.0"})), \
+             patch.object(self.manager, "_reserve_plugin_skill_load", return_value=False) as reserve, \
+             patch("ovos_core.skill_manager.find_skill_plugins") as discover, \
+             patch.object(self.manager, "_load_plugin_skill") as load, \
+             patch.object(self.manager, "_record_plugin_skill_failure") as failed:
+            reloaded = self.manager._reload_upgraded_plugin_skills()
+        self.assertEqual(reloaded, [])
+        reserve.assert_called_once_with("demo.skill")
+        # nothing is loaded, nothing is detached, and no backoff is recorded
+        # against a skill this pass never owned
+        discover.assert_not_called()
+        load.assert_not_called()
+        failed.assert_not_called()
+
+    def test_the_reservation_is_released_when_the_package_vanished(self):
+        self._track("demo.skill", "1.0.0")
+        with patch.object(SkillManager, "_declared_skill_versions",
+                          staticmethod(lambda: {"demo.skill": "2.0.0"})), \
+             patch("ovos_core.skill_manager.find_skill_plugins", return_value={}), \
+             patch.object(self.manager, "_unload_plugin_skill",
+                          side_effect=lambda sid: self.manager.plugin_skills.pop(sid, None)), \
+             patch.object(self.manager, "_release_plugin_skill_load") as release:
+            self.manager._reload_upgraded_plugin_skills()
+        release.assert_called_once_with("demo.skill")
+
+    def test_one_training_event_when_the_scan_also_loaded(self):
+        """`_load_new_skills()` trains only when it loaded something, so the
+        guard here yields exactly one event however the work splits -- never
+        two, and never none."""
+        for reloaded, loaded in ((["a"], []), ([], ["b"]), (["a"], ["b"])):
+            with self.subTest(reloaded=reloaded, loaded=loaded):
+                bus = Mock()
+                manager = SkillManager(bus)
+                with patch.object(manager, "_reload_upgraded_plugin_skills", return_value=reloaded), \
+                     patch.object(manager, "_rescan_plugin_skills", return_value=loaded):
+                    manager.handle_install_complete(Message("ovos.pip.install.complete"))
+                trained = [c for c in bus.emit.call_args_list
+                           if c.args and getattr(c.args[0], "msg_type", None) == "mycroft.skills.train"]
+                # the scan emits its own when it loaded; this only covers the
+                # case where a reload was the only work done
+                expected = 1 if (reloaded and not loaded) else 0
+                self.assertEqual(len(trained), expected)

@@ -89,7 +89,7 @@ class TestLegacyIntentIdBackCompat(TestCase):
             # matches are canonical by construction (register-time alias
             # collapse), so the engine must dealias this before comparing —
             # see ovos_padatious.opm._canonicalize_blacklist.
-            legacy_intent_id = f"{self.skill_id}:Greetings.intent"
+            legacy_intent_id = f"{self.skill_id}:greetings.intent"
             session.blacklisted_intents = [legacy_intent_id]
             message = Message(utt_topic,
                               {"utterances": ["good morning"], "lang": session.lang},
@@ -121,7 +121,7 @@ class TestLegacyIntentIdBackCompat(TestCase):
             warnings = "\n".join(
                 str(a) for call in mock_warning.call_args_list for a in call.args)
             self.assertIn(legacy_intent_id, warnings)
-            self.assertIn(f"{self.skill_id}:Greetings", warnings)
+            self.assertIn(f"{self.skill_id}:greetings", warnings)
         finally:
             minicroft.stop()
 
@@ -146,7 +146,7 @@ class TestLegacyIntentIdBackCompat(TestCase):
             # emission still reaches the handler depends entirely on the
             # bus's own receive-side bridge (RULE 2), which only runs when
             # the bus's namespace ``modernize`` flag is on.
-            legacy_intent_topic = f"{self.skill_id}:Greetings.intent"
+            legacy_intent_topic = f"{self.skill_id}:greetings.intent"
             message = Message(legacy_intent_topic,
                               {"utterance": "good morning", "lang": session.lang},
                               {"session": session.serialize(), "source": "A", "destination": "B"})

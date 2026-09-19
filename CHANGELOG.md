@@ -1,5 +1,91 @@
 # Changelog
 
+## [3.7.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.0a1) (2026-09-18)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.6.2a3...3.7.0a1)
+
+**Merged pull requests:**
+
+- feat: bound each pipeline match call and give each plugin its own workers [\#1003](https://github.com/OpenVoiceOS/ovos-core/pull/1003) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [3.6.2a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.6.2a3) (2026-09-18)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.6.2a2...3.6.2a3)
+
+**Merged pull requests:**
+
+- test: follow the hello-world greetings.intent rename in the e2e suites [\#1004](https://github.com/OpenVoiceOS/ovos-core/pull/1004) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [3.6.2a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.6.2a2) (2026-09-17)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.6.2a1...3.6.2a2)
+
+**Merged pull requests:**
+
+- test: the fallback floor guard counts SpecMessage poll members [\#994](https://github.com/OpenVoiceOS/ovos-core/pull/994) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [3.6.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.6.2a1) (2026-09-17)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.6.1a1...3.6.2a1)
+
+**Merged pull requests:**
+
+- fix: an intent registration without a payload skill\_id is not indexed [\#992](https://github.com/OpenVoiceOS/ovos-core/pull/992) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [3.6.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.6.1a1) (2026-09-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.6.0a1...3.6.1a1)
+
+## [3.6.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.6.0a1) (2026-09-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.6a3...3.6.0a1)
+
+**Merged pull requests:**
+
+- fix: raise ovoscope test-extra floor to 1.8.2a1 [\#985](https://github.com/OpenVoiceOS/ovos-core/pull/985) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- feat: manifest side of ovos.skills.list \(OVOS-INTENT-4 §8.6/§10.3\) [\#970](https://github.com/OpenVoiceOS/ovos-core/pull/970) ([JarbasAl](https://github.com/JarbasAl))
+
+## [3.5.6a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.6a3) (2026-09-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.6a2...3.5.6a3)
+
+## [3.5.6a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.6a2) (2026-09-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.6a1...3.5.6a2)
+
+**Merged pull requests:**
+
+- test: cover StopService real locale matching [\#986](https://github.com/OpenVoiceOS/ovos-core/pull/986) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- test: port unique xformers.py coverage into test\_transformers.py [\#984](https://github.com/OpenVoiceOS/ovos-core/pull/984) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [3.5.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.6a1) (2026-09-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.5a1...3.5.6a1)
+
+**Merged pull requests:**
+
+- fix: a deregistration without a payload skill\_id removes nothing from the manifest [\#991](https://github.com/OpenVoiceOS/ovos-core/pull/991) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [3.5.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.5a1) (2026-09-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.4a2...3.5.5a1)
+
+**Merged pull requests:**
+
+- fix: an unknown pipeline matcher warns once, not an error per utterance [\#993](https://github.com/OpenVoiceOS/ovos-core/pull/993) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- fix: unload plugin skills whose package was uninstalled [\#978](https://github.com/OpenVoiceOS/ovos-core/pull/978) ([goldyfruit](https://github.com/goldyfruit))
+
+## [3.5.4a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.4a2) (2026-09-11)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.4a1...3.5.4a2)
+
+**Merged pull requests:**
+
+- revert: drop ovos.skills.fallback.list; the fallback registry is not served on the bus [\#988](https://github.com/OpenVoiceOS/ovos-core/pull/988) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- fix: include the installer's error output in the failure reply [\#979](https://github.com/OpenVoiceOS/ovos-core/pull/979) ([goldyfruit](https://github.com/goldyfruit))
+- feat: load newly installed plugin skills as soon as the installer reports completion [\#977](https://github.com/OpenVoiceOS/ovos-core/pull/977) ([goldyfruit](https://github.com/goldyfruit))
+- feat\(fallback\): ovos.skills.fallback.list, so a client can see what has no phrases [\#951](https://github.com/OpenVoiceOS/ovos-core/pull/951) ([goldyfruit](https://github.com/goldyfruit))
+
 ## [3.5.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.4a1) (2026-09-10)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.5.3a2...3.5.4a1)
@@ -43,10 +129,6 @@
 ## [3.5.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.5.0a1) (2026-09-08)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.4.4a1...3.5.0a1)
-
-**Closed issues:**
-
-- ovos-core has no targeted pip installer, so ovos.pip.install.ovos\_core reaches nobody [\#888](https://github.com/OpenVoiceOS/ovos-core/issues/888)
 
 ## [3.4.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.4.4a1) (2026-09-08)
 
@@ -257,10 +339,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.1.2a1...3.2.0a1)
 
-**Merged pull requests:**
-
-- feat: add Kabyle \(kab-dz\) global stop vocabulary [\#889](https://github.com/OpenVoiceOS/ovos-core/pull/889) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [3.1.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.1.2a1) (2026-09-01)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.1.1a1...3.1.2a1)
@@ -297,11 +375,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a1...3.0.10a2)
 
-**Merged pull requests:**
-
-- fix: emit bus reply when pip install/uninstall raises RuntimeError [\#891](https://github.com/OpenVoiceOS/ovos-core/pull/891) ([JarbasAl](https://github.com/JarbasAl))
-- docs: add AGENTS.md with the conventions for coding agents [\#890](https://github.com/OpenVoiceOS/ovos-core/pull/890) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [3.0.10a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a1) (2026-08-31)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.9a1...3.0.10a1)
@@ -310,49 +383,25 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.8a1...3.0.9a1)
 
-**Merged pull requests:**
-
-- fix: make skill\_manager tests hermetic against config cache state [\#894](https://github.com/OpenVoiceOS/ovos-core/pull/894) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [3.0.8a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.8a1) (2026-08-31)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.7a4...3.0.8a1)
-
-**Merged pull requests:**
-
-- fix: invalidate ovos-config merge cache in deferred-loading config-flag tests [\#892](https://github.com/OpenVoiceOS/ovos-core/pull/892) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [3.0.7a4](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.7a4) (2026-08-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.7a3...3.0.7a4)
 
-**Merged pull requests:**
-
-- docs: prerelease-quirks changelog [\#881](https://github.com/OpenVoiceOS/ovos-core/pull/881) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [3.0.7a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.7a3) (2026-08-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.7a2...3.0.7a3)
-
-**Merged pull requests:**
-
-- chore: kill queued deprecation-warning hot-path reads [\#879](https://github.com/OpenVoiceOS/ovos-core/pull/879) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [3.0.7a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.7a2) (2026-08-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.7a1...3.0.7a2)
 
-**Merged pull requests:**
-
-- test: account for ovos.converse.pong broadcast answer in e2e expectations [\#880](https://github.com/OpenVoiceOS/ovos-core/pull/880) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [3.0.7a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.7a1) (2026-08-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.6a1...3.0.7a1)
-
-**Merged pull requests:**
-
-- fix: shut down test-created SkillManager instances to stop leaked watcher threads [\#882](https://github.com/OpenVoiceOS/ovos-core/pull/882) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [3.0.6a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.6a1) (2026-08-14)
 
@@ -374,17 +423,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.3a1...3.0.3a2)
 
-**Merged pull requests:**
-
-- docs: rewrite review-campaign comment narration as plain invariants [\#873](https://github.com/OpenVoiceOS/ovos-core/pull/873) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [3.0.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.3a1) (2026-08-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.2a1...3.0.3a1)
-
-**Merged pull requests:**
-
-- fix: update stale legacy-dispatch e2e golden to the current bridge contract [\#871](https://github.com/OpenVoiceOS/ovos-core/pull/871) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [3.0.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.2a1) (2026-08-13)
 

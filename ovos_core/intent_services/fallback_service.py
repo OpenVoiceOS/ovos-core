@@ -59,47 +59,11 @@ class FallbackService(ConfidenceMatcherPipeline):
         self._fallback_response_event = threading.Event()
         self.bus.on("ovos.skills.fallback.register", self.handle_register_fallback)
         self.bus.on("ovos.skills.fallback.deregister", self.handle_deregister_fallback)
-        self.bus.on("ovos.skills.fallback.list", self.handle_list_fallbacks)
 
     def _fallback_registry_snapshot(self) -> Dict[str, int]:
         """A stable copy of the registry, safe to iterate."""
         with self._registry_lock:
             return dict(self.registered_fallbacks)
-
-    def handle_list_fallbacks(self, message: Message) -> None:
-        """Answer which skills are registered as fallbacks, and at what priority.
-
-        The intent manifest (``ovos.intent.list`` / ``ovos.intent.describe``)
-        enumerates *registered intents*. A fallback skill registers no intent
-        and no phrasings at all -- it registers a handler that is offered every
-        utterance nothing else matched -- so it is invisible there by
-        construction, and nothing else on the bus could be asked about it.
-
-        That gap is not academic. A client asking the manifest "what can I be
-        asked in fr-FR" gets an empty list whether the answer is "nothing
-        matches French" or "French is answered by three fallback skills", and
-        those are opposite facts. One such client told its user their assistant
-        did not speak their language while it was answering them in it.
-
-        The reply carries no phrasings because a fallback has none to give;
-        knowing that a fallback exists is the whole of what can honestly be
-        published about it.
-        """
-        # `handle_register_fallback` reads skill_id straight off the message and
-        # stores whatever it finds, so the registry can hold a None key. Sorting
-        # that against a str raises TypeError, and it would do so *before* the
-        # reply is emitted -- turning a malformed registration somewhere else
-        # into a query that never answers. An entry with no skill_id also names
-        # nothing a caller could act on, so it is left out rather than reported.
-        registry = self._fallback_registry_snapshot()
-        listed = [(skill_id, priority) for skill_id, priority in registry.items()
-                  if isinstance(skill_id, str) and skill_id]
-        self.bus.emit(message.reply(
-            "ovos.skills.fallback.list.response",
-            {"ok": True,
-             "fallbacks": [{"skill_id": skill_id, "priority": priority}
-                           for skill_id, priority in
-                           sorted(listed, key=lambda kv: (kv[1], kv[0]))]}))
 
     def _wire_lifecycle(self, skill_id: str) -> None:
         """Translate lifecycle done-signal for a fallback skill.
@@ -349,4 +313,3 @@ class FallbackService(ConfidenceMatcherPipeline):
             self._unwire_lifecycle(skill_id)
         self.bus.remove("ovos.skills.fallback.register", self.handle_register_fallback)
         self.bus.remove("ovos.skills.fallback.deregister", self.handle_deregister_fallback)
-        self.bus.remove("ovos.skills.fallback.list", self.handle_list_fallbacks)

@@ -17,6 +17,8 @@ import copy
 import json
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from threading import Lock
 from uuid import uuid4
 from collections import defaultdict
 from typing import Optional, Tuple, Callable, List
@@ -103,6 +105,20 @@ _PIPELINE_MIGRATION_MAP = {
 }
 
 _PIPELINE_RE = re.compile(r'-(high|medium|low)$')
+
+# OVOS-PIPELINE-1 §4.4: "The orchestrator SHOULD bound each match invocation
+# by a deployment-defined time. The RECOMMENDED default is 10 s." Per-plugin
+# overrides live where every other per-plugin pipeline setting lives:
+# ``intents.<pipe_id>.match_timeout`` (mirrors ``ovos_plugin_manager.pipeline
+# .OVOSPipelineFactory.load_plugin``'s own ``intents.<pipe_id>`` config
+# lookup). A deployment-wide override is ``intents.match_timeout``.
+DEFAULT_MATCH_TIMEOUT = 10
+# Worker budget per plugin id. Each plugin gets its own pool, so a plugin
+# whose calls hang past the bound can only fill its own pool: other plugins
+# keep their workers, and a fresh session that reaches the full plugin is
+# declined at once instead of waiting a full bound in the queue. Overrides:
+# ``intents.<pipe_id>.match_workers``, then ``intents.match_workers``.
+DEFAULT_MATCH_WORKERS = 4
 
 # OVOS-PIPELINE-1 §5.5 / SESSION-1 §3: the deployment-owned per-component
 # override fields that a claiming plugin's ``updated_session`` MUST NOT be
@@ -209,6 +225,13 @@ class IntentService:
     querying the intent service.
     """
 
+    # class-level defaults so an ``IntentService.__new__``-constructed test
+    # double (bypassing ``__init__``) still gets OVOS-PIPELINE-1 §4.4 bounds
+    _match_executors: Optional[dict] = None
+    _match_inflight: Optional[dict] = None
+    _match_abandoned: Optional[dict] = None
+    _match_lock: Optional[Lock] = None
+
     def __init__(self, bus, config=None, preload_pipelines=True,
                  alive_hook=on_alive, started_hook=on_started,
                  ready_hook=on_ready,
@@ -239,6 +262,24 @@ class IntentService:
         self.intent_dispatcher: IntentDispatcher = IntentDispatcher(
             bus, timeout=handler_timeout, on_terminal=self._emit_utterance_handled,
             on_done_signal=self._sync_handler_mutations)
+
+        # OVOS-PIPELINE-1 §4.4: bounds each plugin ``match`` call. A worker
+        # thread whose call outlives the bound is abandoned (never joined
+        # again), so it cannot block the match loop or hold up a later
+        # round; its eventual return value is never collected. One pool per
+        # plugin id, so the abandoned workers of one plugin cannot take the
+        # workers of another.
+        self._match_executors = {}
+        # one in-flight future per (pipeline entry, session id) (§6.2
+        # single-flight): a plugin still running its previous call for a
+        # given session is skipped instead of handed a second worker.
+        self._match_inflight = {}
+        # per plugin id, the futures that outlived their bound and still
+        # hold a worker; only these count toward the full-pool decline
+        self._match_abandoned = {}
+        # check-and-submit is one step, so a burst of arrivals cannot all
+        # pass the check and queue past the pool
+        self._match_lock = Lock()
 
         # INTENT-4 §10 manifest — indexes registration broadcasts and serves
         # ovos.intent.list / ovos.intent.describe pull-queries.
@@ -367,6 +408,129 @@ class IntentService:
 
         return default_lang
 
+    def _match_timeout(self, pipe_id: str) -> float:
+        """OVOS-PIPELINE-1 §4.4 bound for ``pipe_id``'s ``match`` calls:
+        ``intents.<pipe_id>.match_timeout`` overrides the deployment-wide
+        ``intents.match_timeout``, which defaults to 10s."""
+        default = self.config.get("match_timeout", DEFAULT_MATCH_TIMEOUT)
+        return self.config.get(pipe_id, {}).get("match_timeout", default)
+
+    def _match_workers(self, pipe_id: str) -> int:
+        """Worker budget for ``pipe_id``'s pool: ``intents.<pipe_id>.match_workers``
+        overrides the deployment-wide ``intents.match_workers`` (default 4)."""
+        default = self.config.get("match_workers", DEFAULT_MATCH_WORKERS)
+        value = self.config.get(pipe_id, {}).get("match_workers", default)
+        try:
+            return max(1, int(value))
+        except (TypeError, ValueError):
+            LOG.warning(f"intents.{pipe_id}.match_workers is not a number "
+                        f"({value!r}); using {DEFAULT_MATCH_WORKERS}")
+            return DEFAULT_MATCH_WORKERS
+
+    def _match_executor_for(self, pipe_id: str) -> ThreadPoolExecutor:
+        if self._match_executors is None:
+            self._match_executors = {}
+        executor = self._match_executors.get(pipe_id)
+        if executor is None:
+            executor = ThreadPoolExecutor(
+                max_workers=self._match_workers(pipe_id),
+                thread_name_prefix=f"ovos-pipeline-match-{pipe_id}")
+            self._match_executors[pipe_id] = executor
+        return executor
+
+    def _match_busy_workers(self, pipe_id: str) -> int:
+        """Count the workers of ``pipe_id`` held by calls that outlived
+        their bound, across every session and pipeline tier. A call inside
+        its bound never counts: it returns, and a caller behind it waits
+        in the queue for that, not for a full bound. Abandoned futures that
+        have since returned are dropped on the way, and so are done
+        in-flight entries."""
+        if self._match_abandoned is None:
+            self._match_abandoned = {}
+        for key, future in list(self._match_inflight.items()):
+            if future.done():
+                self._match_inflight.pop(key, None)
+        abandoned = self._match_abandoned.get(pipe_id)
+        if not abandoned:
+            return 0
+        abandoned = {f for f in abandoned if not f.done()}
+        self._match_abandoned[pipe_id] = abandoned
+        return len(abandoned)
+
+    def _call_match_bounded(self, pipeline: str, match_func: Callable,
+                            utterances: List[str], intent_lang: str,
+                            message: Message,
+                            session_id: str) -> Optional[IntentHandlerMatch]:
+        """Run one plugin ``match`` call bounded by OVOS-PIPELINE-1 §4.4.
+
+        On timeout the call is logged and treated as if the plugin had
+        declined: no exception propagates, no bus event is emitted, and
+        ``None`` is returned at once. There is no Match to carry an
+        ``updated_session``, so the session is unchanged. The ``message``
+        object itself is shared with the worker: a write the abandoned call
+        makes to it in place is not undone here. The worker thread is not
+        joined and its future is never read again, so a Match it produces
+        later cannot reach the caller. A call whose ``future.result()``
+        returns without raising has finished inside the bound, so it is
+        always safe to dispatch.
+
+        Each plugin id has its own pool of ``match_workers`` threads. When
+        every worker of that pool is held by a call that outlived its
+        bound, a new call is declined at once with a WARN, instead of
+        waiting in the queue for a full bound. A call inside its bound
+        never causes a decline: a caller behind it queues and gets its
+        turn when it returns, as on a single pool. A hung plugin can only
+        fill its own pool. Other plugins keep their workers, so a fresh
+        session still reaches them. The check and the submit are one step
+        under a lock, so a burst of arrivals cannot all pass the check.
+
+        ``(pipeline, session_id)`` tracks one in-flight future per pipeline
+        entry and session (§6.2 single-flight): a pipeline entry still
+        running its previous call for this session is skipped rather than
+        handed a second worker. The key is the full entry, so a hung
+        ``-high`` tier does not skip the ``-medium`` tier of the same
+        plugin in the same round.
+        """
+        pipe_id = _PIPELINE_RE.sub('', _PIPELINE_MIGRATION_MAP.get(pipeline, pipeline))
+        timeout = self._match_timeout(pipe_id)
+        if self._match_inflight is None:
+            self._match_inflight = {}
+        inflight_key = (pipeline, session_id)
+        inflight = self._match_inflight.get(inflight_key)
+        if inflight is not None and not inflight.done():
+            LOG.warning(f"{pipeline} match call from a previous round is still "
+                        f"running for session '{session_id}' (OVOS-PIPELINE-1 "
+                        f"§6.2); skipping this round rather than queuing a "
+                        f"second worker for it")
+            return None
+        workers = self._match_workers(pipe_id)
+        if self._match_lock is None:
+            self._match_lock = Lock()
+        with self._match_lock:
+            busy = self._match_busy_workers(pipe_id)
+            if busy >= workers:
+                LOG.warning(f"{pipeline} has all {workers} match workers held by "
+                            f"calls that outlived their bound (OVOS-PIPELINE-1 "
+                            f"§4.4); declining for session '{session_id}' without "
+                            f"queuing. Raise intents.{pipe_id}.match_workers or "
+                            f"fix the plugin")
+                return None
+            future = self._match_executor_for(pipe_id).submit(
+                match_func, utterances, intent_lang, message)
+            self._match_inflight[inflight_key] = future
+        try:
+            return future.result(timeout=timeout)
+        except FutureTimeoutError:
+            # a call that never started is dropped here; a running call
+            # cannot be stopped (§4.4 puts cancel out of scope) and holds
+            # its worker until it returns
+            if not future.cancel():
+                with self._match_lock:
+                    self._match_abandoned.setdefault(pipe_id, set()).add(future)
+            LOG.warning(f"{pipeline} match call timed out after {timeout}s "
+                        f"(OVOS-PIPELINE-1 §4.4); skipping to the next pipeline")
+            return None
+
     def get_pipeline_matcher(self, matcher_id: str) -> Optional[Callable]:
         """
         Retrieve a matcher function for a given pipeline matcher ID.
@@ -381,7 +545,19 @@ class IntentService:
         pipe_id = _PIPELINE_RE.sub('', matcher_id)
         plugin = self.pipeline_plugins.get(pipe_id)
         if not plugin:
-            LOG.error(f"Unknown pipeline matcher '{matcher_id}': no installed plugin provides it. A bare ovos-core install ships no matchers - install ovos-core[plugins] or add the specific plugin to your environment.")
+            # OVOS-PIPELINE-1 §5.1: an unknown pipeline_id is skipped and
+            # SHOULD log a warning. The default pipeline is resolved on every
+            # utterance and a bare install lacks most of its matchers, so
+            # each id warns once per process and later lookups log at debug.
+            warned = self.__dict__.setdefault("_warned_unknown_matchers", set())
+            if matcher_id in warned:
+                LOG.debug(f"Skipping unknown pipeline matcher '{matcher_id}'")
+            else:
+                warned.add(matcher_id)
+                LOG.warning(f"Unknown pipeline matcher '{matcher_id}': no installed plugin provides it, "
+                            f"so it is skipped. Loaded pipeline plugins: {sorted(self.pipeline_plugins)}. "
+                            f"Install ovos-core[plugins] or the plugin that provides it, "
+                            f"or remove it from the configured pipeline.")
             return None
 
         if isinstance(plugin, ConfidenceMatcherPipeline):
@@ -1090,9 +1266,16 @@ class IntentService:
                               if candidate != lang]
                 for intent_lang in langs:
                     try:
+                        # The bound, the queue wait and a §4.4 decline are all
+                        # latency the utterance actually paid, so the histograms
+                        # wrap the bounded call rather than the plugin call
+                        # inside it: a timed-out entry records its bound and a
+                        # declined one records ~0, which is what each cost.
                         with (INTENT_MATCHING.measure(),
                               pipeline_matching_histogram(pipeline).measure()):
-                            match = match_func(utterances, intent_lang, message)
+                            match = self._call_match_bounded(
+                                pipeline, match_func, utterances, intent_lang,
+                                message, sess.session_id)
                     except Exception:
                         # a misbehaving pipeline matcher (e.g. a malformed .voc
                         # resource) must not abort the whole utterance — log and
@@ -1160,6 +1343,19 @@ class IntentService:
                 selection_measurement.pause()
 
         LOG.debug(f"intent matching took: {stopwatch.time}")
+
+        # §6.2 single-flight bookkeeping: drop this session's completed
+        # entries so _match_inflight does not grow forever across sessions
+        # that only ever speak once (a HiveMind hub can mint a fresh session
+        # per message). An entry whose future is still running is left in
+        # place - clearing it here would let this session's very next round
+        # for the same plugin start a second worker for the same abandoned
+        # call, defeating the guard in ``_call_match_bounded``.
+        if self._match_inflight:
+            for key in [k for k in self._match_inflight if k[1] == sess.session_id]:
+                future = self._match_inflight.get(key)
+                if future is not None and future.done():
+                    self._match_inflight.pop(key, None)
 
         # OVOS-CONTEXT-1 §4.2 no-match path (matched path decrements in
         # _dispatch_match)
@@ -1400,6 +1596,8 @@ class IntentService:
                                     {"intent": None, "utterance": utterance}))
 
     def shutdown(self) -> None:
+        for executor in (self._match_executors or {}).values():
+            executor.shutdown(wait=False)
         self.intent_dispatcher.shutdown()
         self.intent_manifest.shutdown()
         self.utterance_plugins.shutdown()

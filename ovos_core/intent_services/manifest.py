@@ -29,6 +29,9 @@ RESERVED_INTENT_NAMES = frozenset({
     "converse", "response", "stop", "fallback", "common_query",
 })
 
+# OVOS-INTENT-4 §8.6 capability vocabulary; names outside this set are ignored.
+KNOWN_CAPABILITIES = frozenset({"fallback", "common_query", "converse"})
+
 
 def _target_skill_id(message: Message) -> Optional[str]:
     """OVOS-INTENT-4 §3.2 — the skill a §§5-8 message acts on.
@@ -63,6 +66,29 @@ def _target_skill_id(message: Message) -> Optional[str]:
     return source_skill_id
 
 
+def _deregister_target_skill_id(message: Message) -> Optional[str]:
+    """OVOS-INTENT-4 §3.2 — the skill a deregistration removes: the payload
+    ``skill_id`` only.
+
+    A deregistration without a payload ``skill_id`` names no target, so it
+    removes nothing. Falling back to ``context.skill_id`` here would make a
+    malformed deregistration delete the emitter's own entries. Unlike
+    enable/disable, no pre-spec bridge delivers a deregistration without the
+    payload field, so no substitution is kept for this path.
+    """
+    payload_skill_id = message.data.get("skill_id")
+    if not payload_skill_id:
+        LOG.warning(f"{message.msg_type}: no `skill_id` in the payload; "
+                    "OVOS-INTENT-4 §3.2 names the target there, so nothing "
+                    "is removed.")
+        return None
+    source_skill_id = message.context.get("skill_id")
+    if source_skill_id and payload_skill_id != source_skill_id:
+        LOG.debug(f"{message.msg_type}: source {source_skill_id!r} acting on "
+                  f"target {payload_skill_id!r}")
+    return payload_skill_id
+
+
 class IntentManifest:
     """INTENT-4 §10 orchestrator-owned manifest.
 
@@ -83,6 +109,8 @@ class IntentManifest:
         self.bus = bus
         # (session_id, skill_id, intent_name, lang, method) → entry dict
         self._index: dict = {}
+        # (session_id, skill_id) → capabilities list, §8.6 announcement index
+        self._announcements: dict = {}
 
         bus.on("ovos.intent.register.keyword", self._on_register)
         bus.on("ovos.intent.register.template", self._on_register)
@@ -92,6 +120,8 @@ class IntentManifest:
         bus.on("ovos.skill.deregister", self._on_skill_deregister)
         bus.on("ovos.intent.list", self._on_list)
         bus.on("ovos.intent.describe", self._on_describe)
+        bus.on("ovos.skill.loaded", self._on_skill_loaded)
+        bus.on("ovos.skills.list", self._on_skills_list)
 
     def shutdown(self):
         self.bus.remove("ovos.intent.register.keyword", self._on_register)
@@ -102,6 +132,8 @@ class IntentManifest:
         self.bus.remove("ovos.skill.deregister", self._on_skill_deregister)
         self.bus.remove("ovos.intent.list", self._on_list)
         self.bus.remove("ovos.intent.describe", self._on_describe)
+        self.bus.remove("ovos.skill.loaded", self._on_skill_loaded)
+        self.bus.remove("ovos.skills.list", self._on_skills_list)
 
     # ------------------------------------------------------------------
     # internal helpers
@@ -206,7 +238,18 @@ class IntentManifest:
 
     def _on_register(self, message: Message):
         method = "keyword" if message.msg_type == "ovos.intent.register.keyword" else "template"
-        skill_id = _target_skill_id(message)
+        # OVOS-INTENT-4 §3.2: the payload skill_id names the target; the
+        # context skill_id is never substituted for a missing one.
+        skill_id = message.data.get("skill_id")
+        if not skill_id:
+            LOG.warning(f"{message.msg_type}: no `skill_id` in the payload; "
+                        "OVOS-INTENT-4 §3.2 names the target there, so the "
+                        "registration is not indexed.")
+            return
+        source_skill_id = message.context.get("skill_id")
+        if source_skill_id and source_skill_id != skill_id:
+            LOG.debug(f"{message.msg_type}: source {source_skill_id!r} acting on "
+                      f"target {skill_id!r}")
         intent_name = message.data.get("intent_name")
         lang = message.data.get("lang")
         if not (skill_id and intent_name and lang):
@@ -239,7 +282,9 @@ class IntentManifest:
         }
 
     def _on_deregister(self, message: Message):
-        skill_id = _target_skill_id(message)
+        skill_id = _deregister_target_skill_id(message)
+        if not skill_id:
+            return
         intent_name = message.data.get("intent_name")
         lang = message.data.get("lang")
         session_id = self._session_id_of(message)
@@ -275,10 +320,51 @@ class IntentManifest:
             entry["enabled"] = enabled
 
     def _on_skill_deregister(self, message: Message):
-        skill_id = _target_skill_id(message)
+        skill_id = _deregister_target_skill_id(message)
+        if not skill_id:
+            return
         session_id = self._session_id_of(message)
         for key in [k for k in self._index if k[0] == session_id and k[1] == skill_id]:
             del self._index[key]
+        self._announcements.pop((session_id, skill_id), None)
+
+    def _on_skill_loaded(self, message: Message):
+        """OVOS-INTENT-4 §8.6 — ``ovos.skill.loaded`` announcement.
+
+        Re-announcement replaces the ``(session_id, skill_id)`` entry.
+        Unknown capability names are ignored rather than rejected.
+        """
+        skill_id = message.data.get("skill_id")
+        session_id = self._session_id_of(message)
+        if not (skill_id and session_id):
+            return
+        capabilities = [c for c in (message.data.get("capabilities") or [])
+                        if c in KNOWN_CAPABILITIES]
+        self._announcements[(session_id, skill_id)] = capabilities
+
+    def _on_skills_list(self, message: Message):
+        """OVOS-INTENT-4 §10.3 — ``ovos.skills.list`` / ``.response``.
+
+        ``session_id`` is an optional filter: present, the effective scope
+        is "default" plus the named session (§11.2); absent, every
+        announced skill in every session is returned.
+        """
+        f_session = message.data.get("session_id")
+        skills = []
+        for (session_id, skill_id), capabilities in self._announcements.items():
+            if f_session and session_id not in ("default", f_session):
+                continue
+            intents = sum(1 for key in self._index
+                          if key[0] == session_id and key[1] == skill_id)
+            skills.append({
+                "skill_id": skill_id,
+                "session_id": session_id,
+                "capabilities": capabilities,
+                "intents": intents,
+            })
+        skills.sort(key=lambda s: (0 if s["session_id"] == "default" else 1,
+                                    s["session_id"], s["skill_id"]))
+        self.bus.emit(message.response({"ok": True, "skills": skills}))
 
     # ------------------------------------------------------------------
     # introspection queries  §10
