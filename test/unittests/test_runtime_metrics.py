@@ -274,3 +274,62 @@ def test_stage_histograms_wrap_the_bounded_match_call():
     snapshot = histogram.snapshot()
     assert snapshot["count"] == before + 1
     assert snapshot["sum_ms"] >= 50
+
+
+@pytest.mark.parametrize(
+    "failing_step",
+    ("MessageBusClient", "SkillManager", "wait_for_exit_signal"),
+)
+def test_service_entrypoint_stops_the_listener_when_startup_raises(monkeypatch, failing_step):
+    """A raise between start and stop must not leak the bound port.
+
+    The listener is a daemon thread, so it does not keep the interpreter
+    alive and nothing else frees the port it holds. The installed wrapper
+    exits on an uncaught exception, but an in-process caller can catch one
+    and retry ``main`` - and that retry has to be able to bind again.
+    """
+    import ovos_core.__main__ as service_main
+
+    stopped = []
+
+    class _Boom(RuntimeError):
+        pass
+
+    def _fail(*args, **kwargs):
+        raise _Boom(failing_step)
+
+    class _Bus:
+        def __init__(self, *args, **kwargs):
+            self.connected_event = type("E", (), {"wait": lambda self: None})()
+
+        def run_in_thread(self):
+            return None
+
+        def close(self):
+            pass
+
+    class _Manager:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def start(self):
+            pass
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(service_main, "init_service_logger", lambda *a, **k: None)
+    monkeypatch.setattr(service_main, "start_metrics_server", lambda: "listener")
+    monkeypatch.setattr(service_main, "stop_metrics_server", stopped.append)
+    monkeypatch.setattr(service_main, "MessageBusClient", _Bus)
+    monkeypatch.setattr(service_main, "SkillManager", _Manager)
+    monkeypatch.setattr(service_main, "wait_for_exit_signal", lambda: None)
+    monkeypatch.setattr(service_main, failing_step, _fail)
+
+    with pytest.raises(_Boom):
+        service_main.main()
+
+    assert stopped == ["listener"], (
+        f"a raise in {failing_step} left the metrics listener running; a caller "
+        f"that retries main() would fail to bind the port"
+    )

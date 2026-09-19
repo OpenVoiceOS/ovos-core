@@ -44,30 +44,39 @@ def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
     # unless OVOS_METRICS_ENABLED is set (see ovos_core._prometheus).
     metrics_server = start_metrics_server()
 
-    # Connect this process to the OpenVoiceOS message bus
-    bus = MessageBusClient()
-    bus_thread = bus.run_in_thread()
-    bus.connected_event.wait()
+    try:
+        # Connect this process to the OpenVoiceOS message bus
+        bus = MessageBusClient()
+        bus_thread = bus.run_in_thread()
+        bus.connected_event.wait()
 
-    skill_manager = SkillManager(bus, watchdog,
-                                 enable_file_watcher=enable_file_watcher,
-                                 enable_skill_api=enable_skill_api,
-                                 enable_intent_service=enable_intent_service,
-                                 enable_installer=enable_installer,
-                                 enable_event_scheduler=enable_event_scheduler,
-                                 alive_hook=alive_hook,
-                                 started_hook=started_hook,
-                                 stopping_hook=stopping_hook,
-                                 ready_hook=ready_hook,
-                                 error_hook=error_hook)
+        skill_manager = SkillManager(bus, watchdog,
+                                     enable_file_watcher=enable_file_watcher,
+                                     enable_skill_api=enable_skill_api,
+                                     enable_intent_service=enable_intent_service,
+                                     enable_installer=enable_installer,
+                                     enable_event_scheduler=enable_event_scheduler,
+                                     alive_hook=alive_hook,
+                                     started_hook=started_hook,
+                                     stopping_hook=stopping_hook,
+                                     ready_hook=ready_hook,
+                                     error_hook=error_hook)
 
-    skill_manager.start()
+        skill_manager.start()
 
-    wait_for_exit_signal()
+        wait_for_exit_signal()
 
-    skill_manager.shutdown()
-
-    stop_metrics_server(metrics_server)
+        skill_manager.shutdown()
+    finally:
+        # The listener runs on a daemon thread holding the configured port,
+        # so it does not keep the interpreter alive and nothing else frees
+        # the port. A raise in bus setup, in SkillManager construction or
+        # start, or in shutdown would otherwise leave it bound: the
+        # installed wrapper exits anyway, but an in-process caller that
+        # catches the error and retries would then fail to bind. Stopping
+        # it here also covers the raise-during-shutdown case the histogram
+        # endpoint is meant to survive. Safe with None (metrics disabled).
+        stop_metrics_server(metrics_server)
 
     # Stop the messagebus websocket thread and its event dispatcher before
     # the interpreter starts tearing down. `bus.run_in_thread()` spawns a
