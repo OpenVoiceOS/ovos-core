@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 import sys
+from contextlib import nullcontext
 import tempfile
 import time as time_module
 from copy import deepcopy
@@ -1641,3 +1642,97 @@ class TestUpgradedPluginSkillReload(TestCase):
                 # case where a reload was the only work done
                 expected = 1 if (reloaded and not loaded) else 0
                 self.assertEqual(len(trained), expected)
+
+
+class TestUpgradedDependencyForget(TestCase):
+    """An upgraded DEPENDENCY must leave the import cache too.
+
+    Production, 2026-09-22: `thalovant-skillkit` went 0.16.0 -> 0.18.0 as a
+    dependency of a skill upgrade. The process kept the old library in
+    `sys.modules`, and the next three skills to reload each died on a name the
+    running copy did not have -- `ShuffleBagPool`, `combined_lines`,
+    `ThalovantConversationalCommonPlaySkill`. Every one of them was on disk.
+    The manager logged "not discoverable after its upgrade, leaving it
+    unloaded" and gave up, and only restarting the process brought them back.
+    """
+
+    def setUp(self):
+        self.manager = SkillManager(Mock())
+
+    def _manager_seeing(self, before, after, modules):
+        manager = self.manager
+        manager._distribution_versions = dict(before)
+        return patch.object(manager, "_installed_distributions", return_value=dict(after)), \
+            patch.object(manager, "_modules_of",
+                         side_effect=lambda names: {n: set(modules.get(n, ())) for n in names})
+
+    def test_an_upgraded_dependency_is_forgotten(self):
+        installed, module_map = self._manager_seeing(
+            {"thalovant-skillkit": "0.16.0"},
+            {"thalovant-skillkit": "0.18.0"},
+            {"thalovant-skillkit": {"thalovant_skillkit"}},
+        )
+        stale = Mock()
+        with installed, module_map, patch.dict(
+            sys.modules,
+            {"thalovant_skillkit": stale, "thalovant_skillkit.skill": stale},
+            clear=False,
+        ):
+            forgotten = self.manager._forget_upgraded_dependencies()
+            self.assertEqual(forgotten, ["thalovant-skillkit"])
+            self.assertNotIn("thalovant_skillkit", sys.modules)
+            self.assertNotIn("thalovant_skillkit.skill", sys.modules)
+
+    def test_an_unchanged_dependency_is_left_alone(self):
+        """Forgetting on every install would rebuild the world each time."""
+        installed, module_map = self._manager_seeing(
+            {"thalovant-skillkit": "0.18.0"},
+            {"thalovant-skillkit": "0.18.0"},
+            {"thalovant-skillkit": {"thalovant_skillkit"}},
+        )
+        sentinel = Mock()
+        with installed, module_map, patch.dict(
+            sys.modules, {"thalovant_skillkit": sentinel}, clear=False
+        ):
+            self.assertEqual(self.manager._forget_upgraded_dependencies(), [])
+            self.assertIs(sys.modules["thalovant_skillkit"], sentinel)
+
+    def test_the_runtimes_own_machinery_is_never_forgotten(self):
+        """Re-importing these under a live process leaves running skills as
+        instances of classes their own module no longer defines -- a dead
+        skill traded for a corrupt one."""
+        installed, module_map = self._manager_seeing(
+            {"ovos-workshop": "9.8.0"},
+            {"ovos-workshop": "9.9.0"},
+            {"ovos-workshop": {"ovos_workshop"}},
+        )
+        sentinel = Mock()
+        with installed, module_map, patch.dict(
+            sys.modules, {"ovos_workshop": sentinel}, clear=False
+        ):
+            self.assertEqual(self.manager._forget_upgraded_dependencies(), [])
+            self.assertIs(sys.modules["ovos_workshop"], sentinel)
+
+    def test_a_newly_installed_distribution_is_not_an_upgrade(self):
+        """Nothing was cached under it, so there is nothing to forget."""
+        installed, module_map = self._manager_seeing(
+            {"thalovant-skillkit": "0.18.0"},
+            {"thalovant-skillkit": "0.18.0", "thalovant-skill-news": "0.2.5"},
+            {"thalovant-skill-news": {"thalovant_skill_news"}},
+        )
+        with installed, module_map:
+            self.assertEqual(self.manager._forget_upgraded_dependencies(), [])
+
+    def test_dependencies_are_forgotten_before_any_skill_reloads(self):
+        """Order is the whole fix. A skill rebuilt while an upgraded library
+        is still cached is built against the old one."""
+        order = []
+        manager = SkillManager(Mock())
+        with patch.object(manager, "_forget_upgraded_dependencies",
+                          side_effect=lambda: order.append("forget") or []), \
+             patch.object(manager, "_reload_upgraded_plugin_skills",
+                          side_effect=lambda: order.append("reload") or []), \
+             patch.object(manager, "_rescan_plugin_skills",
+                          side_effect=lambda: order.append("rescan") or []):
+            manager.handle_install_complete(Message("ovos.pip.install.complete"))
+        self.assertEqual(order, ["forget", "reload", "rescan"])

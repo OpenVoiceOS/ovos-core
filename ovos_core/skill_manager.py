@@ -18,7 +18,7 @@ import os
 import sys
 import threading
 import time
-from importlib.metadata import entry_points
+from importlib.metadata import distributions, entry_points
 from threading import Thread, Event
 from typing import Callable, Dict, List, Optional, Set
 
@@ -69,6 +69,20 @@ def on_error(e: str = 'Unknown') -> None:
 def on_stopping() -> None:
     LOG.info('Skills Manager is shutting down...')
 
+
+#: Modules the runtime is itself built from. A changed distribution that
+#: installs one of these is NOT forgotten: re-importing it under a live
+#: process leaves every running skill an instance of a class its own module
+#: no longer defines, which trades a dead skill for a corrupt one. A change
+#: here legitimately needs the process to restart.
+PROTECTED_RUNTIME_MODULES = frozenset({
+    "ovos_core",
+    "ovos_bus_client",
+    "ovos_config",
+    "ovos_plugin_manager",
+    "ovos_utils",
+    "ovos_workshop",
+})
 
 class SkillManager(Thread):
     """Manages the loading, activation, and deactivation of Mycroft skills."""
@@ -151,6 +165,13 @@ class SkillManager(Thread):
         #: The installed version each loaded plugin skill was built from,
         #: so an upgrade in place can be told from the version running.
         self._plugin_skill_versions: Dict[str, str] = {}
+        # Every installed distribution's version, as of the last installer
+        # run. A skill's own package is not the only thing an install can
+        # replace: see `_forget_upgraded_dependencies`. Taken when skills are
+        # first loaded rather than here -- reading every distribution costs a
+        # quarter of a second, and nothing can have been upgraded before the
+        # first load anyway.
+        self._distribution_versions: Dict[str, str] = {}
         # skill_id -> (attempt_count, last_attempt_time) for plugin skills whose
         # load raised before a loader object existed (see _load_plugin_skill).
         # These are retried with an exponential backoff instead of every scan.
@@ -454,6 +475,12 @@ class SkillManager(Thread):
         Returns:
             bool: True if new skills were loaded, False otherwise.
         """
+        if not self._distribution_versions:
+            # The baseline an installer run is later compared against. Here
+            # because this is the first moment skills exist to be upgraded,
+            # and because doing it in __init__ made every test that builds a
+            # manager pay for a full distribution scan.
+            self._distribution_versions = self._installed_distributions()
         return bool(self._load_untracked_plugin_skills(network=network, internet=internet))
 
     def _load_untracked_plugin_skills(self, network: Optional[bool] = None,
@@ -776,11 +803,15 @@ class SkillManager(Thread):
         Args:
             message: ``ovos.skills.install.complete`` or ``ovos.pip.install.complete``.
         """
-        # Upgrades first, and the order matters. Discovery imports the entry
-        # points it finds, so a rescan run before the upgraded packages are
-        # forgotten would build any newly declared skill from the *old*
-        # modules still in `sys.modules`, record it against the new version,
-        # and leave the upgrade check with nothing to tell apart.
+        # Upgrades first, and the order matters. Everything below imports:
+        # a skill rebuilt while an upgraded dependency is still cached is
+        # built against the old library, and one needing a symbol only the
+        # new library has cannot be built at all. A rescan run first would
+        # build a newly declared skill from the stale modules and record it
+        # against the new version, leaving the upgrade check nothing to see.
+        forgotten = self._forget_upgraded_dependencies()
+        if forgotten:
+            LOG.info(f"Forgot upgraded dependencies before reloading: {forgotten}")
         reloaded = self._reload_upgraded_plugin_skills()
         if reloaded:
             LOG.info(f"Reloaded skills the installer upgraded: {reloaded}")
@@ -867,6 +898,117 @@ class SkillManager(Thread):
         except Exception:
             LOG.exception("Could not read the declared skill versions")
         return versions
+
+    @staticmethod
+    def _installed_distributions() -> Dict[str, str]:
+        """Every installed distribution's version, read without importing.
+
+        Deliberately does NOT read each distribution's file list: that parses
+        a RECORD per package and this runs at every install. The modules are
+        read separately, for the handful that actually changed.
+
+        Returns:
+            Normalized distribution name to version. One that cannot be read
+            is left out rather than guessed at.
+        """
+        versions: Dict[str, str] = {}
+        try:
+            for dist in distributions():
+                name = (dist.metadata["Name"] if dist.metadata else None) or ""
+                version = getattr(dist, "version", None)
+                if name and version:
+                    versions[name.strip().lower().replace("_", "-")] = str(version)
+        except Exception:
+            LOG.exception("Could not read the installed distributions")
+        return versions
+
+    @staticmethod
+    def _modules_of(names: Set[str]) -> Dict[str, Set[str]]:
+        """The top-level modules each named distribution installs.
+
+        One pass for all of them. ``top_level.txt`` when the wheel carries
+        one, and otherwise the first path component of the files it recorded.
+        Nothing is imported.
+        """
+        found: Dict[str, Set[str]] = {}
+        if not names:
+            return found
+        try:
+            for dist in distributions():
+                raw = (dist.metadata["Name"] if dist.metadata else None) or ""
+                name = raw.strip().lower().replace("_", "-")
+                if name not in names or name in found:
+                    continue
+                modules: Set[str] = set()
+                try:
+                    declared = dist.read_text("top_level.txt") or ""
+                    modules.update(line.strip() for line in declared.splitlines() if line.strip())
+                    if not modules:
+                        for path in dist.files or []:
+                            head = str(path).split("/")[0]
+                            if head and not head.endswith((".dist-info", ".egg-info", ".pth")):
+                                modules.add(head[:-3] if head.endswith(".py") else head)
+                except Exception:
+                    LOG.debug(f"Could not read the modules of {name}")
+                found[name] = {m for m in modules if m and m.isidentifier()}
+        except Exception:
+            LOG.exception("Could not read the modules of the changed distributions")
+        return found
+
+    def _forget_upgraded_dependencies(self) -> List[str]:
+        """Drop upgraded DEPENDENCIES from the import cache, not just skills.
+
+        `_forget_skill_modules` forgets the skill's own package. That is not
+        enough: an installer upgrading a skill upgrades whatever the new
+        version requires, and a shared helper library is the common case. The
+        process keeps the old library in `sys.modules` for ever, so every
+        skill reloaded afterwards is built against it -- and one that needs a
+        symbol only the new version has cannot import at all.
+
+        Seen in production on 2026-09-22: `thalovant-skillkit` went 0.16.0 ->
+        0.18.0 as a dependency of a skill upgrade, and the next three skills
+        to reload each died on a name the running copy did not have --
+        `ShuffleBagPool`, `combined_lines`, `ThalovantConversationalCommonPlaySkill`.
+        All three were on disk. The manager logged "not discoverable after
+        its upgrade, leaving it unloaded" and gave up, and only a restart of
+        the process brought them back.
+
+        The runtime's own machinery is never forgotten. Re-importing it under
+        a live process would leave running skills as instances of classes
+        their own module no longer defines; a change there is a restart, and
+        pretending otherwise would trade a dead skill for a corrupt one.
+
+        Returns:
+            List[str]: The distributions whose modules this call forgot.
+        """
+        previous = self._distribution_versions
+        current = self._installed_distributions()
+        self._distribution_versions = current
+        if not previous:
+            return []
+        changed = {name for name, version in current.items()
+                   if name in previous and previous[name] != version}
+        if not changed:
+            return []
+        installs = self._modules_of(changed)
+        forgotten: List[str] = []
+        for name in sorted(changed):
+            modules = {module for module in installs.get(name, set())
+                       if module not in PROTECTED_RUNTIME_MODULES}
+            if not modules:
+                continue
+            dropped = False
+            for cached in [n for n in list(sys.modules)
+                           if n in modules or any(n.startswith(f"{m}.") for m in modules)]:
+                sys.modules.pop(cached, None)
+                dropped = True
+            if dropped:
+                forgotten.append(name)
+                LOG.info(f"{name} changed {previous[name]} -> {current[name]}; "
+                         "forgetting its modules so reloads read the new code")
+        if forgotten:
+            importlib.invalidate_caches()
+        return forgotten
 
     def _forget_skill_modules(self, skill_id: str) -> None:
         """Drop a skill's package from the import cache so it is read again.
