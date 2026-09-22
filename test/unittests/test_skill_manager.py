@@ -1695,6 +1695,23 @@ class TestUpgradedDependencyForget(TestCase):
         scan.assert_called_once()
         self.assertEqual({"thalovant-skillkit": "0.16.0"}, manager._distribution_versions)
 
+    def test_a_name_is_keyed_the_way_the_installer_keys_it(self):
+        """PEP 503, the same canonical form `skill_installer` already uses.
+
+        A bare `_ -> -` swap leaves dots and repeated separators alone, so
+        `zope.interface` and `zope_interface` key differently and the same
+        distribution can be recorded twice, or read back under a spelling the
+        next scan does not produce.
+        """
+        manager = self.manager
+        spellings = [
+            SimpleNamespace(metadata={"Name": "Zope.Interface"}, version="5.0"),
+            SimpleNamespace(metadata={"Name": "ovos__utils"}, version="0.1"),
+        ]
+        with patch("ovos_core.skill_manager.distributions", return_value=spellings):
+            self.assertEqual({"zope-interface": "5.0", "ovos-utils": "0.1"},
+                             manager._installed_distributions())
+
     def test_a_shadowed_second_copy_never_becomes_the_version(self):
         """One name, installed twice, on the layout a hosted runtime uses.
 

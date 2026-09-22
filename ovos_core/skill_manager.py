@@ -19,6 +19,7 @@ import sys
 import threading
 import time
 from importlib.metadata import distributions, entry_points
+from packaging.utils import canonicalize_name
 from threading import Thread, Event
 from typing import Callable, Dict, List, Optional, Set
 
@@ -923,7 +924,7 @@ class SkillManager(Thread):
             for dist in distributions():
                 name = (dist.metadata["Name"] if dist.metadata else None) or ""
                 version = getattr(dist, "version", None)
-                key = name.strip().lower().replace("_", "-")
+                key = canonicalize_name(name.strip()) if name.strip() else ""
                 # FIRST wins, not last. One name can be installed twice on one
                 # path -- a hosted runtime installs skills into a writable venv
                 # layered over the image's, and both copies are returned here.
@@ -952,7 +953,7 @@ class SkillManager(Thread):
         try:
             for dist in distributions():
                 raw = (dist.metadata["Name"] if dist.metadata else None) or ""
-                name = raw.strip().lower().replace("_", "-")
+                name = canonicalize_name(raw.strip()) if raw.strip() else ""
                 if name not in names or name in found:
                     continue
                 modules: Set[str] = set()
