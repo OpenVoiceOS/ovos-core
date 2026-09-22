@@ -923,8 +923,16 @@ class SkillManager(Thread):
             for dist in distributions():
                 name = (dist.metadata["Name"] if dist.metadata else None) or ""
                 version = getattr(dist, "version", None)
-                if name and version:
-                    versions[name.strip().lower().replace("_", "-")] = str(version)
+                key = name.strip().lower().replace("_", "-")
+                # FIRST wins, not last. One name can be installed twice on one
+                # path -- a hosted runtime installs skills into a writable venv
+                # layered over the image's, and both copies are returned here.
+                # `distributions()` walks sys.path in order, so the first is the
+                # one an import actually gets; recording the later one pins the
+                # version to a copy nothing ever imports, and an upgrade of the
+                # live copy then looks like no change at all.
+                if key and version and key not in versions:
+                    versions[key] = str(version)
         except Exception:
             LOG.exception("Could not read the installed distributions")
             return None

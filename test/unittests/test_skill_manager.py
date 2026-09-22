@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 import sys
+from types import SimpleNamespace
 from contextlib import nullcontext
 import tempfile
 import time as time_module
@@ -1693,6 +1694,28 @@ class TestUpgradedDependencyForget(TestCase):
             manager._load_untracked_plugin_skills(network=True, internet=True)
         scan.assert_called_once()
         self.assertEqual({"thalovant-skillkit": "0.16.0"}, manager._distribution_versions)
+
+    def test_a_shadowed_second_copy_never_becomes_the_version(self):
+        """One name, installed twice, on the layout a hosted runtime uses.
+
+        Skills are installed into a writable venv layered over the image's, so
+        a shared library exists in both and `distributions()` returns both.
+        It walks sys.path in order, so the FIRST is the one an import gets.
+        Recording the later one pins the version to a copy nothing imports,
+        and an upgrade of the live copy then reads as no change: nothing is
+        forgotten and the stale modules stay, which is the whole defect.
+
+        Taken from a live hub: thalovant-skillkit 0.18.0 in /persist/venv
+        shadowing 0.2.0 baked into the image.
+        """
+        manager = self.manager
+        copies = [
+            SimpleNamespace(metadata={"Name": "thalovant-skillkit"}, version="0.18.0"),
+            SimpleNamespace(metadata={"Name": "thalovant-skillkit"}, version="0.2.0"),
+        ]
+        with patch("ovos_core.skill_manager.distributions", return_value=copies):
+            self.assertEqual({"thalovant-skillkit": "0.18.0"},
+                             manager._installed_distributions())
 
     def test_a_scan_that_raises_reports_no_answer_at_all(self):
         """The scan says None when it failed, and {} when nothing is there.
