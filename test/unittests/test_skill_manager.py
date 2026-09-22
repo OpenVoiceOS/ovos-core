@@ -1657,16 +1657,87 @@ class TestUpgradedDependencyForget(TestCase):
     """
 
     def setUp(self):
+        """A manager with no baseline yet, as a freshly started process has."""
         self.manager = SkillManager(Mock())
 
     def _manager_seeing(self, before, after, modules):
+        """A manager that read `before` last time and reads `after` now.
+
+        Args:
+            before: Distribution name to version, the recorded baseline.
+            after: What the scan returns on this install.
+            modules: Distribution name to the modules it installs.
+
+        Returns:
+            The two patches to enter, in that order.
+        """
         manager = self.manager
         manager._distribution_versions = dict(before)
         return patch.object(manager, "_installed_distributions", return_value=dict(after)), \
             patch.object(manager, "_modules_of",
                          side_effect=lambda names: {n: set(modules.get(n, ())) for n in names})
 
+    def test_the_baseline_is_taken_on_the_path_startup_really_uses(self):
+        """Normal startup loads through `_load_untracked_plugin_skills`.
+
+        `_load_new_skills` calls it directly and never goes through
+        `load_plugin_skills`, so seeding the baseline there left it empty on
+        every real boot. The first install then recorded the post-upgrade
+        state as the baseline and forgot nothing, for the life of the process.
+        """
+        manager = self.manager
+        self.assertIsNone(manager._distribution_versions)
+        with patch.object(manager, "_installed_distributions",
+                          return_value={"thalovant-skillkit": "0.16.0"}) as scan, \
+                patch("ovos_core.skill_manager.find_skill_plugins", return_value={}):
+            manager._load_untracked_plugin_skills(network=True, internet=True)
+        scan.assert_called_once()
+        self.assertEqual({"thalovant-skillkit": "0.16.0"}, manager._distribution_versions)
+
+    def test_a_scan_that_raises_reports_no_answer_at_all(self):
+        """The scan says None when it failed, and {} when nothing is there.
+
+        Collapsing the two is what makes a failed first scan permanent: the
+        next install reads the empty baseline as "first time", writes down
+        the post-upgrade versions and drops nothing.
+        """
+        manager = self.manager
+        with patch("ovos_core.skill_manager.distributions", return_value=[]):
+            self.assertEqual({}, manager._installed_distributions())
+        with patch("ovos_core.skill_manager.distributions",
+                   side_effect=OSError("metadata unreadable")):
+            self.assertIsNone(manager._installed_distributions())
+
+    def test_a_failed_scan_does_not_become_the_baseline(self):
+        """A scan that raised must not be read as "nothing is installed".
+
+        Recording an empty baseline would make the next install look like the
+        first one, and an upgrade seen then would be written down as done
+        without a single module being dropped.
+        """
+        manager = self.manager
+        manager._distribution_versions = {"thalovant-skillkit": "0.16.0"}
+        with patch.object(manager, "_installed_distributions", return_value=None):
+            self.assertEqual([], manager._forget_upgraded_dependencies())
+        self.assertEqual({"thalovant-skillkit": "0.16.0"}, manager._distribution_versions)
+
+    def test_an_unreadable_upgrade_is_retried_at_the_next_install(self):
+        """A version is only written down once its modules have been dropped.
+
+        `_modules_of` leaves out what it could not read. Advancing the version
+        anyway would make the upgrade invisible to every later install, and
+        the stale modules would sit in `sys.modules` until a restart.
+        """
+        installed, module_map = self._manager_seeing(
+            {"thalovant-skillkit": "0.16.0"}, {"thalovant-skillkit": "0.18.0"}, {},
+        )
+        manager = self.manager
+        with installed, patch.object(manager, "_modules_of", return_value={}):
+            self.assertEqual([], manager._forget_upgraded_dependencies())
+        self.assertEqual({"thalovant-skillkit": "0.16.0"}, manager._distribution_versions)
+
     def test_an_upgraded_dependency_is_forgotten(self):
+        """The library a skill upgrade pulled in leaves `sys.modules` with it."""
         installed, module_map = self._manager_seeing(
             {"thalovant-skillkit": "0.16.0"},
             {"thalovant-skillkit": "0.18.0"},

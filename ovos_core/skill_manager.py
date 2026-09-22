@@ -170,8 +170,10 @@ class SkillManager(Thread):
         # replace: see `_forget_upgraded_dependencies`. Taken when skills are
         # first loaded rather than here -- reading every distribution costs a
         # quarter of a second, and nothing can have been upgraded before the
-        # first load anyway.
-        self._distribution_versions: Dict[str, str] = {}
+        # first load anyway. None until a scan has actually succeeded: an
+        # empty reading is a real answer on a runtime with nothing installed,
+        # and must not be confused with never having looked.
+        self._distribution_versions: Optional[Dict[str, str]] = None
         # skill_id -> (attempt_count, last_attempt_time) for plugin skills whose
         # load raised before a loader object existed (see _load_plugin_skill).
         # These are retried with an exponential backoff instead of every scan.
@@ -475,12 +477,6 @@ class SkillManager(Thread):
         Returns:
             bool: True if new skills were loaded, False otherwise.
         """
-        if not self._distribution_versions:
-            # The baseline an installer run is later compared against. Here
-            # because this is the first moment skills exist to be upgraded,
-            # and because doing it in __init__ made every test that builds a
-            # manager pay for a full distribution scan.
-            self._distribution_versions = self._installed_distributions()
         return bool(self._load_untracked_plugin_skills(network=network, internet=internet))
 
     def _load_untracked_plugin_skills(self, network: Optional[bool] = None,
@@ -494,6 +490,14 @@ class SkillManager(Thread):
         Returns:
             List[str]: Ids of the skills this call loaded, in discovery order.
         """
+        if self._distribution_versions is None:
+            # The baseline an installer run is later compared against. Seeded
+            # here because this is what every startup path reaches -- the
+            # usual one is `_load_new_skills`, which never calls
+            # `load_plugin_skills` -- and this is the first moment there are
+            # skills to upgrade. Doing it in `__init__` made every test that
+            # builds a manager pay for a full distribution scan.
+            self._distribution_versions = self._installed_distributions()
         loaded: List[str] = []
         if network is None:
             network = self._network_event.is_set()
@@ -900,7 +904,7 @@ class SkillManager(Thread):
         return versions
 
     @staticmethod
-    def _installed_distributions() -> Dict[str, str]:
+    def _installed_distributions() -> Optional[Dict[str, str]]:
         """Every installed distribution's version, read without importing.
 
         Deliberately does NOT read each distribution's file list: that parses
@@ -908,8 +912,11 @@ class SkillManager(Thread):
         read separately, for the handful that actually changed.
 
         Returns:
-            Normalized distribution name to version. One that cannot be read
-            is left out rather than guessed at.
+            Normalized distribution name to version, or None if the scan
+            itself failed. The two are not the same: a runtime with nothing
+            installed legitimately reads empty, and treating a failed scan as
+            empty would let the next install record a post-upgrade baseline
+            and forget nothing, for the life of the process.
         """
         versions: Dict[str, str] = {}
         try:
@@ -920,6 +927,7 @@ class SkillManager(Thread):
                     versions[name.strip().lower().replace("_", "-")] = str(version)
         except Exception:
             LOG.exception("Could not read the installed distributions")
+            return None
         return versions
 
     @staticmethod
@@ -949,7 +957,11 @@ class SkillManager(Thread):
                             if head and not head.endswith((".dist-info", ".egg-info", ".pth")):
                                 modules.add(head[:-3] if head.endswith(".py") else head)
                 except Exception:
+                    # Left out of the result on purpose. The caller holds that
+                    # distribution at its old version so the next install
+                    # tries again, instead of recording the upgrade as done.
                     LOG.debug(f"Could not read the modules of {name}")
+                    continue
                 found[name] = {m for m in modules if m and m.isidentifier()}
         except Exception:
             LOG.exception("Could not read the modules of the changed distributions")
@@ -983,14 +995,28 @@ class SkillManager(Thread):
         """
         previous = self._distribution_versions
         current = self._installed_distributions()
-        self._distribution_versions = current
-        if not previous:
+        if current is None:
+            # The baseline stands. Replacing it with a guess would be worse
+            # than knowing nothing about this install.
+            return []
+        if previous is None:
+            self._distribution_versions = current
             return []
         changed = {name for name, version in current.items()
                    if name in previous and previous[name] != version}
         if not changed:
+            self._distribution_versions = current
             return []
         installs = self._modules_of(changed)
+        # A changed distribution whose modules could not be read keeps its old
+        # version, so the next install sees it as changed and tries again. Any
+        # other outcome would record an upgrade that was never acted on and
+        # leave the stale modules cached until the process restarts.
+        self._distribution_versions = {
+            name: (version if name not in changed or name in installs
+                   else previous.get(name, version))
+            for name, version in current.items()
+        }
         forgotten: List[str] = []
         for name in sorted(changed):
             modules = {module for module in installs.get(name, set())
