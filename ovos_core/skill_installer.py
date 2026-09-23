@@ -207,6 +207,23 @@ class SkillsStore:
         return True
 
     @staticmethod
+    def _includes_another_file(line: str) -> bool:
+        """Whether a constraints line pulls in a second file.
+
+        ``-r``/``--requirement`` and ``-c``/``--constraint`` make pip apply
+        pins this file does not list, so a protected set built from this text
+        alone is not the set pip would enforce.
+
+        Args:
+            line: one raw line from the constraints file.
+
+        Returns:
+            True when the line is an include.
+        """
+        line = line.split("#", 1)[0].strip()
+        return bool(re.match(r"^(-r|-c|--requirement|--constraint)(\s|=|$)", line))
+
+    @staticmethod
     def _constrained_name(line: str) -> Optional[str]:
         """The distribution a constraints line names, canonicalized, or None.
 
@@ -280,6 +297,27 @@ class SkillsStore:
         # Reading the line properly also keeps comments, blank lines and pip
         # options out of the set, so the refusal below can name the package it
         # refused instead of printing the whole file.
+        # Each requested name is forwarded to pip/uv on its own command line,
+        # so an entry that is really an option ("-r evil.txt", "--index-url
+        # ...") is read as one. Canonicalizing it first would not help: it
+        # matches no protected name, so the guard below waves it through.
+        # Refuse before anything else looks at it, for pip and uv alike.
+        option_like = [p for p in packages if str(p).strip().startswith("-")]
+        if option_like:
+            LOG.error(f'refusing option-like package names: {option_like}')
+            self.play_error_sound()
+            return False
+
+        # An include pulls in pins this file does not list, so the protected
+        # set built from this text alone is not the set pip would apply.
+        # Refusing is the only safe answer: proceeding would under-protect,
+        # which is the failure this guard exists to prevent.
+        if any(self._includes_another_file(p) for p in cpkgs):
+            LOG.error('constraints file includes another file; the protected '
+                      'set cannot be known to be complete, refusing')
+            self.play_error_sound()
+            return False
+
         protected = {name for name in (self._constrained_name(p) for p in cpkgs) if name}
 
         norm_packages = [canonicalize_name(p) for p in packages]

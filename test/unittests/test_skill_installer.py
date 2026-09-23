@@ -607,10 +607,57 @@ def test_a_package_named_only_in_a_comment_is_not_protected(skills_store, tmp_pa
     constraints = tmp_path / "constraints.txt"
     constraints.write_text(
         "# ovos-core is pinned elsewhere; this line is prose, not a pin.\n"
-        "-r shared.txt\n"
+        "--index-url https://example.invalid/simple\n"
         "some-other-package==1.0\n"
     )
     skills_store.play_error_sound = Mock()
     skills_store._run_pip = Mock(return_value="ok")
     assert skills_store.pip_uninstall(["ovos-core"], constraints=str(constraints)) is True
+    skills_store.play_error_sound.assert_not_called()
+
+
+@pytest.mark.parametrize("entry", ["-r evil.txt", "--index-url https://evil.invalid",
+                                   "  --break-system-packages", "-e ."])
+def test_pip_uninstall_refuses_option_like_package_names(skills_store, tmp_path, entry):
+    """Each requested name is forwarded to pip/uv on its own command line.
+
+    An entry that is really an option is read as one, and canonicalizing it
+    first does not help -- it matches no protected name, so the guard waves
+    it through. It has to be refused before anything else looks at it.
+    """
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text("ovos-core==1.0\n")
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+    assert skills_store.pip_uninstall([entry], constraints=str(constraints)) is False
+    skills_store._run_pip.assert_not_called()
+    skills_store.play_error_sound.assert_called_once()
+
+
+@pytest.mark.parametrize("include", ["-r base.txt", "-c shared.txt",
+                                     "--requirement base.txt", "--constraint=shared.txt"])
+def test_pip_uninstall_refuses_when_the_constraints_include_another_file(
+        skills_store, tmp_path, include):
+    """An include pulls in pins this file does not list.
+
+    The protected set built from this text alone is then not the set pip would
+    apply, so proceeding would under-protect -- the failure this guard exists
+    to prevent. Refusing is the only safe answer.
+    """
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text(f"# a comment\n{include}\nsome-package==1.0\n")
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+    assert skills_store.pip_uninstall(["anything"], constraints=str(constraints)) is False
+    skills_store._run_pip.assert_not_called()
+    skills_store.play_error_sound.assert_called_once()
+
+
+def test_an_ordinary_option_line_is_not_an_include(skills_store, tmp_path):
+    """--index-url and friends add no pins, so they must not block a uninstall."""
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text("--index-url https://example.invalid/simple\nsome-package==1.0\n")
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+    assert skills_store.pip_uninstall(["unrelated-package"], constraints=str(constraints)) is True
     skills_store.play_error_sound.assert_not_called()
