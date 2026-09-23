@@ -557,3 +557,60 @@ def test_no_suffixed_pip_topic_is_registered(skills_store):
     suffixed = [e for e in skills_store.bus.event_handlers
                 if e.startswith("ovos.pip.") and e.count(".") > 2]
     assert suffixed == []
+
+
+@pytest.mark.parametrize("line,expected", [
+    ("ovos-core==3.7.0a1", "ovos-core"),
+    ("  ovos-core==1.0", "ovos-core"),                      # indented
+    ("ovos-core[extra]==1.0", "ovos-core"),                 # extras
+    ("ovos-core ; python_version < '3.12'", "ovos-core"),   # marker, no version
+    ("OVOS_Core >= 1.0", "ovos-core"),
+    ("ovos-core!=1.0", "ovos-core"),
+    ("ovos-persona==0.9.0a26  # pinned to the fork", "ovos-persona"),
+    ("# Keep runtime skill installs on the validated OVOS line.", None),
+    ("", None),
+    ("   ", None),
+    ("-r other-constraints.txt", None),
+    ("--index-url https://example.invalid/simple", None),
+])
+def test_constrained_name_reads_only_requirement_lines(line, expected):
+    """A constraints file is not a list of package names."""
+    assert SkillsStore._constrained_name(line) == expected
+
+
+@pytest.mark.parametrize("pin", [
+    "  ovos-core==1.0",                      # leading whitespace survived canonicalize_name
+    "ovos-core[extra]==1.0",                 # extras were left on the name
+    "ovos-core ; python_version < '3.12'",   # the marker was split on '<', not stripped
+])
+def test_a_pin_still_protects_when_the_line_is_not_bare(skills_store, tmp_path, pin):
+    """The real defect, and it under-protects.
+
+    The name was taken by splitting on the version operators alone, so
+    anything else on the line stayed attached to it: '  ovos-core==1.0'
+    yielded '  ovos-core', which is not 'ovos-core' to canonicalize_name.
+    A pin written any of these perfectly ordinary ways protected nothing,
+    and the package it named could be uninstalled over the bus.
+    """
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text(f"# a comment\n{pin}\n")
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+    res = skills_store.pip_uninstall(["ovos-core"], constraints=str(constraints))
+    assert res is False, f"{pin!r} must protect ovos-core"
+    skills_store._run_pip.assert_not_called()
+    skills_store.play_error_sound.assert_called_once()
+
+
+def test_a_package_named_only_in_a_comment_is_not_protected(skills_store, tmp_path):
+    """Comments are prose. They never named a distribution, and must not."""
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text(
+        "# ovos-core is pinned elsewhere; this line is prose, not a pin.\n"
+        "-r shared.txt\n"
+        "some-other-package==1.0\n"
+    )
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+    assert skills_store.pip_uninstall(["ovos-core"], constraints=str(constraints)) is True
+    skills_store.play_error_sound.assert_not_called()

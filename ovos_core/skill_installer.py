@@ -1,4 +1,5 @@
 import enum
+import re
 import shutil
 import sys
 from importlib import reload
@@ -205,6 +206,30 @@ class SkillsStore:
         self.play_success_sound()
         return True
 
+    @staticmethod
+    def _constrained_name(line: str) -> Optional[str]:
+        """The distribution a constraints line names, canonicalized, or None.
+
+        Handles what a requirements/constraints file actually contains: a
+        comment, a blank line, a pip option (``-r``, ``--index-url``), an
+        inline comment after a requirement, extras, and an environment
+        marker. Names are canonicalized per PEP 503, so "ovos_core",
+        "OVOS-Core" and "ovos.core" all compare equal to "ovos-core" the way
+        pip and PyPI identify distributions.
+
+        Args:
+            line: one raw line from the constraints file.
+
+        Returns:
+            The canonical distribution name, or None when the line names none.
+        """
+        line = line.split("#", 1)[0].strip()
+        if not line or line.startswith("-"):
+            return None
+        line = line.split(";", 1)[0].strip()  # environment marker
+        name = re.split(r"[\[<>=!~\s]", line, maxsplit=1)[0].strip()
+        return canonicalize_name(name) if name else None
+
     def pip_uninstall(self, packages: list,
                       constraints: Optional[str] = None,
                       print_logs: bool = True) -> bool:
@@ -243,16 +268,25 @@ class SkillsStore:
             cpkgs = ["ovos-core", "ovos-utils", "ovos-plugin-manager",
                      "ovos-config", "ovos-bus-client", "ovos-workshop"]
 
-        # remove version pinning and canonicalize names (PEP 503) so
-        # "ovos_core", "OVOS-Core", "ovos.core", etc. all compare equal
-        # to "ovos-core", matching how pip/pypi identify distributions
-        cpkgs = [canonicalize_name(p.split("~")[0].split("<")[0].split(">")[0].split("=")[0])
-                 for p in cpkgs if p]
+        # The name used to be taken by splitting on the version operators
+        # alone, which left everything else on the line attached to it. That
+        # under-protects, which is the dangerous direction: "  ovos-core==1.0"
+        # yielded "  ovos-core", "ovos-core[extra]==1.0" yielded
+        # "ovos-core[extra]", and a line carrying an environment marker was cut
+        # at the marker's own "<". None of those equal "ovos-core", so a pin
+        # written any of those perfectly ordinary ways protected nothing and
+        # the package it named could be uninstalled over the bus.
+        #
+        # Reading the line properly also keeps comments, blank lines and pip
+        # options out of the set, so the refusal below can name the package it
+        # refused instead of printing the whole file.
+        protected = {name for name in (self._constrained_name(p) for p in cpkgs) if name}
 
         norm_packages = [canonicalize_name(p) for p in packages]
 
-        if any(p in cpkgs for p in norm_packages):
-            LOG.error(f'tried to uninstall a protected package: {cpkgs}')
+        refused = sorted({p for p in norm_packages if p in protected})
+        if refused:
+            LOG.error(f'tried to uninstall protected packages: {refused}')
             self.play_error_sound()
             return False
 
