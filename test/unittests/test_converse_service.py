@@ -1117,11 +1117,20 @@ class TestConverseHandlerLifecycle(unittest.TestCase):
         """When no converse.response arrives, the lifecycle errors out (a
         mycroft.skill.handler.error terminal), patched to a tiny timeout."""
         svc, captured = self._service_with_capture()
+        # the timeout fires on a background Timer thread; wait on an Event
+        # the capture callback itself sets when the error message lands,
+        # rather than polling wall time, so the assertion is driven by the
+        # handler's own emission and not by how fast the runner schedules it.
+        error_seen = threading.Event()
+        svc.bus.on("message", lambda s: error_seen.set()
+                   if Message.deserialize(s).msg_type == "mycroft.skill.handler.error"
+                   else None)
         msg = Message("converse:skill", {"skill_id": "skill_a",
                                          "utterances": ["hello"]})
         with patch("ovos_core.intent_services.converse_service.CONVERSE_HANDLER_TIMEOUT", 0.05):
             svc.handle_converse(msg)
-            time.sleep(0.2)
+            self.assertTrue(error_seen.wait(timeout=10),
+                            "mycroft.skill.handler.error was never emitted")
         topics = [m.msg_type for m in captured]
         self.assertIn("mycroft.skill.handler.error", topics)
         err = next(m for m in captured
