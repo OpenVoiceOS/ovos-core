@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.7.0a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.0a2) (2026-09-25)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.0a1...3.7.0a2)
+
+**Merged pull requests:**
+
+- docs: point the mode enums and common query at surfaces that exist [\#1010](https://github.com/OpenVoiceOS/ovos-core/pull/1010) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- fix: reload a plugin skill the installer upgraded in place [\#1007](https://github.com/OpenVoiceOS/ovos-core/pull/1007) ([goldyfruit](https://github.com/goldyfruit))
+
 ## [3.7.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.0a1) (2026-09-18)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.6.2a3...3.7.0a1)
@@ -361,15 +370,15 @@
 
 ## [3.0.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.12a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.12a1)
-
-## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.10a3)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.12a1)
 
 ## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.11a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.11a1)
+
+## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.10a3)
 
 ## [3.0.10a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a2) (2026-08-31)
 
