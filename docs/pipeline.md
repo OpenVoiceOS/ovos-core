@@ -92,7 +92,7 @@ All other pipeline plugins (`adapt`, `padatious`, `ocp`, etc.) come from separat
 | `ovos-padatious-pipeline-plugin` | `ovos-padatious` | ML intent matching (Padatious) |
 | `ovos-padacioso-pipeline-plugin` | `ovos-padacioso` | Regex+Padatious hybrid |
 | `ovos-ocp-pipeline-plugin` | `ovos-ocp` | OCP media player pipeline |
-| `ovos-common-query-pipeline-plugin` | `ovos-workshop` | `CommonQuerySkill` routing |
+| `ovos-common-query-pipeline-plugin` | `ovos-common-query-pipeline-plugin` | `@common_query()` handler routing; the import package is `ovos_commonqa` |
 | `ovos-persona-pipeline-plugin` | `ovos-persona` | LLM persona / chatbot routing; see [`ovos-persona`](../../ovos-persona) |
 
 ### Converse & Fallback detail
