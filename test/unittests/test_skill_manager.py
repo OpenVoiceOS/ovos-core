@@ -29,6 +29,7 @@ from ovos_config import Configuration
 from ovos_config import LocalConf, DEFAULT_CONFIG
 from ovos_bus_client.session import SessionManager
 from ovos_core.skill_manager import (SkillManager, PLUGIN_SKILL_RETRY_BASE_SECONDS,
+                                     PROTECTED_RUNTIME_MODULES,
                                       PLUGIN_SKILL_RETRY_MAX_SECONDS)
 from ovos_workshop.skill_launcher import SkillLoader
 
@@ -1823,6 +1824,76 @@ class TestUpgradedDependencyForget(TestCase):
         ):
             self.assertEqual(self.manager._forget_upgraded_dependencies(), [])
             self.assertIs(sys.modules["ovos_workshop"], sentinel)
+
+    def test_a_shared_namespace_sibling_is_not_forgotten(self):
+        """Two distributions under one namespace: upgrading one must not evict
+        the other's code.
+
+        The child rule was ``n.startswith(f"{top_level}.")``, and both
+        distributions report the same top level, so upgrading dist-a forgot
+        ``shared.plugin_b`` -- code from a distribution that did not change.
+        The next skill to import it rebuilt it against nothing that moved.
+        """
+        installed, module_map = self._manager_seeing(
+            {"dist-a": "1.0"},
+            {"dist-a": "2.0"},
+            {"dist-a": {"shared"}},
+        )
+        # dist-a ships shared/ and shared/plugin_a; dist-b ships shared/plugin_b.
+        self.manager._distribution_owned = {
+            "dist-a": {"shared", "shared.plugin_a"},
+        }
+        mine, theirs = Mock(), Mock()
+        with installed, module_map, patch.dict(
+            sys.modules,
+            {"shared": mine, "shared.plugin_a": mine, "shared.plugin_b": theirs},
+            clear=False,
+        ):
+            self.assertEqual(
+                self.manager._forget_upgraded_dependencies(), ["dist-a"])
+            self.assertNotIn("shared.plugin_a", sys.modules)
+            self.assertIs(sys.modules.get("shared.plugin_b"), theirs,
+                          "another distribution's module was forgotten")
+
+    def test_a_live_runtime_package_beyond_the_named_six_is_protected(self):
+        """The floor is not the whole runtime.
+
+        Importing ``ovos_core.skill_manager`` alone pulls in nine more
+        top-level packages -- ``padacioso``, ``quebra_frases`` and
+        ``ovos_spec_tools`` among them -- and a live manager holds live objects
+        from them. Forgetting one and re-importing it leaves
+        ``isinstance(running_thing, new_module.Thing)`` False.
+        """
+        self.assertNotIn("padacioso", PROTECTED_RUNTIME_MODULES,
+                         "the floor was widened; this test is about the rest")
+        installed, module_map = self._manager_seeing(
+            {"padacioso": "1.0"},
+            {"padacioso": "2.0"},
+            {"padacioso": {"padacioso"}},
+        )
+        sentinel = Mock()
+        with installed, module_map, patch.dict(
+            sys.modules, {"padacioso": sentinel}, clear=False
+        ):
+            self.assertEqual(self.manager._forget_upgraded_dependencies(), [])
+            self.assertIs(sys.modules["padacioso"], sentinel)
+
+    def test_a_package_imported_only_by_a_skill_is_still_forgettable(self):
+        """The snapshot is taken when the manager starts, so a module a SKILL
+        imports afterwards is not runtime and must stay evictable -- otherwise
+        the feature protects everything and forgets nothing."""
+        installed, module_map = self._manager_seeing(
+            {"late-skill-lib": "1.0"},
+            {"late-skill-lib": "2.0"},
+            {"late-skill-lib": {"late_skill_lib"}},
+        )
+        stale = Mock()
+        with installed, module_map, patch.dict(
+            sys.modules, {"late_skill_lib": stale}, clear=False
+        ):
+            self.assertEqual(
+                self.manager._forget_upgraded_dependencies(), ["late-skill-lib"])
+            self.assertNotIn("late_skill_lib", sys.modules)
 
     def test_a_newly_installed_distribution_is_not_an_upgrade(self):
         """Nothing was cached under it, so there is nothing to forget."""

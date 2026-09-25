@@ -21,7 +21,7 @@ import time
 from importlib.metadata import distributions, entry_points
 from packaging.utils import canonicalize_name
 from threading import Thread, Event
-from typing import Callable, Dict, List, Optional, Set
+from typing import Callable, Dict, FrozenSet, List, Optional, Set
 
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
@@ -84,6 +84,29 @@ PROTECTED_RUNTIME_MODULES = frozenset({
     "ovos_utils",
     "ovos_workshop",
 })
+
+
+def _live_runtime_modules() -> FrozenSet[str]:
+    """Top-level packages this process has already imported, plus the floor.
+
+    The named six are the ones that are always the runtime. They are not all
+    of it: importing ``ovos_core.skill_manager`` alone pulls in nine more --
+    ``padacioso``, ``quebra_frases``, ``ovos_spec_tools``, ``langcodes``,
+    ``combo_lock``, ``ovos_number_parser``, ``ovos_yes_no``,
+    ``ovos_option_matcher_fuzzy``, ``ovos_gui_api_client`` -- and a live
+    manager holds live objects from them. Forgetting one and re-importing it
+    leaves ``isinstance(running_thing, new_module.Thing)`` False, which is the
+    corrupt-skill outcome the floor exists to prevent, so anything already
+    imported when the manager starts is protected too.
+
+    A snapshot, not a live read: a module a SKILL imports after start is not
+    the runtime and stays evictable, which is the whole point of the feature.
+    """
+    imported = {name.split(".", 1)[0] for name in list(sys.modules)}
+    return frozenset(PROTECTED_RUNTIME_MODULES | {
+        name for name in imported if name and name.isidentifier()
+        and not name.startswith("_")
+    })
 
 class SkillManager(Thread):
     """Manages the loading, activation, and deactivation of Mycroft skills."""
@@ -175,6 +198,10 @@ class SkillManager(Thread):
         # empty reading is a real answer on a runtime with nothing installed,
         # and must not be confused with never having looked.
         self._distribution_versions: Optional[Dict[str, str]] = None
+        #: dotted modules each distribution ships, filled by _modules_of
+        self._distribution_owned: Dict[str, Set[str]] = {}
+        #: everything already imported when this manager was built
+        self._protected_modules = _live_runtime_modules()
         # skill_id -> (attempt_count, last_attempt_time) for plugin skills whose
         # load raised before a loader object existed (see _load_plugin_skill).
         # These are retried with an exponential backoff instead of every scan.
@@ -939,8 +966,7 @@ class SkillManager(Thread):
             return None
         return versions
 
-    @staticmethod
-    def _modules_of(names: Set[str]) -> Dict[str, Set[str]]:
+    def _modules_of(self, names: Set[str]) -> Dict[str, Set[str]]:
         """The top-level modules each named distribution installs.
 
         One pass for all of them. ``top_level.txt`` when the wheel carries
@@ -971,7 +997,30 @@ class SkillManager(Thread):
                     # tries again, instead of recording the upgrade as done.
                     LOG.debug(f"Could not read the modules of {name}")
                     continue
+                # The dotted modules this distribution actually ships, not
+                # just their top level. Two distributions can share a
+                # namespace -- `shared` from dist-a and `shared.plugin_b` from
+                # dist-b -- and evicting everything under a shared top level
+                # would forget the other distribution's code on an upgrade
+                # that never touched it.
+                owned: Set[str] = set()
+                try:
+                    for path in dist.files or []:
+                        parts = [part for part in str(path).split("/") if part]
+                        if not parts or parts[0].endswith(
+                                (".dist-info", ".egg-info", ".pth")):
+                            continue
+                        if not parts[-1].endswith(".py"):
+                            continue
+                        parts[-1] = parts[-1][:-3]
+                        if parts[-1] == "__init__":
+                            parts.pop()
+                        if parts and all(part.isidentifier() for part in parts):
+                            owned.add(".".join(parts))
+                except Exception:
+                    LOG.debug(f"Could not read the file list of {name}")
                 found[name] = {m for m in modules if m and m.isidentifier()}
+                self._distribution_owned[name] = owned
         except Exception:
             LOG.exception("Could not read the modules of the changed distributions")
         return found
@@ -1029,12 +1078,33 @@ class SkillManager(Thread):
         forgotten: List[str] = []
         for name in sorted(changed):
             modules = {module for module in installs.get(name, set())
-                       if module not in PROTECTED_RUNTIME_MODULES}
+                       if module not in self._protected_modules}
             if not modules:
                 continue
             dropped = False
-            for cached in [n for n in list(sys.modules)
-                           if n in modules or any(n.startswith(f"{m}.") for m in modules)]:
+            # Children are taken from the distribution's own recorded modules,
+            # so a sibling package that merely shares a namespace prefix is
+            # left alone. Falling back to the top level keeps the old,
+            # broader behaviour only when the file list could not be read.
+            owned = {m for m in self._distribution_owned.get(name) or set()
+                     if m.split(".")[0] in modules}
+            if owned:
+                # Exactly what this distribution ships, plus anything under one
+                # of its SUBmodules. The top level is deliberately not expanded:
+                # `shared` can be a namespace two distributions share, and
+                # expanding it is what forgot `shared.plugin_b` on an upgrade of
+                # the distribution that only owns `shared.plugin_a`.
+                deeper = {m for m in owned if "." in m}
+                def _ours(module: str) -> bool:
+                    return (module in owned
+                            or any(module.startswith(f"{m}.") for m in deeper))
+            else:
+                # No readable file list: fall back to the old, broader rule
+                # rather than forget nothing at all.
+                def _ours(module: str) -> bool:
+                    return (module in modules
+                            or any(module.startswith(f"{m}.") for m in modules))
+            for cached in [n for n in list(sys.modules) if _ours(n)]:
                 sys.modules.pop(cached, None)
                 dropped = True
             if dropped:
