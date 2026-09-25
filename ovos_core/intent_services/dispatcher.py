@@ -30,6 +30,11 @@ from ovos_spec_tools import SpecMessage
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
 
+from ovos_core._metrics import (
+    HANDLER_DISPATCH_EMIT,
+    HANDLER_START_EMIT,
+    HANDLER_TIMEOUT_ARM,
+)
 from ovos_core.intent_services.working_session import raw_session_id
 
 #: default upper bound on handler execution before §8.3 timeout fires, seconds.
@@ -134,19 +139,22 @@ class IntentDispatcher:
             # already logged by raw_session_id; nothing safe to track this under
             return
         entry = _InFlightDispatch(skill_id, intent_name, dispatch_msg)
-        with self._lock:
-            self._in_flight.setdefault(sid, []).append(entry)
-            if self.timeout and self.timeout > 0:
-                entry.timer = threading.Timer(self.timeout, self._on_timeout,
-                                              args=(sid, entry))
-                entry.timer.daemon = True
-                entry.timer.start()
+        with HANDLER_TIMEOUT_ARM.measure():
+            with self._lock:
+                self._in_flight.setdefault(sid, []).append(entry)
+                if self.timeout and self.timeout > 0:
+                    entry.timer = threading.Timer(self.timeout, self._on_timeout,
+                                                  args=(sid, entry))
+                    entry.timer.daemon = True
+                    entry.timer.start()
 
         # §8.1: start immediately before invoking (dispatching) the handler
-        self._emit(SpecMessage.INTENT_HANDLER_START, dispatch_msg,
-                   {"skill_id": skill_id, "intent_name": intent_name})
+        with HANDLER_START_EMIT.measure():
+            self._emit(SpecMessage.INTENT_HANDLER_START, dispatch_msg,
+                       {"skill_id": skill_id, "intent_name": intent_name})
         # §7: the dispatch itself
-        self.bus.emit(dispatch_msg)
+        with HANDLER_DISPATCH_EMIT.measure():
+            self.bus.emit(dispatch_msg)
 
     # -- emission helpers ------------------------------------------------
     def _emit(self, topic, dispatch_msg: Message, data: dict):
