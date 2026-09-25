@@ -34,6 +34,7 @@ def _make_service(config=None) -> FallbackService:
         svc.bus = bus
         svc.config = config or {}
         svc.registered_fallbacks = {}
+        svc._session_fallbacks = {}
         svc._lifecycle_handlers = {}
         svc._fallback_response_event = threading.Event()
         svc.bus.on("ovos.skills.fallback.register", svc.handle_register_fallback)
