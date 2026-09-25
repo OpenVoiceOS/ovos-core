@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.7.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.1a1) (2026-09-25)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.0a2...3.7.1a1)
+
+**Closed issues:**
+
+- A pip upgrade of a loaded plugin skill leaves the old code and intent files running [\#990](https://github.com/OpenVoiceOS/ovos-core/issues/990)
+
+**Merged pull requests:**
+
+- fix: scope the fallback registry by session \(OVOS-FALLBACK-1 3.4, 10\) [\#987](https://github.com/OpenVoiceOS/ovos-core/pull/987) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [3.7.0a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.0a2) (2026-09-25)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.0a1...3.7.0a2)
@@ -360,25 +372,21 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.1.0a1...3.1.1a1)
 
-**Merged pull requests:**
-
-- fix: allow ovos-config 3.x [\#902](https://github.com/OpenVoiceOS/ovos-core/pull/902) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [3.1.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.1.0a1) (2026-08-31)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.12a1...3.1.0a1)
 
 ## [3.0.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.12a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.12a1)
-
-## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.11a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.12a1)
 
 ## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.10a3)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.10a3)
+
+## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.11a1)
 
 ## [3.0.10a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a2) (2026-08-31)
 
