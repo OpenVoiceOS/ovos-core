@@ -240,12 +240,54 @@ class SkillsStore:
         Returns:
             The canonical distribution name, or None when the line names none.
         """
-        line = line.split("#", 1)[0].strip()
-        if not line or line.startswith("-"):
+        raw = line.strip()
+        # ``#egg=NAME`` is a fragment, not a comment, and it is the only thing
+        # naming the distribution on a VCS pin. It has to be read before the
+        # comment split, which would otherwise throw it away -- that is why
+        # ``-e git+...#egg=ovos-core`` used to yield None and protect nothing.
+        egg = re.search(r"#egg=([A-Za-z0-9._-]+)", raw)
+        if egg:
+            return canonicalize_name(egg.group(1))
+
+        line = raw.split("#", 1)[0].strip()
+        if not line:
             return None
+        if line.startswith("-"):
+            # A bare option names no distribution. ``-e <path|url>`` does, and
+            # is handled above when it carries an egg fragment; without one the
+            # target is parsed below like any other URL or path.
+            editable = re.match(r"^(-e|--editable)(\s+|=)(.+)$", line)
+            if not editable:
+                return None
+            line = editable.group(3).strip()
+
         line = line.split(";", 1)[0].strip()  # environment marker
+
+        # A wheel names its distribution in the filename (PEP 427:
+        # ``{distribution}-{version}(-{build})?-{python}-{abi}-{platform}.whl``)
+        # whether it arrives as a URL or a local path. Splitting such a line on
+        # the first separator produced the whole URL as a "name", which matched
+        # no package -- so a deployment pinning ovos-core by wheel URL had it
+        # unprotected.
+        wheel = re.search(r"([^/\\]+)\.whl(?:[?#].*)?$", line)
+        if wheel:
+            return canonicalize_name(wheel.group(1).split("-", 1)[0])
+
+        # An sdist archive names it the same way.
+        sdist = re.search(r"([^/\\]+)\.(?:tar\.gz|zip)(?:[?#].*)?$", line)
+        if sdist:
+            stem = sdist.group(1)
+            return canonicalize_name(re.split(r"-\d", stem, maxsplit=1)[0])
+
         name = re.split(r"[\[<>=!~\s]", line, maxsplit=1)[0].strip()
-        return canonicalize_name(name) if name else None
+        if not name:
+            return None
+        # Anything still carrying a separator is a URL or path this parser did
+        # not recognise. Returning it would be a "name" matching no package,
+        # which is the fail-open the caller now refuses on.
+        if any(sep in name for sep in ("/", "\\", ":")):
+            return None
+        return canonicalize_name(name)
 
     def pip_uninstall(self, packages: list,
                       constraints: Optional[str] = None,
@@ -315,6 +357,27 @@ class SkillsStore:
         if any(self._includes_another_file(p) for p in cpkgs):
             LOG.error('constraints file includes another file; the protected '
                       'set cannot be known to be complete, refusing')
+            self.play_error_sound()
+            return False
+
+        # A line that carries a requirement but yields no name leaves the
+        # protected set smaller than the set pip would apply -- the same
+        # under-protection the include guard above refuses for. A wheel URL, a
+        # local wheel path and an ``#egg=`` VCS pin each name a distribution
+        # and are parsed; what is left here is a form this parser cannot read,
+        # and guessing is exactly the fail-open this guard exists to prevent.
+        unreadable = [
+            line for line in cpkgs
+            if line.split("#", 1)[0].strip()
+            and not line.strip().startswith("#")
+            and self._constrained_name(line) is None
+            and not re.match(r"^\s*-", line.split("#", 1)[0])
+        ]
+        if unreadable:
+            LOG.error('constraints file has requirement lines whose '
+                      f'distribution cannot be determined: {unreadable}; '
+                      'the protected set cannot be known to be complete, '
+                      'refusing')
             self.play_error_sound()
             return False
 
