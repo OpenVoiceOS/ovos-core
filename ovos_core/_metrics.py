@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import os
 import time
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
@@ -62,6 +63,30 @@ class _LatencyMeasurement:
         self._histogram.observe_ms(self._elapsed_ms)
 
 
+#: Reading the environment on every observation would put a syscall on the
+#: utterance path, so the answer is resolved once and cached.
+#: ``reset_metrics_recording_cache()`` exists for tests, which have to be able
+#: to flip the switch inside one process.
+_RECORDING_ENABLED: bool | None = None
+
+_TRUE_VALUES = {"1", "true", "yes", "on"}
+
+
+def metrics_recording_enabled() -> bool:
+    """Whether stage timings should be accumulated at all."""
+    global _RECORDING_ENABLED
+    if _RECORDING_ENABLED is None:
+        _RECORDING_ENABLED = os.getenv(
+            "OVOS_METRICS_ENABLED", "false").strip().lower() in _TRUE_VALUES
+    return _RECORDING_ENABLED
+
+
+def reset_metrics_recording_cache() -> None:
+    """Forget the cached answer; for tests that change the environment."""
+    global _RECORDING_ENABLED
+    _RECORDING_ENABLED = None
+
+
 class LatencyHistogram:
     """Thread-safe cumulative latency histogram with fixed buckets."""
 
@@ -75,7 +100,17 @@ class LatencyHistogram:
         self._lock = Lock()
 
     def observe_ms(self, elapsed_ms: float) -> None:
-        """Record one finite, non-negative duration in milliseconds."""
+        """Record one finite, non-negative duration in milliseconds.
+
+        A no-op unless the runtime endpoint is enabled. ``metrics_enabled()``
+        used to be read by ``start_metrics_server()`` alone, so every stage
+        was still measured and accumulated on a default install that never
+        asked for metrics and had no way to read them -- work, and unbounded
+        counters, for nobody. Opt-in has to mean the recording too, not just
+        the listener.
+        """
+        if not metrics_recording_enabled():
+            return
         value = float(elapsed_ms)
         if not math.isfinite(value):
             raise ValueError("elapsed_ms must be finite")

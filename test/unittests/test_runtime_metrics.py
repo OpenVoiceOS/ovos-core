@@ -10,8 +10,10 @@ import pytest
 from ovos_core._metrics import (
     PIPELINE_MATCHING,
     LatencyHistogram,
+    metrics_recording_enabled,
     performance_histograms,
     pipeline_matching_histogram,
+    reset_metrics_recording_cache,
 )
 from ovos_core._prometheus import (
     collect_histograms,
@@ -20,6 +22,40 @@ from ovos_core._prometheus import (
     start_metrics_server,
     stop_metrics_server,
 )
+
+
+@pytest.fixture(autouse=True)
+def _recording_on(monkeypatch):
+    """Recording is opt-in, so these tests have to opt in.
+
+    Stage timings are only accumulated when ``OVOS_METRICS_ENABLED`` is set:
+    a default install measures nothing, because nothing can read it. Every
+    test that asserts a histogram moved therefore has to turn it on, and the
+    cache is cleared either side so one test cannot decide another's answer.
+    """
+    monkeypatch.setenv("OVOS_METRICS_ENABLED", "true")
+    reset_metrics_recording_cache()
+    yield
+    monkeypatch.delenv("OVOS_METRICS_ENABLED", raising=False)
+    reset_metrics_recording_cache()
+
+
+def test_recording_is_off_until_the_endpoint_is_asked_for(monkeypatch):
+    """The finding behind the gate: opt-in has to mean the recording too.
+
+    ``metrics_enabled()`` was read by ``start_metrics_server()`` alone, so a
+    default install still timed every stage and accumulated counters nobody
+    could read.
+    """
+    monkeypatch.delenv("OVOS_METRICS_ENABLED", raising=False)
+    reset_metrics_recording_cache()
+    assert metrics_recording_enabled() is False
+
+    histogram = LatencyHistogram("test_gate_ms", buckets_ms=(10, 50))
+    histogram.observe_ms(5)
+    with histogram.measure():
+        pass
+    assert histogram.snapshot()["count"] == 0, "a disabled histogram recorded"
 
 
 def test_histogram_observes_exceptional_blocks():
@@ -333,3 +369,46 @@ def test_service_entrypoint_stops_the_listener_when_startup_raises(monkeypatch, 
         f"a raise in {failing_step} left the metrics listener running; a caller "
         f"that retries main() would fail to bind the port"
     )
+
+
+# --------------------------------------------------------------------------
+# A misconfigured opt-in endpoint must not stop the skills service
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("raw_port, why", [
+    ("not-a-port", "unreadable"),
+    ("70000", "out of range"),
+    ("-1", "negative"),
+])
+def test_a_bad_port_disables_the_endpoint_and_nothing_else(monkeypatch, raw_port, why):
+    """``__main__`` calls this before the ``try`` that guards startup.
+
+    So a raise here did not merely skip the endpoint, it stopped the whole
+    skills service: an unreadable ``OVOS_METRICS_PORT`` took the voice
+    assistant down with it. The scrape endpoint is the least important thing
+    in the process and must never be the reason it does not run.
+    """
+    monkeypatch.setenv("OVOS_METRICS_ENABLED", "true")
+    monkeypatch.setenv("OVOS_METRICS_PORT", raw_port)
+
+    server = start_metrics_server()
+
+    assert server is None, f"a {why} port should leave the endpoint off"
+    stop_metrics_server(server)
+
+
+def test_a_port_already_taken_disables_the_endpoint_and_nothing_else(monkeypatch):
+    """Same rule for a bind failure, which is the likelier one in production."""
+    monkeypatch.setenv("OVOS_METRICS_ENABLED", "true")
+    monkeypatch.setenv("OVOS_METRICS_PORT", "0")
+    first = start_metrics_server()
+    assert first is not None
+    taken = first.server_address[1]
+    try:
+        monkeypatch.setenv("OVOS_METRICS_PORT", str(taken))
+        second = start_metrics_server()
+        assert second is None, "a taken port should leave the endpoint off"
+        stop_metrics_server(second)
+    finally:
+        stop_metrics_server(first)

@@ -214,19 +214,40 @@ def metrics_enabled() -> bool:
 
 
 def start_metrics_server() -> ThreadingHTTPServer | None:
-    """Start a daemon metrics listener when explicitly enabled."""
+    """Start a daemon metrics listener when explicitly enabled.
+
+    Never raises. ``__main__`` calls this before the ``try`` that guards
+    service startup, so a raise here stopped the whole skills service -- an
+    unreadable ``OVOS_METRICS_PORT``, or a port already in use, took the voice
+    assistant down with it. An opt-in scrape endpoint is the least important
+    thing in the process and must never be the reason it does not run: the
+    misconfiguration is logged and the endpoint stays off.
+    """
     if not metrics_enabled():
         return None
     host = os.getenv("OVOS_METRICS_HOST", "127.0.0.1")
     raw_port = os.getenv("OVOS_METRICS_PORT", "9474")
     try:
         port = int(raw_port)
-    except ValueError as error:
-        raise ValueError("OVOS_METRICS_PORT must be an integer") from error
+    except ValueError:
+        LOG.error(
+            "OVOS_METRICS_PORT must be an integer, got %r; "
+            "the metrics listener is disabled", raw_port)
+        return None
     if not 0 <= port <= 65_535:
-        raise ValueError("OVOS_METRICS_PORT must be between 0 and 65535")
-    collectors = load_metric_collectors()
-    server = ThreadingHTTPServer((host, port), _handler(collectors))
+        LOG.error(
+            "OVOS_METRICS_PORT must be between 0 and 65535, got %s; "
+            "the metrics listener is disabled", port)
+        return None
+    try:
+        collectors = load_metric_collectors()
+        server = ThreadingHTTPServer((host, port), _handler(collectors))
+    except OSError as error:
+        # Address in use, permission denied on a privileged port, bad host.
+        LOG.error(
+            "the metrics listener could not bind %s:%s (%s); it is disabled",
+            host, port, error)
+        return None
     Thread(
         target=server.serve_forever,
         name="ovos-runtime-metrics",
