@@ -1,4 +1,5 @@
 import enum
+import re
 import shutil
 import sys
 from importlib import reload
@@ -26,6 +27,15 @@ class InstallError(str, enum.Enum):
 #: how much of the installer's output a ``.failed`` reply carries in ``detail``
 FAILURE_DETAIL_CHARS = 2000
 
+
+
+def _strip_requirement_comment(line: str) -> str:
+    """A requirements line without its comment, by pip's rule.
+
+    ``#`` starts a comment at the beginning of a line or after whitespace;
+    anywhere else it is part of a URL (``...#egg=name``, ``...#sha256=...``).
+    """
+    return re.split(r"(?:^|\s)#", line, maxsplit=1)[0].strip()
 
 class SkillsStore:
     # default constraints to use if none are given
@@ -205,6 +215,92 @@ class SkillsStore:
         self.play_success_sound()
         return True
 
+    @staticmethod
+    def _includes_another_file(line: str) -> bool:
+        """Whether a constraints line pulls in a second file.
+
+        ``-r``/``--requirement`` and ``-c``/``--constraint`` make pip apply
+        pins this file does not list, so a protected set built from this text
+        alone is not the set pip would enforce.
+
+        Args:
+            line: one raw line from the constraints file.
+
+        Returns:
+            True when the line is an include.
+        """
+        line = _strip_requirement_comment(line)
+        return bool(re.match(r"^(-r|-c|--requirement|--constraint)(\s|=|$)", line))
+
+    @staticmethod
+    def _constrained_name(line: str) -> Optional[str]:
+        """The distribution a constraints line names, canonicalized, or None.
+
+        Handles what a requirements/constraints file actually contains: a
+        comment, a blank line, a pip option (``-r``, ``--index-url``), an
+        inline comment after a requirement, extras, and an environment
+        marker. Names are canonicalized per PEP 503, so "ovos_core",
+        "OVOS-Core" and "ovos.core" all compare equal to "ovos-core" the way
+        pip and PyPI identify distributions.
+
+        Args:
+            line: one raw line from the constraints file.
+
+        Returns:
+            The canonical distribution name, or None when the line names none.
+        """
+        # pip's rule: ``#`` begins a comment at the start of a line or after
+        # whitespace. A ``#`` glued to a URL is a fragment and stays. Reading
+        # ``#egg=`` before applying this let a comment rename the pin --
+        # ``ovos-core==1.0  # see #egg=other`` protected "other" and left
+        # ovos-core removable.
+        line = _strip_requirement_comment(line)
+        if not line:
+            return None
+        if line.startswith("-"):
+            # A bare option names no distribution. ``-e <path|url>`` does.
+            editable = re.match(r"^(-e|--editable)(\s+|=)(.+)$", line)
+            if not editable:
+                return None
+            line = editable.group(3).strip()
+
+        line = line.split(";", 1)[0].strip()  # environment marker
+
+        # PEP 508 direct reference: pip takes the name before ``@``, whatever
+        # the URL after it says, so a fragment there must not override it.
+        direct = re.match(r"^([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[[^\]]*\])?\s*@", line)
+        if direct:
+            return canonicalize_name(direct.group(1))
+
+        # A wheel names its distribution in the filename (PEP 427:
+        # ``{distribution}-{version}(-{build})?-{python}-{abi}-{platform}.whl``)
+        # whether it arrives as a URL or a local path.
+        wheel = re.search(r"([^/\\]+)\.whl(?:[?#].*)?$", line)
+        if wheel:
+            return canonicalize_name(wheel.group(1).split("-", 1)[0])
+
+        # An sdist archive names it the same way.
+        sdist = re.search(r"([^/\\]+)\.(?:tar\.gz|zip)(?:[?#].*)?$", line)
+        if sdist:
+            stem = sdist.group(1)
+            return canonicalize_name(re.split(r"-\d", stem, maxsplit=1)[0])
+
+        # Only now, and only on a URL or VCS target, does ``#egg=`` name the
+        # distribution: it is the one place that does for a VCS pin.
+        if re.match(r"^(?:[a-z]+\+)?[a-z][a-z0-9.+-]*://|^file:", line, re.I):
+            egg = re.search(r"#egg=([A-Za-z0-9._-]+)", line)
+            return canonicalize_name(egg.group(1)) if egg else None
+
+        name = re.split(r"[\[<>=!~\s]", line, maxsplit=1)[0].strip()
+        if not name:
+            return None
+        # Anything still carrying a separator is a path this parser did not
+        # recognise. Returning it would be a "name" matching no package, which
+        # is the fail-open the caller refuses on.
+        if any(sep in name for sep in ("/", "\\", ":")):
+            return None
+        return canonicalize_name(name)
+
     def pip_uninstall(self, packages: list,
                       constraints: Optional[str] = None,
                       print_logs: bool = True) -> bool:
@@ -243,16 +339,66 @@ class SkillsStore:
             cpkgs = ["ovos-core", "ovos-utils", "ovos-plugin-manager",
                      "ovos-config", "ovos-bus-client", "ovos-workshop"]
 
-        # remove version pinning and canonicalize names (PEP 503) so
-        # "ovos_core", "OVOS-Core", "ovos.core", etc. all compare equal
-        # to "ovos-core", matching how pip/pypi identify distributions
-        cpkgs = [canonicalize_name(p.split("~")[0].split("<")[0].split(">")[0].split("=")[0])
-                 for p in cpkgs if p]
+        # The name used to be taken by splitting on the version operators
+        # alone, which left everything else on the line attached to it. That
+        # under-protects, which is the dangerous direction: "  ovos-core==1.0"
+        # yielded "  ovos-core", "ovos-core[extra]==1.0" yielded
+        # "ovos-core[extra]", and a line carrying an environment marker was cut
+        # at the marker's own "<". None of those equal "ovos-core", so a pin
+        # written any of those perfectly ordinary ways protected nothing and
+        # the package it named could be uninstalled over the bus.
+        #
+        # Reading the line properly also keeps comments, blank lines and pip
+        # options out of the set, so the refusal below can name the package it
+        # refused instead of printing the whole file.
+        # Each requested name is forwarded to pip/uv on its own command line,
+        # so an entry that is really an option ("-r evil.txt", "--index-url
+        # ...") is read as one. Canonicalizing it first would not help: it
+        # matches no protected name, so the guard below waves it through.
+        # Refuse before anything else looks at it, for pip and uv alike.
+        option_like = [p for p in packages if str(p).strip().startswith("-")]
+        if option_like:
+            LOG.error(f'refusing option-like package names: {option_like}')
+            self.play_error_sound()
+            return False
+
+        # An include pulls in pins this file does not list, so the protected
+        # set built from this text alone is not the set pip would apply.
+        # Refusing is the only safe answer: proceeding would under-protect,
+        # which is the failure this guard exists to prevent.
+        if any(self._includes_another_file(p) for p in cpkgs):
+            LOG.error('constraints file includes another file; the protected '
+                      'set cannot be known to be complete, refusing')
+            self.play_error_sound()
+            return False
+
+        # A line that carries a requirement but yields no name leaves the
+        # protected set smaller than the set pip would apply -- the same
+        # under-protection the include guard above refuses for. A wheel URL, a
+        # local wheel path and an ``#egg=`` VCS pin each name a distribution
+        # and are parsed; what is left here is a form this parser cannot read,
+        # and guessing is exactly the fail-open this guard exists to prevent.
+        unreadable = [
+            line for line in cpkgs
+            if _strip_requirement_comment(line)
+            and self._constrained_name(line) is None
+            and not _strip_requirement_comment(line).startswith("-")
+        ]
+        if unreadable:
+            LOG.error('constraints file has requirement lines whose '
+                      f'distribution cannot be determined: {unreadable}; '
+                      'the protected set cannot be known to be complete, '
+                      'refusing')
+            self.play_error_sound()
+            return False
+
+        protected = {name for name in (self._constrained_name(p) for p in cpkgs) if name}
 
         norm_packages = [canonicalize_name(p) for p in packages]
 
-        if any(p in cpkgs for p in norm_packages):
-            LOG.error(f'tried to uninstall a protected package: {cpkgs}')
+        refused = sorted({p for p in norm_packages if p in protected})
+        if refused:
+            LOG.error(f'tried to uninstall protected packages: {refused}')
             self.play_error_sound()
             return False
 
