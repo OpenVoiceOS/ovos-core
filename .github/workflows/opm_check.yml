@@ -1,0 +1,17 @@
+name: OPM Plugin Check
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+jobs:
+  opm_check:
+    uses: OpenVoiceOS/gh-automations/.github/workflows/opm-check.yml@dev
+    secrets: inherit
+    with:
+      system_deps: 'swig libssl-dev portaudio19-dev libpulse-dev'
+      install_extras: 'mycroft,plugins,skills-essential,test'
+      python_version: '3.11'
+      plugin_type: 'pipeline'
