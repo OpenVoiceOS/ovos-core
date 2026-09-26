@@ -21,7 +21,7 @@ import time
 from importlib.metadata import distributions, entry_points
 from packaging.utils import canonicalize_name
 from threading import Thread, Event
-from typing import Callable, Dict, List, Optional, Set
+from typing import Callable, Dict, FrozenSet, List, Optional, Set
 
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
@@ -76,6 +76,11 @@ def on_stopping() -> None:
 #: process leaves every running skill an instance of a class its own module
 #: no longer defines, which trades a dead skill for a corrupt one. A change
 #: here legitimately needs the process to restart.
+#:
+#: This is a floor, not the whole protected set. The runtime imports more
+#: than it is built from, and every one of those imports is open to the same
+#: fork. `SkillManager` adds the top level modules the process already holds
+#: when it starts: see `_protected_modules`.
 PROTECTED_RUNTIME_MODULES = frozenset({
     "ovos_core",
     "ovos_bus_client",
@@ -175,6 +180,14 @@ class SkillManager(Thread):
         # empty reading is a real answer on a runtime with nothing installed,
         # and must not be confused with never having looked.
         self._distribution_versions: Optional[Dict[str, str]] = None
+        #: Top level modules the running process already holds. Everything in
+        #: `sys.modules` when the manager starts is runtime machinery, not
+        #: skill code: a skill package enters the cache later, when it loads.
+        #: Re-importing one of these under a live process is the corruption
+        #: `PROTECTED_RUNTIME_MODULES` names, so the hand written floor is
+        #: kept and the snapshot is added to it.
+        self._protected_modules: FrozenSet[str] = frozenset(
+            PROTECTED_RUNTIME_MODULES | {name.split(".")[0] for name in list(sys.modules)})
         # skill_id -> (attempt_count, last_attempt_time) for plugin skills whose
         # load raised before a loader object existed (see _load_plugin_skill).
         # These are retried with an exponential backoff instead of every scan.
@@ -940,12 +953,42 @@ class SkillManager(Thread):
         return versions
 
     @staticmethod
-    def _modules_of(names: Set[str]) -> Dict[str, Set[str]]:
-        """The top-level modules each named distribution installs.
+    def _dotted_modules_of(dist) -> Set[str]:
+        """Every module name one distribution records, dots included.
 
-        One pass for all of them. ``top_level.txt`` when the wheel carries
-        one, and otherwise the first path component of the files it recorded.
+        `foo/bar/__init__.py` reads as `foo.bar`, `foo/bar/baz.py` as
+        `foo.bar.baz`, and a compiled extension the same way. The names are
+        what the distribution itself recorded, so a namespace package shared
+        with a sibling distribution gives only this one's own subpackages.
         Nothing is imported.
+        """
+        modules: Set[str] = set()
+        for path in dist.files or []:
+            parts = str(path).split("/")
+            if not parts or parts[0].endswith((".dist-info", ".egg-info", ".pth")):
+                continue
+            leaf = parts[-1]
+            if leaf.endswith(".py"):
+                leaf = leaf[:-3]
+            elif ".so" in leaf or leaf.endswith((".pyd", ".dll")):
+                leaf = leaf.split(".")[0]
+            else:
+                continue
+            parts = parts[:-1] if leaf == "__init__" else parts[:-1] + [leaf]
+            if parts and all(part.isidentifier() for part in parts):
+                modules.add(".".join(parts))
+        return modules
+
+    @staticmethod
+    def _modules_of(names: Set[str]) -> Dict[str, Set[str]]:
+        """The modules each named distribution installs.
+
+        One pass for all of them. The top level names come from
+        ``top_level.txt`` when the wheel carries one, and otherwise from the
+        first path component of the files it recorded. The recorded dotted
+        names are added to them, so the caller can tell this distribution's
+        own subpackages from a sibling's inside a shared namespace. Nothing
+        is imported.
         """
         found: Dict[str, Set[str]] = {}
         if not names:
@@ -958,6 +1001,7 @@ class SkillManager(Thread):
                     continue
                 modules: Set[str] = set()
                 try:
+                    dotted = SkillManager._dotted_modules_of(dist)
                     declared = dist.read_text("top_level.txt") or ""
                     modules.update(line.strip() for line in declared.splitlines() if line.strip())
                     if not modules:
@@ -971,10 +1015,40 @@ class SkillManager(Thread):
                     # tries again, instead of recording the upgrade as done.
                     LOG.debug(f"Could not read the modules of {name}")
                     continue
-                found[name] = {m for m in modules if m and m.isidentifier()}
+                found[name] = {m for m in modules if m and m.isidentifier()} | dotted
         except Exception:
             LOG.exception("Could not read the modules of the changed distributions")
         return found
+
+    @staticmethod
+    def _shared_top_level_modules() -> Set[str]:
+        """Top level names that more than one installed distribution records.
+
+        A namespace package split across a plugin family is the ordinary
+        case, and this fleet ships several. Forgetting one member must not
+        evict a sibling's subpackage: nothing upgraded it, and the two copies
+        of it that a later import then makes are the identity fork this whole
+        operation exists to prevent.
+        """
+        owners: Dict[str, Set[str]] = {}
+        try:
+            for dist in distributions():
+                raw = (dist.metadata["Name"] if dist.metadata else None) or ""
+                name = canonicalize_name(raw.strip()) if raw.strip() else ""
+                if not name:
+                    continue
+                try:
+                    tops = {module.split(".")[0]
+                            for module in SkillManager._dotted_modules_of(dist)}
+                except Exception:
+                    LOG.debug(f"Could not read the recorded files of {name}")
+                    continue
+                for top in tops:
+                    owners.setdefault(top, set()).add(name)
+        except Exception:
+            LOG.exception("Could not read the installed distributions")
+            return set()
+        return {top for top, names in owners.items() if len(names) > 1}
 
     def _forget_upgraded_dependencies(self) -> List[str]:
         """Drop upgraded DEPENDENCIES from the import cache, not just skills.
@@ -1026,21 +1100,30 @@ class SkillManager(Thread):
                    else previous.get(name, version))
             for name, version in current.items()
         }
+        shared = self._shared_top_level_modules()
         forgotten: List[str] = []
         for name in sorted(changed):
             modules = {module for module in installs.get(name, set())
-                       if module not in PROTECTED_RUNTIME_MODULES}
+                       if module.split(".")[0] not in self._protected_modules}
             if not modules:
                 continue
-            dropped = False
-            for cached in [n for n in list(sys.modules)
-                           if n in modules or any(n.startswith(f"{m}.") for m in modules)]:
+            # A top level name this distribution owns alone takes its children
+            # with it, so a subpackage it records nowhere is still dropped. A
+            # name a sibling distribution also records does not: inside a
+            # shared namespace only the modules THIS distribution recorded go.
+            owned = {module for module in modules
+                     if "." not in module and module not in shared}
+            victims = [cached for cached in list(sys.modules)
+                       if cached in modules
+                       or any(cached.startswith(f"{top}.") for top in owned)]
+            if not victims:
+                continue
+            for cached in victims:
                 sys.modules.pop(cached, None)
-                dropped = True
-            if dropped:
-                forgotten.append(name)
-                LOG.info(f"{name} changed {previous[name]} -> {current[name]}; "
-                         "forgetting its modules so reloads read the new code")
+            forgotten.append(name)
+            LOG.info(f"{name} changed {previous[name]} -> {current[name]}; "
+                     f"forgetting {len(victims)} cached modules so reloads "
+                     f"read the new code: {', '.join(sorted(victims))}")
         if forgotten:
             importlib.invalidate_caches()
         return forgotten

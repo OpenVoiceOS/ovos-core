@@ -29,7 +29,8 @@ from ovos_config import Configuration
 from ovos_config import LocalConf, DEFAULT_CONFIG
 from ovos_bus_client.session import SessionManager
 from ovos_core.skill_manager import (SkillManager, PLUGIN_SKILL_RETRY_BASE_SECONDS,
-                                      PLUGIN_SKILL_RETRY_MAX_SECONDS)
+                                      PLUGIN_SKILL_RETRY_MAX_SECONDS,
+                                      PROTECTED_RUNTIME_MODULES)
 from ovos_workshop.skill_launcher import SkillLoader
 
 # the retired pre-spec push; OVOS-SESSION-2 §2.7 defines no topic on
@@ -1823,6 +1824,125 @@ class TestUpgradedDependencyForget(TestCase):
         ):
             self.assertEqual(self.manager._forget_upgraded_dependencies(), [])
             self.assertIs(sys.modules["ovos_workshop"], sentinel)
+
+    def test_a_sibling_in_a_shared_namespace_is_not_evicted(self):
+        """`shared.plugin_b` belongs to dist-b, and dist-b did not change.
+
+        The child rule was a dotted prefix, which is namespace blind: an
+        upgrade of dist-a took every `shared.*` module with it. Nothing
+        upgraded the sibling, so the next import of it builds a SECOND copy,
+        and an object the running pipeline holds stops being an instance of
+        the class the new copy defines. That is the fork the whole operation
+        exists to prevent.
+        """
+        installed, _ = self._manager_seeing(
+            {"dist-a": "1.0", "dist-b": "1.0"},
+            {"dist-a": "2.0", "dist-b": "1.0"},
+            {},
+        )
+        manager = self.manager
+        stale, sibling = Mock(), Mock()
+        with installed, \
+                patch.object(manager, "_modules_of",
+                             return_value={"dist-a": {"shared", "shared.plugin_a"}}), \
+                patch.object(manager, "_shared_top_level_modules",
+                             return_value={"shared"}), \
+                patch.dict(sys.modules,
+                           {"shared": stale, "shared.plugin_a": stale,
+                            "shared.plugin_b": sibling}, clear=False):
+            self.assertEqual(["dist-a"], manager._forget_upgraded_dependencies())
+            self.assertNotIn("shared.plugin_a", sys.modules)
+            self.assertIs(sys.modules["shared.plugin_b"], sibling)
+
+    def test_a_child_of_a_top_level_one_distribution_owns_is_still_forgotten(self):
+        """Precision must not cost the ordinary case.
+
+        One distribution owning the top level name keeps the prefix rule, so
+        a submodule the wheel records under another spelling still goes.
+        """
+        installed, module_map = self._manager_seeing(
+            {"thalovant-skillkit": "0.16.0"},
+            {"thalovant-skillkit": "0.18.0"},
+            {"thalovant-skillkit": {"thalovant_skillkit"}},
+        )
+        manager = self.manager
+        stale = Mock()
+        with installed, module_map, \
+                patch.object(manager, "_shared_top_level_modules", return_value=set()), \
+                patch.dict(sys.modules,
+                           {"thalovant_skillkit": stale,
+                            "thalovant_skillkit.util.bag": stale}, clear=False):
+            self.assertEqual(["thalovant-skillkit"],
+                             manager._forget_upgraded_dependencies())
+            self.assertNotIn("thalovant_skillkit.util.bag", sys.modules)
+
+    def test_the_protected_set_covers_what_the_process_already_holds(self):
+        """The hand written six name what a SKILL is built from.
+
+        The pipeline is built from more -- `quebra_frases`, `padacioso`,
+        `langcodes` and the rest are live imports of this process, and an
+        installer upgrading one as a dependency of a skill upgrade evicts it.
+        The docstring's own argument then applies to it. Everything in
+        `sys.modules` when the manager starts is such a module.
+        """
+        sentinel = Mock()
+        with patch.dict(sys.modules, {"pipeline_library": sentinel}, clear=False):
+            manager = SkillManager(Mock())
+            self.assertNotIn("pipeline_library", PROTECTED_RUNTIME_MODULES)
+            self.assertIn("pipeline_library", manager._protected_modules)
+            manager._distribution_versions = {"pipeline-library": "1.0"}
+            with patch.object(manager, "_installed_distributions",
+                              return_value={"pipeline-library": "2.0"}), \
+                    patch.object(manager, "_modules_of",
+                                 return_value={"pipeline-library": {"pipeline_library"}}):
+                self.assertEqual([], manager._forget_upgraded_dependencies())
+            self.assertIs(sys.modules["pipeline_library"], sentinel)
+
+    def test_a_module_the_process_imports_after_the_start_is_not_protected(self):
+        """A skill's own library enters the cache when the skill loads.
+
+        Protecting the snapshot must not protect everything for ever, or the
+        fix this PR carries would forget nothing on a long running process.
+        """
+        manager = SkillManager(Mock())
+        installed, module_map = self._manager_seeing(
+            {"late-library": "1.0"}, {"late-library": "2.0"},
+            {"late-library": {"late_library"}},
+        )
+        manager._distribution_versions = {"late-library": "1.0"}
+        with patch.object(manager, "_installed_distributions",
+                          return_value={"late-library": "2.0"}), \
+                patch.object(manager, "_modules_of",
+                             return_value={"late-library": {"late_library"}}), \
+                patch.dict(sys.modules, {"late_library": Mock()}, clear=False):
+            self.assertEqual(["late-library"],
+                             manager._forget_upgraded_dependencies())
+            self.assertNotIn("late_library", sys.modules)
+
+    def test_the_recorded_modules_of_a_distribution_are_read_with_their_dots(self):
+        """What a wheel records, not what a prefix guesses."""
+        dist = SimpleNamespace(files=[
+            "shared/plugin_a/__init__.py",
+            "shared/plugin_a/bag.py",
+            "shared/plugin_a/_speedup.cpython-311-x86_64-linux-gnu.so",
+            "shared/plugin_a/res/dialog.txt",
+            "solo.py",
+            "dist_a-2.0.dist-info/RECORD",
+        ])
+        self.assertEqual(
+            {"shared.plugin_a", "shared.plugin_a.bag", "shared.plugin_a._speedup", "solo"},
+            SkillManager._dotted_modules_of(dist))
+
+    def test_a_namespace_two_distributions_record_reads_as_shared(self):
+        """The sharing map is what makes the child rule safe."""
+        dists = [
+            SimpleNamespace(metadata={"Name": "dist-a"},
+                            files=["shared/plugin_a/__init__.py", "solo/__init__.py"]),
+            SimpleNamespace(metadata={"Name": "dist-b"},
+                            files=["shared/plugin_b/__init__.py"]),
+        ]
+        with patch("ovos_core.skill_manager.distributions", return_value=dists):
+            self.assertEqual({"shared"}, SkillManager._shared_top_level_modules())
 
     def test_a_newly_installed_distribution_is_not_an_upgrade(self):
         """Nothing was cached under it, so there is nothing to forget."""
