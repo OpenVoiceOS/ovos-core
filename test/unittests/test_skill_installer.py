@@ -728,3 +728,27 @@ def test_comments_and_options_are_still_not_refused(skills_store, tmp_path):
     assert skills_store.pip_uninstall(
         ["some-unrelated-thing"], constraints=str(constraints)) is True
     skills_store.play_error_sound.assert_not_called()
+
+
+@pytest.mark.parametrize("pin", [
+    "ovos-core==1.0 #egg=other",
+    "ovos-core==1.0   # pinned here; see #egg=other",
+    "ovos-core @ git+https://github.com/OpenVoiceOS/ovos-core@v1.0#egg=other",
+])
+def test_a_fragment_cannot_rename_a_pin(skills_store, tmp_path, pin):
+    """``#egg=`` names a distribution only on a URL or VCS target.
+
+    Reading it before stripping comments let a comment rename the pin: the
+    protected set held "other" and ovos-core could be uninstalled over the
+    bus. pip treats a whitespace-prefixed ``#`` as a comment, and for a PEP 508
+    ``name @ url`` it takes the name before ``@``; the guard has to agree.
+    """
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text(f"{pin}\n")
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+
+    assert skills_store.pip_uninstall(
+        ["ovos-core"], constraints=str(constraints)) is False, \
+        f"{pin!r} must protect ovos-core"
+    skills_store._run_pip.assert_not_called()

@@ -28,6 +28,15 @@ class InstallError(str, enum.Enum):
 FAILURE_DETAIL_CHARS = 2000
 
 
+
+def _strip_requirement_comment(line: str) -> str:
+    """A requirements line without its comment, by pip's rule.
+
+    ``#`` starts a comment at the beginning of a line or after whitespace;
+    anywhere else it is part of a URL (``...#egg=name``, ``...#sha256=...``).
+    """
+    return re.split(r"(?:^|\s)#", line, maxsplit=1)[0].strip()
+
 class SkillsStore:
     # default constraints to use if none are given
     DEFAULT_CONSTRAINTS = 'https://raw.githubusercontent.com/OpenVoiceOS/ovos-releases/refs/heads/main/constraints-stable.txt'
@@ -220,7 +229,7 @@ class SkillsStore:
         Returns:
             True when the line is an include.
         """
-        line = line.split("#", 1)[0].strip()
+        line = _strip_requirement_comment(line)
         return bool(re.match(r"^(-r|-c|--requirement|--constraint)(\s|=|$)", line))
 
     @staticmethod
@@ -240,22 +249,16 @@ class SkillsStore:
         Returns:
             The canonical distribution name, or None when the line names none.
         """
-        raw = line.strip()
-        # ``#egg=NAME`` is a fragment, not a comment, and it is the only thing
-        # naming the distribution on a VCS pin. It has to be read before the
-        # comment split, which would otherwise throw it away -- that is why
-        # ``-e git+...#egg=ovos-core`` used to yield None and protect nothing.
-        egg = re.search(r"#egg=([A-Za-z0-9._-]+)", raw)
-        if egg:
-            return canonicalize_name(egg.group(1))
-
-        line = raw.split("#", 1)[0].strip()
+        # pip's rule: ``#`` begins a comment at the start of a line or after
+        # whitespace. A ``#`` glued to a URL is a fragment and stays. Reading
+        # ``#egg=`` before applying this let a comment rename the pin --
+        # ``ovos-core==1.0  # see #egg=other`` protected "other" and left
+        # ovos-core removable.
+        line = _strip_requirement_comment(line)
         if not line:
             return None
         if line.startswith("-"):
-            # A bare option names no distribution. ``-e <path|url>`` does, and
-            # is handled above when it carries an egg fragment; without one the
-            # target is parsed below like any other URL or path.
+            # A bare option names no distribution. ``-e <path|url>`` does.
             editable = re.match(r"^(-e|--editable)(\s+|=)(.+)$", line)
             if not editable:
                 return None
@@ -263,12 +266,15 @@ class SkillsStore:
 
         line = line.split(";", 1)[0].strip()  # environment marker
 
+        # PEP 508 direct reference: pip takes the name before ``@``, whatever
+        # the URL after it says, so a fragment there must not override it.
+        direct = re.match(r"^([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[[^\]]*\])?\s*@", line)
+        if direct:
+            return canonicalize_name(direct.group(1))
+
         # A wheel names its distribution in the filename (PEP 427:
         # ``{distribution}-{version}(-{build})?-{python}-{abi}-{platform}.whl``)
-        # whether it arrives as a URL or a local path. Splitting such a line on
-        # the first separator produced the whole URL as a "name", which matched
-        # no package -- so a deployment pinning ovos-core by wheel URL had it
-        # unprotected.
+        # whether it arrives as a URL or a local path.
         wheel = re.search(r"([^/\\]+)\.whl(?:[?#].*)?$", line)
         if wheel:
             return canonicalize_name(wheel.group(1).split("-", 1)[0])
@@ -279,12 +285,18 @@ class SkillsStore:
             stem = sdist.group(1)
             return canonicalize_name(re.split(r"-\d", stem, maxsplit=1)[0])
 
+        # Only now, and only on a URL or VCS target, does ``#egg=`` name the
+        # distribution: it is the one place that does for a VCS pin.
+        if re.match(r"^(?:[a-z]+\+)?[a-z][a-z0-9.+-]*://|^file:", line, re.I):
+            egg = re.search(r"#egg=([A-Za-z0-9._-]+)", line)
+            return canonicalize_name(egg.group(1)) if egg else None
+
         name = re.split(r"[\[<>=!~\s]", line, maxsplit=1)[0].strip()
         if not name:
             return None
-        # Anything still carrying a separator is a URL or path this parser did
-        # not recognise. Returning it would be a "name" matching no package,
-        # which is the fail-open the caller now refuses on.
+        # Anything still carrying a separator is a path this parser did not
+        # recognise. Returning it would be a "name" matching no package, which
+        # is the fail-open the caller refuses on.
         if any(sep in name for sep in ("/", "\\", ":")):
             return None
         return canonicalize_name(name)
@@ -368,10 +380,9 @@ class SkillsStore:
         # and guessing is exactly the fail-open this guard exists to prevent.
         unreadable = [
             line for line in cpkgs
-            if line.split("#", 1)[0].strip()
-            and not line.strip().startswith("#")
+            if _strip_requirement_comment(line)
             and self._constrained_name(line) is None
-            and not re.match(r"^\s*-", line.split("#", 1)[0])
+            and not _strip_requirement_comment(line).startswith("-")
         ]
         if unreadable:
             LOG.error('constraints file has requirement lines whose '
