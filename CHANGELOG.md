@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.7.1a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.1a2) (2026-09-26)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.1a1...3.7.1a2)
+
+**Merged pull requests:**
+
+- translate\(kab\): update global\_stop.voc [\#1013](https://github.com/OpenVoiceOS/ovos-core/pull/1013) ([ovos-localize[bot]](https://github.com/apps/ovos-localize))
+
 ## [3.7.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.1a1) (2026-09-25)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.0a2...3.7.1a1)
@@ -363,10 +371,6 @@
 ## [3.1.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.1.2a1) (2026-09-01)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.1.1a1...3.1.2a1)
-
-**Merged pull requests:**
-
-- fix: back off failed plugin-skill loads and report loaded\_new truthfully [\#905](https://github.com/OpenVoiceOS/ovos-core/pull/905) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [3.1.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.1.1a1) (2026-09-01)
 
