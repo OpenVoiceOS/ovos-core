@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.7.1a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.1a3) (2026-09-26)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.1a2...3.7.1a3)
+
+**Merged pull requests:**
+
+- translate\(kab\): update stop.voc [\#1014](https://github.com/OpenVoiceOS/ovos-core/pull/1014) ([ovos-localize[bot]](https://github.com/apps/ovos-localize))
+
 ## [3.7.1a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.1a2) (2026-09-26)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.1a1...3.7.1a2)
@@ -360,10 +368,6 @@
 
 - User story: "what did you just say" — repeat the last spoken response [\#910](https://github.com/OpenVoiceOS/ovos-core/issues/910)
 
-**Merged pull requests:**
-
-- fix: ovos.intent.matched always carries the producing pipeline's bare id [\#908](https://github.com/OpenVoiceOS/ovos-core/pull/908) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [3.2.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.0a1) (2026-09-01)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.1.2a1...3.2.0a1)
@@ -382,15 +386,15 @@
 
 ## [3.0.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.12a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.12a1)
-
-## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.10a3)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.12a1)
 
 ## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.11a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.11a1)
+
+## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.10a3)
 
 ## [3.0.10a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a2) (2026-08-31)
 
