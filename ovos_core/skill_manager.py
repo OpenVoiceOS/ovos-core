@@ -160,6 +160,11 @@ class SkillManager(Thread):
         self._network_skill_timeout = 300
         self._allow_state_reloads = True
         self._logged_skill_warnings = set()
+        # Taken BEFORE skill discovery: find_skill_plugins() loads every skill
+        # entry point, which imports the skills and their libraries. A snapshot
+        # after it would protect exactly the dependencies this manager exists
+        # to refresh -- thalovant-skillkit among them.
+        self._protected_modules = _live_runtime_modules()
         self._detected_installed_skills = bool(find_skill_plugins())
         if not self._detected_installed_skills:
             LOG.warning(
@@ -200,8 +205,8 @@ class SkillManager(Thread):
         self._distribution_versions: Optional[Dict[str, str]] = None
         #: dotted modules each distribution ships, filled by _modules_of
         self._distribution_owned: Dict[str, Set[str]] = {}
-        #: everything already imported when this manager was built
-        self._protected_modules = _live_runtime_modules()
+        #: resolved file paths each distribution ships, filled by _modules_of
+        self._distribution_files: Dict[str, Set[str]] = {}
         # skill_id -> (attempt_count, last_attempt_time) for plugin skills whose
         # load raised before a loader object existed (see _load_plugin_skill).
         # These are retried with an exponential backoff instead of every scan.
@@ -990,7 +995,11 @@ class SkillManager(Thread):
                         for path in dist.files or []:
                             head = str(path).split("/")[0]
                             if head and not head.endswith((".dist-info", ".egg-info", ".pth")):
-                                modules.add(head[:-3] if head.endswith(".py") else head)
+                                if head.endswith(".py"):
+                                    head = head[:-3]
+                                elif head.endswith((".so", ".pyd")):
+                                    head = head.split(".", 1)[0]
+                                modules.add(head)
                 except Exception:
                     # Left out of the result on purpose. The caller holds that
                     # distribution at its old version so the next install
@@ -1004,15 +1013,24 @@ class SkillManager(Thread):
                 # would forget the other distribution's code on an upgrade
                 # that never touched it.
                 owned: Set[str] = set()
+                files: Set[str] = set()
                 try:
                     for path in dist.files or []:
                         parts = [part for part in str(path).split("/") if part]
                         if not parts or parts[0].endswith(
                                 (".dist-info", ".egg-info", ".pth")):
                             continue
-                        if not parts[-1].endswith(".py"):
+                        if parts[-1].endswith(".py"):
+                            parts[-1] = parts[-1][:-3]
+                        elif parts[-1].endswith((".so", ".pyd")):
+                            # extension module: `name.cpython-313-x86_64-linux-gnu.so`
+                            parts[-1] = parts[-1].split(".", 1)[0]
+                        else:
                             continue
-                        parts[-1] = parts[-1][:-3]
+                        try:
+                            files.add(os.path.realpath(dist.locate_file(path)))
+                        except Exception:
+                            pass
                         if parts[-1] == "__init__":
                             parts.pop()
                         if parts and all(part.isidentifier() for part in parts):
@@ -1021,9 +1039,64 @@ class SkillManager(Thread):
                     LOG.debug(f"Could not read the file list of {name}")
                 found[name] = {m for m in modules if m and m.isidentifier()}
                 self._distribution_owned[name] = owned
+                self._distribution_files[name] = files
         except Exception:
             LOG.exception("Could not read the modules of the changed distributions")
         return found
+
+    @staticmethod
+    def _modules_to_forget(owned: Set[str], top_levels: Set[str],
+                           files: Set[str]) -> Set[str]:
+        """The cached modules an upgrade of one distribution should drop.
+
+        Ownership is decided per module, not by name prefix. Two distributions
+        can install under one package -- `shared.plugin_a` from dist-a,
+        `shared.plugin_b` from dist-b, or both under `shared.plugins` -- and a
+        prefix match forgets the other one's unchanged code. A cached child of
+        an owned package is this distribution's only when its file is one this
+        distribution installed; a child with no file (created at runtime, or a
+        namespace portion) goes with its parent.
+
+        A parent that still has a retained child is kept. Python binds a
+        submodule onto its parent only when the submodule is imported, so a
+        re-imported parent would lose the binding to a child that stayed in
+        the cache -- `shared.plugin_b` would still import, but `shared` would
+        no longer have it. A forgotten child of a kept parent is rebound onto
+        it by the import that reads the new code.
+
+        Without a readable file list this falls back to the broader top-level
+        rule, rather than forget nothing.
+        """
+        cached = list(sys.modules.items())
+        doomed: Set[str] = set()
+        if owned:
+            for module_name, module in cached:
+                if module_name in owned:
+                    doomed.add(module_name)
+                    continue
+                if not any(module_name.startswith(f"{m}.") for m in owned):
+                    continue
+                path = getattr(module, "__file__", None)
+                if path is None:
+                    doomed.add(module_name)
+                elif isinstance(path, (str, os.PathLike)) \
+                        and os.path.realpath(path) in files:
+                    doomed.add(module_name)
+        else:
+            doomed = {module_name for module_name, _ in cached
+                      if module_name in top_levels
+                      or any(module_name.startswith(f"{m}.") for m in top_levels)}
+
+        names = [module_name for module_name, _ in cached]
+        changed = True
+        while changed:
+            changed = False
+            for parent in sorted(doomed):
+                if any(child.startswith(f"{parent}.") and child not in doomed
+                       for child in names):
+                    doomed.discard(parent)
+                    changed = True
+        return doomed
 
     def _forget_upgraded_dependencies(self) -> List[str]:
         """Drop upgraded DEPENDENCIES from the import cache, not just skills.
@@ -1082,29 +1155,11 @@ class SkillManager(Thread):
             if not modules:
                 continue
             dropped = False
-            # Children are taken from the distribution's own recorded modules,
-            # so a sibling package that merely shares a namespace prefix is
-            # left alone. Falling back to the top level keeps the old,
-            # broader behaviour only when the file list could not be read.
             owned = {m for m in self._distribution_owned.get(name) or set()
                      if m.split(".")[0] in modules}
-            if owned:
-                # Exactly what this distribution ships, plus anything under one
-                # of its SUBmodules. The top level is deliberately not expanded:
-                # `shared` can be a namespace two distributions share, and
-                # expanding it is what forgot `shared.plugin_b` on an upgrade of
-                # the distribution that only owns `shared.plugin_a`.
-                deeper = {m for m in owned if "." in m}
-                def _ours(module: str) -> bool:
-                    return (module in owned
-                            or any(module.startswith(f"{m}.") for m in deeper))
-            else:
-                # No readable file list: fall back to the old, broader rule
-                # rather than forget nothing at all.
-                def _ours(module: str) -> bool:
-                    return (module in modules
-                            or any(module.startswith(f"{m}.") for m in modules))
-            for cached in [n for n in list(sys.modules) if _ours(n)]:
+            doomed = self._modules_to_forget(
+                owned, modules, self._distribution_files.get(name) or set())
+            for cached in sorted(doomed):
                 sys.modules.pop(cached, None)
                 dropped = True
             if dropped:

@@ -1843,10 +1843,15 @@ class TestUpgradedDependencyForget(TestCase):
         self.manager._distribution_owned = {
             "dist-a": {"shared", "shared.plugin_a"},
         }
-        mine, theirs = Mock(), Mock()
+        self.manager._distribution_files = {
+            "dist-a": {"/site/shared/__init__.py", "/site/shared/plugin_a.py"},
+        }
+        parent = Mock(__file__="/site/shared/__init__.py")
+        mine = Mock(__file__="/site/shared/plugin_a.py")
+        theirs = Mock(__file__="/site/shared/plugin_b.py")
         with installed, module_map, patch.dict(
             sys.modules,
-            {"shared": mine, "shared.plugin_a": mine, "shared.plugin_b": theirs},
+            {"shared": parent, "shared.plugin_a": mine, "shared.plugin_b": theirs},
             clear=False,
         ):
             self.assertEqual(
@@ -1854,6 +1859,83 @@ class TestUpgradedDependencyForget(TestCase):
             self.assertNotIn("shared.plugin_a", sys.modules)
             self.assertIs(sys.modules.get("shared.plugin_b"), theirs,
                           "another distribution's module was forgotten")
+            # Re-importing `shared` would drop its binding to the plugin_b
+            # that stayed cached, so the parent stays too.
+            self.assertIs(sys.modules.get("shared"), parent,
+                          "a parent with a retained child was forgotten")
+
+    def test_a_sibling_under_a_shared_subpackage_is_not_forgotten(self):
+        """Both distributions under `shared.plugins`, which dist-a ships.
+
+        Matching by prefix under an owned SUBpackage is still a guess: dist-a
+        owns `shared.plugins`, so `shared.plugins.b` from dist-b matched
+        `shared.plugins.` and went with it. Ownership is by file.
+        """
+        installed, module_map = self._manager_seeing(
+            {"dist-a": "1.0"}, {"dist-a": "2.0"}, {"dist-a": {"shared"}},
+        )
+        self.manager._distribution_owned = {
+            "dist-a": {"shared.plugins", "shared.plugins.a"},
+        }
+        self.manager._distribution_files = {
+            "dist-a": {"/site/shared/plugins/__init__.py",
+                       "/site/shared/plugins/a.py"},
+        }
+        plugins = Mock(__file__="/site/shared/plugins/__init__.py")
+        mine = Mock(__file__="/site/shared/plugins/a.py")
+        theirs = Mock(__file__="/site/shared/plugins/b.py")
+        with installed, module_map, patch.dict(
+            sys.modules,
+            {"shared.plugins": plugins, "shared.plugins.a": mine,
+             "shared.plugins.b": theirs},
+            clear=False,
+        ):
+            self.assertEqual(
+                self.manager._forget_upgraded_dependencies(), ["dist-a"])
+            self.assertNotIn("shared.plugins.a", sys.modules)
+            self.assertIs(sys.modules.get("shared.plugins.b"), theirs,
+                          "another distribution's module was forgotten")
+            self.assertIs(sys.modules.get("shared.plugins"), plugins)
+
+    def test_an_owned_package_goes_whole_when_nothing_else_lives_in_it(self):
+        """The file rule must not turn into forgetting too little: an owned
+        package, its files and a runtime-made child with no file all go."""
+        installed, module_map = self._manager_seeing(
+            {"dist-a": "1.0"}, {"dist-a": "2.0"}, {"dist-a": {"pkg"}},
+        )
+        self.manager._distribution_owned = {"dist-a": {"pkg", "pkg.core"}}
+        self.manager._distribution_files = {
+            "dist-a": {"/site/pkg/__init__.py", "/site/pkg/core.py"},
+        }
+        with installed, module_map, patch.dict(
+            sys.modules,
+            {"pkg": Mock(__file__="/site/pkg/__init__.py"),
+             "pkg.core": Mock(__file__="/site/pkg/core.py"),
+             "pkg.generated": Mock(__file__=None)},
+            clear=False,
+        ):
+            self.assertEqual(
+                self.manager._forget_upgraded_dependencies(), ["dist-a"])
+            for name in ("pkg", "pkg.core", "pkg.generated"):
+                self.assertNotIn(name, sys.modules)
+
+    def test_what_skill_discovery_imports_is_not_protected(self):
+        """The snapshot is taken before `find_skill_plugins()`.
+
+        Discovery loads every skill entry point, which imports the skills and
+        the libraries they use. Snapshotting after it protected exactly the
+        dependency this feature exists to refresh -- `thalovant_skillkit`
+        among them -- so its upgrade was never forgotten.
+        """
+        def discover():
+            sys.modules["imported_by_a_skill"] = Mock()
+            return {}
+
+        with patch("ovos_core.skill_manager.find_skill_plugins",
+                   side_effect=discover), \
+                patch.dict(sys.modules, {}, clear=False):
+            manager = SkillManager(Mock())
+            self.assertNotIn("imported_by_a_skill", manager._protected_modules)
 
     def test_a_live_runtime_package_beyond_the_named_six_is_protected(self):
         """The floor is not the whole runtime.
