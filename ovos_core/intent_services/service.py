@@ -608,20 +608,31 @@ class IntentService:
         """
         lang = standardize_lang(lang)
         sess = SessionManager.fold_inbound(message)
+        # OVOS-SESSION-1 §3.2.7: "Resolution reads the signals; it MUST NOT
+        # mutate them", and "The resolved tag MUST travel with the utterance
+        # so that every downstream consumer reads the same value". So the tag
+        # goes on the message and NOT onto session.lang, which §3.2.1 defines
+        # as "stable across the session, not derived from any one utterance" —
+        # a preference declared by the session origin, where detected_lang and
+        # stt_lang are the per-utterance observations the resolver read to get
+        # here (§3.2, "one purpose per field, no overlaps").
+        #
+        # The default session must not take a per-utterance lang. Writing it
+        # back made one tagged utterance permanent: a detected_lang of en on an
+        # nl-NL deployment moved the default store to en-US, the orchestrator
+        # broadcast that store to every process, and every later untagged
+        # utterance then resolved en-US from it.
+        #
+        # This forbids the RESOLVER only. An OVOS-TRANSFORM-1 §7.1 utterance
+        # transformer may still overwrite session.lang when a confident
+        # classification warrants persisting it, at a SESSION-2 §2.6 boundary.
+        message.data["lang"] = lang
         if sess.is_default:
-            updated = False
             # Default session, check if it needs to be (re)-created
             if sess.expired():
                 sess = SessionManager.reset_default_session()
-                updated = True
-            if lang != sess.lang:
-                sess.lang = lang
-                updated = True
-            if updated:
                 SessionManager.update(sess)
                 SessionManager.sync(message)
-        else:
-            sess.lang = lang
         sess.touch()
         return sess
 
