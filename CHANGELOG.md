@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.7.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.2a1) (2026-09-28)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.1a3...3.7.2a1)
+
+**Merged pull requests:**
+
+- fix\(session\): the match language is not the session preference [\#1018](https://github.com/OpenVoiceOS/ovos-core/pull/1018) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [3.7.1a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.1a3) (2026-09-26)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.1a2...3.7.1a3)
@@ -363,10 +371,6 @@
 ## [3.2.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.1a1) (2026-09-02)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.0a1...3.2.1a1)
-
-**Closed issues:**
-
-- User story: "what did you just say" — repeat the last spoken response [\#910](https://github.com/OpenVoiceOS/ovos-core/issues/910)
 
 ## [3.2.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.0a1) (2026-09-01)
 
