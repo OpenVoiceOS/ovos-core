@@ -1,0 +1,13 @@
+name: Release Preview
+
+on:
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+jobs:
+  release_preview:
+    uses: OpenVoiceOS/gh-automations/.github/workflows/release-preview.yml@dev
+    secrets: inherit
+    with:
+      version_file: 'ovos_core/version.py'
