@@ -18,9 +18,10 @@ import os
 import sys
 import threading
 import time
-from importlib.metadata import entry_points
+from importlib.metadata import distributions, entry_points
+from packaging.utils import canonicalize_name
 from threading import Thread, Event
-from typing import Callable, Dict, List, Optional, Set
+from typing import Callable, Dict, FrozenSet, List, Optional, Set
 
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
@@ -69,6 +70,43 @@ def on_error(e: str = 'Unknown') -> None:
 def on_stopping() -> None:
     LOG.info('Skills Manager is shutting down...')
 
+
+#: Modules the runtime is itself built from. A changed distribution that
+#: installs one of these is NOT forgotten: re-importing it under a live
+#: process leaves every running skill an instance of a class its own module
+#: no longer defines, which trades a dead skill for a corrupt one. A change
+#: here legitimately needs the process to restart.
+PROTECTED_RUNTIME_MODULES = frozenset({
+    "ovos_core",
+    "ovos_bus_client",
+    "ovos_config",
+    "ovos_plugin_manager",
+    "ovos_utils",
+    "ovos_workshop",
+})
+
+
+def _live_runtime_modules() -> FrozenSet[str]:
+    """Top-level packages this process has already imported, plus the floor.
+
+    The named six are the ones that are always the runtime. They are not all
+    of it: importing ``ovos_core.skill_manager`` alone pulls in nine more --
+    ``padacioso``, ``quebra_frases``, ``ovos_spec_tools``, ``langcodes``,
+    ``combo_lock``, ``ovos_number_parser``, ``ovos_yes_no``,
+    ``ovos_option_matcher_fuzzy``, ``ovos_gui_api_client`` -- and a live
+    manager holds live objects from them. Forgetting one and re-importing it
+    leaves ``isinstance(running_thing, new_module.Thing)`` False, which is the
+    corrupt-skill outcome the floor exists to prevent, so anything already
+    imported when the manager starts is protected too.
+
+    A snapshot, not a live read: a module a SKILL imports after start is not
+    the runtime and stays evictable, which is the whole point of the feature.
+    """
+    imported = {name.split(".", 1)[0] for name in list(sys.modules)}
+    return frozenset(PROTECTED_RUNTIME_MODULES | {
+        name for name in imported if name and name.isidentifier()
+        and not name.startswith("_")
+    })
 
 class SkillManager(Thread):
     """Manages the loading, activation, and deactivation of Mycroft skills."""
@@ -122,6 +160,11 @@ class SkillManager(Thread):
         self._network_skill_timeout = 300
         self._allow_state_reloads = True
         self._logged_skill_warnings = set()
+        # Taken BEFORE skill discovery: find_skill_plugins() loads every skill
+        # entry point, which imports the skills and their libraries. A snapshot
+        # after it would protect exactly the dependencies this manager exists
+        # to refresh -- thalovant-skillkit among them.
+        self._protected_modules = _live_runtime_modules()
         self._detected_installed_skills = bool(find_skill_plugins())
         if not self._detected_installed_skills:
             LOG.warning(
@@ -151,6 +194,19 @@ class SkillManager(Thread):
         #: The installed version each loaded plugin skill was built from,
         #: so an upgrade in place can be told from the version running.
         self._plugin_skill_versions: Dict[str, str] = {}
+        # Every installed distribution's version, as of the last installer
+        # run. A skill's own package is not the only thing an install can
+        # replace: see `_forget_upgraded_dependencies`. Taken when skills are
+        # first loaded rather than here -- reading every distribution costs a
+        # quarter of a second, and nothing can have been upgraded before the
+        # first load anyway. None until a scan has actually succeeded: an
+        # empty reading is a real answer on a runtime with nothing installed,
+        # and must not be confused with never having looked.
+        self._distribution_versions: Optional[Dict[str, str]] = None
+        #: dotted modules each distribution ships, filled by _modules_of
+        self._distribution_owned: Dict[str, Set[str]] = {}
+        #: resolved file paths each distribution ships, filled by _modules_of
+        self._distribution_files: Dict[str, Set[str]] = {}
         # skill_id -> (attempt_count, last_attempt_time) for plugin skills whose
         # load raised before a loader object existed (see _load_plugin_skill).
         # These are retried with an exponential backoff instead of every scan.
@@ -467,6 +523,14 @@ class SkillManager(Thread):
         Returns:
             List[str]: Ids of the skills this call loaded, in discovery order.
         """
+        if self._distribution_versions is None:
+            # The baseline an installer run is later compared against. Seeded
+            # here because this is what every startup path reaches -- the
+            # usual one is `_load_new_skills`, which never calls
+            # `load_plugin_skills` -- and this is the first moment there are
+            # skills to upgrade. Doing it in `__init__` made every test that
+            # builds a manager pay for a full distribution scan.
+            self._distribution_versions = self._installed_distributions()
         loaded: List[str] = []
         if network is None:
             network = self._network_event.is_set()
@@ -776,11 +840,15 @@ class SkillManager(Thread):
         Args:
             message: ``ovos.skills.install.complete`` or ``ovos.pip.install.complete``.
         """
-        # Upgrades first, and the order matters. Discovery imports the entry
-        # points it finds, so a rescan run before the upgraded packages are
-        # forgotten would build any newly declared skill from the *old*
-        # modules still in `sys.modules`, record it against the new version,
-        # and leave the upgrade check with nothing to tell apart.
+        # Upgrades first, and the order matters. Everything below imports:
+        # a skill rebuilt while an upgraded dependency is still cached is
+        # built against the old library, and one needing a symbol only the
+        # new library has cannot be built at all. A rescan run first would
+        # build a newly declared skill from the stale modules and record it
+        # against the new version, leaving the upgrade check nothing to see.
+        forgotten = self._forget_upgraded_dependencies()
+        if forgotten:
+            LOG.info(f"Forgot upgraded dependencies before reloading: {forgotten}")
         reloaded = self._reload_upgraded_plugin_skills()
         if reloaded:
             LOG.info(f"Reloaded skills the installer upgraded: {reloaded}")
@@ -867,6 +935,240 @@ class SkillManager(Thread):
         except Exception:
             LOG.exception("Could not read the declared skill versions")
         return versions
+
+    @staticmethod
+    def _installed_distributions() -> Optional[Dict[str, str]]:
+        """Every installed distribution's version, read without importing.
+
+        Deliberately does NOT read each distribution's file list: that parses
+        a RECORD per package and this runs at every install. The modules are
+        read separately, for the handful that actually changed.
+
+        Returns:
+            Normalized distribution name to version, or None if the scan
+            itself failed. The two are not the same: a runtime with nothing
+            installed legitimately reads empty, and treating a failed scan as
+            empty would let the next install record a post-upgrade baseline
+            and forget nothing, for the life of the process.
+        """
+        versions: Dict[str, str] = {}
+        try:
+            for dist in distributions():
+                name = (dist.metadata["Name"] if dist.metadata else None) or ""
+                version = getattr(dist, "version", None)
+                key = canonicalize_name(name.strip()) if name.strip() else ""
+                # FIRST wins, not last. One name can be installed twice on one
+                # path -- a hosted runtime installs skills into a writable venv
+                # layered over the image's, and both copies are returned here.
+                # `distributions()` walks sys.path in order, so the first is the
+                # one an import actually gets; recording the later one pins the
+                # version to a copy nothing ever imports, and an upgrade of the
+                # live copy then looks like no change at all.
+                if key and version and key not in versions:
+                    versions[key] = str(version)
+        except Exception:
+            LOG.exception("Could not read the installed distributions")
+            return None
+        return versions
+
+    def _modules_of(self, names: Set[str]) -> Dict[str, Set[str]]:
+        """The top-level modules each named distribution installs.
+
+        One pass for all of them. ``top_level.txt`` when the wheel carries
+        one, and otherwise the first path component of the files it recorded.
+        Nothing is imported.
+        """
+        found: Dict[str, Set[str]] = {}
+        if not names:
+            return found
+        try:
+            for dist in distributions():
+                raw = (dist.metadata["Name"] if dist.metadata else None) or ""
+                name = canonicalize_name(raw.strip()) if raw.strip() else ""
+                if name not in names or name in found:
+                    continue
+                modules: Set[str] = set()
+                try:
+                    declared = dist.read_text("top_level.txt") or ""
+                    modules.update(line.strip() for line in declared.splitlines() if line.strip())
+                    if not modules:
+                        for path in dist.files or []:
+                            head = str(path).split("/")[0]
+                            if head and not head.endswith((".dist-info", ".egg-info", ".pth")):
+                                if head.endswith(".py"):
+                                    head = head[:-3]
+                                elif head.endswith((".so", ".pyd")):
+                                    head = head.split(".", 1)[0]
+                                modules.add(head)
+                except Exception:
+                    # Left out of the result on purpose. The caller holds that
+                    # distribution at its old version so the next install
+                    # tries again, instead of recording the upgrade as done.
+                    LOG.debug(f"Could not read the modules of {name}")
+                    continue
+                # The dotted modules this distribution actually ships, not
+                # just their top level. Two distributions can share a
+                # namespace -- `shared` from dist-a and `shared.plugin_b` from
+                # dist-b -- and evicting everything under a shared top level
+                # would forget the other distribution's code on an upgrade
+                # that never touched it.
+                owned: Set[str] = set()
+                files: Set[str] = set()
+                try:
+                    for path in dist.files or []:
+                        parts = [part for part in str(path).split("/") if part]
+                        if not parts or parts[0].endswith(
+                                (".dist-info", ".egg-info", ".pth")):
+                            continue
+                        if parts[-1].endswith(".py"):
+                            parts[-1] = parts[-1][:-3]
+                        elif parts[-1].endswith((".so", ".pyd")):
+                            # extension module: `name.cpython-313-x86_64-linux-gnu.so`
+                            parts[-1] = parts[-1].split(".", 1)[0]
+                        else:
+                            continue
+                        try:
+                            files.add(os.path.realpath(dist.locate_file(path)))
+                        except Exception:
+                            pass
+                        if parts[-1] == "__init__":
+                            parts.pop()
+                        if parts and all(part.isidentifier() for part in parts):
+                            owned.add(".".join(parts))
+                except Exception:
+                    LOG.debug(f"Could not read the file list of {name}")
+                found[name] = {m for m in modules if m and m.isidentifier()}
+                self._distribution_owned[name] = owned
+                self._distribution_files[name] = files
+        except Exception:
+            LOG.exception("Could not read the modules of the changed distributions")
+        return found
+
+    @staticmethod
+    def _modules_to_forget(owned: Set[str], top_levels: Set[str],
+                           files: Set[str]) -> Set[str]:
+        """The cached modules an upgrade of one distribution should drop.
+
+        Ownership is decided per module, not by name prefix. Two distributions
+        can install under one package -- `shared.plugin_a` from dist-a,
+        `shared.plugin_b` from dist-b, or both under `shared.plugins` -- and a
+        prefix match forgets the other one's unchanged code. A cached child of
+        an owned package is this distribution's only when its file is one this
+        distribution installed; a child with no file (created at runtime, or a
+        namespace portion) goes with its parent.
+
+        A parent that still has a retained child is kept. Python binds a
+        submodule onto its parent only when the submodule is imported, so a
+        re-imported parent would lose the binding to a child that stayed in
+        the cache -- `shared.plugin_b` would still import, but `shared` would
+        no longer have it. A forgotten child of a kept parent is rebound onto
+        it by the import that reads the new code.
+
+        Without a readable file list this falls back to the broader top-level
+        rule, rather than forget nothing.
+        """
+        cached = list(sys.modules.items())
+        doomed: Set[str] = set()
+        if owned:
+            for module_name, module in cached:
+                if module_name in owned:
+                    doomed.add(module_name)
+                    continue
+                if not any(module_name.startswith(f"{m}.") for m in owned):
+                    continue
+                path = getattr(module, "__file__", None)
+                if path is None:
+                    doomed.add(module_name)
+                elif isinstance(path, (str, os.PathLike)) \
+                        and os.path.realpath(path) in files:
+                    doomed.add(module_name)
+        else:
+            doomed = {module_name for module_name, _ in cached
+                      if module_name in top_levels
+                      or any(module_name.startswith(f"{m}.") for m in top_levels)}
+
+        names = [module_name for module_name, _ in cached]
+        changed = True
+        while changed:
+            changed = False
+            for parent in sorted(doomed):
+                if any(child.startswith(f"{parent}.") and child not in doomed
+                       for child in names):
+                    doomed.discard(parent)
+                    changed = True
+        return doomed
+
+    def _forget_upgraded_dependencies(self) -> List[str]:
+        """Drop upgraded DEPENDENCIES from the import cache, not just skills.
+
+        `_forget_skill_modules` forgets the skill's own package. That is not
+        enough: an installer upgrading a skill upgrades whatever the new
+        version requires, and a shared helper library is the common case. The
+        process keeps the old library in `sys.modules` for ever, so every
+        skill reloaded afterwards is built against it -- and one that needs a
+        symbol only the new version has cannot import at all.
+
+        Seen in production on 2026-09-22: `thalovant-skillkit` went 0.16.0 ->
+        0.18.0 as a dependency of a skill upgrade, and the next three skills
+        to reload each died on a name the running copy did not have --
+        `ShuffleBagPool`, `combined_lines`, `ThalovantConversationalCommonPlaySkill`.
+        All three were on disk. The manager logged "not discoverable after
+        its upgrade, leaving it unloaded" and gave up, and only a restart of
+        the process brought them back.
+
+        The runtime's own machinery is never forgotten. Re-importing it under
+        a live process would leave running skills as instances of classes
+        their own module no longer defines; a change there is a restart, and
+        pretending otherwise would trade a dead skill for a corrupt one.
+
+        Returns:
+            List[str]: The distributions whose modules this call forgot.
+        """
+        previous = self._distribution_versions
+        current = self._installed_distributions()
+        if current is None:
+            # The baseline stands. Replacing it with a guess would be worse
+            # than knowing nothing about this install.
+            return []
+        if previous is None:
+            self._distribution_versions = current
+            return []
+        changed = {name for name, version in current.items()
+                   if name in previous and previous[name] != version}
+        if not changed:
+            self._distribution_versions = current
+            return []
+        installs = self._modules_of(changed)
+        # A changed distribution whose modules could not be read keeps its old
+        # version, so the next install sees it as changed and tries again. Any
+        # other outcome would record an upgrade that was never acted on and
+        # leave the stale modules cached until the process restarts.
+        self._distribution_versions = {
+            name: (version if name not in changed or name in installs
+                   else previous.get(name, version))
+            for name, version in current.items()
+        }
+        forgotten: List[str] = []
+        for name in sorted(changed):
+            modules = {module for module in installs.get(name, set())
+                       if module not in self._protected_modules}
+            if not modules:
+                continue
+            dropped = False
+            owned = {m for m in self._distribution_owned.get(name) or set()
+                     if m.split(".")[0] in modules}
+            doomed = self._modules_to_forget(
+                owned, modules, self._distribution_files.get(name) or set())
+            for cached in sorted(doomed):
+                sys.modules.pop(cached, None)
+                dropped = True
+            if dropped:
+                forgotten.append(name)
+                LOG.info(f"{name} changed {previous[name]} -> {current[name]}; "
+                         "forgetting its modules so reloads read the new code")
+        if forgotten:
+            importlib.invalidate_caches()
+        return forgotten
 
     def _forget_skill_modules(self, skill_id: str) -> None:
         """Drop a skill's package from the import cache so it is read again.
