@@ -557,3 +557,198 @@ def test_no_suffixed_pip_topic_is_registered(skills_store):
     suffixed = [e for e in skills_store.bus.event_handlers
                 if e.startswith("ovos.pip.") and e.count(".") > 2]
     assert suffixed == []
+
+
+@pytest.mark.parametrize("line,expected", [
+    ("ovos-core==3.7.0a1", "ovos-core"),
+    ("  ovos-core==1.0", "ovos-core"),                      # indented
+    ("ovos-core[extra]==1.0", "ovos-core"),                 # extras
+    ("ovos-core ; python_version < '3.12'", "ovos-core"),   # marker, no version
+    ("OVOS_Core >= 1.0", "ovos-core"),
+    ("ovos-core!=1.0", "ovos-core"),
+    ("ovos-persona==0.9.0a26  # pinned to the fork", "ovos-persona"),
+    ("# Keep runtime skill installs on the validated OVOS line.", None),
+    ("", None),
+    ("   ", None),
+    ("-r other-constraints.txt", None),
+    ("--index-url https://example.invalid/simple", None),
+])
+def test_constrained_name_reads_only_requirement_lines(line, expected):
+    """A constraints file is not a list of package names."""
+    assert SkillsStore._constrained_name(line) == expected
+
+
+@pytest.mark.parametrize("pin", [
+    "  ovos-core==1.0",                      # leading whitespace survived canonicalize_name
+    "ovos-core[extra]==1.0",                 # extras were left on the name
+    "ovos-core ; python_version < '3.12'",   # the marker was split on '<', not stripped
+])
+def test_a_pin_still_protects_when_the_line_is_not_bare(skills_store, tmp_path, pin):
+    """The real defect, and it under-protects.
+
+    The name was taken by splitting on the version operators alone, so
+    anything else on the line stayed attached to it: '  ovos-core==1.0'
+    yielded '  ovos-core', which is not 'ovos-core' to canonicalize_name.
+    A pin written any of these perfectly ordinary ways protected nothing,
+    and the package it named could be uninstalled over the bus.
+    """
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text(f"# a comment\n{pin}\n")
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+    res = skills_store.pip_uninstall(["ovos-core"], constraints=str(constraints))
+    assert res is False, f"{pin!r} must protect ovos-core"
+    skills_store._run_pip.assert_not_called()
+    skills_store.play_error_sound.assert_called_once()
+
+
+def test_a_package_named_only_in_a_comment_is_not_protected(skills_store, tmp_path):
+    """Comments are prose. They never named a distribution, and must not."""
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text(
+        "# ovos-core is pinned elsewhere; this line is prose, not a pin.\n"
+        "--index-url https://example.invalid/simple\n"
+        "some-other-package==1.0\n"
+    )
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+    assert skills_store.pip_uninstall(["ovos-core"], constraints=str(constraints)) is True
+    skills_store.play_error_sound.assert_not_called()
+
+
+@pytest.mark.parametrize("entry", ["-r evil.txt", "--index-url https://evil.invalid",
+                                   "  --break-system-packages", "-e ."])
+def test_pip_uninstall_refuses_option_like_package_names(skills_store, tmp_path, entry):
+    """Each requested name is forwarded to pip/uv on its own command line.
+
+    An entry that is really an option is read as one, and canonicalizing it
+    first does not help -- it matches no protected name, so the guard waves
+    it through. It has to be refused before anything else looks at it.
+    """
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text("ovos-core==1.0\n")
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+    assert skills_store.pip_uninstall([entry], constraints=str(constraints)) is False
+    skills_store._run_pip.assert_not_called()
+    skills_store.play_error_sound.assert_called_once()
+
+
+@pytest.mark.parametrize("include", ["-r base.txt", "-c shared.txt",
+                                     "--requirement base.txt", "--constraint=shared.txt"])
+def test_pip_uninstall_refuses_when_the_constraints_include_another_file(
+        skills_store, tmp_path, include):
+    """An include pulls in pins this file does not list.
+
+    The protected set built from this text alone is then not the set pip would
+    apply, so proceeding would under-protect -- the failure this guard exists
+    to prevent. Refusing is the only safe answer.
+    """
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text(f"# a comment\n{include}\nsome-package==1.0\n")
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+    assert skills_store.pip_uninstall(["anything"], constraints=str(constraints)) is False
+    skills_store._run_pip.assert_not_called()
+    skills_store.play_error_sound.assert_called_once()
+
+
+def test_an_ordinary_option_line_is_not_an_include(skills_store, tmp_path):
+    """--index-url and friends add no pins, so they must not block a uninstall."""
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text("--index-url https://example.invalid/simple\nsome-package==1.0\n")
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+    assert skills_store.pip_uninstall(["unrelated-package"], constraints=str(constraints)) is True
+    skills_store.play_error_sound.assert_not_called()
+
+
+# --------------------------------------------------------------------------
+# A pin the parser cannot read must not fail open
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("pin", [
+    "https://files.pythonhosted.org/packages/ovos_core-1.0.0-py3-none-any.whl",
+    "/opt/wheels/ovos_core-1.0.0-py3-none-any.whl",
+    "-e git+https://github.com/OpenVoiceOS/ovos-core@v1.0#egg=ovos-core",
+    "git+https://github.com/OpenVoiceOS/ovos-core@v1.0#egg=ovos_core",
+    "https://example.invalid/ovos_core-1.0.0.tar.gz",
+])
+def test_a_pin_by_url_or_vcs_still_protects(skills_store, tmp_path, pin):
+    """Each of these names ovos-core to a reader, so each must protect it.
+
+    Splitting on the version operators produced the whole URL as a "name",
+    which matched no package, and an ``#egg=`` fragment was thrown away as a
+    comment before it could be read. Both left ovos-core removable over the
+    bus on a deployment that pins it this way.
+    """
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text(f"# a comment\n{pin}\n")
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+
+    assert skills_store.pip_uninstall(
+        ["ovos-core"], constraints=str(constraints)) is False, \
+        f"{pin!r} must protect ovos-core"
+    skills_store._run_pip.assert_not_called()
+
+
+def test_a_requirement_line_with_no_readable_name_is_refused(skills_store, tmp_path):
+    """The same answer the include guard already gives, for the same reason.
+
+    A line that carries a requirement but yields no distribution leaves the
+    protected set smaller than the one pip would apply. Guessing is the
+    fail-open this guard exists to prevent.
+    """
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text("git+https://github.com/some/repo@main\n")
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+
+    assert skills_store.pip_uninstall(
+        ["something-else"], constraints=str(constraints)) is False
+    skills_store._run_pip.assert_not_called()
+    skills_store.play_error_sound.assert_called_once()
+
+
+def test_comments_and_options_are_still_not_refused(skills_store, tmp_path):
+    """Failing closed must not mean refusing an ordinary constraints file."""
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text(
+        "# prose\n"
+        "\n"
+        "--index-url https://example.invalid/simple\n"
+        "some-other-package==1.0\n"
+        "ovos_core[extra]>=1.0 ; python_version > '3.9'\n"
+    )
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+
+    assert skills_store.pip_uninstall(
+        ["some-unrelated-thing"], constraints=str(constraints)) is True
+    skills_store.play_error_sound.assert_not_called()
+
+
+@pytest.mark.parametrize("pin", [
+    "ovos-core==1.0 #egg=other",
+    "ovos-core==1.0   # pinned here; see #egg=other",
+    "ovos-core @ git+https://github.com/OpenVoiceOS/ovos-core@v1.0#egg=other",
+])
+def test_a_fragment_cannot_rename_a_pin(skills_store, tmp_path, pin):
+    """``#egg=`` names a distribution only on a URL or VCS target.
+
+    Reading it before stripping comments let a comment rename the pin: the
+    protected set held "other" and ovos-core could be uninstalled over the
+    bus. pip treats a whitespace-prefixed ``#`` as a comment, and for a PEP 508
+    ``name @ url`` it takes the name before ``@``; the guard has to agree.
+    """
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text(f"{pin}\n")
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+
+    assert skills_store.pip_uninstall(
+        ["ovos-core"], constraints=str(constraints)) is False, \
+        f"{pin!r} must protect ovos-core"
+    skills_store._run_pip.assert_not_called()
