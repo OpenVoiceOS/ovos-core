@@ -87,5 +87,21 @@ class TestStopServiceRealLocale(unittest.TestCase):
             svc._locale.voc_match("como esta o tempo hoje", "stop", "pt-PT", exact=True))
 
 
+class TestStopServiceNlBeFallsBackToNlNl(unittest.TestCase):
+    """``locale/nl-be`` carried a ``stop`` role but no ``global_stop`` role at
+    all, so a ``nl-BE`` request matched zero global-stop utterances.
+    OVOS-INTENT-2 §2.2 falls a requested tag back to the closest available
+    directory; with the ``nl-be`` tree folded into ``nl-nl``, ``nl-NL`` is
+    that closest match and serves the full vocabulary for both roles."""
+
+    def test_nl_be_resolves_stop_vocab(self):
+        svc = _make_real_service()
+        self.assertEqual(len(svc._locale.voc_list("stop", "nl-BE")), 17)
+
+    def test_nl_be_resolves_global_stop_vocab(self):
+        svc = _make_real_service()
+        self.assertEqual(len(svc._locale.voc_list("global_stop", "nl-BE")), 24)
+
+
 if __name__ == '__main__':
     unittest.main()
