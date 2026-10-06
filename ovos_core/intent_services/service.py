@@ -967,7 +967,26 @@ class IntentService:
                 sess = SessionManager.update(updated)
                 open_round(message, sess)
                 SessionManager.bind(message, sess)
-        sess.lang = lang  # ensure it is updated
+        # OVOS-SESSION-1 §3.2.1 makes ``lang`` the participant's standing
+        # input-side preference — "stable across the session, not derived from
+        # any one utterance" — and §3.2.7 says intake resolution "reads the
+        # signals; it MUST NOT mutate them". Under ``multilingual_matching``
+        # the plugin is called once per candidate language, so ``lang`` here
+        # can be a member of ``secondary_langs``. Writing it back would make
+        # the match language the session's preference, and for the default
+        # session ``sess`` IS the §5.1 store, so the flip would outlive the
+        # round and reach every later utterance. It would also break §3.2.2,
+        # which forbids ``secondary_langs`` from containing ``lang``.
+        #
+        # OVOS-SESSION-2 §5.1 enumerates the writes that apply on top of a
+        # committed ``Match.updated_session`` — the PIPELINE-1 §7.1
+        # ``active_handlers`` push and the OVOS-CONTEXT-1 §5.3
+        # ``intent_context`` merge — and ``lang`` is not one of them.
+        #
+        # The match language reaches the handler where the specifications put
+        # it: ``reply.data["lang"]`` (§3.2.8, the payload content language,
+        # which ``get_message_lang`` reads before the session) and the §9.2
+        # ``ovos.intent.matched`` notification, both set below.
 
         # Launch intent handler
         if match.match_type:
