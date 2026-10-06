@@ -752,3 +752,86 @@ def test_a_fragment_cannot_rename_a_pin(skills_store, tmp_path, pin):
         ["ovos-core"], constraints=str(constraints)) is False, \
         f"{pin!r} must protect ovos-core"
     skills_store._run_pip.assert_not_called()
+
+
+# --------------------------------------------------------------------------
+# A request is a name, not a requirement
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("requested", [
+    "ovos-core>=0",
+    "ovos-core==1.0",
+    "OVOS_Core~=3.0",
+    "ovos-core[extra]",
+    'ovos-core ; python_version>"3"',
+    "ovos-core @ https://example.invalid/ovos_core-1.0-py3-none-any.whl",
+    "https://example.invalid/ovos_core-1.0-py3-none-any.whl",
+    "/opt/wheels/ovos_core-1.0-py3-none-any.whl",
+    "git+https://github.com/OpenVoiceOS/ovos-core@dev#egg=ovos-core",
+    " ovos-core",
+    "ovos-core ",
+    "ovos-core (>=0)",
+])
+@pytest.mark.parametrize('skills_store', [{"allow_pip": True}], indirect=True)
+def test_a_protected_package_cannot_be_uninstalled_as_a_requirement(
+        skills_store, tmp_path, requested):
+    """pip and uv uninstall by the distribution a requirement names.
+
+    Every one of these removes ovos-core when handed to ``pip uninstall`` or
+    ``uv pip uninstall``. The guard canonicalized the whole string and found
+    no protected name in it, so each reached pip over the bus.
+    """
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text("ovos-core==1.0\n")
+    skills_store.config["constraints"] = str(constraints)
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+
+    skills_store.handle_uninstall_python(
+        Message("ovos.pip.uninstall", {"packages": [requested]}))
+
+    skills_store._run_pip.assert_not_called()
+    assert skills_store.bus.message_types[-1] == "ovos.pip.uninstall.failed"
+
+
+@pytest.mark.parametrize('skills_store', [{"allow_pip": True}], indirect=True)
+def test_a_skill_uninstall_cannot_name_a_requirement(skills_store, tmp_path):
+    """ovos.skills.uninstall reaches the same guard with the same hole."""
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text("ovos-core==1.0\n")
+    skills_store.config["constraints"] = str(constraints)
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+
+    skills_store.handle_uninstall_skill(
+        Message("ovos.skills.uninstall", {"skill": "ovos-core>=0"}))
+
+    skills_store._run_pip.assert_not_called()
+    assert skills_store.bus.message_types[-1] == "ovos.skills.uninstall.failed"
+
+
+def test_one_requirement_refuses_the_whole_request(skills_store, tmp_path):
+    """Nothing is removed when any entry is refused, as for a protected name."""
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text("ovos-core==1.0\n")
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+
+    assert skills_store.pip_uninstall(
+        ["some-skill", "ovos-core>=0"], constraints=str(constraints)) is False
+    skills_store._run_pip.assert_not_called()
+    skills_store.play_error_sound.assert_called_once()
+
+
+@pytest.mark.parametrize("requested", ["some-skill", "Some_Skill", "skill.foo", "a", "x2"])
+def test_a_bare_unprotected_name_still_uninstalls(skills_store, tmp_path, requested):
+    """Refusing requirements must not refuse names."""
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text("ovos-core==1.0\n")
+    skills_store.play_error_sound = Mock()
+    skills_store._run_pip = Mock(return_value="ok")
+
+    assert skills_store.pip_uninstall([requested], constraints=str(constraints)) is True
+    assert skills_store._run_pip.call_args[0][0][-1] == requested
+    skills_store.play_error_sound.assert_not_called()

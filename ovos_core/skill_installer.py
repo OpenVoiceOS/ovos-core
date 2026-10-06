@@ -24,6 +24,10 @@ class InstallError(str, enum.Enum):
     NO_PKGS = "no packages to install"
 
 
+#: a bare distribution name (PEP 508 ``name``): no version, extras, marker,
+#: URL, path, option or surrounding whitespace
+_BARE_NAME = re.compile(r"[A-Z0-9](?:[A-Z0-9._-]*[A-Z0-9])?", re.IGNORECASE)
+
 #: how much of the installer's output a ``.failed`` reply carries in ``detail``
 FAILURE_DETAIL_CHARS = 2000
 
@@ -351,14 +355,21 @@ class SkillsStore:
         # Reading the line properly also keeps comments, blank lines and pip
         # options out of the set, so the refusal below can name the package it
         # refused instead of printing the whole file.
-        # Each requested name is forwarded to pip/uv on its own command line,
-        # so an entry that is really an option ("-r evil.txt", "--index-url
-        # ...") is read as one. Canonicalizing it first would not help: it
-        # matches no protected name, so the guard below waves it through.
-        # Refuse before anything else looks at it, for pip and uv alike.
-        option_like = [p for p in packages if str(p).strip().startswith("-")]
-        if option_like:
-            LOG.error(f'refusing option-like package names: {option_like}')
+        # Each requested entry is forwarded to pip/uv on its own command line,
+        # and both read it as a requirement, not a name: "ovos-core>=0",
+        # "ovos-core[extra]", "ovos-core ; python_version>'3'", "ovos-core @
+        # <url>", a wheel path and " ovos-core" all uninstall ovos-core. The
+        # guard below compares the canonicalized string, which for any of
+        # those is not "ovos-core", so it waved them through. An option ("-r
+        # evil.txt", "--index-url ...") is read as an option the same way.
+        # Uninstalling takes a name, so refuse anything that is not exactly
+        # one: then the string checked is the string pip/uv act on, and there
+        # is no second reading of a requirement here to drift from theirs.
+        not_names = [p for p in packages
+                     if not isinstance(p, str) or not _BARE_NAME.fullmatch(p)]
+        if not_names:
+            LOG.error('refusing entries that are not bare distribution names: '
+                      f'{not_names}')
             self.play_error_sound()
             return False
 
