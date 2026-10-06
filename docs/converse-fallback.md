@@ -132,7 +132,7 @@ Skills that participate in converse or fallback inherit from special base classe
 | `OVOSSkill` (base, has `self.converse()`) | `ovos_workshop.skills.ovos` | [`ovos-workshop/docs/ovos-skill.md`](../../ovos-workshop/docs/ovos-skill.md) |
 
 ### Mode enums (ovos-workshop)
-`ConverseMode`, `ConverseActivationMode`, and `FallbackMode` control who can participate and when. Defined in `ovos_workshop.skills.common_query_skill` and `ovos_workshop.skills` respectively → [`ovos-workshop/docs/permissions.md`](../../ovos-workshop/docs/permissions.md).
+`ConverseMode`, `ConverseActivationMode`, and `FallbackMode` control who can participate and when. All three are defined in `ovos_workshop.permissions` → [`ovos-workshop/docs/permissions.md`](../../ovos-workshop/docs/permissions.md).
 
 ### Session & active skills
 Active skills are tracked in `Session.active_skills` — `ovos_bus_client.session.Session`. The converse service reads and updates this list via `sess.activate_skill()` / `sess.deactivate_skill()`. See [`ovos-bus-client/docs/session.md`](../../ovos-bus-client/docs/session.md).
