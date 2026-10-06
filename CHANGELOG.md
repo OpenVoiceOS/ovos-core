@@ -1,5 +1,58 @@
 # Changelog
 
+## [3.7.2a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.2a2) (2026-10-01)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.2a1...3.7.2a2)
+
+**Merged pull requests:**
+
+- translate\(kab-DZ\): update global\_stop.voc [\#1020](https://github.com/OpenVoiceOS/ovos-core/pull/1020) ([ovos-localize[bot]](https://github.com/apps/ovos-localize))
+
+## [3.7.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.2a1) (2026-09-28)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.1a3...3.7.2a1)
+
+**Merged pull requests:**
+
+- fix\(session\): the match language is not the session preference [\#1018](https://github.com/OpenVoiceOS/ovos-core/pull/1018) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [3.7.1a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.1a3) (2026-09-26)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.1a2...3.7.1a3)
+
+**Merged pull requests:**
+
+- translate\(kab\): update stop.voc [\#1014](https://github.com/OpenVoiceOS/ovos-core/pull/1014) ([ovos-localize[bot]](https://github.com/apps/ovos-localize))
+
+## [3.7.1a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.1a2) (2026-09-26)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.1a1...3.7.1a2)
+
+**Merged pull requests:**
+
+- translate\(kab\): update global\_stop.voc [\#1013](https://github.com/OpenVoiceOS/ovos-core/pull/1013) ([ovos-localize[bot]](https://github.com/apps/ovos-localize))
+
+## [3.7.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.1a1) (2026-09-25)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.0a2...3.7.1a1)
+
+**Closed issues:**
+
+- A pip upgrade of a loaded plugin skill leaves the old code and intent files running [\#990](https://github.com/OpenVoiceOS/ovos-core/issues/990)
+
+**Merged pull requests:**
+
+- fix: scope the fallback registry by session \(OVOS-FALLBACK-1 3.4, 10\) [\#987](https://github.com/OpenVoiceOS/ovos-core/pull/987) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [3.7.0a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.0a2) (2026-09-25)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.0a1...3.7.0a2)
+
+**Merged pull requests:**
+
+- docs: point the mode enums and common query at surfaces that exist [\#1010](https://github.com/OpenVoiceOS/ovos-core/pull/1010) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- fix: reload a plugin skill the installer upgraded in place [\#1007](https://github.com/OpenVoiceOS/ovos-core/pull/1007) ([goldyfruit](https://github.com/goldyfruit))
+
 ## [3.7.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.0a1) (2026-09-18)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.6.2a3...3.7.0a1)
@@ -319,21 +372,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.1a1...3.2.2a1)
 
-**Merged pull requests:**
-
-- fix: improve unknown pipeline matcher log message [\#913](https://github.com/OpenVoiceOS/ovos-core/pull/913) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [3.2.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.1a1) (2026-09-02)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.0a1...3.2.1a1)
-
-**Closed issues:**
-
-- User story: "what did you just say" — repeat the last spoken response [\#910](https://github.com/OpenVoiceOS/ovos-core/issues/910)
-
-**Merged pull requests:**
-
-- fix: ovos.intent.matched always carries the producing pipeline's bare id [\#908](https://github.com/OpenVoiceOS/ovos-core/pull/908) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [3.2.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.0a1) (2026-09-01)
 
@@ -343,17 +384,9 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.1.1a1...3.1.2a1)
 
-**Merged pull requests:**
-
-- fix: back off failed plugin-skill loads and report loaded\_new truthfully [\#905](https://github.com/OpenVoiceOS/ovos-core/pull/905) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [3.1.1a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.1.1a1) (2026-09-01)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.1.0a1...3.1.1a1)
-
-**Merged pull requests:**
-
-- fix: allow ovos-config 3.x [\#902](https://github.com/OpenVoiceOS/ovos-core/pull/902) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [3.1.0a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.1.0a1) (2026-08-31)
 
