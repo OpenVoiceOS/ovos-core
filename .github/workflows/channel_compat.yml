@@ -1,0 +1,58 @@
+name: Channel Compat
+
+# Run the unit tests against the package versions an OVOS distro release
+# channel pins, instead of against current dev siblings.
+#
+# The distro publishes one constraints file per channel, fetched live by the
+# reusable workflow and uploaded as an artifact. As of writing, `stable` pins
+# ovos-workshop 3.4.x / ovos-bus-client 1.3.x / ovos-padatious 1.4.x and
+# `testing` pins ovos-workshop 7.0.x — both far below dev. A change can be green
+# on dev and still break every device on the fleet; this job is the gate for
+# that.
+#
+# This is the third layer of the compat program:
+#
+#   boundary pins  where did the behavior change? (test/backcompat in
+#                  ovos-core and ovos-test-harness)
+#   channels       what does the fleet run today? (this file)
+#   dev edge       where is the stack going? (build_tests.yml, ovoscope.yml)
+#
+# soft_fail is TRUE for now. A channel is behind dev by construction, so
+# the first runs are expected to fail a pile of tests — that is the finding, not
+# a broken job. TURN soft_fail OFF once the baseline is established, the same
+# way ovos-test-harness did it: check in a per-channel known-gap file, strict-
+# xfail exactly those node ids, and let anything else be red.
+# See https://github.com/OpenVoiceOS/ovos-test-harness (test/channel_gaps/).
+
+on:
+  pull_request:
+    branches: [dev]
+  push:
+    branches: [dev]
+  schedule:
+    # The channels move on the distro's schedule, not on this repo's.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  channel-compat:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - channel: stable
+            url: https://raw.githubusercontent.com/OpenVoiceOS/OpenVoiceOS/main/constraints-stable.txt
+          - channel: testing
+            url: https://raw.githubusercontent.com/OpenVoiceOS/OpenVoiceOS/main/constraints-testing.txt
+    name: ${{ matrix.channel }}
+    uses: OpenVoiceOS/gh-automations/.github/workflows/channel-compat.yml@dev
+    secrets: inherit
+    with:
+      channel_url: ${{ matrix.url }}
+      channel_name: ${{ matrix.channel }}
+      # GitHub rejects `continue-on-error` on a job that calls a reusable
+      # workflow, so the advisory mode is an input instead.
+      soft_fail: true
+      test_path: 'test/unittests'
+      system_deps: 'swig libssl-dev portaudio19-dev libpulse-dev libfann-dev'
+      install_extras: 'mycroft,plugins,skills-essential,lgpl,test'

@@ -3,11 +3,12 @@ import shutil
 import sys
 from importlib import reload
 from os.path import exists
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, STDOUT
 from typing import Optional
 
 import requests
 from combo_lock import NamedLock
+from packaging.utils import canonicalize_name
 from ovos_bus_client import Message
 from ovos_config.config import Configuration
 from ovos_utils.log import LOG
@@ -22,11 +23,20 @@ class InstallError(str, enum.Enum):
     NO_PKGS = "no packages to install"
 
 
+#: how much of the installer's output a ``.failed`` reply carries in ``detail``
+FAILURE_DETAIL_CHARS = 2000
+
+
 class SkillsStore:
     # default constraints to use if none are given
     DEFAULT_CONSTRAINTS = 'https://raw.githubusercontent.com/OpenVoiceOS/ovos-releases/refs/heads/main/constraints-stable.txt'
     PIP_LOCK = NamedLock("ovos_pip.lock")
     UV = shutil.which("uv")  # use 'uv pip' if available, speeds things up a lot and is the default in raspOVOS
+
+    #: OVOS-INSTALL-1 §2.3: the name a request addresses this service by,
+    #: in ``data.service_name``. The skills service owns skills, solvers,
+    #: personas, pipeline stages and utterance transformers.
+    SERVICE_NAME = "ovos_core"
 
     def __init__(self, bus, config=None):
         self.config = config or Configuration().get("skills", {}).get("installer", {})
@@ -36,22 +46,88 @@ class SkillsStore:
         self.bus.on("ovos.pip.install", self.handle_install_python)
         self.bus.on("ovos.pip.uninstall", self.handle_uninstall_python)
 
-    def shutdown(self):
+    def shutdown(self) -> None:
+        """Unregister all message bus event handlers."""
         self.bus.remove("ovos.skills.install", self.handle_install_skill)
         self.bus.remove("ovos.skills.uninstall", self.handle_uninstall_skill)
         self.bus.remove("ovos.pip.install", self.handle_install_python)
         self.bus.remove("ovos.pip.uninstall", self.handle_uninstall_python)
 
-    def play_error_sound(self):
+    def play_error_sound(self) -> None:
+        """Emit a message to play the configured error sound."""
         snd = self.config.get("sounds", {}).get("pip_error", "snd/error.mp3")
         self.bus.emit(Message("mycroft.audio.play_sound", {"uri": snd}))
 
-    def play_success_sound(self):
+    def play_success_sound(self) -> None:
+        """Emit a message to play the configured success sound."""
         snd = self.config.get("sounds", {}).get("pip_success", "snd/acknowledge.mp3")
         self.bus.emit(Message("mycroft.audio.play_sound", {"uri": snd}))
 
     @staticmethod
-    def validate_constrainsts(constraints: str):
+    def failure_detail(output) -> str:
+        """The tail of an installer run's output, sized for a bus reply.
+
+        Args:
+            output: The captured output, or the ``RuntimeError`` carrying it.
+
+        Returns:
+            str: At most ``FAILURE_DETAIL_CHARS`` characters, taken from the end,
+                since that is where pip and uv explain why a run failed.
+        """
+        return str(output or "")[-FAILURE_DETAIL_CHARS:]
+
+    def _reply_failed(self, message: Message, topic: str, error: str, detail: str = "") -> None:
+        """Reply to a request with a ``.failed`` message.
+
+        Args:
+            message (Message): The request being answered.
+            topic (str): The ``.failed`` topic.
+            error (str): The ``InstallError`` value (or exception text) naming the failure.
+            detail (str): The installer's output tail, empty when pip did not run.
+        """
+        self.bus.emit(message.reply(topic, {"error": error, "detail": detail}))
+
+    @staticmethod
+    def _run_pip(pip_command: list, print_logs: bool) -> str:
+        """Run one pip/uv command and return what it printed.
+
+        stdout and stderr are captured as a single stream: uv writes everything
+        to stderr, pip splits progress and errors across the two, and the last
+        lines of the merged stream are the ones that say why a run failed. With
+        ``print_logs`` every line is also echoed through ``LOG`` as it arrives.
+
+        Args:
+            pip_command (list): The full command line.
+            print_logs (bool): Whether to echo the output to the log.
+
+        Returns:
+            str: The captured output.
+
+        Raises:
+            RuntimeError: On a non-zero exit, carrying the captured output.
+        """
+        lines = []
+        with Popen(pip_command, stdout=PIPE, stderr=STDOUT, text=True, errors="replace") as proc:
+            for line in proc.stdout or []:
+                line = line.rstrip("\n")
+                lines.append(line)
+                if print_logs:
+                    LOG.info(f"(pip) {line}")
+        output = "\n".join(lines)
+        if proc.returncode != 0:
+            raise RuntimeError(output)
+        return output
+
+    @staticmethod
+    def validate_constraints(constraints: str) -> bool:
+        """Validate a constraints file path or URL.
+
+        Args:
+            constraints (str): Local file path or HTTP URL to a pip constraints file.
+
+        Returns:
+            bool: True if the constraints file is accessible, False otherwise.
+        """
         if constraints.startswith('http'):
             LOG.debug(f"Constraints url: {constraints}")
             try:
@@ -73,7 +149,17 @@ class SkillsStore:
 
     def pip_install(self, packages: list,
                     constraints: Optional[str] = None,
-                    print_logs: bool = True):
+                    print_logs: bool = True) -> bool:
+        """Install Python packages via pip or uv.
+
+        Args:
+            packages (list): List of package specifiers to install.
+            constraints (str): Optional constraints file path or URL.
+            print_logs (bool): Whether to echo pip output to the log.
+
+        Returns:
+            bool: True if all packages were installed successfully, False otherwise.
+        """
         if not len(packages):
             LOG.error("no package list provided to install")
             self.play_error_sound()
@@ -82,7 +168,7 @@ class SkillsStore:
         # can be set in mycroft.conf to change to testing/alpha channels
         constraints = constraints or self.config.get("constraints", SkillsStore.DEFAULT_CONSTRAINTS)
 
-        if not self.validate_constrainsts(constraints):
+        if not self.validate_constraints(constraints):
             self.play_error_sound()
             return False
 
@@ -96,6 +182,8 @@ class SkillsStore:
             pip_args += ["--break-system-packages"]
         if self.config.get("allow_alphas", False):
             pip_args += ["--pre"]
+        if self.config.get("upgrade", False):
+            pip_args += ["--upgrade"]
 
         with SkillsStore.PIP_LOCK:
             """
@@ -107,17 +195,11 @@ class SkillsStore:
                 LOG.info("(pip) Installing " + dependent_python_package)
                 pip_command = pip_args + [dependent_python_package]
                 LOG.debug(" ".join(pip_command))
-                if print_logs:
-                    proc = Popen(pip_command)
-                else:
-                    proc = Popen(pip_command, stdout=PIPE, stderr=PIPE)
-                pip_code = proc.wait()
-                if pip_code != 0:
-                    stderr = proc.stderr
-                    if stderr:
-                        stderr = stderr.read().decode()
+                try:
+                    self._run_pip(pip_command, print_logs)
+                except RuntimeError:
                     self.play_error_sound()
-                    raise RuntimeError(stderr)
+                    raise
 
         reload(ovos_plugin_manager)  # force core to pick new entry points
         self.play_success_sound()
@@ -125,7 +207,19 @@ class SkillsStore:
 
     def pip_uninstall(self, packages: list,
                       constraints: Optional[str] = None,
-                      print_logs: bool = True):
+                      print_logs: bool = True) -> bool:
+        """Uninstall Python packages via pip or uv.
+
+        Protected packages (listed in the constraints file) cannot be removed.
+
+        Args:
+            packages (list): List of package names to uninstall.
+            constraints (str): Optional constraints file path or URL used to identify protected packages.
+            print_logs (bool): Whether to echo pip output to the log.
+
+        Returns:
+            bool: True if all packages were uninstalled successfully, False otherwise.
+        """
         if not len(packages):
             LOG.error("no package list provided to uninstall")
             self.play_error_sound()
@@ -134,7 +228,7 @@ class SkillsStore:
         # can be set in mycroft.conf to change to testing/alpha channels
         constraints = constraints or self.config.get("constraints", SkillsStore.DEFAULT_CONSTRAINTS)
 
-        if not self.validate_constrainsts(constraints):
+        if not self.validate_constraints(constraints):
             self.play_error_sound()
             return False
 
@@ -149,11 +243,15 @@ class SkillsStore:
             cpkgs = ["ovos-core", "ovos-utils", "ovos-plugin-manager",
                      "ovos-config", "ovos-bus-client", "ovos-workshop"]
 
-        # remove version pinning and normalize _ to - (pip accepts both)
-        cpkgs = [p.split("~")[0].split("<")[0].split(">")[0].split("=")[0].replace("_", "-")
-                 for p in cpkgs]
+        # remove version pinning and canonicalize names (PEP 503) so
+        # "ovos_core", "OVOS-Core", "ovos.core", etc. all compare equal
+        # to "ovos-core", matching how pip/pypi identify distributions
+        cpkgs = [canonicalize_name(p.split("~")[0].split("<")[0].split(">")[0].split("=")[0])
+                 for p in cpkgs if p]
 
-        if any(p in cpkgs for p in packages):
+        norm_packages = [canonicalize_name(p) for p in packages]
+
+        if any(p in cpkgs for p in norm_packages):
             LOG.error(f'tried to uninstall a protected package: {cpkgs}')
             self.play_error_sound()
             return False
@@ -175,106 +273,226 @@ class SkillsStore:
                 LOG.info("(pip) Uninstalling " + dependent_python_package)
                 pip_command = pip_args + [dependent_python_package]
                 LOG.debug(" ".join(pip_command))
-                if print_logs:
-                    proc = Popen(pip_command)
-                else:
-                    proc = Popen(pip_command, stdout=PIPE, stderr=PIPE)
-                pip_code = proc.wait()
-                if pip_code != 0:
-                    stderr = proc.stderr.read().decode()
+                try:
+                    self._run_pip(pip_command, print_logs)
+                except RuntimeError:
                     self.play_error_sound()
-                    raise RuntimeError(stderr)
+                    raise
 
         reload(ovos_plugin_manager)  # force core to pick new entry points
         self.play_success_sound()
         return True
 
     @staticmethod
-    def validate_skill(url):
+    def validate_skill(url: str) -> bool:
+        """Validate that a skill URL is an installable GitHub skill.
+
+        Performs lightweight GitHub API validation (no auth required for public
+        repos).  The checks are:
+
+        1. URL must start with ``https://github.com/``.
+        2. The repository must exist (HTTP 200 from the GitHub contents API).
+        3. The repo must contain ``pyproject.toml`` or ``setup.cfg`` or ``setup.py``
+           — a bare repo is rejected as it indicates a legacy skill.
+        4. ``pyproject.toml`` / ``setup.cfg`` must *not* reference ``MycroftSkill``
+           or ``CommonPlaySkill`` — those class names indicate an incompatible
+           legacy skill.
+
+        The GitHub API call uses a 3-second timeout; if GitHub is unreachable
+        the method falls back to ``True`` so that a transient network error does
+        not block legitimate installs.
+
+        Args:
+            url (str): GitHub repository URL of the skill
+                (e.g. ``https://github.com/OpenVoiceOS/ovos-skill-hello-world``).
+
+        Returns:
+            bool: True if the URL points to a valid, OVOS-compatible GitHub skill;
+                  False if the URL is invalid or the repo fails any check.
+        """
         if not url.startswith("https://github.com/"):
             return False
-        # TODO - check if setup.py
-        # TODO - check if not using MycroftSkill class
-        # TODO - check if not mycroft CommonPlay
+
+        # parse owner/repo from URL (strip trailing .git or extra path segments)
+        path = url[len("https://github.com/"):].rstrip("/")
+        parts = path.split("/")
+        if len(parts) < 2:
+            LOG.warning(f"validate_skill: cannot parse owner/repo from '{url}'")
+            return False
+        owner, repo = parts[0], parts[1].removesuffix(".git")
+
+        api_base = f"https://api.github.com/repos/{owner}/{repo}/contents/"
+        try:
+            response = requests.get(api_base, timeout=3,
+                                    headers={"Accept": "application/vnd.github+json"})
+        except Exception as exc:
+            LOG.warning(f"validate_skill: GitHub unreachable, skipping deep check — {exc}")
+            return True  # fail open: transient network errors should not block installs
+
+        if response.status_code == 404:
+            LOG.warning(f"validate_skill: repo not found — {owner}/{repo}")
+            return False
+        if not response.ok:
+            LOG.warning(f"validate_skill: GitHub API returned {response.status_code} for {url}, skipping deep check")
+            return True  # fail open on unexpected API errors
+
+        file_names = {entry["name"] for entry in response.json()
+                      if isinstance(entry, dict)}
+
+        # reject bare setup.py-only repos (legacy Mycroft packaging)
+        if "setup.py" not in file_names and "pyproject.toml" not in file_names and "setup.cfg" not in file_names:
+            LOG.warning(f"validate_skill: '{owner}/{repo}' - legacy packaging, rejecting")
+            return False
+
         return True
 
-    def handle_install_skill(self, message: Message):
+    def handle_install_skill(self, message: Message) -> None:
+        """Handle a request to install a skill from a GitHub URL."""
         if not self.config.get("allow_pip"):
             LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()
-            self.bus.emit(message.reply("ovos.skills.install.failed",
-                                        {"error": InstallError.DISABLED.value}))
+            self._reply_failed(message, "ovos.skills.install.failed", InstallError.DISABLED.value)
             return
 
         url = message.data["url"]
         if self.validate_skill(url):
-            success = self.pip_install([f"git+{url}"])
+            detail = ""
+            try:
+                success = self.pip_install([f"git+{url}"])
+            except RuntimeError as e:
+                LOG.error(f"pip failed: {e}")
+                success = False
+                detail = self.failure_detail(e)
             if success:
                 self.bus.emit(message.reply("ovos.skills.install.complete"))
             else:
-                self.bus.emit(message.reply("ovos.skills.install.failed",
-                                            {"error": InstallError.PIP_ERROR.value}))
+                self._reply_failed(message, "ovos.skills.install.failed", InstallError.PIP_ERROR.value, detail)
         else:
             LOG.error("invalid skill url, does not appear to be a github skill")
             self.play_error_sound()
-            self.bus.emit(message.reply("ovos.skills.install.failed",
-                                        {"error": InstallError.BAD_URL.value}))
+            self._reply_failed(message, "ovos.skills.install.failed", InstallError.BAD_URL.value)
 
-    def handle_uninstall_skill(self, message: Message):
+    def handle_uninstall_skill(self, message: Message) -> None:
+        """Handle a request to uninstall a skill.
+
+        Args:
+            message (Message): Bus message with data containing 'skill' (skill_id or package name).
+        """
         if not self.config.get("allow_pip"):
             LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()
-            self.bus.emit(message.reply("ovos.skills.uninstall.failed",
-                                        {"error": InstallError.DISABLED.value}))
+            self._reply_failed(message, "ovos.skills.uninstall.failed", InstallError.DISABLED.value)
             return
-        # TODO
-        LOG.error("pip uninstall not yet implemented")
-        self.play_error_sound()
-        self.bus.emit(message.reply("ovos.skills.uninstall.failed",
-                                    {"error": "not implemented"}))
 
-    def handle_install_python(self, message: Message):
+        skill = message.data.get("skill")
+        if not skill:
+            LOG.error("no skill specified for uninstall")
+            self.play_error_sound()
+            self._reply_failed(message, "ovos.skills.uninstall.failed", InstallError.NO_PKGS.value)
+            return
+
+        # Treat skill_id as a package name (e.g., 'skill-name.author' -> 'skill-name-author')
+        # or accept directly as package name
+        pkg_name = skill.replace(".", "-") if "." in skill else skill
+
+        try:
+            if self.pip_uninstall([pkg_name]):
+                LOG.info(f"Successfully uninstalled skill: {skill}")
+                self.bus.emit(message.reply("ovos.skills.uninstall.complete"))
+            else:
+                LOG.error(f"Failed to uninstall skill: {skill}")
+                self._reply_failed(message, "ovos.skills.uninstall.failed", InstallError.PIP_ERROR.value)
+        except Exception as e:
+            LOG.exception(f"Error uninstalling skill {skill}: {e}")
+            self._reply_failed(message, "ovos.skills.uninstall.failed", str(e), self.failure_detail(e))
+
+    def _addressed_to_us(self, message: Message) -> bool:
+        """Whether this service should act on a pip request.
+
+        OVOS-INSTALL-1 §2.2: ``data.service_name`` names the one service a
+        request is for. Absent, every installer acts. Naming another service,
+        this one installs nothing and answers nothing, because a decline from
+        every other installer would bury the real answer in a burst the
+        client cannot pick it out of.
+
+        The comparison is exact: a service name is an identifier, not a
+        pattern.
+        """
+        target = message.data.get("service_name")
+        if target is None or target == self.SERVICE_NAME:
+            return True
+        LOG.debug(f"{message.msg_type} is addressed to '{target}', "
+                  f"not '{self.SERVICE_NAME}'; ignoring")
+        return False
+
+    def handle_install_python(self, message: Message) -> None:
+        """Handle a request to install arbitrary Python packages via pip."""
+        if not self._addressed_to_us(message):
+            return
         if not self.config.get("allow_pip"):
             LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()
-            self.bus.emit(message.reply("ovos.pip.install.failed",
-                                        {"error": InstallError.DISABLED.value}))
+            self._reply_failed(message, "ovos.pip.install.failed", InstallError.DISABLED.value)
             return
         pkgs = message.data.get("packages")
         if pkgs:
-            if self.pip_install(pkgs):
+            detail = ""
+            try:
+                success = self.pip_install(pkgs)
+            except RuntimeError as e:
+                LOG.error(f"pip failed: {e}")
+                success = False
+                detail = self.failure_detail(e)
+            if success:
                 self.bus.emit(message.reply("ovos.pip.install.complete"))
             else:
-                self.bus.emit(message.reply("ovos.pip.install.failed",
-                                            {"error": InstallError.PIP_ERROR.value}))
+                self._reply_failed(message, "ovos.pip.install.failed", InstallError.PIP_ERROR.value, detail)
         else:
-            self.bus.emit(message.reply("ovos.pip.install.failed",
-                                        {"error": InstallError.NO_PKGS.value}))
+            self._reply_failed(message, "ovos.pip.install.failed", InstallError.NO_PKGS.value)
 
-    def handle_uninstall_python(self, message: Message):
+    def handle_uninstall_python(self, message: Message) -> None:
+        """Handle a request to uninstall Python packages via pip."""
+        if not self._addressed_to_us(message):
+            return
         if not self.config.get("allow_pip"):
             LOG.error(InstallError.DISABLED.value)
             self.play_error_sound()
-            self.bus.emit(message.reply("ovos.pip.uninstall.failed",
-                                        {"error": InstallError.DISABLED.value}))
+            self._reply_failed(message, "ovos.pip.uninstall.failed", InstallError.DISABLED.value)
             return
         pkgs = message.data.get("packages")
         if pkgs:
-            if self.pip_uninstall(pkgs):
+            detail = ""
+            try:
+                success = self.pip_uninstall(pkgs)
+            except RuntimeError as e:
+                LOG.error(f"pip failed: {e}")
+                success = False
+                detail = self.failure_detail(e)
+            if success:
                 self.bus.emit(message.reply("ovos.pip.uninstall.complete"))
             else:
-                self.bus.emit(message.reply("ovos.pip.uninstall.failed",
-                                            {"error": InstallError.PIP_ERROR.value}))
+                self._reply_failed(message, "ovos.pip.uninstall.failed", InstallError.PIP_ERROR.value, detail)
         else:
-            self.bus.emit(message.reply("ovos.pip.uninstall.failed",
-                                        {"error": InstallError.NO_PKGS.value}))
+            self._reply_failed(message, "ovos.pip.uninstall.failed", InstallError.NO_PKGS.value)
 
 
 def launch_standalone():
-    # TODO - add docker detection and warn user
+    """Launch SkillsStore as a standalone service on the messagebus.
+
+    Warns the user if running in a container (Docker/Podman) where pip may
+    fail due to filesystem or permission issues.
+    """
     from ovos_bus_client import MessageBusClient
     from ovos_utils import wait_for_exit_signal
     from ovos_utils.log import init_service_logger
+
+    # Warn if running in a container
+    if exists("/.dockerenv") or exists("/run/.containerenv"):
+        LOG.warning(
+            "⚠️  SkillsStore is running inside a container (Docker/Podman). "
+            "Pip install/uninstall may fail if the container filesystem is read-only. "
+            "Mount a writable volume or use 'pip' with appropriate flags."
+        )
 
     LOG.info("Launching SkillsStore in standalone mode")
     init_service_logger("skill-installer")

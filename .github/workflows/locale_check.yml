@@ -1,0 +1,14 @@
+name: Locale Build Check
+
+on:
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+jobs:
+  locale_check:
+    uses: OpenVoiceOS/gh-automations/.github/workflows/locale-check.yml@dev
+    secrets: inherit
+    with:
+      locale_path: 'ovos_core/intent_services/locale'
+      pr_comment: true
