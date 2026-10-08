@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.7.3a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.3a1) (2026-10-08)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.2a2...3.7.3a1)
+
+**Merged pull requests:**
+
+- fix: raise padacioso floor to 2.4.2a1 [\#1022](https://github.com/OpenVoiceOS/ovos-core/pull/1022) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [3.7.2a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.2a2) (2026-10-01)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.2a1...3.7.2a2)
@@ -364,10 +372,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.2a1...3.2.3a1)
 
-**Merged pull requests:**
-
-- fix: take the inbound session at the utterance intake [\#915](https://github.com/OpenVoiceOS/ovos-core/pull/915) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [3.2.2a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.2a1) (2026-09-03)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.1a1...3.2.2a1)
@@ -394,15 +398,15 @@
 
 ## [3.0.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.12a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.12a1)
-
-## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.10a3)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.12a1)
 
 ## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.11a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.11a1)
+
+## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.10a3)
 
 ## [3.0.10a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a2) (2026-08-31)
 
