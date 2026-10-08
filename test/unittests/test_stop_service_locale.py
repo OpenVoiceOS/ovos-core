@@ -87,5 +87,20 @@ class TestStopServiceRealLocale(unittest.TestCase):
             svc._locale.voc_match("como esta o tempo hoje", "stop", "pt-PT", exact=True))
 
 
+class TestStopServiceBareEuFallsBackToRegional(unittest.TestCase):
+    """``locale/eu`` carried no ``.voc`` file, so a bare ``eu`` request
+    matched zero stop words. OVOS-INTENT-2 §2.2 falls a requested tag
+    back to the closest available directory; with the duplicate ``eu`` tree
+    removed, ``eu-ES`` is that closest match and serves the full vocabulary."""
+
+    def test_bare_eu_resolves_stop_vocab(self):
+        svc = _make_real_service()
+        self.assertEqual(len(svc._locale.voc_list("stop", "eu")), 17)
+
+    def test_bare_eu_resolves_global_stop_vocab(self):
+        svc = _make_real_service()
+        self.assertEqual(len(svc._locale.voc_list("global_stop", "eu")), 27)
+
+
 if __name__ == '__main__':
     unittest.main()
