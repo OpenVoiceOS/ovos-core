@@ -473,6 +473,9 @@ class SkillManager(Thread):
         if internet is None:
             internet = self._connected_event.is_set()
         plugins = find_skill_plugins()
+        # one metadata scan per pass, not one per skill: each scan walks every
+        # installed distribution's entry points
+        versions = self._declared_skill_versions()
         blacklist = self.blacklist
         for skill_id, plug in plugins.items():
             if skill_id in blacklist:
@@ -494,7 +497,8 @@ class SkillManager(Thread):
                 continue
             if not self._reserve_plugin_skill_load(skill_id):
                 continue
-            if self._load_plugin_skill(skill_id, plug, reserved=True) is not None:
+            if self._load_plugin_skill(skill_id, plug, reserved=True,
+                                       version=versions.get(skill_id)) is not None:
                 loaded.append(skill_id)
         return loaded
 
@@ -614,6 +618,17 @@ class SkillManager(Thread):
         max_wait: int = self.config.get("skills", {}).get("intent_service_timeout", 300)
         elapsed: int = 0
         start_time = time.monotonic()
+        intents = getattr(self, "intents", None)
+        status = getattr(intents, "status", None)
+        if isinstance(getattr(status, "state", None), ProcessState):
+            # The intent service runs in this process: read its state instead
+            # of asking over the bus, where every miss cost a reply round trip
+            # plus a one second sleep before the next question.
+            while not self._stop_event.is_set() and elapsed < max_wait:
+                if status.state >= ProcessState.READY:
+                    return
+                self._stop_event.wait(0.05)
+                elapsed = int(time.monotonic() - start_time)
         while not self._stop_event.is_set() and elapsed < max_wait:
             response = self.bus.wait_for_response(
                 Message('mycroft.intents.is_ready',
@@ -733,9 +748,10 @@ class SkillManager(Thread):
             if internet is None:
                 internet = True
 
-        if gui is None:
-            gui = self._gui_event.is_set() or is_gui_connected(self.bus)
-
+        # ``gui`` is accepted for compatibility and not read: no load decision
+        # depends on it. Asking the bus for it cost a full ``gui.status.request``
+        # timeout (3 s) on every pass on a runtime with no GUI, including the
+        # first one, between "IntentService is ready" and the first skill load.
         loaded = self._load_untracked_plugin_skills(network=network, internet=internet)
 
         if loaded:
