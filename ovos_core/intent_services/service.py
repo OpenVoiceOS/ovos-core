@@ -46,6 +46,7 @@ from ovos_core.transformers import (IntentTransformersService,
                                     UtteranceTransformersService)
 from ovos_core.intent_services.dispatcher import IntentDispatcher, DEFAULT_HANDLER_TIMEOUT
 from ovos_core.intent_services.manifest import IntentManifest
+from ovos_core.intent_services.ready_gate import is_ready, still_starting_dialog
 from ovos_core.intent_services.working_session import (
     close_round, open_round, pruned_entries, record_pruned, round_session,
 )
@@ -1180,6 +1181,24 @@ class IntentService:
             LOG.warning(f"OVOS-SESSION-1 §2.5: malformed session carrier on "
                         f"{message.msg_type} (got {type(carrier).__name__}, "
                         f"expected object); dropping utterance")
+            self.bus.emit(message.forward(SpecMessage.UTTERANCE_HANDLED, {}))
+            return
+
+        # OVOS-READY-1 §3: an utterance that arrives before this process is
+        # ready MUST NOT enter the pipeline loop. Right after a restart, a
+        # pipeline's bounded match call (§4.4) can legally exceed its bound
+        # from boot contention alone -- nothing wrong with the utterance,
+        # nothing wrong with the plugin -- get declined as designed, and
+        # fall through to the next pipeline, which can match a mid-
+        # conversation utterance (a bare "yes") to an unrelated literal
+        # entity instead of continuing the conversation it belonged to
+        # (OpenVoiceOS/ovos-core#1027). Decline with a short, localized
+        # dialog instead of silence or a wrong match; still emit the one
+        # terminal event a caller is owed, same as the carrier-drop above.
+        if not is_ready(self.status):
+            lang = message.data.get("lang") or message.context.get("lang")
+            self.bus.emit(message.forward(SpecMessage.SPEAK, {
+                "utterance": still_starting_dialog(lang), "lang": lang}))
             self.bus.emit(message.forward(SpecMessage.UTTERANCE_HANDLED, {}))
             return
 

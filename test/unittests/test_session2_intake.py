@@ -233,6 +233,9 @@ class TestSessionSyncIsRetired(SessionIntakeTestCase):
                                    match_data={"conf": 1.0},
                                    skill_id="lights.skill", utterance="turn on")
         svc = IntentService(self.bus, preload_pipelines=False)
+        svc.status.set_ready()  # OVOS-READY-1: a real service dispatches
+        # here, so it must report ready, same as production once boot
+        # finishes.
         svc.get_pipeline = lambda session: (
             [("fake-high", lambda utts, lang, msg: match)])
 
