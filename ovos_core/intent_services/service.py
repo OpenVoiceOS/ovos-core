@@ -243,10 +243,17 @@ class IntentService:
         # OVOS-READY-1: aggregates every pipeline plugin's own warm/cold
         # transition and the skill manager's first-load-done event. Constructed before any plugin, so it is listening
         # before the earliest one it could ever hear from.
-        self._readiness = ReadinessTracker(self.bus)
-        # a skill manager that finished before this service started will not
-        # emit mycroft.skills.initialized again; ask it once
-        self._readiness.ask_skills()
+        # ``ready_gate.skills_required`` (default true) is false only for an
+        # intent service that runs with no skill manager on the bus, where
+        # nothing would ever signal a first skill load
+        skills_required = self.config.get("ready_gate", {}).get(
+            "skills_required", True)
+        self._readiness = ReadinessTracker(
+            self.bus, skills_required=skills_required)
+        if skills_required:
+            # a skill manager that finished before this service started will
+            # not emit mycroft.skills.initialized again; ask it once
+            self._readiness.ask_skills()
 
         # load and cache the plugins right away so they receive all bus messages
         self.pipeline_plugins: dict = {}

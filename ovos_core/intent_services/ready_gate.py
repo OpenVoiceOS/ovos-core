@@ -114,9 +114,13 @@ class ReadinessTracker:
     business, not a reason to refuse every utterance.
     """
 
-    def __init__(self, bus):
+    def __init__(self, bus, skills_required: bool = True):
         self._warm: Dict[str, bool] = {}
         self._skills_loaded = False
+        #: False for a deployment with no skill manager on the bus at all
+        #: (an intent service used on its own), where nothing would ever
+        #: signal a first load and the gate would decline for good
+        self._skills_required = skills_required
         self.bus = bus
         bus.on(PIPELINE_WARM_STATE, self._on_warm_state)
         bus.on(SKILLS_INITIALIZED, self._on_skills_initialized)
@@ -154,5 +158,7 @@ class ReadinessTracker:
         return all(self._warm.values())
 
     def ready(self) -> bool:
-        """Every pipeline warm and the first skill load done."""
-        return self._skills_loaded and self.all_warm()
+        """Every pipeline warm and, where skills are required, the first
+        skill load done."""
+        return ((not self._skills_required or self._skills_loaded)
+                and self.all_warm())

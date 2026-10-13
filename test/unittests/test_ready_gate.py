@@ -205,6 +205,16 @@ class TestReadyGate(unittest.TestCase):
         self.assertEqual(len(asked), 1)
         self.assertTrue(tracker.skills_loaded)
 
+    def test_skills_not_required_gates_on_pipelines_alone(self):
+        """An intent service with no skill manager on the bus never hears a
+        first-load signal; it must not decline for good."""
+        tracker = ReadinessTracker(self.bus, skills_required=False)
+        self.assertTrue(tracker.ready())
+        _report_warm(self.bus, "a", False)
+        self.assertFalse(tracker.ready(), "a cold pipeline still counts")
+        _report_warm(self.bus, "a", True)
+        self.assertTrue(tracker.ready())
+
     def test_ask_skills_not_ready_leaves_the_latch_to_the_event(self):
         tracker = ReadinessTracker(self.bus)
         self.bus.on("mycroft.skills.is_ready", lambda m: self.bus.emit(
