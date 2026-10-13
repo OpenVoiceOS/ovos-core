@@ -49,7 +49,7 @@ from ovos_core.intent_services.manifest import IntentManifest
 from ovos_core.intent_services.ready_gate import (ERROR_SOUND_URI, PLAY_SOUND,
                                                   ReadinessTracker,
                                                   is_ready,
-                                                  still_starting_dialog)
+                                                  response_dialog)
 from ovos_core.intent_services.working_session import (
     close_round, open_round, pruned_entries, record_pruned, round_session,
 )
@@ -1226,7 +1226,8 @@ class IntentService:
             # OVOS-READY-1 §3.2: a stable identifier on whichever response
             # this sends, so a listener can tell it apart from an ordinary
             # one and knows why it was declined.
-            dialog = still_starting_dialog(lang)
+            session = message.context.get("session") or {}
+            dialog, lang = response_dialog(lang, session.get("output_lang"))
             if dialog is None:
                 # no dialog in the session's language: the error sound,
                 # never a dialog in the wrong language (§3.1)

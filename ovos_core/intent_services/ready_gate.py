@@ -86,6 +86,20 @@ def still_starting_dialog(lang: Optional[str]) -> Optional[str]:
     return STILL_STARTING_DIALOG.get(lang.split("-")[0].lower())
 
 
+def response_dialog(message_lang: Optional[str], output_lang: Optional[str]):
+    """``(dialog, lang)`` in the language OVOS-SESSION-1 section 3.2.3 says a
+    response is rendered in: ``output_lang`` when the session sets it, else
+    the language resolved for the utterance. When ``output_lang`` is set but
+    has no dialog here, the input-side language is the fallback section 3.2.3
+    allows. ``(None, None)`` when neither has one: the caller plays the
+    error sound, never a dialog in some other language."""
+    for lang in (output_lang, message_lang):
+        dialog = still_starting_dialog(lang)
+        if dialog is not None:
+            return dialog, lang
+    return None, None
+
+
 def is_ready(status) -> bool:
     """True once ``status`` (an ``ovos_utils.process_utils.ProcessStatus``)
     has reached ``READY``. A thin wrapper around ``check_ready()`` (called

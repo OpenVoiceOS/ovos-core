@@ -222,6 +222,37 @@ class TestReadyGate(unittest.TestCase):
         tracker.ask_skills()
         self.assertFalse(tracker.skills_loaded)
 
+    def test_output_lang_wins_over_the_input_language(self):
+        """OVOS-SESSION-1 section 3.2.3: a German speaker who set
+        output_lang to English hears the English dialog."""
+        svc = _make_service(self.bus, ready=False)
+        session = Session("s3", lang="de-DE")
+        data = session.serialize()
+        data["output_lang"] = "en-US"
+        message = Message("recognizer_loop:utterance",
+                          data={"utterances": ["yes"]},
+                          context={"session": data})
+        emitted = []
+        with patch.object(svc.bus, "emit", side_effect=emitted.append):
+            svc.handle_utterance(message)
+        speaks = [m for m in emitted if m.msg_type == "ovos.utterance.speak"]
+        self.assertEqual(speaks[0].data["utterance"], STILL_STARTING_DIALOG["en"])
+        self.assertEqual(speaks[0].data["lang"], "en-US")
+
+    def test_output_lang_without_a_dialog_falls_back_to_the_input_language(self):
+        svc = _make_service(self.bus, ready=False)
+        session = Session("s4", lang="fr-FR")
+        data = session.serialize()
+        data["output_lang"] = "zz-ZZ"
+        message = Message("recognizer_loop:utterance",
+                          data={"utterances": ["yes"]},
+                          context={"session": data})
+        emitted = []
+        with patch.object(svc.bus, "emit", side_effect=emitted.append):
+            svc.handle_utterance(message)
+        speaks = [m for m in emitted if m.msg_type == "ovos.utterance.speak"]
+        self.assertEqual(speaks[0].data["utterance"], STILL_STARTING_DIALOG["fr"])
+
     def test_no_dialog_for_an_unlisted_language(self):
         self.assertIsNone(still_starting_dialog("zz-ZZ"))
         self.assertIsNone(still_starting_dialog(None))
