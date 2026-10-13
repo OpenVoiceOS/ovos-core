@@ -25,6 +25,7 @@ def _manager():
     manager._gui_event = Event()
     manager._stop_event = Event()
     manager.config = {"skills": {}}
+    manager.intents = None
     return manager
 
 

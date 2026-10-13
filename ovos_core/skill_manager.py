@@ -618,14 +618,12 @@ class SkillManager(Thread):
         max_wait: int = self.config.get("skills", {}).get("intent_service_timeout", 300)
         elapsed: int = 0
         start_time = time.monotonic()
-        intents = getattr(self, "intents", None)
-        status = getattr(intents, "status", None)
-        if isinstance(getattr(status, "state", None), ProcessState):
+        if self.intents is not None:
             # The intent service runs in this process: read its state instead
             # of asking over the bus, where every miss cost a reply round trip
             # plus a one second sleep before the next question.
             while not self._stop_event.is_set() and elapsed < max_wait:
-                if status.state >= ProcessState.READY:
+                if self.intents.status.state >= ProcessState.READY:
                     return
                 self._stop_event.wait(0.05)
                 elapsed = int(time.monotonic() - start_time)
