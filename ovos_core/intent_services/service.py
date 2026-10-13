@@ -1212,9 +1212,16 @@ class IntentService:
                 self._pipeline_warm is not None
                 and not self._pipeline_warm.all_warm()):
             lang = get_message_lang(message)
-            self.bus.emit(message.forward(SpecMessage.SPEAK, {
-                "utterance": still_starting_dialog(lang), "lang": lang}))
-            self.bus.emit(message.forward(SpecMessage.UTTERANCE_HANDLED, {}))
+            # OVOS-READY-1 §3.2: a stable identifier on whichever response
+            # this sends, so a listener can tell it apart from an ordinary
+            # one and knows why it was declined.
+            speak = message.forward(SpecMessage.SPEAK, {
+                "utterance": still_starting_dialog(lang), "lang": lang})
+            speak.context["error"] = "ovos.ready.not_ready"
+            self.bus.emit(speak)
+            handled = message.forward(SpecMessage.UTTERANCE_HANDLED, {})
+            handled.context["error"] = "ovos.ready.not_ready"
+            self.bus.emit(handled)
             return
 
         # Get utterance utterance_plugins additional context

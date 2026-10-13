@@ -93,6 +93,9 @@ class TestReadyGate(unittest.TestCase):
         self.assertEqual(speaks[0].data["utterance"],
                          STILL_STARTING_DIALOG["fr"],
                          "localized to the utterance's own language")
+        self.assertEqual(speaks[0].context.get("error"), "ovos.ready.not_ready",
+                         "OVOS-READY-1 §3.2: a stable identifier so a "
+                         "listener knows why this was declined")
         self.assertEqual(len(handled), 1,
                          "the pipeline-loop terminal is still owed even "
                          "though the loop never ran")
