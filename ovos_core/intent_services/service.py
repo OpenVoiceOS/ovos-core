@@ -46,7 +46,9 @@ from ovos_core.transformers import (IntentTransformersService,
                                     UtteranceTransformersService)
 from ovos_core.intent_services.dispatcher import IntentDispatcher, DEFAULT_HANDLER_TIMEOUT
 from ovos_core.intent_services.manifest import IntentManifest
-from ovos_core.intent_services.ready_gate import is_ready, still_starting_dialog
+from ovos_core.intent_services.ready_gate import (PipelineWarmTracker,
+                                                  is_ready,
+                                                  still_starting_dialog)
 from ovos_core.intent_services.working_session import (
     close_round, open_round, pruned_entries, record_pruned, round_session,
 )
@@ -214,6 +216,10 @@ class IntentService:
     _match_inflight: Optional[dict] = None
     _match_abandoned: Optional[dict] = None
     _match_lock: Optional[Lock] = None
+    # same idiom, for OVOS-READY-1: a test double that never saw any
+    # pipeline's warm_state report has nothing to wait on, same as the
+    # real tracker before any plugin has reported.
+    _pipeline_warm: Optional[PipelineWarmTracker] = None
 
     def __init__(self, bus, config=None, preload_pipelines=True,
                  alive_hook=on_alive, started_hook=on_started,
@@ -232,6 +238,11 @@ class IntentService:
         self.status: ProcessStatus = ProcessStatus('intents', bus=self.bus, callback_map=callbacks)
         self.status.set_started()
         self.config: dict = config or Configuration().get("intents", {})
+
+        # OVOS-READY-1: aggregates every pipeline plugin's own warm/cold
+        # transition. Constructed before any plugin, so it is listening
+        # before the earliest one it could ever hear from.
+        self._pipeline_warm = PipelineWarmTracker(self.bus)
 
         # load and cache the plugins right away so they receive all bus messages
         self.pipeline_plugins: dict = {}
@@ -1184,19 +1195,23 @@ class IntentService:
             self.bus.emit(message.forward(SpecMessage.UTTERANCE_HANDLED, {}))
             return
 
-        # OVOS-READY-1 §3: an utterance that arrives before this process is
-        # ready MUST NOT enter the pipeline loop. Right after a restart, a
-        # pipeline's bounded match call (§4.4) can legally exceed its bound
-        # from boot contention alone -- nothing wrong with the utterance,
-        # nothing wrong with the plugin -- get declined as designed, and
-        # fall through to the next pipeline, which can match a mid-
-        # conversation utterance (a bare "yes") to an unrelated literal
-        # entity instead of continuing the conversation it belonged to
+        # OVOS-READY-1 §3: an utterance that arrives before every pipeline
+        # that can report is warm MUST NOT enter the pipeline loop.
+        # ``is_ready`` alone is NOT the signal (see the ready_gate module
+        # docstring for the timeline that proved it): a pipeline's bounded
+        # match call (§4.4) can legally exceed its bound from boot
+        # contention alone -- nothing wrong with the utterance, nothing
+        # wrong with the plugin -- get declined as designed, and fall
+        # through to the next pipeline, which can match a mid-conversation
+        # utterance (a bare "yes") to an unrelated literal entity instead
+        # of continuing the conversation it belonged to
         # (OpenVoiceOS/ovos-core#1027). Decline with a short, localized
         # dialog instead of silence or a wrong match; still emit the one
         # terminal event a caller is owed, same as the carrier-drop above.
-        if not is_ready(self.status):
-            lang = message.data.get("lang") or message.context.get("lang")
+        if not is_ready(self.status) or (
+                self._pipeline_warm is not None
+                and not self._pipeline_warm.all_warm()):
+            lang = get_message_lang(message)
             self.bus.emit(message.forward(SpecMessage.SPEAK, {
                 "utterance": still_starting_dialog(lang), "lang": lang}))
             self.bus.emit(message.forward(SpecMessage.UTTERANCE_HANDLED, {}))
