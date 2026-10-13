@@ -8,7 +8,7 @@ no load decision reads, and ``wait_for_intent_service`` asked the in-process
 intent service over the bus, sleeping a second after every miss.
 """
 import time
-from threading import Event
+from threading import Event, RLock
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
@@ -65,6 +65,41 @@ class TestVersionsReadOncePerPass(TestCase):
                     for c in manager._load_plugin_skill.call_args_list}
         self.assertEqual(versions["skill-1"], "1.0")
         self.assertIsNone(versions["skill-0"])
+
+    def test_skills_without_a_version_do_not_rescan(self):
+        """A skill with no version metadata gets None from the pass's map, and
+        the load must take that as the answer rather than scan again."""
+        manager = _manager()
+        manager._network_event = Event()
+        manager._connected_event = Event()
+        manager._logged_skill_warnings = set()
+        manager._should_retry_plugin_skill = Mock(return_value=True)
+        manager._is_plugin_skill_tracked = Mock(return_value=False)
+        manager._reserve_plugin_skill_load = Mock(return_value=True)
+        manager._plugin_skills_lock = RLock()
+        manager._plugin_skill_unload_pending = set()
+        manager._plugin_skill_serials = {}
+        manager._loading_plugin_skills = set()
+        manager.plugin_skills = {}
+        manager._clear_plugin_skill_failure = Mock()
+        manager._record_plugin_skill_version = Mock()
+        loader = Mock()
+        loader.runtime_requirements.network_before_load = False
+        loader.runtime_requirements.internet_before_load = False
+        loader.load.return_value = True
+        manager._get_plugin_skill_loader = Mock(return_value=loader)
+        plugins = {f"skill-{i}": Mock() for i in range(5)}
+        scan = Mock(return_value={"skill-1": "1.0"})
+        with patch("ovos_core.skill_manager.find_skill_plugins", return_value=plugins), \
+                patch.object(SkillManager, "blacklist", []), \
+                patch.object(SkillManager, "_declared_skill_versions", staticmethod(scan)):
+            loaded = manager._load_untracked_plugin_skills(network=True, internet=True)
+        self.assertEqual(len(loaded), 5)
+        self.assertEqual(scan.call_count, 1)
+        recorded = {c.args[0]: c.args[1]
+                    for c in manager._record_plugin_skill_version.call_args_list}
+        self.assertEqual(recorded["skill-1"], "1.0")
+        self.assertIsNone(recorded["skill-0"])
 
 
 class TestInProcessIntentServiceWait(TestCase):

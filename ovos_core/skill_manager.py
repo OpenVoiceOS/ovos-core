@@ -498,7 +498,8 @@ class SkillManager(Thread):
             if not self._reserve_plugin_skill_load(skill_id):
                 continue
             if self._load_plugin_skill(skill_id, plug, reserved=True,
-                                       version=versions.get(skill_id)) is not None:
+                                       version=versions.get(skill_id),
+                                       version_read=True) is not None:
                 loaded.append(skill_id)
         return loaded
 
@@ -540,13 +541,18 @@ class SkillManager(Thread):
         return loader
 
     def _load_plugin_skill(self, skill_id: str, skill_plugin: type, reserved: bool = False,
-                           version: Optional[str] = None) -> Optional[PluginSkillLoader]:
+                           version: Optional[str] = None,
+                           version_read: bool = False) -> Optional[PluginSkillLoader]:
         """Load a plugin skill.
 
         Args:
             skill_id (str): ID of the skill.
             skill_plugin: Plugin skill class.
             reserved (bool): True if the caller already marked the skill as loading.
+            version (str): The skill's installed version, if the caller read it.
+            version_read (bool): True if the caller already read the installed
+                versions, so a None ``version`` means the skill declares none
+                and is not looked up again.
 
         Returns:
             PluginSkillLoader: Loaded plugin skill loader instance if successful, None otherwise.
@@ -560,7 +566,7 @@ class SkillManager(Thread):
         # this load is running. Recording the later one would leave the
         # upgrade check comparing the new version against itself and the old
         # code still answering.
-        if version is None:
+        if version is None and not version_read:
             version = self._declared_skill_versions().get(skill_id)
 
         skill_loader = None
@@ -721,14 +727,12 @@ class SkillManager(Thread):
             self._load_new_skills(network=False, internet=False)
 
     def _load_new_skills(self, network: Optional[bool] = None,
-                          internet: Optional[bool] = None,
-                          gui: Optional[bool] = None) -> List[str]:
+                          internet: Optional[bool] = None) -> List[str]:
         """Handle loading of skills installed since startup.
 
         Args:
             network (bool): Network connection status.
             internet (bool): Internet connection status.
-            gui (bool): GUI connection status.
 
         Returns:
             List[str]: Ids of the skills this call loaded.
@@ -746,10 +750,6 @@ class SkillManager(Thread):
             if internet is None:
                 internet = True
 
-        # ``gui`` is accepted for compatibility and not read: no load decision
-        # depends on it. Asking the bus for it cost a full ``gui.status.request``
-        # timeout (3 s) on every pass on a runtime with no GUI, including the
-        # first one, between "IntentService is ready" and the first skill load.
         loaded = self._load_untracked_plugin_skills(network=network, internet=internet)
 
         if loaded:

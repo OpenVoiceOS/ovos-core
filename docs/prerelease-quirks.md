@@ -11,10 +11,11 @@ quirks log starts.
 
 ## Skill loading starts as soon as the intent service is ready (alpha of 2026-10-12)
 
-- `_load_new_skills` no longer sends `gui.status.request`. Its `gui` argument
-  is still accepted, but no load decision read the answer. Each load pass
-  waited out the 3 s reply timeout on a runtime with no GUI, including the
-  first pass, between "IntentService is ready" and the first skill load.
+- `_load_new_skills` no longer sends `gui.status.request` and no longer takes
+  a `gui` argument: no load decision read the answer, and no caller passed
+  it. Each load pass waited out the 3 s reply timeout on a runtime with no
+  GUI, including the first pass, between "IntentService is ready" and the
+  first skill load.
 - With the intent service in the same process (the default), the skill
   manager reads its state directly instead of sending
   `mycroft.intents.is_ready` and sleeping a second after every "not yet". A
