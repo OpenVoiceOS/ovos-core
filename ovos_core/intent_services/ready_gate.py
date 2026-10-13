@@ -19,15 +19,36 @@ here means every pipeline plugin that reports a warm/cold transition
 reports one counts as warm by default, so this never blocks on a signal
 that cannot exist.
 
+SECOND HALF (measured on a canary): warm pipelines are still not enough. A
+hub whose padatious was warm at ~80 s kept loading skills until ~125 s, and
+an utterance in that gap ("yes", in the middle of a game whose skill was not
+registered yet) still reached an unrelated skill. The orchestrator is ready
+to answer when every pipeline is warm AND the skills it will route to are
+registered. The signal for the second half is the one the skill manager
+already emits when its first load is done, ``mycroft.skills.initialized``.
+It is latched: only the FIRST load counts, so a skill installed, upgraded or
+reloaded afterwards never turns a ready system back into a not-ready one
+(the manager emits the event once, and the latch would ignore a repeat).
+
 This module holds the short, localized "still starting" dialog, the
 pipeline warm-state tracker, and the one function that decides whether
 to speak the dialog instead of matching.
 """
 from typing import Dict, Optional
 
+from ovos_bus_client.message import Message
+
 #: must match the literal every pipeline plugin emits on
 #: (OpenVoiceOS/ovos-padatious-pipeline-plugin#179 is the first producer)
 PIPELINE_WARM_STATE = "ovos.pipeline.warm_state"
+
+#: emitted once by the skill manager when its first load is done
+SKILLS_INITIALIZED = "mycroft.skills.initialized"
+#: the skill manager's own status query (ProcessStatus ``is_ready``) and the
+#: reply type; used once at startup for an intent service that came up after
+#: the skill manager had already finished loading
+SKILLS_IS_READY = "mycroft.skills.is_ready"
+SKILLS_IS_READY_RESPONSE = "mycroft.skills.is_ready.response"
 
 #: lang-prefix (first two letters of a BCP-47 code) -> a short, spoken
 #: "the assistant is still starting" sentence. A prefix not listed here has NO
@@ -71,24 +92,42 @@ def is_ready(status) -> bool:
     with no message, so nothing is emitted). This is a floor, not the
     whole gate: a process that has not even started obviously is not
     ready, but reaching ``READY`` is not sufficient on its own (see the
-    module docstring) -- ``PipelineWarmTracker.all_warm()`` is the other
+    module docstring) -- ``ReadinessTracker.ready()`` is the other
     half."""
     return bool(status.check_ready())
 
 
-class PipelineWarmTracker:
-    """Aggregates every pipeline plugin's own warm/cold transition
-    (``ovos.pipeline.warm_state``, ``{pipeline_id, warm}``) into one
-    "every configured pipeline that can report is warm" answer.
+class ReadinessTracker:
+    """The one aggregate behind "the orchestrator is ready to answer":
+    every pipeline that reports a warm/cold transition
+    (``ovos.pipeline.warm_state``, ``{pipeline_id, warm}``) is warm, AND the
+    skill manager has finished its first load.
 
-    A pipeline that never emits this message is never added to the
-    tracked map at all, so it can never block ``all_warm()`` -- a plugin
-    without a warm signal counts as warm, per the OVOS-READY-1 proposal.
+    A pipeline that never emits a warm report is never added to the tracked
+    map, so it can never block ``all_warm()`` -- a plugin without a warm
+    signal counts as warm, per the OVOS-READY-1 proposal.
+
+    The skills half is a latch. ``mycroft.skills.initialized`` is emitted once
+    after the first load; from then on ``skills_loaded`` stays True, so a
+    skill that is installed or reloaded later cannot flip the system back to
+    not ready. Registration of that one later skill is the skill manager's
+    business, not a reason to refuse every utterance.
     """
 
     def __init__(self, bus):
         self._warm: Dict[str, bool] = {}
+        self._skills_loaded = False
+        self.bus = bus
         bus.on(PIPELINE_WARM_STATE, self._on_warm_state)
+        bus.on(SKILLS_INITIALIZED, self._on_skills_initialized)
+        bus.on(SKILLS_IS_READY_RESPONSE, self._on_skills_is_ready)
+
+    def ask_skills(self) -> None:
+        """Ask the skill manager once whether it is already done. Covers an
+        intent service that starts after the skill manager finished loading
+        and so never heard ``mycroft.skills.initialized``. Not a poll and not
+        a timer: nobody answering just leaves the latch to the event."""
+        self.bus.emit(Message(SKILLS_IS_READY))
 
     def _on_warm_state(self, message) -> None:
         pipeline_id = message.data.get("pipeline_id")
@@ -96,9 +135,24 @@ class PipelineWarmTracker:
         if pipeline_id is not None and warm is not None:
             self._warm[pipeline_id] = bool(warm)
 
+    def _on_skills_initialized(self, message=None) -> None:
+        self._skills_loaded = True
+
+    def _on_skills_is_ready(self, message) -> None:
+        if message.data.get("status"):
+            self._skills_loaded = True
+
+    @property
+    def skills_loaded(self) -> bool:
+        return self._skills_loaded
+
     def all_warm(self) -> bool:
         """True when every pipeline that has ever reported is currently
         warm. Vacuously true before anything has reported at all -- there
         is nothing to wait on yet, and ``is_ready`` is the floor that
         covers that window regardless."""
         return all(self._warm.values())
+
+    def ready(self) -> bool:
+        """Every pipeline warm and the first skill load done."""
+        return self._skills_loaded and self.all_warm()

@@ -235,7 +235,8 @@ class TestSessionSyncIsRetired(SessionIntakeTestCase):
         svc = IntentService(self.bus, preload_pipelines=False)
         svc.status.set_ready()  # OVOS-READY-1: a real service dispatches
         # here, so it must report ready, same as production once boot
-        # finishes.
+        # finishes, skills included (mycroft.skills.initialized).
+        self.bus.emit(Message("mycroft.skills.initialized"))
         svc.get_pipeline = lambda session: (
             [("fake-high", lambda utts, lang, msg: match)])
 

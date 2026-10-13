@@ -6,7 +6,7 @@ owed instead (OpenVoiceOS/ovos-core#1027, OpenVoiceOS/architecture#285).
 "Ready" is NOT ``IntentService.status`` alone: the timeline posted on #1027
 showed a misroute landing well after ``ProcessState.READY``, while
 padatious was still "compiling in background, serving last compiled
-state". ``PipelineWarmTracker`` is the signal that actually covers that
+state". ``ReadinessTracker`` is the signal that actually covers that
 window."""
 import unittest
 from collections import defaultdict
@@ -20,13 +20,13 @@ from ovos_core.intent_services.dispatcher import IntentDispatcher
 from ovos_core.intent_services.manifest import IntentManifest
 from ovos_core.intent_services.ready_gate import (PIPELINE_WARM_STATE,
                                                   STILL_STARTING_DIALOG,
-                                                  PipelineWarmTracker,
+                                                  ReadinessTracker,
                                                   is_ready,
                                                   still_starting_dialog)
 from ovos_core.intent_services.service import IntentService
 
 
-def _make_service(bus, ready: bool) -> IntentService:
+def _make_service(bus, ready: bool, skills: bool = True) -> IntentService:
     svc = IntentService.__new__(IntentService)
     svc.bus = bus
     svc.config = {}
@@ -34,7 +34,9 @@ def _make_service(bus, ready: bool) -> IntentService:
     svc._deactivations = defaultdict(list)
     svc.status = MagicMock()
     svc.status.check_ready.return_value = ready
-    svc._pipeline_warm = PipelineWarmTracker(bus)
+    svc._readiness = ReadinessTracker(bus)
+    if skills:
+        bus.emit(Message("mycroft.skills.initialized"))
 
     for attr, transform in (("utterance_plugins", lambda utt, ctx: (utt, ctx)),
                             ("metadata_plugins", lambda ctx: ctx),
@@ -158,6 +160,58 @@ class TestReadyGate(unittest.TestCase):
                          "the session's own language, not the English "
                          "default, when no data/context lang is given")
 
+    def test_pipelines_warm_but_skills_still_loading_declines(self):
+        """The canary gap: padatious was warm at ~80 s, the skills were not
+        registered until ~125 s, and a mid-game "yes" still misrouted."""
+        svc = _make_service(self.bus, ready=True, skills=False)
+        _report_warm(self.bus, "ovos-padatious-pipeline-plugin", True)
+        emitted = []
+        with patch.object(svc.bus, "emit", side_effect=emitted.append):
+            svc.handle_utterance(_utterance("yes"))
+        svc.utterance_plugins.transform.assert_not_called()
+        self.assertTrue(any(m.msg_type == "ovos.utterance.speak" for m in emitted))
+        handled = [m for m in emitted if m.msg_type == "ovos.utterance.handled"]
+        self.assertEqual(handled[0].context.get("error"), "ovos.ready.not_ready")
+
+    def test_skills_initialized_lifts_the_gate(self):
+        svc = _make_service(self.bus, ready=True, skills=False)
+        self.bus.emit(Message("mycroft.skills.initialized"))
+        emitted = []
+        with patch.object(svc.bus, "emit", side_effect=emitted.append):
+            svc.handle_utterance(_utterance("yes"))
+        svc.utterance_plugins.transform.assert_called_once()
+
+    def test_a_later_skill_load_does_not_flip_back_to_not_ready(self):
+        """Only the first load counts. Reloading or installing a skill later
+        must not turn a ready system back into a declining one."""
+        tracker = ReadinessTracker(self.bus)
+        self.assertFalse(tracker.ready())
+        self.bus.emit(Message("mycroft.skills.initialized"))
+        self.assertTrue(tracker.ready())
+        self.bus.emit(Message("mycroft.skill.loaded", {"skill_id": "x"}))
+        self.bus.emit(Message("mycroft.skills.initialized"))
+        self.assertTrue(tracker.ready())
+        _report_warm(self.bus, "a", False)
+        self.assertFalse(tracker.ready(), "a cold pipeline still counts")
+
+    def test_ask_skills_picks_up_a_skill_manager_that_finished_first(self):
+        """An intent service that starts after the skill manager finished
+        never hears mycroft.skills.initialized; the one startup query does."""
+        tracker = ReadinessTracker(self.bus)
+        asked = []
+        self.bus.on("mycroft.skills.is_ready", lambda m: (
+            asked.append(m), self.bus.emit(m.response(data={"status": True}))))
+        tracker.ask_skills()
+        self.assertEqual(len(asked), 1)
+        self.assertTrue(tracker.skills_loaded)
+
+    def test_ask_skills_not_ready_leaves_the_latch_to_the_event(self):
+        tracker = ReadinessTracker(self.bus)
+        self.bus.on("mycroft.skills.is_ready", lambda m: self.bus.emit(
+            m.response(data={"status": False})))
+        tracker.ask_skills()
+        self.assertFalse(tracker.skills_loaded)
+
     def test_no_dialog_for_an_unlisted_language(self):
         self.assertIsNone(still_starting_dialog("zz-ZZ"))
         self.assertIsNone(still_starting_dialog(None))
@@ -187,7 +241,7 @@ class TestReadyGate(unittest.TestCase):
         status.check_ready.assert_called_once_with()
 
     def test_warm_tracker_ignores_a_pipeline_that_never_reports(self):
-        tracker = PipelineWarmTracker(self.bus)
+        tracker = ReadinessTracker(self.bus)
         self.assertTrue(tracker.all_warm(), "vacuously warm until told otherwise")
         _report_warm(self.bus, "a", False)
         self.assertFalse(tracker.all_warm())

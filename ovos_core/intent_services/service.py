@@ -47,7 +47,7 @@ from ovos_core.transformers import (IntentTransformersService,
 from ovos_core.intent_services.dispatcher import IntentDispatcher, DEFAULT_HANDLER_TIMEOUT
 from ovos_core.intent_services.manifest import IntentManifest
 from ovos_core.intent_services.ready_gate import (ERROR_SOUND_URI, PLAY_SOUND,
-                                                  PipelineWarmTracker,
+                                                  ReadinessTracker,
                                                   is_ready,
                                                   still_starting_dialog)
 from ovos_core.intent_services.working_session import (
@@ -220,7 +220,7 @@ class IntentService:
     # same idiom, for OVOS-READY-1: a test double that never saw any
     # pipeline's warm_state report has nothing to wait on, same as the
     # real tracker before any plugin has reported.
-    _pipeline_warm: Optional[PipelineWarmTracker] = None
+    _readiness: Optional[ReadinessTracker] = None
 
     def __init__(self, bus, config=None, preload_pipelines=True,
                  alive_hook=on_alive, started_hook=on_started,
@@ -241,9 +241,12 @@ class IntentService:
         self.config: dict = config or Configuration().get("intents", {})
 
         # OVOS-READY-1: aggregates every pipeline plugin's own warm/cold
-        # transition. Constructed before any plugin, so it is listening
+        # transition and the skill manager's first-load-done event. Constructed before any plugin, so it is listening
         # before the earliest one it could ever hear from.
-        self._pipeline_warm = PipelineWarmTracker(self.bus)
+        self._readiness = ReadinessTracker(self.bus)
+        # a skill manager that finished before this service started will not
+        # emit mycroft.skills.initialized again; ask it once
+        self._readiness.ask_skills()
 
         # load and cache the plugins right away so they receive all bus messages
         self.pipeline_plugins: dict = {}
@@ -1197,7 +1200,7 @@ class IntentService:
             return
 
         # OVOS-READY-1 §3: an utterance that arrives before every pipeline
-        # that can report is warm MUST NOT enter the pipeline loop.
+        # that can report is warm and the skills are loaded MUST NOT enter the pipeline loop.
         # ``is_ready`` alone is NOT the signal (see the ready_gate module
         # docstring for the timeline that proved it): a pipeline's bounded
         # match call (§4.4) can legally exceed its bound from boot
@@ -1210,8 +1213,8 @@ class IntentService:
         # dialog instead of silence or a wrong match; still emit the one
         # terminal event a caller is owed, same as the carrier-drop above.
         if not is_ready(self.status) or (
-                self._pipeline_warm is not None
-                and not self._pipeline_warm.all_warm()):
+                self._readiness is not None
+                and not self._readiness.ready()):
             lang = get_message_lang(message)
             # OVOS-READY-1 §3.2: a stable identifier on whichever response
             # this sends, so a listener can tell it apart from an ordinary
