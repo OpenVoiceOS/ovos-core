@@ -46,7 +46,8 @@ from ovos_core.transformers import (IntentTransformersService,
                                     UtteranceTransformersService)
 from ovos_core.intent_services.dispatcher import IntentDispatcher, DEFAULT_HANDLER_TIMEOUT
 from ovos_core.intent_services.manifest import IntentManifest
-from ovos_core.intent_services.ready_gate import (PipelineWarmTracker,
+from ovos_core.intent_services.ready_gate import (ERROR_SOUND_URI, PLAY_SOUND,
+                                                  PipelineWarmTracker,
                                                   is_ready,
                                                   still_starting_dialog)
 from ovos_core.intent_services.working_session import (
@@ -1215,10 +1216,16 @@ class IntentService:
             # OVOS-READY-1 §3.2: a stable identifier on whichever response
             # this sends, so a listener can tell it apart from an ordinary
             # one and knows why it was declined.
-            speak = message.forward(SpecMessage.SPEAK, {
-                "utterance": still_starting_dialog(lang), "lang": lang})
-            speak.context["error"] = "ovos.ready.not_ready"
-            self.bus.emit(speak)
+            dialog = still_starting_dialog(lang)
+            if dialog is None:
+                # no dialog in the session's language: the error sound,
+                # never a dialog in the wrong language (§3.1)
+                reply = message.forward(PLAY_SOUND, {"uri": ERROR_SOUND_URI})
+            else:
+                reply = message.forward(SpecMessage.SPEAK, {
+                    "utterance": dialog, "lang": lang})
+            reply.context["error"] = "ovos.ready.not_ready"
+            self.bus.emit(reply)
             handled = message.forward(SpecMessage.UTTERANCE_HANDLED, {})
             handled.context["error"] = "ovos.ready.not_ready"
             self.bus.emit(handled)

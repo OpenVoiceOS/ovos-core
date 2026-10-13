@@ -30,8 +30,9 @@ from typing import Dict, Optional
 PIPELINE_WARM_STATE = "ovos.pipeline.warm_state"
 
 #: lang-prefix (first two letters of a BCP-47 code) -> a short, spoken
-#: "the assistant is still starting" sentence. Falls back to English for any
-#: prefix not listed here. Reviewed for the languages the Thalovant fleet
+#: "the assistant is still starting" sentence. A prefix not listed here has NO
+#: dialog (OVOS-READY-1 section 3: never a dialog in the wrong language);
+#: the caller plays the error sound instead. Reviewed for the languages the Thalovant fleet
 #: serves (OpenVoiceOS/ovos-core#1027); a wider upstream release would want
 #: this reviewed per-locale rather than per-prefix.
 STILL_STARTING_DIALOG = {
@@ -49,11 +50,19 @@ STILL_STARTING_DIALOG = {
 }
 
 
-def still_starting_dialog(lang: Optional[str]) -> str:
+#: the non-verbal reply OVOS-READY-1 section 3 requires when there is no
+#: dialog in the session's language
+ERROR_SOUND_URI = "snd/error.mp3"
+PLAY_SOUND = "mycroft.audio.play_sound"
+
+
+def still_starting_dialog(lang: Optional[str]) -> Optional[str]:
     """The "still starting" sentence for ``lang``, by its two-letter prefix,
-    falling back to English for an unlisted or missing language."""
-    prefix = (lang or "en").split("-")[0].lower()
-    return STILL_STARTING_DIALOG.get(prefix, STILL_STARTING_DIALOG["en"])
+    or None for an unlisted or missing language -- never another
+    language's dialog (OVOS-READY-1 section 3)."""
+    if not lang:
+        return None
+    return STILL_STARTING_DIALOG.get(lang.split("-")[0].lower())
 
 
 def is_ready(status) -> bool:

@@ -158,11 +158,27 @@ class TestReadyGate(unittest.TestCase):
                          "the session's own language, not the English "
                          "default, when no data/context lang is given")
 
-    def test_dialog_falls_back_to_english_for_an_unlisted_language(self):
-        self.assertEqual(still_starting_dialog("zz-ZZ"),
-                         STILL_STARTING_DIALOG["en"])
-        self.assertEqual(still_starting_dialog(None),
-                         STILL_STARTING_DIALOG["en"])
+    def test_no_dialog_for_an_unlisted_language(self):
+        self.assertIsNone(still_starting_dialog("zz-ZZ"))
+        self.assertIsNone(still_starting_dialog(None))
+
+    def test_unlisted_language_gets_the_error_sound_not_english(self):
+        """OVOS-READY-1 section 3: never a dialog in the wrong language."""
+        svc = _make_service(self.bus, ready=False)
+        message = Message("recognizer_loop:utterance",
+                          data={"utterances": ["yes"], "lang": "zz-ZZ"})
+        emitted = []
+        with patch.object(svc.bus, "emit", side_effect=emitted.append):
+            svc.handle_utterance(message)
+        self.assertFalse(any(m.msg_type == "ovos.utterance.speak"
+                             for m in emitted))
+        sounds = [m for m in emitted if m.msg_type == "mycroft.audio.play_sound"]
+        self.assertEqual(len(sounds), 1)
+        self.assertEqual(sounds[0].data["uri"], "snd/error.mp3")
+        self.assertEqual(sounds[0].context.get("error"), "ovos.ready.not_ready")
+        handled = [m for m in emitted if m.msg_type == "ovos.utterance.handled"]
+        self.assertEqual(len(handled), 1)
+        self.assertEqual(handled[0].context.get("error"), "ovos.ready.not_ready")
 
     def test_is_ready_reads_through_check_ready_without_emitting(self):
         status = MagicMock()
