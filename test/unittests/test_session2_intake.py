@@ -18,6 +18,7 @@ from ovos_utils.fakebus import FakeBus
 
 from ovos_core.intent_services.dispatcher import IntentDispatcher
 from ovos_core.intent_services.manifest import IntentManifest
+from ovos_core.intent_services.ready_gate import LoadTracker
 from ovos_core.intent_services.service import IntentService
 
 INTENT_CONTEXT_FIELD = "intent_context"
@@ -32,6 +33,7 @@ def _make_service(bus, match=None) -> IntentService:
     and a single pipeline that returns ``match`` (or never matches)."""
     svc = IntentService.__new__(IntentService)
     svc.bus = bus
+    svc._load_tracker = LoadTracker(bus, skills_required=False)
     svc.config = {}
     svc.pipeline_plugins = {}
     svc._deactivations = defaultdict(list)
@@ -233,9 +235,7 @@ class TestSessionSyncIsRetired(SessionIntakeTestCase):
                                    match_data={"conf": 1.0},
                                    skill_id="lights.skill", utterance="turn on")
         svc = IntentService(self.bus, preload_pipelines=False)
-        svc.status.set_ready()  # OVOS-READY-1: a real service dispatches
-        # here, so it must report ready, same as production once boot
-        # finishes, skills included (mycroft.skills.initialized).
+        svc.status.set_ready()
         self.bus.emit(Message("mycroft.skills.initialized"))
         svc.get_pipeline = lambda session: (
             [("fake-high", lambda utts, lang, msg: match)])

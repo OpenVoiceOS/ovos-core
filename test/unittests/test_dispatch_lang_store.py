@@ -38,6 +38,7 @@ from ovos_spec_tools import SpecMessage
 from ovos_utils.fakebus import FakeBus
 
 from ovos_core.intent_services.dispatcher import IntentDispatcher
+from ovos_core.intent_services.ready_gate import LoadTracker
 from ovos_core.intent_services.service import IntentService
 
 MATCHED = SpecMessage.INTENT_MATCHED.value
@@ -55,6 +56,7 @@ class TestDispatchDoesNotWriteMatchLangToStore(unittest.TestCase):
         self.bus = FakeBus()
         svc = IntentService.__new__(IntentService)
         svc.bus = self.bus
+        svc._load_tracker = LoadTracker(self.bus, skills_required=False)
         svc.config = {"multilingual_matching": True}
         svc.pipeline_plugins = {}
         svc._deactivations = defaultdict(list)

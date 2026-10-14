@@ -1,13 +1,4 @@
-"""OVOS-READY-1 — an utterance that arrives before every pipeline that can
-report is warm must not enter the pipeline loop at all, and must get a
-short, localized "still starting" dialog plus the one terminal event it is
-owed instead (OpenVoiceOS/ovos-core#1027, OpenVoiceOS/architecture#285).
-
-"Ready" is NOT ``IntentService.status`` alone: the timeline posted on #1027
-showed a misroute landing well after ``ProcessState.READY``, while
-padatious was still "compiling in background, serving last compiled
-state". ``ReadinessTracker`` is the signal that actually covers that
-window."""
+"""Utterances arriving before the service is ready get a "still starting" reply."""
 import unittest
 from collections import defaultdict
 from unittest.mock import MagicMock, patch
@@ -18,10 +9,10 @@ from ovos_utils.fakebus import FakeBus
 
 from ovos_core.intent_services.dispatcher import IntentDispatcher
 from ovos_core.intent_services.manifest import IntentManifest
-from ovos_core.intent_services.ready_gate import (PIPELINE_WARM_STATE,
+from ovos_core.intent_services.ready_gate import (PIPELINE_LOADED,
+                                                  PIPELINE_LOADING,
                                                   STILL_STARTING_DIALOG,
-                                                  ReadinessTracker,
-                                                  is_ready,
+                                                  LoadTracker,
                                                   still_starting_dialog)
 from ovos_core.intent_services.service import IntentService
 
@@ -34,7 +25,7 @@ def _make_service(bus, ready: bool, skills: bool = True) -> IntentService:
     svc._deactivations = defaultdict(list)
     svc.status = MagicMock()
     svc.status.check_ready.return_value = ready
-    svc._readiness = ReadinessTracker(bus)
+    svc._load_tracker = LoadTracker(bus)
     if skills:
         bus.emit(Message("mycroft.skills.initialized"))
 
@@ -65,9 +56,12 @@ def _utterance(utterance="yes", lang=None, session_id="s1") -> Message:
                    context={"session": {"session_id": session_id}})
 
 
-def _report_warm(bus, pipeline_id: str, warm: bool) -> None:
-    bus.emit(Message(PIPELINE_WARM_STATE,
-                     {"pipeline_id": pipeline_id, "warm": warm}))
+def _loading(bus, pipeline_id: str) -> None:
+    bus.emit(Message(PIPELINE_LOADING, {"pipeline_id": pipeline_id}))
+
+
+def _loaded(bus, pipeline_id: str) -> None:
+    bus.emit(Message(PIPELINE_LOADED, {"pipeline_id": pipeline_id}))
 
 
 class TestReadyGate(unittest.TestCase):
@@ -102,41 +96,31 @@ class TestReadyGate(unittest.TestCase):
                          "the pipeline-loop terminal is still owed even "
                          "though the loop never ran")
 
-    def test_process_ready_but_a_pipeline_still_cold_still_declines(self):
-        """The #1027 case: process status alone said ready while padatious
-        was still serving a stale compiled state."""
-        svc = _make_service(self.bus, ready=True)
-        _report_warm(self.bus, "ovos-padatious-pipeline-plugin", False)
+    def test_status_ready_but_a_pipeline_still_loading_declines(self):
+        svc = _make_service(self.bus, ready=True, skills=False)
+        _loading(self.bus, "ovos-padatious-pipeline-plugin")
+        self.bus.emit(Message("mycroft.skills.initialized"))
         emitted = []
         with patch.object(svc.bus, "emit", side_effect=emitted.append):
             svc.handle_utterance(_utterance("yes"))
 
         svc.utterance_plugins.transform.assert_not_called()
-        self.assertTrue(
-            any(m.msg_type == "ovos.utterance.speak" for m in emitted),
-            "a cold pipeline must decline even though process status "
-            "alone reports ready")
+        self.assertTrue(any(m.msg_type == "ovos.utterance.speak" for m in emitted))
 
-    def test_ready_and_every_reporting_pipeline_warm_runs_normally(self):
+    def test_ready_and_every_pipeline_loaded_runs_normally(self):
         svc = _make_service(self.bus, ready=True)
-        _report_warm(self.bus, "ovos-padatious-pipeline-plugin", False)
-        _report_warm(self.bus, "ovos-padatious-pipeline-plugin", True)
+        _loading(self.bus, "ovos-padatious-pipeline-plugin")
+        _loaded(self.bus, "ovos-padatious-pipeline-plugin")
         emitted = []
         with patch.object(svc.bus, "emit", side_effect=emitted.append):
             svc.handle_utterance(_utterance("yes"))
 
         svc.utterance_plugins.transform.assert_called_once()
-        self.assertFalse(
-            any(m.msg_type == "ovos.utterance.speak" for m in emitted),
-            "every pipeline that reported is warm; no substitute reply")
+        self.assertFalse(any(m.msg_type == "ovos.utterance.speak" for m in emitted))
 
-    def test_a_pipeline_that_never_reports_does_not_block_readiness(self):
-        """A plugin with no warm signal counts as warm -- this must never
-        block on a signal that cannot exist."""
+    def test_a_pipeline_that_never_reports_does_not_block(self):
         svc = _make_service(self.bus, ready=True)
-        emitted = []
-        with patch.object(svc.bus, "emit", side_effect=emitted.append):
-            svc.handle_utterance(_utterance("yes"))
+        svc.handle_utterance(_utterance("yes"))
         svc.utterance_plugins.transform.assert_called_once()
 
     def test_decline_resolves_a_session_only_language_not_just_english(self):
@@ -160,11 +144,10 @@ class TestReadyGate(unittest.TestCase):
                          "the session's own language, not the English "
                          "default, when no data/context lang is given")
 
-    def test_pipelines_warm_but_skills_still_loading_declines(self):
-        """The canary gap: padatious was warm at ~80 s, the skills were not
-        registered until ~125 s, and a mid-game "yes" still misrouted."""
+    def test_pipelines_loaded_but_skills_still_loading_declines(self):
         svc = _make_service(self.bus, ready=True, skills=False)
-        _report_warm(self.bus, "ovos-padatious-pipeline-plugin", True)
+        _loading(self.bus, "ovos-padatious-pipeline-plugin")
+        _loaded(self.bus, "ovos-padatious-pipeline-plugin")
         emitted = []
         with patch.object(svc.bus, "emit", side_effect=emitted.append):
             svc.handle_utterance(_utterance("yes"))
@@ -181,46 +164,50 @@ class TestReadyGate(unittest.TestCase):
             svc.handle_utterance(_utterance("yes"))
         svc.utterance_plugins.transform.assert_called_once()
 
-    def test_a_later_skill_load_does_not_flip_back_to_not_ready(self):
-        """Only the first load counts. Reloading or installing a skill later
-        must not turn a ready system back into a declining one."""
-        tracker = ReadinessTracker(self.bus)
-        self.assertFalse(tracker.ready())
+    def test_answering_never_closes_after_it_opens(self):
+        tracker = LoadTracker(self.bus)
+        self.assertFalse(tracker.answering)
         self.bus.emit(Message("mycroft.skills.initialized"))
-        self.assertTrue(tracker.ready())
-        self.bus.emit(Message("mycroft.skill.loaded", {"skill_id": "x"}))
+        self.assertTrue(tracker.answering)
+        _loading(self.bus, "a")
         self.bus.emit(Message("mycroft.skills.initialized"))
-        self.assertTrue(tracker.ready())
-        _report_warm(self.bus, "a", False)
-        self.assertFalse(tracker.ready(), "a cold pipeline still counts")
+        self.assertTrue(tracker.answering)
+        self.assertTrue(tracker.pipelines_loading)
+
+    def test_answering_waits_for_a_pipeline_loading_at_skills_initialized(self):
+        tracker = LoadTracker(self.bus)
+        _loading(self.bus, "a")
+        self.bus.emit(Message("mycroft.skills.initialized"))
+        self.assertFalse(tracker.answering)
+        _loaded(self.bus, "a")
+        self.assertTrue(tracker.answering)
 
     def test_ask_skills_picks_up_a_skill_manager_that_finished_first(self):
         """An intent service that starts after the skill manager finished
         never hears mycroft.skills.initialized; the one startup query does."""
-        tracker = ReadinessTracker(self.bus)
+        tracker = LoadTracker(self.bus)
         asked = []
         self.bus.on("mycroft.skills.is_ready", lambda m: (
             asked.append(m), self.bus.emit(m.response(data={"status": True}))))
         tracker.ask_skills()
         self.assertEqual(len(asked), 1)
-        self.assertTrue(tracker.skills_loaded)
+        self.assertTrue(tracker._skills_loaded)
 
-    def test_skills_not_required_gates_on_pipelines_alone(self):
-        """An intent service with no skill manager on the bus never hears a
-        first-load signal; it must not decline for good."""
-        tracker = ReadinessTracker(self.bus, skills_required=False)
-        self.assertTrue(tracker.ready())
-        _report_warm(self.bus, "a", False)
-        self.assertFalse(tracker.ready(), "a cold pipeline still counts")
-        _report_warm(self.bus, "a", True)
-        self.assertTrue(tracker.ready())
+    def test_skills_not_required_waits_for_pipelines_alone(self):
+        tracker = LoadTracker(self.bus, skills_required=False)
+        self.assertTrue(tracker.answering)
+        tracker = LoadTracker(self.bus, skills_required=False)
+        _loading(self.bus, "a")
+        self.assertFalse(tracker.answering)
+        _loaded(self.bus, "a")
+        self.assertTrue(tracker.answering)
 
     def test_ask_skills_not_ready_leaves_the_latch_to_the_event(self):
-        tracker = ReadinessTracker(self.bus)
+        tracker = LoadTracker(self.bus)
         self.bus.on("mycroft.skills.is_ready", lambda m: self.bus.emit(
             m.response(data={"status": False})))
         tracker.ask_skills()
-        self.assertFalse(tracker.skills_loaded)
+        self.assertFalse(tracker._skills_loaded)
 
     def test_output_lang_wins_over_the_input_language(self):
         """OVOS-SESSION-1 section 3.2.3: a German speaker who set
@@ -275,21 +262,24 @@ class TestReadyGate(unittest.TestCase):
         self.assertEqual(len(handled), 1)
         self.assertEqual(handled[0].context.get("error"), "ovos.ready.not_ready")
 
-    def test_is_ready_reads_through_check_ready_without_emitting(self):
-        status = MagicMock()
-        status.check_ready.return_value = True
-        self.assertTrue(is_ready(status))
-        status.check_ready.assert_called_once_with()
+    def test_status_becomes_ready_only_once_pipelines_are_loaded(self):
+        svc = IntentService(self.bus, config={}, preload_pipelines=False)
+        _loading(self.bus, "slow")
+        svc._plugins_loaded = True
+        svc._set_ready_when_loaded()
+        self.assertFalse(svc.status.check_ready())
+        _loaded(self.bus, "slow")
+        self.assertTrue(svc.status.check_ready())
 
-    def test_warm_tracker_ignores_a_pipeline_that_never_reports(self):
-        tracker = ReadinessTracker(self.bus)
-        self.assertTrue(tracker.all_warm(), "vacuously warm until told otherwise")
-        _report_warm(self.bus, "a", False)
-        self.assertFalse(tracker.all_warm())
-        _report_warm(self.bus, "b", True)
-        self.assertFalse(tracker.all_warm(), "a is still cold")
-        _report_warm(self.bus, "a", True)
-        self.assertTrue(tracker.all_warm())
+    def test_loaded_callback_fires_once_nothing_is_loading(self):
+        calls = []
+        LoadTracker(self.bus, on_pipelines_loaded=lambda: calls.append(1))
+        _loading(self.bus, "a")
+        _loading(self.bus, "b")
+        _loaded(self.bus, "a")
+        self.assertEqual(calls, [])
+        _loaded(self.bus, "b")
+        self.assertEqual(calls, [1])
 
 
 if __name__ == "__main__":

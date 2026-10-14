@@ -26,6 +26,7 @@ from ovos_utils.fakebus import FakeBus
 from ovos_core.intent_services.dispatcher import IntentDispatcher
 from ovos_core.intent_services.manifest import IntentManifest
 from ovos_core.intent_services import service as service_module
+from ovos_core.intent_services.ready_gate import LoadTracker
 from ovos_core.intent_services.service import IntentService
 from ovos_core import transformers as transformers_module
 from ovos_core.transformers import TypedSlotsTransformersService
@@ -63,6 +64,7 @@ def _make_service(typed_slots=None) -> IntentService:
     bus = FakeBus()
     svc = IntentService.__new__(IntentService)
     svc.bus = bus
+    svc._load_tracker = LoadTracker(bus, skills_required=False)
     svc.config = {}
     svc.pipeline_plugins = {}
     svc._deactivations = defaultdict(list)

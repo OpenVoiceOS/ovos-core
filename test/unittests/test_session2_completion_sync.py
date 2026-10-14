@@ -28,6 +28,7 @@ from ovos_utils.fakebus import FakeBus
 
 from ovos_core.intent_services.dispatcher import IntentDispatcher
 from ovos_core.intent_services.manifest import IntentManifest
+from ovos_core.intent_services.ready_gate import LoadTracker
 from ovos_core.intent_services.service import IntentService
 
 SKILL_ID = "lights.skill"
@@ -40,6 +41,7 @@ def _make_service(bus, match) -> IntentService:
     ``match``, and the real IntentDispatcher wired to both its callbacks."""
     svc = IntentService.__new__(IntentService)
     svc.bus = bus
+    svc._load_tracker = LoadTracker(bus, skills_required=False)
     svc.config = {}
     svc.pipeline_plugins = {}
     svc._deactivations = defaultdict(list)

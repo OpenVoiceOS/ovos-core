@@ -32,6 +32,7 @@ from ovos_spec_tools.context import (
     context_supplied_slots,
     INTENT_CONTEXT_FIELD,
 )
+from ovos_core.intent_services.ready_gate import LoadTracker
 from ovos_core.intent_services.service import IntentService
 
 
@@ -57,6 +58,7 @@ def _make_service(config=None) -> IntentService:
     bus = FakeBus()
     svc = IntentService.__new__(IntentService)
     svc.bus = bus
+    svc._load_tracker = LoadTracker(bus, skills_required=False)
     svc.config = config or {}
     svc.pipeline_plugins = {}
     svc._deactivations = defaultdict(list)

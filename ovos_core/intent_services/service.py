@@ -47,8 +47,7 @@ from ovos_core.transformers import (IntentTransformersService,
 from ovos_core.intent_services.dispatcher import IntentDispatcher, DEFAULT_HANDLER_TIMEOUT
 from ovos_core.intent_services.manifest import IntentManifest
 from ovos_core.intent_services.ready_gate import (ERROR_SOUND_URI, PLAY_SOUND,
-                                                  ReadinessTracker,
-                                                  is_ready,
+                                                  LoadTracker,
                                                   response_dialog)
 from ovos_core.intent_services.working_session import (
     close_round, open_round, pruned_entries, record_pruned, round_session,
@@ -217,10 +216,8 @@ class IntentService:
     _match_inflight: Optional[dict] = None
     _match_abandoned: Optional[dict] = None
     _match_lock: Optional[Lock] = None
-    # same idiom, for OVOS-READY-1: a test double that never saw any
-    # pipeline's warm_state report has nothing to wait on, same as the
-    # real tracker before any plugin has reported.
-    _readiness: Optional[ReadinessTracker] = None
+    _load_tracker: Optional[LoadTracker] = None
+    _plugins_loaded: bool = False
 
     def __init__(self, bus, config=None, preload_pipelines=True,
                  alive_hook=on_alive, started_hook=on_started,
@@ -240,20 +237,13 @@ class IntentService:
         self.status.set_started()
         self.config: dict = config or Configuration().get("intents", {})
 
-        # OVOS-READY-1: aggregates every pipeline plugin's own warm/cold
-        # transition and the skill manager's first-load-done event. Constructed before any plugin, so it is listening
-        # before the earliest one it could ever hear from.
-        # ``ready_gate.skills_required`` (default true) is false only for an
-        # intent service that runs with no skill manager on the bus, where
-        # nothing would ever signal a first skill load
         skills_required = self.config.get("ready_gate", {}).get(
             "skills_required", True)
-        self._readiness = ReadinessTracker(
-            self.bus, skills_required=skills_required)
+        self._load_tracker = LoadTracker(
+            self.bus, skills_required=skills_required,
+            on_pipelines_loaded=self._set_ready_when_loaded)
         if skills_required:
-            # a skill manager that finished before this service started will
-            # not emit mycroft.skills.initialized again; ask it once
-            self._readiness.ask_skills()
+            self._load_tracker.ask_skills()
 
         # load and cache the plugins right away so they receive all bus messages
         self.pipeline_plugins: dict = {}
@@ -356,7 +346,14 @@ class IntentService:
                 LOG.debug(f"Loaded pipeline plugin: '{p}'")
             except Exception as e:
                 LOG.error(f"Failed to load pipeline plugin '{p}': {e}")
-        self.status.set_ready()
+        self._plugins_loaded = True
+        self._set_ready_when_loaded()
+
+    def _set_ready_when_loaded(self) -> None:
+        """READY means every pipeline plugin is loaded, not only constructed."""
+        if (self._plugins_loaded and not self._load_tracker.pipelines_loading
+                and not self.status.check_ready()):
+            self.status.set_ready()
 
     def _handle_transformers(self, message: Message) -> Message:
         """
@@ -1206,31 +1203,12 @@ class IntentService:
             self.bus.emit(message.forward(SpecMessage.UTTERANCE_HANDLED, {}))
             return
 
-        # OVOS-READY-1 §3: an utterance that arrives before every pipeline
-        # that can report is warm and the skills are loaded MUST NOT enter the pipeline loop.
-        # ``is_ready`` alone is NOT the signal (see the ready_gate module
-        # docstring for the timeline that proved it): a pipeline's bounded
-        # match call (§4.4) can legally exceed its bound from boot
-        # contention alone -- nothing wrong with the utterance, nothing
-        # wrong with the plugin -- get declined as designed, and fall
-        # through to the next pipeline, which can match a mid-conversation
-        # utterance (a bare "yes") to an unrelated literal entity instead
-        # of continuing the conversation it belonged to
-        # (OpenVoiceOS/ovos-core#1027). Decline with a short, localized
-        # dialog instead of silence or a wrong match; still emit the one
-        # terminal event a caller is owed, same as the carrier-drop above.
-        if not is_ready(self.status) or (
-                self._readiness is not None
-                and not self._readiness.ready()):
+        if not (self.status.check_ready() and self._load_tracker.answering):
             lang = get_message_lang(message)
-            # OVOS-READY-1 §3.2: a stable identifier on whichever response
-            # this sends, so a listener can tell it apart from an ordinary
-            # one and knows why it was declined.
             session = message.context.get("session") or {}
             dialog, lang = response_dialog(lang, session.get("output_lang"))
             if dialog is None:
-                # no dialog in the session's language: the error sound,
-                # never a dialog in the wrong language (§3.1)
+                # never a dialog in the wrong language
                 reply = message.forward(PLAY_SOUND, {"uri": ERROR_SOUND_URI})
             else:
                 reply = message.forward(SpecMessage.SPEAK, {
