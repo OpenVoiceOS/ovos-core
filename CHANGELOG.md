@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.7.5a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.5a1) (2026-10-22)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.4a1...3.7.5a1)
+
+**Merged pull requests:**
+
+- fix\(deps\): accept ovos-plugin-manager 3 [\#1029](https://github.com/OpenVoiceOS/ovos-core/pull/1029) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [3.7.4a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.4a1) (2026-10-08)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.3a1...3.7.4a1)
