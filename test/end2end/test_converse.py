@@ -1,167 +1,275 @@
+"""End-to-end converse test, exercised on BOTH bus namespaces.
+
+- **spec**: ``modernize=False, emit_legacy=False`` — utterances injected on the spec
+  topic ``ovos.utterance.handle``; core handles them natively, no bridging.
+- **legacy**: ``modernize=True, emit_legacy=False`` — utterances injected on the
+  legacy topic ``recognizer_loop:utterance``; the FakeBus modernize-bridge
+  re-dispatches each as ``ovos.utterance.handle`` so the spec listener handles it.
+
+The parrot skill speaks on the spec topic ``ovos.utterance.speak``. The start/stop
+dialog utterances are randomized variants, so only their stable ``meta.dialog`` is
+asserted; the deterministic echo reply asserts its full utterance.
+"""
 from copy import deepcopy
 from unittest import TestCase
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import Session
+from ovos_spec_tools import SpecMessage, migration_counterpart
 from ovos_utils.log import LOG
 
 from ovoscope import End2EndTest, get_minicroft
 
+# Topics from the ovos-spec-tools SpecMessage enum; legacy derived, not hardcoded.
+SPEC_UTTERANCE = SpecMessage.UTTERANCE.value
+LEGACY_UTTERANCE = migration_counterpart(SPEC_UTTERANCE)
+SPEC_SPEAK = SpecMessage.SPEAK.value
+UTTERANCE_HANDLED = SpecMessage.UTTERANCE_HANDLED.value
+INTENT_MATCHED = SpecMessage.INTENT_MATCHED.value      # ovos.intent.matched (§9.2)
+# §8 handler-lifecycle trio wraps every dispatch; this suite asserts converse
+# routing, not the trio (covered by the adapt/padatious suites), so it is
+# filtered via ignore_messages below.
+HANDLER_TRIO = [SpecMessage.INTENT_HANDLER_START.value,
+                SpecMessage.INTENT_HANDLER_COMPLETE.value,
+                SpecMessage.INTENT_HANDLER_ERROR.value,
+                "ovos.skills.settings_changed",  # keep ovoscope's default ignore
+                "recognizer_loop:audio_output_start",  # TTS mock duck
+                "recognizer_loop:audio_output_end"]  # TTS mock unduck
+INTENT_UNMATCHED = SpecMessage.INTENT_UNMATCHED.value  # ovos.intent.unmatched (§9.3)
+
+# key -> (modernize, emit_legacy, utterance_topic)
+NAMESPACE_PATHS = {
+    "spec": (False, False, SPEC_UTTERANCE),
+    "legacy": (True, False, LEGACY_UTTERANCE),
+}
+
 
 class TestConverse(TestCase):
 
+    skill_id = "ovos-skill-parrot.openvoiceos"
+
     def setUp(self):
         LOG.set_level("DEBUG")
-        self.skill_id = "ovos-skill-parrot.openvoiceos"
-        self.minicroft = get_minicroft([self.skill_id])  # reuse for speed, but beware if skills keeping internal state
 
     def tearDown(self):
-        if self.minicroft:
-            self.minicroft.stop()
         LOG.set_level("CRITICAL")
 
-    def test_parrot_mode(self):
-        session = Session("123")
-        session.lang = "en-US"
-        session.pipeline = ["ovos-converse-pipeline-plugin", "ovos-padatious-pipeline-plugin-high"]
+    def _run_parrot_mode(self, namespace: str) -> None:
+        modernize, emit_legacy, utt_topic = NAMESPACE_PATHS[namespace]
+        minicroft = get_minicroft([self.skill_id], modernize=modernize,
+                                  emit_legacy=emit_legacy)
+        try:
 
-        message1 = Message("recognizer_loop:utterance",
-                           {"utterances": ["start parrot mode"], "lang": session.lang},
-                           {"session": session.serialize(), "source": "A", "destination": "B"})
+            session = Session("123")
+            session.lang = "en-US"
+            session.pipeline = ["ovos-converse-pipeline-plugin", "ovos-padatious-pipeline-plugin-high"]
+
+            message1 = Message(utt_topic,
+                               {"utterances": ["start parrot mode"], "lang": session.lang},
+                               {"session": session.serialize(), "source": "A", "destination": "B"})
         # NOTE: we dont pass session after first message
         # End2EndTest will inject/update the session from message1
-        message2 = Message("recognizer_loop:utterance",
-                           {"utterances": ["echo test"], "lang": session.lang},
-                           {"source": "A", "destination": "B"})
-        message3 = Message("recognizer_loop:utterance",
-                           {"utterances": ["stop parrot"], "lang": session.lang},
-                           {"source": "A", "destination": "B"})
-        message4 = Message("recognizer_loop:utterance",
-                           {"utterances": ["echo test"], "lang": session.lang},
-                           {"source": "A", "destination": "B"})
+            message2 = Message(utt_topic,
+                               {"utterances": ["echo test"], "lang": session.lang},
+                               {"source": "A", "destination": "B"})
+            message3 = Message(utt_topic,
+                               {"utterances": ["stop parrot"], "lang": session.lang},
+                               {"source": "A", "destination": "B"})
+            message4 = Message(utt_topic,
+                               {"utterances": ["echo test"], "lang": session.lang},
+                               {"source": "A", "destination": "B"})
 
-        expected1 = [
-            message1,
-            Message(f"{self.skill_id}.activate",
-                    data={},
-                    context={"skill_id": self.skill_id}),
-            Message(f"{self.skill_id}:start_parrot.intent",
-                    data={"utterance": "start parrot mode", "lang": session.lang},
-                    context={"skill_id": self.skill_id}),
-            Message("mycroft.skill.handler.start",
-                    data={"name": "ParrotSkill.handle_start_parrot_intent"},
-                    context={"skill_id": self.skill_id}),
-            Message("speak",
-                    data={"expect_response": False,
-                          "meta": {
-                              "dialog": "parrot_start",
-                              "data": {},
-                              "skill": self.skill_id
-                          }},
-                    context={"skill_id": self.skill_id}),
-            Message("mycroft.skill.handler.complete",
-                    data={"name": "ParrotSkill.handle_start_parrot_intent"},
-                    context={"skill_id": self.skill_id}),
-            Message("ovos.utterance.handled",
-                    data={},
-                    context={"skill_id": self.skill_id}),
-        ]
-        expected2 = [
-            message2,
-            Message(f"{self.skill_id}.converse.ping",
-                    data={"utterances": ["echo test"], "skill_id": self.skill_id},
-                    context={}),
-            Message("skill.converse.pong",
-                    data={"can_handle": True, "skill_id": self.skill_id},
-                    context={"skill_id": self.skill_id}),
-            Message(f"{self.skill_id}.activate",
-                    data={},
-                    context={"skill_id": self.skill_id}),
-            Message("converse:skill",
-                    data={"utterances": ["echo test"], "lang": session.lang, "skill_id": self.skill_id},
-                    context={"skill_id": self.skill_id}),
-            Message(f"{self.skill_id}.converse.request",
-                    data={"utterances": ["echo test"], "lang": session.lang},
-                    context={"skill_id": self.skill_id}),
-            Message("speak",
-                    data={"utterance": "echo test",
-                          "expect_response": False,
-                          "lang": session.lang,
-                          "meta": {
-                              "skill": self.skill_id
-                          }},
-                    context={"skill_id": self.skill_id}),
-            Message("skill.converse.response",
-                    data={"skill_id": self.skill_id},
-                    context={"skill_id": self.skill_id}),
-            Message("ovos.utterance.handled",
-                    data={},
-                    context={"skill_id": self.skill_id})
-        ]
-        expected3 = [
-            message3,
-            Message(f"{self.skill_id}.converse.ping",
-                    data={"utterances": ["stop parrot"], "skill_id": self.skill_id},
-                    context={}),
-            Message("skill.converse.pong",
-                    data={"can_handle": True, "skill_id": self.skill_id},
-                    context={"skill_id": self.skill_id}),
-            Message(f"{self.skill_id}.activate",
-                    data={},
-                    context={"skill_id": self.skill_id}),
+            expected1 = [
+                message1,
+                Message(f"{self.skill_id}.activate",
+                        data={},
+                        context={"skill_id": self.skill_id}),
+                Message(INTENT_MATCHED,
+                        data={"skill_id": self.skill_id,
+                              # INTENT-4 / register-time alias collapse (padatious-pipeline#89,
+                              # padacioso#73): the pipeline now matches and dispatches on the
+                              # canonical suffix-less intent id, not the legacy `.intent`-suffixed
+                              # one (see test_padatious.py for full rationale).
+                              "intent_name": f"{self.skill_id}:start_parrot"},
+                        context={"skill_id": self.skill_id}),
+                Message(f"{self.skill_id}:start_parrot",
+                        data={"utterance": "start parrot mode", "lang": session.lang},
+                        context={"skill_id": self.skill_id}),
+                Message("mycroft.skill.handler.start",
+                        data={"name": "ParrotSkill.handle_start_parrot_intent"},
+                        context={"skill_id": self.skill_id}),
+                Message(SPEC_SPEAK,
+                        data={"expect_response": False,
+                              "meta": {
+                                  "dialog": "parrot_start",
+                                  "data": {},
+                                  "skill": self.skill_id
+                              }},
+                        context={"skill_id": self.skill_id}),
+                Message("mycroft.skill.handler.complete",
+                        data={"name": "ParrotSkill.handle_start_parrot_intent"},
+                        context={"skill_id": self.skill_id}),
+                Message(UTTERANCE_HANDLED,
+                        data={},
+                        context={"skill_id": self.skill_id}),
+            ]
+            expected2 = [
+                message2,
+                # OVOS-CONVERSE-1 §4.2: one broadcast poll per round, emitted
+                # before the legacy per-skill pings (dual-emit compat window).
+                Message("ovos.converse.ping",
+                        data={"utterances": ["echo test"], "lang": session.lang},
+                        context={}),
+                # OVOS-CONVERSE-1 §4.2 broadcast answer (ovos-workshop#534):
+                # aggregated result of the broadcast poll, one per round,
+                # mirrors the legacy skill.converse.pong's can_handle value.
+                Message("ovos.converse.pong",
+                        data={"skill_id": self.skill_id, "result": True},
+                        context={}),
+                Message(f"{self.skill_id}.converse.ping",
+                        data={"utterances": ["echo test"], "skill_id": self.skill_id},
+                        context={}),
+                Message("skill.converse.pong",
+                        data={"can_handle": True, "skill_id": self.skill_id},
+                        context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §7.3 marks `converse` non-activating: the
+                # dispatch continues an existing participation, so no
+                # activation is registered and no activation callback
+                # fires.
+                Message(INTENT_MATCHED,
+                        data={"skill_id": self.skill_id, "intent_name": "converse:skill"},
+                        context={"skill_id": self.skill_id}),
+                Message("converse:skill",
+                        data={"utterances": ["echo test"], "lang": session.lang, "skill_id": self.skill_id},
+                        context={"skill_id": self.skill_id}),
+            # core reports the converse dispatch lifecycle as the framework
+            # done-signal (handler.start at dispatch, handler.complete on the
+            # skill's converse.response) so an orchestrator can resolve it
+                Message("mycroft.skill.handler.start",
+                        data={"handler": f"{self.skill_id}.converse"},
+                        context={"skill_id": self.skill_id}),
+                Message(f"{self.skill_id}.converse.request",
+                        data={"utterances": ["echo test"], "lang": session.lang},
+                        context={"skill_id": self.skill_id}),
+                Message(SPEC_SPEAK,
+                        data={"utterance": "echo test",
+                              "expect_response": False,
+                              "lang": session.lang,
+                              "meta": {
+                                  "skill": self.skill_id
+                              }},
+                        context={"skill_id": self.skill_id}),
+                Message("skill.converse.response",
+                        data={"skill_id": self.skill_id},
+                        context={"skill_id": self.skill_id}),
+                Message("mycroft.skill.handler.complete",
+                        data={"handler": f"{self.skill_id}.converse"},
+                        context={"skill_id": self.skill_id}),
+                Message(UTTERANCE_HANDLED,
+                        data={},
+                        context={"skill_id": self.skill_id})
+            ]
+            expected3 = [
+                message3,
+                Message("ovos.converse.ping",
+                        data={"utterances": ["stop parrot"], "lang": session.lang},
+                        context={}),
+                # OVOS-CONVERSE-1 §4.2 broadcast answer (ovos-workshop#534).
+                Message("ovos.converse.pong",
+                        data={"skill_id": self.skill_id, "result": True},
+                        context={}),
+                Message(f"{self.skill_id}.converse.ping",
+                        data={"utterances": ["stop parrot"], "skill_id": self.skill_id},
+                        context={}),
+                Message("skill.converse.pong",
+                        data={"can_handle": True, "skill_id": self.skill_id},
+                        context={"skill_id": self.skill_id}),
+                # PIPELINE-1 §7.3 marks `converse` non-activating: the
+                # dispatch continues an existing participation, so no
+                # activation is registered and no activation callback
+                # fires.
+                Message(INTENT_MATCHED,
+                        data={"skill_id": self.skill_id, "intent_name": "converse:skill"},
+                        context={"skill_id": self.skill_id}),
+                Message("converse:skill",
+                        data={"utterances": ["stop parrot"], "lang": session.lang, "skill_id": self.skill_id},
+                        context={"skill_id": self.skill_id}),
+                Message("mycroft.skill.handler.start",
+                        data={"handler": f"{self.skill_id}.converse"},
+                        context={"skill_id": self.skill_id}),
+                Message(f"{self.skill_id}.converse.request",
+                        data={"utterances": ["stop parrot"], "lang": session.lang},
+                        context={"skill_id": self.skill_id}),
 
-            Message("converse:skill",
-                    data={"utterances": ["stop parrot"], "lang": session.lang, "skill_id": self.skill_id},
-                    context={"skill_id": self.skill_id}),
-            Message(f"{self.skill_id}.converse.request",
-                    data={"utterances": ["stop parrot"], "lang": session.lang},
-                    context={"skill_id": self.skill_id}),
+                Message(SPEC_SPEAK,
+                        data={"expect_response": False,
+                              "lang": session.lang,
+                              "meta": {
+                                  "dialog": "parrot_stop",
+                                  "data": {},
+                                  "skill": self.skill_id
+                              }},
+                        context={"skill_id": self.skill_id}),
+                Message("skill.converse.response",
+                        data={"skill_id": self.skill_id},
+                        context={"skill_id": self.skill_id}),
+                Message("mycroft.skill.handler.complete",
+                        data={"handler": f"{self.skill_id}.converse"},
+                        context={"skill_id": self.skill_id}),
+                Message(UTTERANCE_HANDLED,
+                        data={},
+                        context={"skill_id": self.skill_id})
+            ]
+            expected4 = [
+                message4,
+                Message("ovos.converse.ping",
+                        data={"utterances": ["echo test"], "lang": session.lang},
+                        context={}),
+                # OVOS-CONVERSE-1 §4.2 broadcast answer (ovos-workshop#534);
+                # result mirrors the legacy skill.converse.pong can_handle=False below.
+                Message("ovos.converse.pong",
+                        data={"skill_id": self.skill_id, "result": False},
+                        context={}),
+                Message(f"{self.skill_id}.converse.ping",
+                        data={"utterances": ["echo test"], "skill_id": self.skill_id},
+                        context={}),
+                Message("skill.converse.pong",
+                        data={"can_handle": False, "skill_id": self.skill_id},
+                        context={"skill_id": self.skill_id}),
+                Message("mycroft.audio.play_sound", data={"uri": "snd/error.mp3"}),
+                Message(INTENT_UNMATCHED),
+                Message(UTTERANCE_HANDLED)
+            ]
 
-            Message("speak",
-                    data={"expect_response": False,
-                          "lang": session.lang,
-                          "meta": {
-                              "dialog": "parrot_stop",
-                              "data": {},
-                              "skill": self.skill_id
-                          }},
-                    context={"skill_id": self.skill_id}),
-            Message("skill.converse.response",
-                    data={"skill_id": self.skill_id},
-                    context={"skill_id": self.skill_id}),
-            Message("ovos.utterance.handled",
-                    data={},
-                    context={"skill_id": self.skill_id})
-        ]
-        expected4 = [
-            message4,
-            Message(f"{self.skill_id}.converse.ping",
-                    data={"utterances": ["echo test"], "skill_id": self.skill_id},
-                    context={}),
-            Message("skill.converse.pong",
-                    data={"can_handle": False, "skill_id": self.skill_id},
-                    context={"skill_id": self.skill_id}),
-            Message("mycroft.audio.play_sound", data={"uri": "snd/error.mp3"}),
-            Message("complete_intent_failure"),
-            Message("ovos.utterance.handled")
-        ]
+            final_session = deepcopy(session)
+            final_session.active_skills = [(self.skill_id, 0.0)]
 
-        final_session = deepcopy(session)
-        final_session.active_skills = [(self.skill_id, 0.0)]
-
-        test = End2EndTest(
-            minicroft=self.minicroft,
-            skill_ids=[self.skill_id],
-            eof_msgs=["ovos.utterance.handled"],
-            flip_points=["recognizer_loop:utterance"],
-            final_session=final_session,
-            source_message=[message1, message2, message3, message4],
-            expected_messages=expected1 + expected2 + expected3 + expected4,
-            activation_points=[f"{self.skill_id}:start_parrot.intent"],
+            test = End2EndTest(
+                minicroft=minicroft,
+                skill_ids=[self.skill_id],
+                eof_msgs=[UTTERANCE_HANDLED],
+                flip_points=[utt_topic],
+                entry_points=[utt_topic],
+                final_session=final_session,
+                source_message=[message1, message2, message3, message4],
+                expected_messages=expected1 + expected2 + expected3 + expected4,
+                ignore_messages=HANDLER_TRIO,
+                activation_points=[f"{self.skill_id}:start_parrot"],
             # messages internal to ovos-core, i.e. would not be sent to clients such as hivemind
-            keep_original_src=[f"{self.skill_id}.converse.ping",
-                               f"{self.skill_id}.converse.request"
+            # ovos.converse.pong (OVOS-CONVERSE-1 §4.2 broadcast answer, ovos-workshop#534)
+            # is emitted on the same source/destination pair as the entry utterance,
+            # not flipped like the per-round response messages.
+                keep_original_src=[f"{self.skill_id}.converse.ping",
+                                   f"{self.skill_id}.converse.request",
+                                   "ovos.converse.pong"
                                # f"{self.skill_id}.activate",  # TODO
-                               ]
-        )
-        test.execute(timeout=10)
+                                   ]
+            )
+            test.execute(timeout=10)
+        finally:
+            minicroft.stop()
+
+    def test_parrot_mode(self):
+        for namespace in NAMESPACE_PATHS:
+            with self.subTest(namespace=namespace):
+                self._run_parrot_mode(namespace)

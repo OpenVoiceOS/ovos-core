@@ -1,224 +1,138 @@
-from typing import Optional, List
+from typing import Dict, FrozenSet, List, Optional
+
 from ovos_config import Configuration
 from ovos_plugin_manager.intent_transformers import find_intent_transformer_plugins
 from ovos_plugin_manager.metadata_transformers import find_metadata_transformer_plugins
+from ovos_plugin_manager.templates.transformers import TypedSlotsTransformer
 from ovos_plugin_manager.text_transformers import find_utterance_transformer_plugins
-
-from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch
-from ovos_utils.json_helper import merge_dict
+from ovos_plugin_manager.transformer_services import (
+    IntentTransformersService as _IntentTransformersService,
+    MetadataTransformersService as _MetadataTransformersService,
+    TransformersService as _TransformersService,
+    UtteranceTransformersService as _UtteranceTransformersService)
+from ovos_plugin_manager.typed_slots_transformers import find_typed_slots_transformer_plugins
 from ovos_utils.log import LOG
 
 
-class UtteranceTransformersService:
+def _stage_config(config: Optional[dict], section: str) -> dict:
+    """The configuration for one transformer stage.
 
-    def __init__(self, bus, config=None):
-        self.config_core = config or Configuration()
-        self.loaded_plugins = {}
-        self.has_loaded = False
-        self.bus = bus
-        self.config = self.config_core.get("utterance_transformers") or {}
-        self.load_plugins()
+    The plugin manager accepts either a whole core configuration or the
+    stage's own section, and when a whole configuration does not carry the
+    section it cannot tell the two apart: every top-level key then reads as
+    an enabled plugin, and the loader warns once per key that the plugin is
+    not installed. Reading the section here keeps a stage that configures
+    itself from the deployment off that path.
 
-    @staticmethod
-    def find_plugins():
+    An explicit ``config`` is returned untouched, because a caller that
+    supplies one has already named the mapping it wants used.
+    """
+    if config is not None:
+        return config
+    return Configuration().get(section) or {}
+
+
+class UtteranceTransformersService(_UtteranceTransformersService):
+    """Runs utterance transformers in OVOS-TRANSFORM §4 ascending priority
+    order: a plugin of priority 1 runs first."""
+
+    def __init__(self, bus, config: Optional[dict] = None):
+        super().__init__(bus=bus,
+                         config=_stage_config(config, self.config_section))
+
+    @classmethod
+    def find_plugins(cls):
         return find_utterance_transformer_plugins().items()
 
-    def load_plugins(self):
-        for plug_name, plug in self.find_plugins():
-            if plug_name in self.config:
-                # if disabled skip it
-                if not self.config[plug_name].get("active", True):
-                    continue
-                try:
-                    self.loaded_plugins[plug_name] = plug()
-                    LOG.info(f"loaded utterance transformer plugin: {plug_name}")
-                except Exception as e:
-                    LOG.error(e)
-                    LOG.exception(f"Failed to load utterance transformer plugin: {plug_name}")
 
-    @property
-    def plugins(self):
-        """
-        Return loaded transformers in priority order, such that modules with a
-        higher `priority` rank are called first and changes from lower ranked
-        transformers are applied last
+class MetadataTransformersService(_MetadataTransformersService):
+    """Runs metadata transformers in OVOS-TRANSFORM §4 ascending priority
+    order: a plugin of priority 1 runs first."""
 
-        A plugin of `priority` 1 will override any existing context keys and
-        will be the last to modify utterances`
-        """
-        return sorted(self.loaded_plugins.values(),
-                      key=lambda k: k.priority, reverse=True)
+    def __init__(self, bus, config: Optional[dict] = None):
+        super().__init__(bus=bus,
+                         config=_stage_config(config, self.config_section))
 
-    def shutdown(self):
-        for module in self.plugins:
-            try:
-                module.shutdown()
-            except:
-                pass
-
-    def transform(self, utterances: List[str], context: Optional[dict] = None):
-        context = context or {}
-
-        for module in self.plugins:
-            try:
-                utterances, data = module.transform(utterances, context)
-                _safe = {k:v for k,v in data.items() if k != "session"}  # no leaking TTS/STT creds in logs    
-                LOG.debug(f"{module.name}: {_safe}")
-                context = merge_dict(context, data)
-            except Exception as e:
-                LOG.warning(f"{module.name} transform exception: {e}")
-        return utterances, context
-
-
-class MetadataTransformersService:
-
-    def __init__(self, bus, config=None):
-        self.config_core = config or Configuration()
-        self.loaded_plugins = {}
-        self.has_loaded = False
-        self.bus = bus
-        self.config = self.config_core.get("metadata_transformers") or {}
-        self.load_plugins()
-
-    @staticmethod
-    def find_plugins():
+    @classmethod
+    def find_plugins(cls):
         return find_metadata_transformer_plugins().items()
 
-    def load_plugins(self):
-        for plug_name, plug in self.find_plugins():
-            if plug_name in self.config:
-                # if disabled skip it
-                if not self.config[plug_name].get("active", True):
-                    continue
-                try:
-                    self.loaded_plugins[plug_name] = plug()
-                    LOG.info(f"loaded metadata transformer plugin: {plug_name}")
-                except Exception as e:
-                    LOG.error(e)
-                    LOG.exception(f"Failed to load metadata transformer plugin: {plug_name}")
 
-    @property
-    def plugins(self):
-        """
-        Return loaded transformers in priority order, such that modules with a
-        higher `priority` rank are called first and changes from lower ranked
-        transformers are applied last.
+class IntentTransformersService(_IntentTransformersService):
+    """Runs intent transformers in OVOS-TRANSFORM §4 ascending priority
+    order: a plugin of priority 1 runs first."""
 
-        A plugin of `priority` 1 will override any existing context keys
-        """
-        return sorted(self.loaded_plugins.values(),
-                      key=lambda k: k.priority, reverse=True)
+    def __init__(self, bus, config: Optional[dict] = None):
+        super().__init__(bus=bus,
+                         config=_stage_config(config, self.config_section))
 
-    def shutdown(self):
-        for module in self.plugins:
-            try:
-                module.shutdown()
-            except:
-                pass
-
-    def transform(self, context: Optional[dict] = None):
-        """
-        Sequentially applies all loaded metadata transformer plugins to the provided context.
-
-        Each plugin's `transform` method is called in order of descending priority, and the resulting data is merged into the context. Sensitive session data is excluded from debug logs. Exceptions raised by plugins are logged as warnings and do not interrupt the transformation process.
-
-        Args:
-            context: Optional dictionary containing metadata to be transformed.
-
-        Returns:
-            The updated context dictionary after all transformations.
-        """
-        context = context or {}
-
-        for module in self.plugins:
-            try:
-                data = module.transform(context)                
-                _safe = {k:v for k,v in data.items() if k != "session"}  # no leaking TTS/STT creds in logs    
-                LOG.debug(f"{module.name}: {_safe}")
-                context = merge_dict(context, data)
-            except Exception as e:
-                LOG.warning(f"{module.name} transform exception: {e}")
-        return context
-
-
-class IntentTransformersService:
-
-    def __init__(self, bus, config=None):
-        """
-        Initializes the IntentTransformersService with the provided message bus and configuration.
-
-        Loads and prepares intent transformer plugins based on the configuration, making them ready for use.
-        """
-        self.config_core = config or Configuration()
-        self.loaded_plugins = {}
-        self.has_loaded = False
-        self.bus = bus
-        self.config = self.config_core.get("intent_transformers") or {}
-        self.load_plugins()
-
-    @staticmethod
-    def find_plugins():
-        """
-        Discovers and returns available intent transformer plugins.
-
-        Returns:
-            An iterable of (plugin_name, plugin_class) pairs for all discovered intent transformer plugins.
-        """
+    @classmethod
+    def find_plugins(cls):
         return find_intent_transformer_plugins().items()
 
-    def load_plugins(self):
-        """
-        Loads and initializes enabled intent transformer plugins based on the configuration.
 
-        Plugins marked as inactive in the configuration are skipped. Successfully loaded plugins are added to the internal registry, while failures are logged without interrupting the loading process.
-        """
-        for plug_name, plug in self.find_plugins():
-            if plug_name in self.config:
-                # if disabled skip it
-                if not self.config[plug_name].get("active", True):
-                    continue
-                try:
-                    self.loaded_plugins[plug_name] = plug()
-                    self.loaded_plugins[plug_name].bind(self.bus)
-                    LOG.info(f"loaded intent transformer plugin: {plug_name}")
-                except Exception as e:
-                    LOG.error(e)
-                    LOG.exception(f"Failed to load intent transformer plugin: {plug_name}")
+class TypedSlotsTransformersService(_TransformersService):
+    """Runs the OVOS-TRANSFORM-1 §3.7 typed-slots stage.
+
+    The stage produces one map, so §4's ordering selects a single plugin
+    instead of sequencing them: the first entry of an explicit order list
+    where the deployment configures one, otherwise the lowest priority
+    number loaded.
+    """
+    transformer_type = "typed_slots"
+    config_section = "typed_slots_transformers"
+    plugin_finder = staticmethod(find_typed_slots_transformer_plugins)
+
+    def __init__(self, bus, config: Optional[dict] = None):
+        self._selected = None
+        super().__init__(bus=bus,
+                         config=_stage_config(config, self.config_section))
+
+    @classmethod
+    def find_plugins(cls):
+        return find_typed_slots_transformer_plugins().items()
 
     @property
-    def plugins(self):
-        """
-        Returns the loaded intent transformer plugins sorted by priority.
-        """
-        return sorted(self.loaded_plugins.values(),
-                      key=lambda k: k.priority, reverse=True)
+    def selected(self) -> Optional[TypedSlotsTransformer]:
+        """The one transformer §4's ordering places first, if any is loaded.
 
-    def shutdown(self):
+        Resolved once and kept, so an unresolvable tie is reported at
+        selection time rather than on every utterance. A reload clears the
+        sorted-plugin cache, which is the signal to select again.
         """
-        Shuts down all loaded plugins, suppressing any exceptions raised during shutdown.
+        if self._sorted_plugins is None:
+            self._selected = None
+        plugins = self.plugins
+        if self._selected is None and plugins:
+            self._selected = plugins[0]
+            if (not isinstance(self.config.get("order"), list) and len(plugins) > 1
+                    and plugins[1].priority == self._selected.priority):
+                LOG.warning(
+                    f"typed-slots transformers {self._selected.name!r} and "
+                    f"{plugins[1].name!r} share priority {self._selected.priority}; "
+                    f"the choice is stable but unspecified, configure an explicit "
+                    f"'order' list (OVOS-TRANSFORM-1 §3.7)")
+        return self._selected
+
+    def transform(self, utterances: List[str], declared_types: FrozenSet[str],
+                  session) -> Optional[Dict[str, List[dict]]]:
+        """Compute the typed-slots map, or ``None`` when none was computed.
+
+        ``None`` and an empty map are different answers: OVOS-INTENT-1 §5.6
+        reads an absent map as "not computed" and an empty one as "computed
+        and nothing found". A plugin that raises or returns the wrong shape
+        is treated as having produced nothing (§7).
         """
-        for module in self.plugins:
-            try:
-                module.shutdown()
-            except:
-                pass
-
-    def transform(self, intent: IntentHandlerMatch) -> IntentHandlerMatch:
-        """
-        Sequentially applies all loaded intent transformer plugins to the given intent object.
-
-        Each plugin's `transform` method is called in order of priority. Exceptions raised by individual plugins are logged as warnings, and processing continues with the next plugin. The final, transformed intent object is returned.
-
-        Args:
-            intent: The intent match object to be transformed.
-
-        Returns:
-            The transformed intent match object after all plugins have been applied.
-        """
-        for module in self.plugins:
-            try:
-                intent = module.transform(intent)
-                LOG.debug(f"{module.name}: {intent}")
-            except Exception as e:
-                LOG.warning(f"{module.name} transform exception: {e}")
-        return intent
+        module = self.selected
+        if module is None:
+            return None
+        try:
+            typed_slots = module.transform(utterances, declared_types, session)
+        except Exception as e:
+            LOG.warning(f"{module.name} transform exception: {e}")
+            return None
+        if not isinstance(typed_slots, dict):
+            LOG.warning(f"{module.name} returned wrong shape (expected a "
+                        f"typed-slots map): {type(typed_slots)}; ignoring its output")
+            return None
+        return typed_slots
