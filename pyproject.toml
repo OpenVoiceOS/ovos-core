@@ -14,7 +14,7 @@ dependencies = [
     "requests>=2.26, <3.0",
     "packaging>=20.0",
     "python-dateutil>=2.6, <3.0",
-    "combo-lock>=0.2.2, <0.4",
+    "filelock>=3.12",
     "ovos-utils>=0.13.9a1,<1.0.0",
     # OVOS-SESSION-2 §5.1 arrival merge (SessionManager.fold_inbound) plus the
     # one-cycle ovos.session.sync compat shim (SessionManager.handle_session_sync)

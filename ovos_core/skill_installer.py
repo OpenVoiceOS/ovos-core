@@ -1,13 +1,16 @@
 import enum
 import shutil
 import sys
+from base64 import urlsafe_b64encode
 from importlib import reload
 from os.path import exists
+from pathlib import Path
 from subprocess import Popen, PIPE, STDOUT
+from tempfile import gettempdir
 from typing import Optional
 
 import requests
-from combo_lock import NamedLock
+from filelock import FileLock
 from packaging.utils import canonicalize_name
 from ovos_bus_client import Message
 from ovos_config.config import Configuration
@@ -27,10 +30,29 @@ class InstallError(str, enum.Enum):
 FAILURE_DETAIL_CHARS = 2000
 
 
+def _named_lock(name: str) -> FileLock:
+    """Return a lock shared by every process and thread that uses ``name``.
+
+    The lock file path is the one combo-lock uses when the temp directory is
+    in RAM, so a process that still runs combo-lock waits on the same lock.
+    The directory and the file are writable by all users, because services
+    that share a lock can run as different users.
+    """
+    lock_dir = Path(gettempdir(), "combo_locks")
+    try:
+        lock_dir.mkdir()
+    except FileExistsError:
+        pass
+    else:
+        lock_dir.chmod(0o777)
+    filename = urlsafe_b64encode(name.encode()).decode() + ".lock"
+    return FileLock(lock_dir / filename, mode=0o666)
+
+
 class SkillsStore:
     # default constraints to use if none are given
     DEFAULT_CONSTRAINTS = 'https://raw.githubusercontent.com/OpenVoiceOS/ovos-releases/refs/heads/main/constraints-stable.txt'
-    PIP_LOCK = NamedLock("ovos_pip.lock")
+    PIP_LOCK = _named_lock("ovos_pip.lock")
     UV = shutil.which("uv")  # use 'uv pip' if available, speeds things up a lot and is the default in raspOVOS
 
     #: OVOS-INSTALL-1 §2.3: the name a request addresses this service by,
