@@ -15,6 +15,11 @@ from ovos_utils.log import LOG
 from ovos_plugin_manager.templates.pipeline import PipelinePlugin, IntentHandlerMatch
 from ovos_workshop.permissions import ConverseMode, ConverseActivationMode
 
+from ovos_core._metrics import (
+    CONVERSE_POLICY,
+    CONVERSE_POLL,
+    CONVERSE_PREPARE,
+)
 from ovos_core.intent_services.working_session import round_session
 
 #: upper bound, seconds, on how long core waits for a skill's
@@ -467,24 +472,25 @@ class ConverseService(PipelinePlugin):
             - Checks for skill conversation timeouts
             - Attempts conversation with each eligible skill
         """
-        lang = standardize_lang(lang)
-        # the round's session, threaded through every sub-call below so
-        # each step reads what the previous one wrote. The arrival already
-        # happened at the orchestrator's lifecycle entry (SESSION-2 §5.1);
-        # this pipeline does not fold again (§2.6).
-        session = round_session(message)
+        with CONVERSE_PREPARE.measure():
+            lang = standardize_lang(lang)
+            # the round's session, threaded through every sub-call below so
+            # each step reads what the previous one wrote. The arrival already
+            # happened at the orchestrator's lifecycle entry (SESSION-2 §5.1);
+            # this pipeline does not fold again (§2.6).
+            session = round_session(message)
 
-        # we call flatten in case someone is sending the old style list of tuples
-        utterances = flatten_list(utterances)
+            # we call flatten in case someone is sending the old style list of tuples
+            utterances = flatten_list(utterances)
 
-        # OVOS-CONVERSE-1 §4.1 step 1: the §2.2 identity invariant (checked
-        # by the gr_skills filter below) is verified "after the §3.2 TTL
-        # prune (when configured)", so the prune runs first.
-        self._prune_converse_handlers(message)
+            # OVOS-CONVERSE-1 §4.1 step 1: the §2.2 identity invariant (checked
+            # by the gr_skills filter below) is verified "after the §3.2 TTL
+            # prune (when configured)", so the prune runs first.
+            self._prune_converse_handlers(message)
 
-        # note: this is sorted by priority already
-        gr_skills = [skill_id for skill_id in self.get_active_skills(message, session=session)
-                     if session.response_mode and session.response_mode.get("skill_id") == skill_id]
+            # note: this is sorted by priority already
+            gr_skills = [skill_id for skill_id in self.get_active_skills(message, session=session)
+                         if session.response_mode and session.response_mode.get("skill_id") == skill_id]
 
         # check if any skill wants to capture utterance for self.get_response method
         for skill_id in gr_skills:
@@ -501,12 +507,16 @@ class ConverseService(PipelinePlugin):
             )
 
         # check if any skill wants to converse
-        for skill_id in self._collect_converse_skills(message, session=session):
+        with CONVERSE_POLL.measure():
+            candidates = self._collect_converse_skills(message, session=session)
+        for skill_id in candidates:
             if skill_id in (session.blacklisted_skills or []):
                 LOG.debug(f"ignoring match, skill_id '{skill_id}' blacklisted by Session '{session.session_id}'")
                 continue
             LOG.debug(f"Attempting to converse with skill: {skill_id}")
-            if self._converse_allowed(skill_id):
+            with CONVERSE_POLICY.measure():
+                allowed = self._converse_allowed(skill_id)
+            if allowed:
                 return IntentHandlerMatch(
                     match_type="converse:skill",
                     match_data={"utterances": utterances, "lang": lang, "skill_id": skill_id},

@@ -1,0 +1,414 @@
+"""Tests for the opt-in process-local OVOS runtime metrics endpoint."""
+
+import inspect
+import re
+import time
+from urllib.request import urlopen
+
+import pytest
+
+from ovos_core._metrics import (
+    PIPELINE_MATCHING,
+    LatencyHistogram,
+    metrics_recording_enabled,
+    performance_histograms,
+    pipeline_matching_histogram,
+    reset_metrics_recording_cache,
+)
+from ovos_core._prometheus import (
+    collect_histograms,
+    load_metric_collectors,
+    render_prometheus,
+    start_metrics_server,
+    stop_metrics_server,
+)
+
+
+@pytest.fixture(autouse=True)
+def _recording_on(monkeypatch):
+    """Recording is opt-in, so these tests have to opt in.
+
+    Stage timings are only accumulated when ``OVOS_METRICS_ENABLED`` is set:
+    a default install measures nothing, because nothing can read it. Every
+    test that asserts a histogram moved therefore has to turn it on, and the
+    cache is cleared either side so one test cannot decide another's answer.
+    """
+    monkeypatch.setenv("OVOS_METRICS_ENABLED", "true")
+    reset_metrics_recording_cache()
+    yield
+    monkeypatch.delenv("OVOS_METRICS_ENABLED", raising=False)
+    reset_metrics_recording_cache()
+
+
+def test_recording_is_off_until_the_endpoint_is_asked_for(monkeypatch):
+    """The finding behind the gate: opt-in has to mean the recording too.
+
+    ``metrics_enabled()`` was read by ``start_metrics_server()`` alone, so a
+    default install still timed every stage and accumulated counters nobody
+    could read.
+    """
+    monkeypatch.delenv("OVOS_METRICS_ENABLED", raising=False)
+    reset_metrics_recording_cache()
+    assert metrics_recording_enabled() is False
+
+    histogram = LatencyHistogram("test_gate_ms", buckets_ms=(10, 50))
+    histogram.observe_ms(5)
+    with histogram.measure():
+        pass
+    assert histogram.snapshot()["count"] == 0, "a disabled histogram recorded"
+
+
+def test_histogram_observes_exceptional_blocks():
+    histogram = LatencyHistogram("test_stage_ms", buckets_ms=(10, 50))
+
+    with pytest.raises(RuntimeError), histogram.measure():
+        raise RuntimeError("expected")
+
+    snapshot = histogram.snapshot()
+    assert snapshot["count"] == 1
+    assert snapshot["buckets"]["inf"] == 1
+
+
+def test_histogram_measurement_can_exclude_nested_work(monkeypatch):
+    clock = iter((10.0, 10.1))
+    monkeypatch.setattr("ovos_core._metrics.time.monotonic", lambda: next(clock))
+    histogram = LatencyHistogram("test_stage_ms")
+
+    with histogram.measure() as measurement:
+        measurement.pause()
+
+    snapshot = histogram.snapshot()
+    assert snapshot["count"] == 1
+    assert snapshot["sum_ms"] == pytest.approx(100.0)
+
+
+def test_histogram_rejects_non_finite_observations():
+    histogram = LatencyHistogram("test_stage_ms")
+
+    with pytest.raises(ValueError, match="must be finite"):
+        histogram.observe_ms(float("nan"))
+
+
+def test_prometheus_renderer_converts_milliseconds_to_seconds():
+    payload = render_prometheus({
+        "test_stage_ms": {
+            "count": 1,
+            "sum_ms": 125.0,
+            "buckets": {"le_100": 0, "le_250": 1, "inf": 1},
+        },
+    })
+
+    assert 'test_stage_seconds_bucket{le="0.1"} 0' in payload
+    assert 'test_stage_seconds_bucket{le="0.25"} 1' in payload
+    assert "test_stage_seconds_sum 0.125" in payload
+    assert "test_stage_seconds_count 1" in payload
+
+
+def test_prometheus_renderer_supports_counters():
+    payload = render_prometheus({
+        "test_cache_hit_total": {"type": "counter", "value": 7},
+    })
+
+    assert "# TYPE test_cache_hit_total counter" in payload
+    assert "test_cache_hit_total 7" in payload
+
+
+def test_prometheus_renderer_rejects_malformed_counters():
+    with pytest.raises(ValueError, match="must end with '_total'"):
+        render_prometheus({
+            "test_cache_hit": {"type": "counter", "value": 1},
+        })
+
+
+@pytest.mark.parametrize(
+    ("pipeline_id", "family"),
+    (
+        ("ovos-stop-pipeline-plugin-high", "stop"),
+        ("ovos-converse-pipeline-plugin", "converse"),
+        ("ovos-padatious-pipeline-plugin-high", "padatious"),
+        ("ovos-padatious-pipeline-plugin-low", "padatious"),
+        ("ovos-common-query-pipeline-plugin", "common_query"),
+        ("ovos-m2v-pipeline-high", "m2v"),
+        ("third-party-matcher-high", "other"),
+        ("third-party-adapt-wrapper", "other"),
+    ),
+)
+def test_pipeline_histogram_uses_fixed_families(pipeline_id, family):
+    assert pipeline_matching_histogram(pipeline_id) is PIPELINE_MATCHING[family]
+
+
+def test_collectors_reject_duplicate_metric_names():
+    collector = lambda: {  # noqa: E731
+        "duplicate_ms": {
+            "count": 0,
+            "sum_ms": 0,
+            "buckets": {"inf": 0},
+        },
+    }
+
+    with pytest.raises(ValueError, match="duplicate performance metric"):
+        collect_histograms((("first", collector), ("second", collector)))
+
+
+def test_renderer_rejects_exported_metric_name_collisions():
+    snapshot = {
+        "count": 0,
+        "sum_ms": 0,
+        "buckets": {"inf": 0},
+    }
+
+    with pytest.raises(ValueError, match="both export as"):
+        render_prometheus({
+            "duplicate_ms": snapshot,
+            "duplicate_seconds": snapshot,
+        })
+
+
+def test_prometheus_renderer_preserves_sum_precision():
+    payload = render_prometheus({
+        "test_stage_ms": {
+            "count": 1,
+            "sum_ms": 1_000_000_000.125,
+            "buckets": {"inf": 1},
+        },
+    })
+
+    assert "test_stage_seconds_sum 1000000.000125" in payload
+
+
+def test_plugin_metric_collectors_are_loaded_in_stable_order(monkeypatch):
+    def plugin_collector():
+        return {}
+
+    class EntryPoint:
+        def __init__(self, name, value):
+            self.name = name
+            self.value = value
+
+        def load(self):
+            return plugin_collector
+
+    class EntryPoints(list):
+        def select(self, *, group):
+            assert group == "ovos.performance.metrics"
+            return self
+
+    monkeypatch.setattr(
+        "ovos_core._prometheus.metadata.entry_points",
+        lambda: EntryPoints((
+            EntryPoint("weather", "weather:metrics"),
+            EntryPoint("workshop", "workshop:metrics"),
+        )),
+    )
+
+    collectors = load_metric_collectors()
+
+    assert [name for name, _collector in collectors] == [
+        "core", "weather", "workshop",
+    ]
+
+
+def test_opt_in_metrics_endpoint(monkeypatch):
+    def fractional_counter():
+        return {
+            "test_fractional_work_total": {
+                "type": "counter",
+                "value": 1.6,
+            },
+        }
+
+    monkeypatch.setenv("OVOS_METRICS_ENABLED", "true")
+    monkeypatch.setenv("OVOS_METRICS_HOST", "127.0.0.1")
+    monkeypatch.setenv("OVOS_METRICS_PORT", "0")
+    monkeypatch.setattr(
+        "ovos_core._prometheus.load_metric_collectors",
+        lambda: (
+            ("core", performance_histograms),
+            ("fractional", fractional_counter),
+        ),
+    )
+    server = start_metrics_server()
+    assert server is not None
+    try:
+        with urlopen(  # noqa: S310 - loopback test server only
+            f"http://127.0.0.1:{server.server_address[1]}/metrics",
+            timeout=2,
+        ) as response:
+            payload = response.read().decode()
+        assert response.status == 200
+        assert "ovos_utterance_dispatch_seconds" in payload
+        assert "ovos_utterance_preprocess_seconds" in payload
+        assert "ovos_utterance_transform_seconds" in payload
+        assert "ovos_language_resolution_seconds" in payload
+        assert "ovos_session_validation_seconds" in payload
+        assert "ovos_session_stamp_seconds" in payload
+        assert "ovos_intent_matching_seconds" in payload
+        assert "ovos_intent_pipeline_build_seconds" in payload
+        assert "ovos_skill_selection_seconds" in payload
+        assert "ovos_intent_dispatch_seconds" in payload
+        assert "ovos_intent_transform_seconds" in payload
+        assert "ovos_intent_activation_seconds" in payload
+        assert "ovos_intent_matched_emit_seconds" in payload
+        assert "ovos_intent_handler_schedule_seconds" in payload
+        assert "ovos_handler_timeout_arm_seconds" in payload
+        assert "ovos_handler_start_emit_seconds" in payload
+        assert "ovos_handler_dispatch_emit_seconds" in payload
+        assert "ovos_utterance_finalize_seconds" in payload
+        assert "ovos_converse_prepare_seconds" in payload
+        assert "ovos_converse_poll_seconds" in payload
+        assert "ovos_converse_policy_seconds" in payload
+        assert "test_fractional_work_total 1.6000000000000001" in payload
+    finally:
+        stop_metrics_server(server)
+
+
+def test_service_entrypoint_starts_and_stops_the_metrics_server():
+    """The scrape endpoint is only useful if the service actually starts it.
+
+    ovos_core.__main__ is the process entry point; without the
+    start/stop calls the histograms are collected but nothing ever serves
+    them, and the endpoint silently never comes up.
+    """
+    import inspect
+
+    import ovos_core.__main__ as service_main
+
+    source = inspect.getsource(service_main.main)
+    assert "start_metrics_server()" in source
+    assert "stop_metrics_server(" in source
+
+
+def test_stage_histograms_wrap_the_bounded_match_call():
+    """A bound the utterance waited out is latency it paid.
+
+    OVOS-PIPELINE-1 §4.4 runs each plugin ``match`` through
+    ``_call_match_bounded``, which returns ``None`` on timeout and on a
+    §6.2 single-flight skip rather than raising. The stage histograms wrap
+    that bounded call, not the plugin call inside it, so a slow entry
+    records the time the round actually spent on it and a declined entry
+    records ~0. Measuring inside the bound would make a timed-out pipeline
+    look free.
+    """
+    import ovos_core.intent_services.service as service
+
+    source = inspect.getsource(service.IntentService.handle_utterance)
+    wrapped = re.search(
+        r"with \(INTENT_MATCHING\.measure\(\),\s*"
+        r"pipeline_matching_histogram\(pipeline\)\.measure\(\)\):\s*"
+        r"match = self\._call_match_bounded\(",
+        source,
+    )
+    assert wrapped, (
+        "the stage histograms no longer wrap _call_match_bounded; a timed-out "
+        "or declined pipeline entry would be recorded as free"
+    )
+
+    histogram = LatencyHistogram("test_bounded_ms", buckets_ms=(10, 50))
+    before = histogram.snapshot()["count"]
+    with histogram.measure():
+        time.sleep(0.05)
+    snapshot = histogram.snapshot()
+    assert snapshot["count"] == before + 1
+    assert snapshot["sum_ms"] >= 50
+
+
+@pytest.mark.parametrize(
+    "failing_step",
+    ("MessageBusClient", "SkillManager", "wait_for_exit_signal"),
+)
+def test_service_entrypoint_stops_the_listener_when_startup_raises(monkeypatch, failing_step):
+    """A raise between start and stop must not leak the bound port.
+
+    The listener is a daemon thread, so it does not keep the interpreter
+    alive and nothing else frees the port it holds. The installed wrapper
+    exits on an uncaught exception, but an in-process caller can catch one
+    and retry ``main`` - and that retry has to be able to bind again.
+    """
+    import ovos_core.__main__ as service_main
+
+    stopped = []
+
+    class _Boom(RuntimeError):
+        pass
+
+    def _fail(*args, **kwargs):
+        raise _Boom(failing_step)
+
+    class _Bus:
+        def __init__(self, *args, **kwargs):
+            self.connected_event = type("E", (), {"wait": lambda self: None})()
+
+        def run_in_thread(self):
+            return None
+
+        def close(self):
+            pass
+
+    class _Manager:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def start(self):
+            pass
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(service_main, "init_service_logger", lambda *a, **k: None)
+    monkeypatch.setattr(service_main, "start_metrics_server", lambda: "listener")
+    monkeypatch.setattr(service_main, "stop_metrics_server", stopped.append)
+    monkeypatch.setattr(service_main, "MessageBusClient", _Bus)
+    monkeypatch.setattr(service_main, "SkillManager", _Manager)
+    monkeypatch.setattr(service_main, "wait_for_exit_signal", lambda: None)
+    monkeypatch.setattr(service_main, failing_step, _fail)
+
+    with pytest.raises(_Boom):
+        service_main.main()
+
+    assert stopped == ["listener"], (
+        f"a raise in {failing_step} left the metrics listener running; a caller "
+        f"that retries main() would fail to bind the port"
+    )
+
+
+# --------------------------------------------------------------------------
+# A misconfigured opt-in endpoint must not stop the skills service
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("raw_port, why", [
+    ("not-a-port", "unreadable"),
+    ("70000", "out of range"),
+    ("-1", "negative"),
+])
+def test_a_bad_port_disables_the_endpoint_and_nothing_else(monkeypatch, raw_port, why):
+    """``__main__`` calls this before the ``try`` that guards startup.
+
+    So a raise here did not merely skip the endpoint, it stopped the whole
+    skills service: an unreadable ``OVOS_METRICS_PORT`` took the voice
+    assistant down with it. The scrape endpoint is the least important thing
+    in the process and must never be the reason it does not run.
+    """
+    monkeypatch.setenv("OVOS_METRICS_ENABLED", "true")
+    monkeypatch.setenv("OVOS_METRICS_PORT", raw_port)
+
+    server = start_metrics_server()
+
+    assert server is None, f"a {why} port should leave the endpoint off"
+    stop_metrics_server(server)
+
+
+def test_a_port_already_taken_disables_the_endpoint_and_nothing_else(monkeypatch):
+    """Same rule for a bind failure, which is the likelier one in production."""
+    monkeypatch.setenv("OVOS_METRICS_ENABLED", "true")
+    monkeypatch.setenv("OVOS_METRICS_PORT", "0")
+    first = start_metrics_server()
+    assert first is not None
+    taken = first.server_address[1]
+    try:
+        monkeypatch.setenv("OVOS_METRICS_PORT", str(taken))
+        second = start_metrics_server()
+        assert second is None, "a taken port should leave the endpoint off"
+        stop_metrics_server(second)
+    finally:
+        stop_metrics_server(first)
