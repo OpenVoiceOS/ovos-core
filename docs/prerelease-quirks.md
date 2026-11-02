@@ -9,6 +9,22 @@ This file resets at the next stable release. At that point its contents
 become upgrade notes for the `2.1.1 -> next-stable` jump, and a new, empty
 quirks log starts.
 
+## Skill loading starts as soon as the intent service is ready (alpha of 2026-10-12)
+
+- `_load_new_skills` no longer sends `gui.status.request` and no longer takes
+  a `gui` argument: no load decision read the answer, and no caller passed
+  it. Each load pass waited out the 3 s reply timeout on a runtime with no
+  GUI, including the first pass, between "IntentService is ready" and the
+  first skill load.
+- With the intent service in the same process (the default), the skill
+  manager reads its state directly instead of sending
+  `mycroft.intents.is_ready` and sleeping a second after every "not yet". A
+  skills-only process still asks over the bus.
+- A load pass reads the installed skill versions once, not once per skill.
+
+Measured on an 18-skill runtime: the first skill load went from 3.6 s to
+0.2 s after "IntentService is ready".
+
 ## #979 (alpha of 2026-09-09)
 
 `SkillsStore` always captures pip/uv output now (stdout and stderr as one

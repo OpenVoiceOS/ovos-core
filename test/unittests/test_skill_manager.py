@@ -569,7 +569,7 @@ class TestSkillManager(TestCase):
             self.skill_manager._use_deferred_loading = False
 
             # A failed attempt must not request retraining.
-            self.skill_manager._load_new_skills(network=True, internet=True, gui=False)
+            self.skill_manager._load_new_skills(network=True, internet=True)
             self.assertNotIn('mycroft.skills.train', self.message_bus_mock.message_types)
 
             # A successful load must request retraining.
@@ -582,7 +582,7 @@ class TestSkillManager(TestCase):
             self.skill_manager._plugin_skill_failures = {}
             self.message_bus_mock.message_types = []
 
-            self.skill_manager._load_new_skills(network=True, internet=True, gui=False)
+            self.skill_manager._load_new_skills(network=True, internet=True)
             self.assertIn('mycroft.skills.train', self.message_bus_mock.message_types)
 
     @patch('ovos_core.skill_manager.find_skill_plugins')
@@ -765,7 +765,7 @@ class TestSkillManager(TestCase):
         mock_loader.runtime_requirements.internet_before_load = False
         self.skill_manager._get_plugin_skill_loader = Mock(return_value=mock_loader)
         with patch(self.mock_package + 'find_skill_plugins', return_value={skill_id: Mock()}):
-            self.skill_manager._load_new_skills(network=True, internet=True, gui=False)
+            self.skill_manager._load_new_skills(network=True, internet=True)
 
         self.assertIn(skill_id, self.skill_manager.plugin_skills)
         mock_loader.load.assert_called_once()
@@ -1291,7 +1291,7 @@ class TestDeferredLoadingConfigFlag(TestCase):
             result = skill_manager.load_plugin_skills(network=True, internet=True)
 
             # Skill should be loaded despite having network/internet requirements
-            skill_manager._load_plugin_skill.assert_called_once_with('test.skill', mock_plugin, reserved=True)
+            skill_manager._load_plugin_skill.assert_called_once_with('test.skill', mock_plugin, reserved=True, version=None, version_read=True)
             self.assertTrue(result)
 
     @patch('ovos_core.skill_manager.find_skill_plugins')

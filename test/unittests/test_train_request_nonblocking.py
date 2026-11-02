@@ -32,14 +32,13 @@ class TestTrainRequestNonBlocking(TestCase):
         self.manager._load_untracked_plugin_skills = Mock(return_value=["skill-a"])
 
     def test_train_request_emitted_after_load(self):
-        self.manager._load_new_skills(network=True, internet=True, gui=False)
+        self.manager._load_new_skills(network=True, internet=True)
         self.assertEqual(len(self.train_requests), 1)
 
     def test_completes_promptly_without_any_responder(self):
         start = time.monotonic()
         with patch("ovos_core.skill_manager.LOG") as mock_log:
-            self.manager._load_new_skills(network=True, internet=True,
-                                          gui=False)
+            self.manager._load_new_skills(network=True, internet=True)
         elapsed = time.monotonic() - start
 
         # No blocking wait on a reply nobody is required to send.
@@ -50,5 +49,5 @@ class TestTrainRequestNonBlocking(TestCase):
 
     def test_no_train_request_when_nothing_loaded(self):
         self.manager._load_untracked_plugin_skills = Mock(return_value=[])
-        self.manager._load_new_skills(network=True, internet=True, gui=False)
+        self.manager._load_new_skills(network=True, internet=True)
         self.assertEqual(self.train_requests, [])
