@@ -9,6 +9,18 @@ This file resets at the next stable release. At that point its contents
 become upgrade notes for the `2.1.1 -> next-stable` jump, and a new, empty
 quirks log starts.
 
+## Opt-in latency histograms for the utterance path (alpha of 2026-11-03)
+
+- `OVOS_METRICS_ENABLED=true` makes `ovos-core` and `ovos-intent-service` record
+  a latency histogram for each stage of the utterance path and serve them on the
+  shared `/metrics` endpoint from `ovos_utils.prometheus`. Off by default: nothing is recorded and
+  no port is opened.
+- The endpoint binds to `127.0.0.1:9474` unless `OVOS_METRICS_HOST` or
+  `OVOS_METRICS_PORT` say otherwise, and it has no authentication.
+- `ovos-core` now requires an `ovos-utils` that ships `ovos_utils.prometheus`.
+
+See `docs/performance-metrics.md`.
+
 ## Skill loading starts as soon as the intent service is ready (alpha of 2026-10-12)
 
 - `_load_new_skills` no longer sends `gui.status.request` and no longer takes
