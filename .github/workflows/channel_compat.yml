@@ -1,28 +1,28 @@
 name: Channel Compat
 
 # Run the unit tests against the package versions an OVOS distro release
-# channel pins, instead of against current dev siblings.
-#
-# The distro publishes one constraints file per channel, fetched live by the
-# reusable workflow and uploaded as an artifact. As of writing, `stable` pins
-# ovos-workshop 3.4.x / ovos-bus-client 1.3.x / ovos-padatious 1.4.x and
-# `testing` pins ovos-workshop 7.0.x — both far below dev. A change can be green
-# on dev and still break every device on the fleet; this job is the gate for
-# that.
+# channel pins, instead of against current dev siblings. A change can be green
+# on dev and still break the fleet; this job is the gate for that.
 #
 # This is the third layer of the compat program:
 #
 #   boundary pins  where did the behavior change? (test/backcompat in
 #                  ovos-core and ovos-test-harness)
-#   channels       what does the fleet run today? (this file)
+#   channels       what does the fleet run? (this file)
 #   dev edge       where is the stack going? (build_tests.yml, ovoscope.yml)
 #
-# soft_fail is TRUE for now. A channel is behind dev by construction, so
-# the first runs are expected to fail a pile of tests — that is the finding, not
-# a broken job. TURN soft_fail OFF once the baseline is established, the same
-# way ovos-test-harness did it: check in a per-channel known-gap file, strict-
-# xfail exactly those node ids, and let anything else be red.
-# See https://github.com/OpenVoiceOS/ovos-test-harness (test/channel_gaps/).
+# Only the alpha channel is checked here, and it is strict. A single virtual
+# environment holding this repository plus a channel's pins can only resolve
+# when the channel's pins agree with this repository's own floors, and a
+# released channel caps the very siblings dev already requires. Alpha sits at
+# or ahead of dev, so it resolves, it runs, and it is also the channel the spec
+# lands in.
+#
+# The released channels are covered instead by ovos-test-harness, which
+# installs each channel's stack rather than this repository against a
+# constraints file, and records the known gaps per channel under
+# test/channel_gaps/. That is where a "does stable still work" question is
+# answered. See https://github.com/OpenVoiceOS/ovos-test-harness.
 
 on:
   pull_request:
@@ -40,19 +40,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - channel: stable
-            url: https://raw.githubusercontent.com/OpenVoiceOS/OpenVoiceOS/main/constraints-stable.txt
-          - channel: testing
-            url: https://raw.githubusercontent.com/OpenVoiceOS/OpenVoiceOS/main/constraints-testing.txt
+          - channel: alpha
+            url: https://raw.githubusercontent.com/OpenVoiceOS/OpenVoiceOS/main/constraints-alpha.txt
     name: ${{ matrix.channel }}
     uses: OpenVoiceOS/gh-automations/.github/workflows/channel-compat.yml@dev
     secrets: inherit
     with:
       channel_url: ${{ matrix.url }}
       channel_name: ${{ matrix.channel }}
-      # GitHub rejects `continue-on-error` on a job that calls a reusable
-      # workflow, so the advisory mode is an input instead.
-      soft_fail: true
+      soft_fail: false
       test_path: 'test/unittests'
       system_deps: 'swig libssl-dev portaudio19-dev libpulse-dev libfann-dev'
       install_extras: 'mycroft,plugins,skills-essential,lgpl,test'
