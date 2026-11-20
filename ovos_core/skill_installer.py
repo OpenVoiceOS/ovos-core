@@ -39,12 +39,29 @@ class SkillsStore:
     SERVICE_NAME = "ovos_core"
 
     def __init__(self, bus, config=None):
-        self.config = config or Configuration().get("skills", {}).get("installer", {})
+        self._config = config or None
         self.bus = bus
         self.bus.on("ovos.skills.install", self.handle_install_skill)
         self.bus.on("ovos.skills.uninstall", self.handle_uninstall_skill)
         self.bus.on("ovos.pip.install", self.handle_install_python)
         self.bus.on("ovos.pip.uninstall", self.handle_uninstall_python)
+
+    @property
+    def config(self) -> dict:
+        """``skills.installer``, read when it is used.
+
+        Read at use rather than once at startup, so a change to the installer
+        settings (the constraints file, ``allow_alphas``) applies to the next
+        install without a restart. A config passed to the constructor, or set
+        later, is used as given.
+        """
+        if self._config is not None:
+            return self._config
+        return Configuration().get("skills", {}).get("installer", {})
+
+    @config.setter
+    def config(self, value: dict) -> None:
+        self._config = value or None
 
     def shutdown(self) -> None:
         """Unregister all message bus event handlers."""
