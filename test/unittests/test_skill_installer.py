@@ -557,3 +557,34 @@ def test_no_suffixed_pip_topic_is_registered(skills_store):
     suffixed = [e for e in skills_store.bus.event_handlers
                 if e.startswith("ovos.pip.") and e.count(".") > 2]
     assert suffixed == []
+
+
+def test_a_changed_installer_config_applies_without_a_restart(tmp_path, monkeypatch):
+    """Switching the release channel (e.g. in ovos-control-panel) changes
+    skills.installer.constraints and allow_alphas; the next install must use
+    them, not the values read when ovos-core started."""
+    stable = tmp_path / "stable.txt"
+    alpha = tmp_path / "alpha.txt"
+    stable.write_text("")
+    alpha.write_text("")
+    live = {"skills": {"installer": {"constraints": str(stable)}}}
+    monkeypatch.setattr("ovos_core.skill_installer.Configuration", lambda: live)
+    store = SkillsStore(bus=MessageBusMock())
+    commands = []
+    store._run_pip = lambda command, print_logs: commands.append(command) or ""
+
+    store.pip_install(["ovos-skill-foo"])
+    assert str(stable) in commands[-1] and "--pre" not in commands[-1]
+
+    live["skills"]["installer"] = {"constraints": str(alpha), "allow_alphas": True}
+    store.pip_install(["ovos-skill-foo"])
+    assert str(alpha) in commands[-1] and "--pre" in commands[-1]
+
+
+def test_an_installer_config_given_to_the_constructor_is_used_as_given(monkeypatch):
+    monkeypatch.setattr("ovos_core.skill_installer.Configuration",
+                        lambda: {"skills": {"installer": {"allow_pip": False}}})
+    store = SkillsStore(bus=MessageBusMock(), config={"allow_pip": True})
+    assert store.config == {"allow_pip": True}
+    store.config = {"allow_pip": False}
+    assert store.config == {"allow_pip": False}
