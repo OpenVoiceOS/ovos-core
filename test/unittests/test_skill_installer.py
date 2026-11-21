@@ -588,3 +588,20 @@ def test_an_installer_config_given_to_the_constructor_is_used_as_given(monkeypat
     assert store.config == {"allow_pip": True}
     store.config = {"allow_pip": False}
     assert store.config == {"allow_pip": False}
+
+
+def test_an_empty_config_set_later_is_used_as_given(monkeypatch):
+    """An empty override must not fall back to the live configuration, which
+    may allow pip."""
+    monkeypatch.setattr("ovos_core.skill_installer.Configuration",
+                        lambda: {"skills": {"installer": {"allow_pip": True}}})
+    store = SkillsStore(bus=MessageBusMock(), config={"allow_pip": True})
+    store.config = {}
+    assert store.config == {}
+    store.play_error_sound = Mock()
+    store.pip_install = Mock()
+    store.handle_install_python(Message(msg_type="test", data={"packages": ["x"]}))
+    assert store.bus.message_types[-1] == "ovos.pip.install.failed"
+    store.pip_install.assert_not_called()
+    store.config = None
+    assert store.config == {"allow_pip": True}, "None means the live configuration"

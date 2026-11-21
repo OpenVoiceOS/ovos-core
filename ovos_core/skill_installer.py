@@ -52,8 +52,9 @@ class SkillsStore:
 
         Read at use rather than once at startup, so a change to the installer
         settings (the constraints file, ``allow_alphas``) applies to the next
-        install without a restart. A config passed to the constructor, or set
-        later, is used as given.
+        install without a restart. A non-empty config passed to the
+        constructor, or any config set later (an empty one included), is used
+        as given; ``None`` means the live configuration.
         """
         if self._config is not None:
             return self._config
@@ -61,7 +62,7 @@ class SkillsStore:
 
     @config.setter
     def config(self, value: dict) -> None:
-        self._config = value or None
+        self._config = value
 
     def shutdown(self) -> None:
         """Unregister all message bus event handlers."""
