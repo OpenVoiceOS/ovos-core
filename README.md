@@ -143,6 +143,12 @@ Add the persona pipeline to your `mycroft.conf` after the `_high` pipeline match
 
 ---
 
+## Performance Metrics
+
+`ovos-core` can expose latency histograms for the utterance path on a Prometheus
+`/metrics` endpoint. It is off by default; set `OVOS_METRICS_ENABLED=true` to turn
+it on. See [docs/performance-metrics.md](docs/performance-metrics.md).
+
 ## Getting Involved
 
 OVOS is open source and depends on community contributions. There is a way to contribute as a coder, designer, or translator.
