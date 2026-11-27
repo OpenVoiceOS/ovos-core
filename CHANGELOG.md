@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.7.5a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.5a3) (2026-11-27)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.5a2...3.7.5a3)
+
+**Merged pull requests:**
+
+- test: the load-gap manager stub sets \_distribution\_versions [\#1035](https://github.com/OpenVoiceOS/ovos-core/pull/1035) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [3.7.5a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.5a2) (2026-11-27)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.5a1...3.7.5a2)
