@@ -1170,6 +1170,45 @@ class IntentService:
         message.context["utterance_id"] = uid
         return uid
 
+    def _match_rejected(self, match, sess, lang: str) -> Optional[str]:
+        """Return why the orchestrator refuses a plugin's match, or None to accept it."""
+        if not match.match_type:
+            LOG.warning(f"{type(match).__name__} has an empty match_type; skipping")
+            return "empty match_type"
+        if match.skill_id and match.skill_id in (sess.blacklisted_skills or []):
+            return f"skill blacklisted by session '{sess.session_id}'"
+        is_intent = isinstance(match, IntentHandlerMatch)
+        if is_intent and match.match_type in (sess.blacklisted_intents or []):
+            return f"intent blacklisted by session '{sess.session_id}'"
+        # OVOS-PIPELINE-1 §6.2: a missing required slot counts as a decline.
+        missing = self._missing_required_slots(
+            match, sess.session_id, lang, intent_context=sess.intent_context)
+        if missing:
+            return f"missing required slots {missing} (§6.2)"
+        # OVOS-CONTEXT-1 §6: gates come from the manifest, not from the Match.
+        if is_intent and match.skill_id:
+            intent_name = match.match_type.split(":", 1)[-1]
+            requires, excludes = self.intent_manifest.get_context_requirements(
+                sess.session_id, match.skill_id, intent_name, lang)
+            if (requires or excludes) and not gate_satisfied(
+                    sess.intent_context or {}, requires, excludes,
+                    owner_id=match.skill_id):
+                return "context gate unsatisfied"
+        return None
+
+    def _drop_finished_matches(self, session_id: str):
+        """Forget this session's completed single-flight match calls (§6.2).
+
+        A call still running stays, so the next round cannot start a second
+        worker for the same abandoned call.
+        """
+        if not self._match_inflight:
+            return
+        for key in [k for k in self._match_inflight if k[1] == session_id]:
+            future = self._match_inflight.get(key)
+            if future is not None and future.done():
+                self._match_inflight.pop(key, None)
+
     @UTTERANCE_DISPATCH.timed
     def handle_utterance(self, message: Message):
         """Main entrypoint for handling user utterances, typically generated
@@ -1307,40 +1346,10 @@ class IntentService:
                         match = None
                     if match:
                         LOG.info(f"{pipeline} match ({intent_lang}): {match}")
-                        if match and not match.match_type:
-                            LOG.warning(f"Matcher {type(match_func).__name__} returned a match with empty match_type; skipping")
+                        reason = self._match_rejected(match, sess, intent_lang)
+                        if reason:
+                            LOG.debug(f"ignoring match '{match.match_type}': {reason}")
                             continue
-                        if match.skill_id and match.skill_id in (sess.blacklisted_skills or []):
-                            LOG.debug(
-                                f"ignoring match, skill_id '{match.skill_id}' blacklisted by Session '{sess.session_id}'")
-                            continue
-                        if isinstance(match, IntentHandlerMatch) and match.match_type in (sess.blacklisted_intents or []):
-                            LOG.debug(
-                                f"ignoring match, intent '{match.match_type}' blacklisted by Session '{sess.session_id}'")
-                            continue
-                        # OVOS-PIPELINE-1 §6.2: if the matched intent is missing
-                        # any required slot, treat it as if the plugin had
-                        # declined and continue iteration; no bus event is emitted.
-                        missing = self._missing_required_slots(
-                            match, sess.session_id, intent_lang,
-                            intent_context=sess.intent_context)
-                        if missing:
-                            LOG.debug(f"ignoring match '{match.match_type}': "
-                                      f"missing required slots {missing} (§6.2)")
-                            continue
-                        # OVOS-CONTEXT-1 §6/§6.1: orchestrator gate backstop
-                        # against a misbehaving matcher; gates read from the
-                        # manifest, not the Match
-                        if isinstance(match, IntentHandlerMatch) and match.skill_id:
-                            intent_name = match.match_type.split(":", 1)[-1]
-                            requires, excludes = self.intent_manifest.get_context_requirements(
-                                sess.session_id, match.skill_id, intent_name, intent_lang)
-                            if (requires or excludes) and not gate_satisfied(
-                                    sess.intent_context or {}, requires, excludes,
-                                    owner_id=match.skill_id):
-                                LOG.debug(
-                                    f"ignoring match, context gate unsatisfied for '{match.match_type}'")
-                                continue
                         try:
                             # FakeBus and the in-process WebSocket bus invoke
                             # skill handlers synchronously from emit(). That is
@@ -1366,18 +1375,7 @@ class IntentService:
 
         LOG.debug(f"intent matching took: {stopwatch.time}")
 
-        # §6.2 single-flight bookkeeping: drop this session's completed
-        # entries so _match_inflight does not grow forever across sessions
-        # that only ever speak once (a HiveMind hub can mint a fresh session
-        # per message). An entry whose future is still running is left in
-        # place - clearing it here would let this session's very next round
-        # for the same plugin start a second worker for the same abandoned
-        # call, defeating the guard in ``_call_match_bounded``.
-        if self._match_inflight:
-            for key in [k for k in self._match_inflight if k[1] == sess.session_id]:
-                future = self._match_inflight.get(key)
-                if future is not None and future.done():
-                    self._match_inflight.pop(key, None)
+        self._drop_finished_matches(sess.session_id)
 
         # OVOS-CONTEXT-1 §4.2 no-match path (matched path decrements in
         # _dispatch_match)
