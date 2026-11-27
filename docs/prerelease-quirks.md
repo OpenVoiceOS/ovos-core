@@ -3,7 +3,7 @@
 covers: the behaviours of a dev alpha that differ from the last stable release, and what to do about each one
 source: ovos_core/intent_services/stop_service_legacy.py, ovos_core/skill_installer.py:FAILURE_DETAIL_CHARS, ovos_core/skill_manager.py:PLUGIN_SKILL_RETRY_MAX_SECONDS
 generated: no
-verify: python3 docs/check_page.py docs/prerelease-quirks.md && grep -q 'FAILURE_DETAIL_CHARS = 2000' ovos_core/skill_installer.py && grep -qF 'last 2000 characters' docs/prerelease-quirks.md && grep -q 'PLUGIN_SKILL_RETRY_MAX_SECONDS = 15 \* 60' ovos_core/skill_manager.py && grep -qF 'maximum of 15 minutes' docs/prerelease-quirks.md
+verify: python3 docs/check_page.py docs/prerelease-quirks.md && grep -q 'FAILURE_DETAIL_CHARS = 2000' ovos_core/skill_installer.py && { grep -v '^verify:' docs/prerelease-quirks.md | grep -qF 'last 2000 characters'; } && grep -q 'PLUGIN_SKILL_RETRY_MAX_SECONDS = 15 \* 60' ovos_core/skill_manager.py && { grep -v '^verify:' docs/prerelease-quirks.md | grep -qF 'maximum of 15 minutes'; }
 see: index.md
 -->
 
