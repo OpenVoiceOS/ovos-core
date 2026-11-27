@@ -15,8 +15,6 @@
 import threading
 import time
 import unittest
-
-import pytest
 from unittest.mock import MagicMock, patch, call
 from threading import Event
 
@@ -615,14 +613,13 @@ class TestMatchLow(unittest.TestCase):
              patch("ovos_core.intent_services.stop_service.match_one",
                    return_value=("stop", 0.45)), \
              patch.object(StopService, "get_active_skills", return_value=["skill_a"]), \
-             patch.object(self.svc, "_collect_stop_skills", return_value=[]), \
+             patch.object(self.svc, "_collect_stop_skills", return_value=["skill_a"]), \
              patch("ovos_core.intent_services.stop_service.SessionManager.get",
                    return_value=Session("s")):
-            result = self.svc.match_low(["stop"], "en-US", Message("test"))
+            result = self.svc.match_low(["stop"], "en-US", _round_message("u1"))
 
-        # 0.45 + 0.1 = 0.55 ≥ 0.5, and no skills to stop → global stop
-        self.assertIsNotNone(result)
-        self.assertEqual(result.match_type, GLOBAL_STOP)
+        # 0.45 + 0.1 = 0.55 >= 0.5, so the stop goes to the active skill
+        self.assertEqual(result.match_type, "skill_a:stop")
 
     def test_above_threshold_with_stoppable_skill(self):
         """A confident match with a stoppable skill → skill stop."""
@@ -1755,34 +1752,29 @@ class TestMatchDataCarriesNoInternalKeys(unittest.TestCase):
 
 class TestRecencyFallbackWithoutPong(unittest.TestCase):
     """OVOS-STOP-1 §4.1 step 5: no positive pong and a non-empty
-    active_handlers falls back to recency, never to global_stop."""
+    active_handlers falls back to recency, never to global_stop.
+    The ping runs for real; no skill answers it."""
 
     def setUp(self):
         self.svc = _make_service()
 
     def _patches(self):
         return (patch.object(StopService, "get_active_skills", return_value=["skill_a"]),
-                patch.object(self.svc, "_stop_candidates", return_value=["skill_a"]),
-                patch.object(self.svc, "_collect_stop_skills", return_value=[]),
                 patch("ovos_core.intent_services.stop_service.SessionManager.get",
                       return_value=Session("s")))
 
-    @pytest.mark.xfail(strict=True, reason="#1043 STOP-1 §4.1 step 5: no recency fallback without a pong")
     def test_exact_stop_without_pong_targets_the_recent_skill(self):
-        a, b, c, d = self._patches()
+        a, b = self._patches()
         with patch.object(self.svc._locale, "voc_match",
-                          side_effect=lambda utt, voc, lang, exact: voc == "stop"), a, b, c, d:
+                          side_effect=lambda utt, voc, lang, exact: voc == "stop"), a, b:
             result = self.svc.match_high(["stop"], "en-US", _round_message("u1"))
-        self.assertIsNotNone(result)
         self.assertEqual(result.match_type, "skill_a:stop")
 
-    @pytest.mark.xfail(strict=True, reason="#1043 STOP-1 §4.1 step 5: no recency fallback without a pong")
     def test_fuzzy_stop_without_pong_targets_the_recent_skill(self):
         self.svc.config = {"min_conf": 0.5}
-        a, b, c, d = self._patches()
+        a, b = self._patches()
         with patch.object(self.svc._locale, "voc_list", return_value=["stop"]), \
              patch("ovos_core.intent_services.stop_service.match_one",
-                   return_value=("stop", 0.8)), a, b, c, d:
+                   return_value=("stop", 0.8)), a, b:
             result = self.svc.match_low(["stop"], "en-US", _round_message("u1"))
-        self.assertIsNotNone(result)
         self.assertEqual(result.match_type, "skill_a:stop")

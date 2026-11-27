@@ -51,9 +51,9 @@ class StopService(ConfidenceMatcherPipeline):
       recency-selected active handler declares itself stoppable via the §4
       ping-pong cascade;
     - a **global** stop dispatched on ``<pipeline_id>:global_stop`` (§5)
-      otherwise — explicit "stop everything" vocabulary (§3.2), an empty
-      ``active_handlers`` (§4.1 step 1), or no positive pong responder
-      (§4.1 step 5).
+      for explicit "stop everything" vocabulary (§3.2) or an empty
+      ``active_handlers`` (§4.1 step 1). With no positive pong responder,
+      the targeted stop goes to the most recent candidate (§4.1 step 5).
 
     The reserved ``stop`` intent_name suppresses the OVOS-PIPELINE-1 §7.1
     activation push by the §7.3 registry; ``global_stop`` is not reserved and
@@ -499,7 +499,7 @@ class StopService(ConfidenceMatcherPipeline):
         if candidates:
             return self._targeted_stop(candidates[0], utterance, sess, message)
 
-        # no positive pong responder -> escalate to a §5 global stop
+        # no candidates at all (§4.1 step 1) -> §5 global stop
         return self._global_stop(utterance, sess)
 
     def shutdown(self) -> None:
