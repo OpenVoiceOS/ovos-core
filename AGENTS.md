@@ -1,6 +1,8 @@
 # AGENTS.md
 
-`ovos-core` is the skills and intents service of OpenVoiceOS. It runs the intent pipeline, loads and unloads skills, and dispatches converse, fallback and stop. Other services (audio, GUI, listener, skills) talk to it over the messagebus and do not import it.
+`ovos-core` is the skills and intents service of OpenVoiceOS. It runs the intent pipeline, loads and unloads skills, and dispatches converse, fallback and stop.
+
+Other services (audio, GUI, listener, skills) talk to it over the messagebus. They do not import it.
 
 ## Map
 
@@ -38,4 +40,5 @@ The end-to-end tests load real demo skills from the `test` extra. See `docs/test
 - A regression test fails on the code before the fix and passes after it. A mock returns only a value that the real function can return.
 - All tests are in `test/`. Do not make a `tests/` directory.
 - A change to the stage order or to the confidence thresholds of the pipeline changes which skill wins for every skill. Treat it as a change to the public API.
-- A change in behaviour updates the page in `docs/` that describes it, and adds an entry at the top of `docs/prerelease-quirks.md`, in the same PR.
+- A change in behaviour updates the page in `docs/` that describes it, in the same PR.
+- When the behaviour differs from the last stable release, the PR also updates `docs/prerelease-quirks.md`.
