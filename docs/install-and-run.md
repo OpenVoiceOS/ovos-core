@@ -23,7 +23,6 @@ INFO - IntentService is starting up.
 INFO - ScheduledEventService started
 INFO - IntentService is ready.
 INFO - Skills Manager is ready.
-INFO - ovos-core is ready! additional skills can now be loaded
 ```
 
 ## Steps
