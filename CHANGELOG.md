@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.7.5a4](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.5a4) (2026-11-27)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.5a3...3.7.5a4)
+
+**Merged pull requests:**
+
+- ci: run build tests when the default branch gets a commit [\#1038](https://github.com/OpenVoiceOS/ovos-core/pull/1038) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [3.7.5a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.7.5a3) (2026-11-27)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.7.5a2...3.7.5a3)
@@ -354,10 +362,6 @@
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.6a3...3.2.7a1)
 
-**Merged pull requests:**
-
-- fix: drop a malformed session carrier but still emit its ovos.utterance.handled [\#930](https://github.com/OpenVoiceOS/ovos-core/pull/930) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [3.2.6a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.2.6a3) (2026-09-04)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.2.6a2...3.2.6a3)
@@ -412,15 +416,15 @@
 
 ## [3.0.12a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.12a1) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.12a1)
-
-## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
-
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.11a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a3...3.0.12a1)
 
 ## [3.0.10a3](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a3) (2026-08-31)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.10a3)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.11a1...3.0.10a3)
+
+## [3.0.11a1](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.11a1) (2026-08-31)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-core/compare/3.0.10a2...3.0.11a1)
 
 ## [3.0.10a2](https://github.com/OpenVoiceOS/ovos-core/tree/3.0.10a2) (2026-08-31)
 
