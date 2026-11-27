@@ -26,6 +26,7 @@ def _manager():
     manager._stop_event = Event()
     manager.config = {"skills": {}}
     manager.intents = None
+    manager._distribution_versions = {}
     return manager
 
 
