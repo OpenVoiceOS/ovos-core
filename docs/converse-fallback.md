@@ -3,7 +3,7 @@
 covers: how the converse and fallback pipeline plugins pick a skill
 source: ovos_core/intent_services/converse_service.py, ovos_core/intent_services/fallback_service.py
 generated: no
-verify: python3 docs/check_page.py docs/converse-fallback.md
+verify: python3 docs/check_page.py docs/converse-fallback.md ovos_workshop.skills.ovos
 see: skill-installer.md
 -->
 
