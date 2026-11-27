@@ -7,7 +7,7 @@
 covers: what ovos-core is, how to install it, and where each topic is documented
 source: pyproject.toml, ovos_core/__main__.py
 generated: no
-verify: grep -q 'ovos-core = "ovos_core.__main__:main"' pyproject.toml
+verify: python3 docs/check_page.py README.md
 see: docs/index.md
 -->
 

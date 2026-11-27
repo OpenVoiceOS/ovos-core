@@ -3,7 +3,7 @@
 covers: the reading order of the ovos-core docs and the packages it works with
 source: docs/*.md, pyproject.toml
 generated: no
-verify: for f in $(grep -o '([a-z-]*\.md)' docs/index.md | tr -d '()' | sort -u); do test -f docs/$f || exit 1; done
+verify: python3 docs/check_page.py docs/index.md recognizer_loop:utterance && { for f in $(grep -o '([a-z-]*\.md)' docs/index.md | tr -d '()' | sort -u); do test -f docs/$f || exit 1; done; }
 see: install-and-run.md
 -->
 

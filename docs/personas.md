@@ -3,7 +3,7 @@
 covers: how to add an LLM persona that answers the utterances that no skill handles
 source: pyproject.toml (plugins extra: ovos-persona), ovos_core/intent_services/service.py:_PIPELINE_MIGRATION_MAP
 generated: no
-verify: grep -q '"ovos-persona>=' pyproject.toml && grep -q '"ovos-fallback-pipeline-plugin-low"' ovos_core/intent_services/service.py
+verify: python3 docs/check_page.py docs/personas.md ovos-solver-openai-persona-plugin
 see: pipeline.md
 -->
 

@@ -3,7 +3,7 @@
 covers: which components run in the ovos-core process and how they start
 source: ovos_core/__main__.py, ovos_core/skill_manager.py
 generated: no
-verify: grep -q 'enable_event_scheduler=True' ovos_core/__main__.py
+verify: python3 docs/check_page.py docs/architecture.md recognizer_loop:utterance
 see: skill-manager.md
 -->
 

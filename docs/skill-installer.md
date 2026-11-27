@@ -3,7 +3,7 @@
 covers: how to install and uninstall skills over the bus
 source: ovos_core/skill_installer.py:SkillsStore
 generated: no
-verify: grep -q 'class SkillsStore' ovos_core/skill_installer.py
+verify: python3 docs/check_page.py docs/skill-installer.md
 see: bus-events.md
 -->
 

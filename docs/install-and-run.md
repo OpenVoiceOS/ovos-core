@@ -3,7 +3,7 @@
 covers: how to install ovos-core, which extras exist, and which commands start which services
 source: pyproject.toml ([project.scripts], [project.optional-dependencies]), ovos_core/__main__.py
 generated: no
-verify: grep -q 'ovos-skill-installer = "ovos_core.skill_installer:launch_standalone"' pyproject.toml
+verify: python3 docs/check_page.py docs/install-and-run.md
 see: architecture.md
 -->
 

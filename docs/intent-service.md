@@ -3,7 +3,7 @@
 covers: how IntentService takes an utterance and dispatches the match
 source: ovos_core/intent_services/service.py:IntentService
 generated: no
-verify: grep -q 'def handle_utterance' ovos_core/intent_services/service.py
+verify: python3 docs/check_page.py docs/intent-service.md opm.intent_transformer opm.metadata_transformer opm.utterance_transformer ovos_spec_tools.closest_lang recognizer_loop:utterance
 see: pipeline.md
 -->
 
@@ -37,7 +37,7 @@ Language is chosen by priority from message context keys:
 3. `detected_lang`: detected by a transformer plugin
 4. Config default / `message.data["lang"]`
 
-The chosen language is validated against `valid_langs` from config using `langcodes.closest_match` (max distance 10). Invalid tags fall through to the next candidate.
+The chosen language is validated against `valid_langs` from config with `ovos_spec_tools.closest_lang`, with a distance bound of 10. The bound includes 10, so a member language matches its macrolanguage (`arz` matches `ar`). Invalid tags fall through to the next candidate.
 
 ## Multilingual Matching
 
@@ -129,7 +129,7 @@ If `open_data.intent_urls` is configured, intent match results (utterance, inten
 
 ### Language handling
 - **`get_valid_languages()`**: `ovos_config.locale.get_valid_languages` → [`ovos-config/docs/configuration.md`](https://github.com/OpenVoiceOS/ovos-config). Returns the list of enabled languages from `mycroft.conf`.
-- **`langcodes.closest_match`**: third-party `langcodes` library; used in `disambiguate_lang()` to validate language tags against enabled languages.
+- **`ovos_spec_tools.closest_lang`**: used in `disambiguate_lang()` to check a language tag against the enabled languages.
 
 ### Metrics / Open Data
 - **`ovos-opendata-server`**: optional companion server for intent metrics collection. Configure `open_data.intent_urls` in `mycroft.conf` to enable upload. See [`ovos-opendata-server`](https://github.com/OpenVoiceOS/ovos-opendata-server) repo.

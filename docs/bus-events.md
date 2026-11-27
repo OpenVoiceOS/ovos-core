@@ -3,7 +3,7 @@
 covers: each bus message that ovos-core sends or handles
 source: ovos_core/intent_services/service.py, ovos_core/skill_manager.py, ovos_core/skill_installer.py
 generated: no
-verify: grep -q 'ovos.skills.install' ovos_core/skill_installer.py
+verify: python3 docs/check_page.py docs/bus-events.md gui.page.show recognizer_loop:utterance skillmanager.rescan.response
 see: performance-metrics.md
 -->
 
@@ -45,7 +45,6 @@ All events use the OVOS `Message` format: `{type, data, context}`.
 |---|---|---|
 | `mycroft.skills.initialized` | core → * | All startup skills loaded, manager ready |
 | `mycroft.skills.train` | core → * | Request pipeline intent training |
-| `mycroft.skills.trained` | * → core | Training complete |
 | `mycroft.skill.loaded` | core → * | A skill was successfully loaded |
 | `mycroft.skills.list` | core → * | Response to `skillmanager.list` |
 | `mycroft.skills.error` | core → * | Some skills failed to load on startup |

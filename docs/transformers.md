@@ -3,7 +3,7 @@
 covers: which transformer stages run on an utterance before matching
 source: ovos_core/transformers.py
 generated: no
-verify: grep -q 'class UtteranceTransformersService' ovos_core/transformers.py
+verify: python3 docs/check_page.py docs/transformers.md opm.intent_transformer opm.metadata_transformer opm.utterance_transformer ovos-stt-server recognizer_loop:utterance
 see: personas.md
 -->
 

@@ -3,7 +3,7 @@
 covers: how SkillManager finds, loads, gates and unloads skills
 source: ovos_core/skill_manager.py:SkillManager
 generated: no
-verify: grep -q 'class SkillManager' ovos_core/skill_manager.py
+verify: python3 docs/check_page.py docs/skill-manager.md opm.skills
 see: intent-service.md
 -->
 
@@ -58,10 +58,10 @@ The skill manager does not load a skill whose ID is in `skills.blacklisted_skill
 After new skills are loaded, the manager requests pipeline re-training:
 
 ```
-mycroft.skills.train  →  (pipeline plugins train)  →  mycroft.skills.trained
+mycroft.skills.train  →  (pipeline plugins train)
 ```
 
-Training has a 60-second timeout. On failure, an error is logged but the manager continues.
+The request has no reply. The manager does not wait for the training to finish.
 
 ## Loading After an Install
 

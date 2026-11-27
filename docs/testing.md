@@ -3,7 +3,7 @@
 covers: how to run the unit tests and the end-to-end tests, locally and on CI
 source: .github/workflows/build_tests.yml, .github/workflows/ovoscope.yml, pyproject.toml (test extra)
 generated: no
-verify: grep -q "test_path: 'test/unittests'" .github/workflows/build_tests.yml && grep -q 'test_path: "test/end2end/"' .github/workflows/ovoscope.yml
+verify: python3 docs/check_page.py docs/testing.md
 see: index.md
 -->
 
