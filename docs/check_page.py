@@ -17,9 +17,8 @@ def word(w):
 
 
 def held(token):
-    bare = token.replace("<skill_id>", "").replace("<pipeline_id>", "")
-    if bare != token:
-        return bare in corpus
+    if token.startswith(("<skill_id>", "<pipeline_id>")):
+        return token.split(">", 1)[1] in corpus and token[1:token.index(">")] in ("skill_id", "pipeline_id")
     if token.endswith("_seconds") and word(token[:-8] + "_ms"):
         return True
     if word(token):
