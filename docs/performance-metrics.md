@@ -3,7 +3,7 @@
 covers: how to turn on the latency histograms and read them
 source: ovos_core/_metrics.py, ovos_core/intent_services/service.py
 generated: no
-verify: python3 docs/check_page.py docs/performance-metrics.md ovos.performance.metrics recognizer_loop:utterance && for m in $(grep -o '^| `ovos_[a-z_]*_seconds`' docs/performance-metrics.md | grep -o 'ovos_[a-z_]*' | sed 's/_seconds$//'); do grep -q "\"${m}_ms\"" ovos_core/_metrics.py || exit 1; done
+verify: python3 docs/check_page.py docs/performance-metrics.md sum_ms ovos.performance.metrics recognizer_loop:utterance && for m in $(grep -o '^| `ovos_[a-z_]*_seconds`' docs/performance-metrics.md | grep -o 'ovos_[a-z_]*' | sed 's/_seconds$//'); do grep -q "\"${m}_ms\"" ovos_core/_metrics.py || exit 1; done
 see: testing.md
 -->
 

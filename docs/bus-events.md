@@ -3,7 +3,7 @@
 covers: each bus message that ovos-core sends or handles
 source: ovos_core/intent_services/service.py, ovos_core/skill_manager.py, ovos_core/skill_installer.py
 generated: no
-verify: python3 docs/check_page.py docs/bus-events.md gui.page.show recognizer_loop:utterance skillmanager.rescan.response
+verify: python3 docs/check_page.py docs/bus-events.md dig_for_message gui.page.show recognizer_loop:utterance skillmanager.rescan.response
 see: performance-metrics.md
 -->
 

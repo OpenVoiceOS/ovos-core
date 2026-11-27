@@ -3,7 +3,7 @@
 covers: how SkillManager finds, loads, gates and unloads skills
 source: ovos_core/skill_manager.py:SkillManager
 generated: no
-verify: python3 docs/check_page.py docs/skill-manager.md opm.skills
+verify: python3 docs/check_page.py docs/skill-manager.md requires_gui opm.skills
 see: intent-service.md
 -->
 

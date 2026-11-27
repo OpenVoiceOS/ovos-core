@@ -3,7 +3,7 @@
 covers: how to configure the order of the intent matchers and which IDs exist
 source: ovos_core/intent_services/service.py:_PIPELINE_MIGRATION_MAP
 generated: no
-verify: python3 docs/check_page.py docs/pipeline.md ovos-persona-pipeline-plugin
+verify: python3 docs/check_page.py docs/pipeline.md ovos-adapt ovos-ocp ovos-padacioso ovos_commonqa ovos-persona-pipeline-plugin
 see: transformers.md
 -->
 
