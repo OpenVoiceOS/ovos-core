@@ -68,7 +68,7 @@ The `api_url` is a demo server with no uptime guarantee. Use the URL of your own
 | :--- | :--- |
 | "What personas are available?" | The assistant lists the personas |
 | "Connect me to Salamandra" | The persona answers the utterances that follow |
-| "Stop the interaction" | The persona stops |
+| "End the conversation" | The persona stops |
 
 The [ovos-persona README](https://github.com/OpenVoiceOS/ovos-persona) gives all the keys of a persona file.
 

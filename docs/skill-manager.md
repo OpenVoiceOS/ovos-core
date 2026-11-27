@@ -22,7 +22,7 @@ plugins = find_skill_plugins()
 
 ## Connectivity Gating
 
-Skills declare their runtime requirements (network/internet/GUI) in their `RuntimeRequirements`. The skill manager only loads a skill when those requirements are met:
+By default, the skill manager loads all skills at startup, with no gate. Set `skills.use_deferred_loading` to `true` in `mycroft.conf` to load each skill only when the network, internet or GUI that its `RuntimeRequirements` declare is available:
 
 | Event | Action |
 |---|---|
@@ -46,7 +46,12 @@ Each skill gets its own bus connection when `websocket.shared_connection` is `fa
 
 ## Blacklisting
 
-Skills listed in `skills.blacklisted_skills` in `mycroft.conf` are skipped at load time. The recommended approach is to uninstall unwanted skills rather than blacklist them.
+The skill manager does not load a skill whose ID is in `skills.blacklisted_skills` in `mycroft.conf`. To remove a skill for all users, uninstall it.
+
+## Startup checks
+
+- When no skill is installed, the log shows `No installed skills detected!`. Ignore it when the skills run in their own process. Otherwise, install skills.
+- The skill manager waits for the intent service before it loads skills. After `skills.intent_service_timeout` seconds (default 300), it raises `RuntimeError: IntentService did not become ready within 300 seconds`.
 
 ## Intent Training
 

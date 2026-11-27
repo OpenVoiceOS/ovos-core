@@ -8,7 +8,7 @@ Other services (audio, GUI, listener, skills) talk to it over the messagebus. Th
 
 | Path | Holds |
 | :--- | :--- |
-| `ovos_core/__main__.py` | The `ovos-core` command and its `--disable-*` flags |
+| `ovos_core/__main__.py` | The `ovos-core` command, and the `--disable-*` flags of `python -m ovos_core` |
 | `ovos_core/skill_manager.py` | `SkillManager`: skill discovery, loading, connectivity gating, unloading |
 | `ovos_core/intent_services/service.py` | `IntentService`: transformers, the pipeline loop and the dispatch |
 | `ovos_core/intent_services/converse_service.py`, `fallback_service.py`, `stop_service.py` | The converse, fallback and stop pipeline plugins |

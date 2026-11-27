@@ -46,7 +46,7 @@ INFO - ovos-core is ready! additional skills can now be loaded
 
 ### Flags of `ovos-core`
 
-Each part runs by default. A flag stops one part.
+Each part runs by default. A flag stops one part. The flags work only when you start the service with `python -m ovos_core`. The `ovos-core` command ignores them: [#1045](https://github.com/OpenVoiceOS/ovos-core/issues/1045).
 
 | Flag | Stops |
 | :--- | :--- |
@@ -54,7 +54,7 @@ Each part runs by default. A flag stops one part.
 | `--disable-installer` | The skill installer |
 | `--disable-event-scheduler` | The bus event scheduler |
 | `--disable-skill-api` | The skill bus API: the services that skills give to other skills |
-| `--disable-file-watcher` | The watcher that reloads a skill when its `settings.json` changes |
+| `--disable-file-watcher` | The watcher that sends `ovos.skills.settings_changed` when the `settings.json` of a skill changes |
 
 ### Extras
 
