@@ -19,10 +19,11 @@ The executable gets added to the bin directory when installed
 """
 
 from ovos_bus_client import MessageBusClient
-from ovos_config.locale import setup_locale
 from ovos_utils import wait_for_exit_signal
 from ovos_utils.log import LOG, init_service_logger
 
+from ovos_core._metrics import performance_histograms
+from ovos_utils.prometheus import start_metrics_server, stop_metrics_server
 from ovos_core.skill_manager import SkillManager, on_error, on_stopping, on_ready, on_alive, on_started
 
 
@@ -40,30 +41,65 @@ def main(alive_hook=on_alive, started_hook=on_started, ready_hook=on_ready,
     """
     init_service_logger("skills")
 
-    setup_locale()
+    # Opt-in scrape endpoint for the runtime stage histograms; a no-op
+    # unless OVOS_METRICS_ENABLED is set (see ovos_utils.prometheus).
+    metrics_server = start_metrics_server([("core", performance_histograms)])
 
-    # Connect this process to the OpenVoiceOS message bus
-    bus = MessageBusClient()
-    bus.run_in_thread()
-    bus.connected_event.wait()
+    try:
+        # Connect this process to the OpenVoiceOS message bus
+        bus = MessageBusClient()
+        bus_thread = bus.run_in_thread()
+        bus.connected_event.wait()
 
-    skill_manager = SkillManager(bus, watchdog,
-                                 enable_file_watcher=enable_file_watcher,
-                                 enable_skill_api=enable_skill_api,
-                                 enable_intent_service=enable_intent_service,
-                                 enable_installer=enable_installer,
-                                 enable_event_scheduler=enable_event_scheduler,
-                                 alive_hook=alive_hook,
-                                 started_hook=started_hook,
-                                 stopping_hook=stopping_hook,
-                                 ready_hook=ready_hook,
-                                 error_hook=error_hook)
+        skill_manager = SkillManager(bus, watchdog,
+                                     enable_file_watcher=enable_file_watcher,
+                                     enable_skill_api=enable_skill_api,
+                                     enable_intent_service=enable_intent_service,
+                                     enable_installer=enable_installer,
+                                     enable_event_scheduler=enable_event_scheduler,
+                                     alive_hook=alive_hook,
+                                     started_hook=started_hook,
+                                     stopping_hook=stopping_hook,
+                                     ready_hook=ready_hook,
+                                     error_hook=error_hook)
 
-    skill_manager.start()
+        skill_manager.start()
 
-    wait_for_exit_signal()
+        wait_for_exit_signal()
 
-    skill_manager.shutdown()
+        skill_manager.shutdown()
+    finally:
+        # The listener runs on a daemon thread holding the configured port,
+        # so it does not keep the interpreter alive and nothing else frees
+        # the port. A raise in bus setup, in SkillManager construction or
+        # start, or in shutdown would otherwise leave it bound: the
+        # installed wrapper exits anyway, but an in-process caller that
+        # catches the error and retries would then fail to bind. Stopping
+        # it here also covers the raise-during-shutdown case the histogram
+        # endpoint is meant to survive. Safe with None (metrics disabled).
+        stop_metrics_server(metrics_server)
+
+    # Stop the messagebus websocket thread and its event dispatcher before
+    # the interpreter starts tearing down. `bus.run_in_thread()` spawns a
+    # daemon thread that keeps receiving messages and dispatching them onto
+    # `bus.emitter`'s internal ThreadPoolExecutor for as long as the socket
+    # is open. If that thread is still alive when Python begins interpreter
+    # shutdown, an incoming message can call `emitter.emit()` -> `executor
+    # .submit()` after the executor has already been torn down, raising
+    # `RuntimeError: cannot schedule new futures after shutdown` from a
+    # background thread and leaving the process unable to exit cleanly
+    # (systemd then waits out the stop timeout and SIGKILLs it).
+    #
+    # `bus.close()` itself is fire-and-forget: it signals the run_forever
+    # loop to stop and closes the socket, but does not wait for the
+    # receiver thread to actually exit. We join that thread here, with a
+    # bounded timeout, to narrow the window further. This is not a
+    # guarantee the thread has fully stopped by the time we return (the
+    # join can time out), but it removes most of the residual race where a
+    # buffered inbound frame is still being dispatched during teardown.
+    bus.close()
+    if bus_thread is not None:
+        bus_thread.join(timeout=3)
 
     LOG.info('Skills service shutdown complete!')
 
