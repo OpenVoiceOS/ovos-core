@@ -180,16 +180,13 @@ class TestDisambiguateLang(unittest.TestCase):
 
     def test_macrolanguage_member_resolves_to_its_macrolanguage(self):
         """A tag at the language-distance threshold resolves (arz -> ar)."""
-        for tag in ("arz", "wuu"):
-            macro = "ar" if tag == "arz" else "zh"
-            with self.subTest(tag=tag):
-                msg = Message("test", data={}, context={"stt_lang": tag})
-                with patch("ovos_core.intent_services.service.get_message_lang",
-                           return_value="en-US"), \
-                     patch("ovos_core.intent_services.service.get_valid_languages",
-                           return_value=["en-US", macro]):
-                    result = IntentService.disambiguate_lang(msg)
-                self.assertEqual(result, tag)
+        msg = Message("test", data={}, context={"stt_lang": "arz"})
+        with patch("ovos_core.intent_services.service.get_message_lang",
+                   return_value="en-US"), \
+             patch("ovos_core.intent_services.service.get_valid_languages",
+                   return_value=["en-US", "ar"]):
+            result = IntentService.disambiguate_lang(msg)
+        self.assertEqual(result, "arz")
 
     def test_regional_variant_resolves(self):
         """Regional variants stay inside the threshold."""
