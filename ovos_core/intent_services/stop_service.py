@@ -476,7 +476,8 @@ class StopService(ConfidenceMatcherPipeline):
 
         Confidence is boosted when active skills are present. Below
         ``min_conf`` (default 0.5), no match. Otherwise runs the §4 cascade
-        and falls back to a §5 global stop when no skill responds.
+        and gives a §5 global stop only when there is no
+        candidate (§4.1 step 1).
         """
         sess = SessionManager.get(message)
         # we call flatten in case someone is sending the old style list of tuples
