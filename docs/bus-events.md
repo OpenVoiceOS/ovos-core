@@ -1,5 +1,11 @@
-
 # MessageBus Events Reference
+<!-- agent-hint
+covers: each bus message that ovos-core sends or handles
+source: ovos_core/intent_services/service.py, ovos_core/skill_manager.py, ovos_core/skill_installer.py
+generated: no
+verify: grep -q 'ovos.skills.install' ovos_core/skill_installer.py
+see: performance-metrics.md
+-->
 
 All events use the OVOS `Message` format: `{type, data, context}`.
 
@@ -114,32 +120,32 @@ All events use the OVOS `Message` format: `{type, data, context}`.
 
 ### Message format
 All events use the OVOS `Message` format. See **`ovos-bus-client`** for the full `Message` API: fields, routing methods (`reply`, `forward`, `response`), and `dig_for_message`:
-→ [`ovos-bus-client/docs/message.md`](../../ovos-bus-client/docs/message.md)
+→ [`ovos-bus-client/docs/message.md`](https://github.com/OpenVoiceOS/ovos-bus-client)
 
 ### Session serialisation
 Every reply message carries the current `Session` serialised under `context.session`. Skills and pipeline plugins can read/modify the session from the message context. See:
-→ [`ovos-bus-client/docs/session.md`](../../ovos-bus-client/docs/session.md)
+→ [`ovos-bus-client/docs/session.md`](https://github.com/OpenVoiceOS/ovos-bus-client/blob/dev/docs/session.md)
 
 ### `recognizer_loop:utterance`: upstream source
 This event is produced by **`ovos-dinkum-listener`** at the end of the STT pipeline. Its `data` contains `utterances` (list) and its `context` carries `stt_lang`, `session`, and any listener-level transformer additions. See:
-→ [`ovos-dinkum-listener/docs/voice-loop.md`](../../ovos-dinkum-listener/docs/voice-loop.md)
+→ [`ovos-dinkum-listener/docs/voice-loop.md`](https://github.com/OpenVoiceOS/ovos-dinkum-listener/blob/dev/docs/voice-loop.md)
 
 ### `mycroft.audio.play_sound`: downstream consumer
 Consumed by **`ovos-audio`**. The `uri` field can be a file path or URL. See:
-→ [`ovos-audio/docs/audio-service.md`](../../ovos-audio/docs/audio-service.md)
+→ [`ovos-audio/docs/audio-service.md`](https://github.com/OpenVoiceOS/ovos-audio/blob/dev/docs/audio-service.md)
 
 ### Connectivity events: upstream source
 `mycroft.network.connected`, `mycroft.internet.connected`, etc. are produced by the connectivity PHAL plugin. The `ovos.PHAL.internet_check` request/response pattern is described in:
-→ [`ovos-PHAL/docs/index.md`](../../ovos-PHAL/docs/index.md)
+→ [`ovos-PHAL/docs/index.md`](https://github.com/OpenVoiceOS/ovos-PHAL)
 
 ### GUI events
 GUI-related bus events (`mycroft.gui.available`, `mycroft.gui.unavailable`, `gui.page.show`, etc.) are documented in the GUI service:
-→ [`ovos-gui/docs/bus-protocol.md`](../../ovos-gui/docs/bus-protocol.md)
+→ [`ovos-gui/docs/bus-protocol.md`](https://github.com/OpenVoiceOS/ovos-gui)
 
 ### Skill-side events
 Skills emit and handle many additional events not listed here (intent handlers, `get_response`, OCP media, etc.). See:
-→ [`ovos-workshop/docs/decorators.md`](../../ovos-workshop/docs/decorators.md)
-→ [`ovos-workshop/docs/ovos-skill.md`](../../ovos-workshop/docs/ovos-skill.md)
+→ [`ovos-workshop/docs/decorators.md`](https://github.com/OpenVoiceOS/ovos-workshop/blob/dev/docs/decorators.md)
+→ [`ovos-workshop/docs/ovos-skill.md`](https://github.com/OpenVoiceOS/ovos-workshop/blob/dev/docs/ovos-skill.md)
 
 ---
-[← Skill Installer](skill-installer.md) · [Home](index.md)
+[← Skill installer](skill-installer.md) · [Home](index.md) · [Next →](performance-metrics.md)

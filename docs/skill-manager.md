@@ -1,5 +1,11 @@
-
 # SkillManager
+<!-- agent-hint
+covers: how SkillManager finds, loads, gates and unloads skills
+source: ovos_core/skill_manager.py:SkillManager
+generated: no
+verify: grep -q 'class SkillManager' ovos_core/skill_manager.py
+see: intent-service.md
+-->
 
 **Module:** `ovos_core.skill_manager.SkillManager`
 
@@ -123,25 +129,25 @@ ovos.skills.settings_changed  {skill_id: "..."}
 ## Cross-References
 
 ### Skill discovery & loading
-- **`find_skill_plugins()`**: `ovos_plugin_manager.skills.find_skill_plugins` → [`ovos-plugin-manager/docs/plugin-types.md`](../../ovos-plugin-manager/docs/plugin-types.md). Entry point group: `opm.skills`.
-- **`PluginSkillLoader`**: `ovos_workshop.skill_launcher.PluginSkillLoader` → [`ovos-workshop/docs/skill-launcher.md`](../../ovos-workshop/docs/skill-launcher.md). Handles load, hot-reload, and settings watching for a single skill.
-- **`RuntimeRequirements`**: declared by each skill class to specify `network_before_load`, `internet_before_load`, `requires_gui`. Defined in `ovos-workshop` → [`ovos-workshop/docs/ovos-skill.md`](../../ovos-workshop/docs/ovos-skill.md).
+- **`find_skill_plugins()`**: `ovos_plugin_manager.skills.find_skill_plugins` → [`ovos-plugin-manager/docs/plugin-types.md`](https://github.com/OpenVoiceOS/ovos-plugin-manager/blob/dev/docs/plugin-types.md). Entry point group: `opm.skills`.
+- **`PluginSkillLoader`**: `ovos_workshop.skill_launcher.PluginSkillLoader` → [`ovos-workshop/docs/skill-launcher.md`](https://github.com/OpenVoiceOS/ovos-workshop/blob/dev/docs/skill-launcher.md). Handles load, hot-reload, and settings watching for a single skill.
+- **`RuntimeRequirements`**: declared by each skill class to specify `network_before_load`, `internet_before_load`, `requires_gui`. Defined in `ovos-workshop` → [`ovos-workshop/docs/ovos-skill.md`](https://github.com/OpenVoiceOS/ovos-workshop/blob/dev/docs/ovos-skill.md).
 
 ### Writing skills
-- Skill base classes (`OVOSSkill`, `FallbackSkill`, `ConversationalSkill`) → [`ovos-workshop/docs/skill-classes.md`](../../ovos-workshop/docs/skill-classes.md).
-- Skill resource files (vocab, dialog, locale) → [`ovos-workshop/docs/resource-files.md`](../../ovos-workshop/docs/resource-files.md).
-- Skill settings & settings.json → [`ovos-workshop/docs/settings.md`](../../ovos-workshop/docs/settings.md).
+- Skill base classes (`OVOSSkill`, `FallbackSkill`, `ConversationalSkill`) → [`ovos-workshop/docs/skill-classes.md`](https://github.com/OpenVoiceOS/ovos-workshop/blob/dev/docs/skill-classes.md).
+- Skill resource files (vocab, dialog, locale) → [`ovos-workshop/docs/resource-files.md`](https://github.com/OpenVoiceOS/ovos-workshop/blob/dev/docs/resource-files.md).
+- Skill settings & settings.json → [`ovos-workshop/docs/settings.md`](https://github.com/OpenVoiceOS/ovos-workshop/blob/dev/docs/settings.md).
 
 ### Bus & session
-- **`MessageBusClient`**: `ovos_bus_client.client.MessageBusClient` → [`ovos-bus-client/docs/client.md`](../../ovos-bus-client/docs/client.md).
-- **Shared vs. isolated bus connections**: `websocket.shared_connection` in `mycroft.conf`. See [`ovos-config/docs/configuration.md`](../../ovos-config/docs/configuration.md).
+- **`MessageBusClient`**: `ovos_bus_client.client.MessageBusClient` → [`ovos-bus-client/docs/client.md`](https://github.com/OpenVoiceOS/ovos-bus-client/blob/dev/docs/client.md).
+- **Shared vs. isolated bus connections**: `websocket.shared_connection` in `mycroft.conf`. See [`ovos-config/docs/configuration.md`](https://github.com/OpenVoiceOS/ovos-config).
 
 ### Connectivity detection
-- **`ovos.PHAL.internet_check`**: emitted by `SkillManager._sync_skill_loading_state()`, answered by the connectivity PHAL plugin → [`ovos-PHAL/docs/index.md`](../../ovos-PHAL/docs/index.md).
-- **`is_connected_http()`**: fallback from `ovos_utils.network_utils` → [`ovos-utils/docs/utilities.md`](../../ovos-utils/docs/utilities.md).
+- **`ovos.PHAL.internet_check`**: emitted by `SkillManager._sync_skill_loading_state()`, answered by the connectivity PHAL plugin → [`ovos-PHAL/docs/index.md`](https://github.com/OpenVoiceOS/ovos-PHAL).
+- **`is_connected_http()`**: fallback from `ovos_utils.network_utils` → [`ovos-utils/docs/utilities.md`](https://github.com/OpenVoiceOS/ovos-utils/blob/dev/docs/utilities.md).
 
 ### Settings file watcher
-- **`FileWatcher`**: `ovos_utils.file_utils.FileWatcher` → [`ovos-utils/docs/utilities.md`](../../ovos-utils/docs/utilities.md).
+- **`FileWatcher`**: `ovos_utils.file_utils.FileWatcher` → [`ovos-utils/docs/utilities.md`](https://github.com/OpenVoiceOS/ovos-utils/blob/dev/docs/utilities.md).
 
 ### Full bus events list
 See [`bus-events.md`](bus-events.md) for the complete SkillManager event reference.

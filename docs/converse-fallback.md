@@ -1,5 +1,11 @@
-
 # Converse and Fallback Services
+<!-- agent-hint
+covers: how the converse and fallback pipeline plugins pick a skill
+source: ovos_core/intent_services/converse_service.py, ovos_core/intent_services/fallback_service.py
+generated: no
+verify: grep -q 'class FallbackService' ovos_core/intent_services/fallback_service.py
+see: skill-installer.md
+-->
 
 Both services are pipeline plugins shipped inside `ovos-core` and registered via its own entry points.
 
@@ -127,21 +133,21 @@ Skills that participate in converse or fallback inherit from special base classe
 
 | Class | Module | Docs |
 |---|---|---|
-| `ConversationalSkill` | `ovos_workshop.skills` | [`ovos-workshop/docs/skill-classes.md`](../../ovos-workshop/docs/skill-classes.md) |
-| `FallbackSkill` | `ovos_workshop.skills` | [`ovos-workshop/docs/skill-classes.md`](../../ovos-workshop/docs/skill-classes.md) |
-| `OVOSSkill` (base, has `self.converse()`) | `ovos_workshop.skills.ovos` | [`ovos-workshop/docs/ovos-skill.md`](../../ovos-workshop/docs/ovos-skill.md) |
+| `ConversationalSkill` | `ovos_workshop.skills` | [`ovos-workshop/docs/skill-classes.md`](https://github.com/OpenVoiceOS/ovos-workshop/blob/dev/docs/skill-classes.md) |
+| `FallbackSkill` | `ovos_workshop.skills` | [`ovos-workshop/docs/skill-classes.md`](https://github.com/OpenVoiceOS/ovos-workshop/blob/dev/docs/skill-classes.md) |
+| `OVOSSkill` (base, has `self.converse()`) | `ovos_workshop.skills.ovos` | [`ovos-workshop/docs/ovos-skill.md`](https://github.com/OpenVoiceOS/ovos-workshop/blob/dev/docs/ovos-skill.md) |
 
 ### Mode enums (ovos-workshop)
-`ConverseMode`, `ConverseActivationMode`, and `FallbackMode` control who can participate and when. All three are defined in `ovos_workshop.permissions` → [`ovos-workshop/docs/permissions.md`](../../ovos-workshop/docs/permissions.md).
+`ConverseMode`, `ConverseActivationMode`, and `FallbackMode` control who can participate and when. All three are defined in `ovos_workshop.permissions` → [`ovos-workshop/docs/permissions.md`](https://github.com/OpenVoiceOS/ovos-workshop/blob/dev/docs/permissions.md).
 
 ### Session & active skills
-Active skills are tracked in `Session.active_skills` — `ovos_bus_client.session.Session`. The converse service reads and updates this list via `sess.activate_skill()` / `sess.deactivate_skill()`. See [`ovos-bus-client/docs/session.md`](../../ovos-bus-client/docs/session.md).
+Active skills are tracked in `Session.active_skills` — `ovos_bus_client.session.Session`. The converse service reads and updates this list via `sess.activate_skill()` / `sess.deactivate_skill()`. See [`ovos-bus-client/docs/session.md`](https://github.com/OpenVoiceOS/ovos-bus-client/blob/dev/docs/session.md).
 
 ### Intent decorators for converse
-Skills declare converse handlers with `@converse_handler` from `ovos-workshop` → [`ovos-workshop/docs/decorators.md`](../../ovos-workshop/docs/decorators.md).
+Skills declare converse handlers with `@converse_handler` from `ovos-workshop` → [`ovos-workshop/docs/decorators.md`](https://github.com/OpenVoiceOS/ovos-workshop/blob/dev/docs/decorators.md).
 
 ### Full bus events list
 See [`bus-events.md`](bus-events.md) for the Converse and Fallback event reference.
 
 ---
-[← Transformers](transformers.md) · [Home](index.md) · [Next →](skill-installer.md)
+[← Personas](personas.md) · [Home](index.md) · [Next →](skill-installer.md)

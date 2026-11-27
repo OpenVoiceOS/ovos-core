@@ -1,12 +1,15 @@
-# Runtime Performance Metrics
+# Performance metrics
+<!-- agent-hint
+covers: how to turn on the latency histograms and read them
+source: ovos_core/intent_services/service.py (UTTERANCE_DISPATCH)
+generated: no
+verify: grep -rq 'OVOS_METRICS_ENABLED' ovos_core
+see: testing.md
+-->
 
-`ovos-core` can expose process-local, fixed-cardinality Prometheus histograms
-for the synchronous utterance path. The histogram, the opt-in switch and the
-`/metrics` endpoint are shared by every OVOS service and live in
-`ovos_utils.metrics` and `ovos_utils.prometheus` (see ovos-utils
-`docs/metrics.md`); core registers its own stage collector with them. The
-endpoint is disabled by default and binds to loopback unless explicitly
-configured.
+`ovos-core` can record a Prometheus latency histogram for each stage of the utterance path. This page tells you how to turn them on and how to read them.
+
+The histogram type, the switch and the `/metrics` endpoint are in `ovos_utils.metrics` and `ovos_utils.prometheus`. All OVOS services use them. `ovos-core` adds its own stage collector. The endpoint is off by default. It binds to the loopback address unless you set a host.
 
 ```text
 OVOS_METRICS_ENABLED=true
@@ -14,26 +17,24 @@ OVOS_METRICS_HOST=127.0.0.1
 OVOS_METRICS_PORT=9474
 ```
 
-`ovos-core` and `ovos-intent-service` each start the endpoint for their own
-process. Scrape `GET /metrics`. The endpoint has no authentication, so do not expose it
-publicly. For remote scraping, place it behind an authenticating reverse proxy
-or restrict access with a firewall rule. Do not bind it to `0.0.0.0` on an
-untrusted network.
+`ovos-core` and `ovos-intent-service` each start the endpoint for their own process. Scrape `GET /metrics`.
+
+The endpoint has no authentication. Do not bind it to `0.0.0.0` on a network that you do not trust. For a remote scrape, put it behind a reverse proxy that authenticates, or limit access with a firewall rule.
 
 ## Core stages
 
 | Metric | Boundary |
 |---|---|
 | `ovos_utterance_dispatch_seconds` | Complete synchronous handling of one `recognizer_loop:utterance` message by `IntentService` |
-| `ovos_utterance_preprocess_seconds` | Utterance and metadata transforms and language selection before matching; session validation is measured separately |
+| `ovos_utterance_preprocess_seconds` | Utterance and metadata transforms and language selection before matching; session validation has its own histogram |
 | `ovos_utterance_transform_seconds` | Utterance and metadata transformer plugin chains |
 | `ovos_language_resolution_seconds` | Resolve the request language against the enabled language set |
 | `ovos_session_validation_seconds` | Fold and validate the message session before matching |
 | `ovos_session_stamp_seconds` | Serialize the validated session back onto the in-process message |
 | `ovos_skill_selection_seconds` | Selection loop across the configured intent pipelines |
 | `ovos_intent_pipeline_build_seconds` | Resolve the session's configured matcher functions before invoking them |
-| `ovos_intent_matching_seconds` | One bounded pipeline match attempt, including its queue wait; a timed-out attempt records its bound and a declined one records about 0. An utterance can produce more than one observation |
-| `ovos_intent_matching_{family}_seconds` | One bounded match attempt classified into the fixed `stop`, `converse`, `padatious`, `padacioso`, `adapt`, `common_query`, `ocp`, `m2v`, `fallback`, or `other` family; a plugin that is not one of these built-ins is `other` |
+| `ovos_intent_matching_seconds` | One bounded pipeline match attempt, including its queue wait. A timed-out attempt records its bound. A declined attempt records about 0. One utterance can give more than one observation |
+| `ovos_intent_matching_{family}_seconds` | One bounded match attempt classified into the fixed `stop`, `converse`, `padatious`, `padacioso`, `adapt`, `common_query`, `ocp`, `m2v`, `fallback`, or `other` family. A plugin outside these families is `other` |
 | `ovos_intent_dispatch_seconds` | Post-match transformation, activation, lifecycle emission, and handler scheduling for a matched utterance |
 | `ovos_intent_transform_seconds` | Intent transformer plugin chain after a successful match |
 | `ovos_intent_activation_seconds` | Update active-handler state and emit the selected skill activation event |
@@ -47,27 +48,23 @@ untrusted network.
 | `ovos_converse_poll_seconds` | Prune stale converse owners and collect their bounded capability replies |
 | `ovos_converse_policy_seconds` | Apply blacklist and converse policy checks to the owners that accepted a poll |
 
-The boundaries are nested: utterance dispatch contains preprocessing,
-selection, matched-intent dispatch, and finalization; selection contains
-pipeline construction and one or more match attempts; matched-intent
-dispatch contains handler scheduling. Plugin-provided handler observations can
-contain further plugin-provided stages. Do not add nested durations as if they
-were disjoint stages.
+The stages are nested. Do not add the durations of nested stages:
 
-Installed packages can contribute histograms and cumulative counters through the
-`ovos.performance.metrics` entry-point group. A collector is a zero-argument
-callable returning fixed metric snapshots. Histograms provide `count`,
-`sum_ms`, and cumulative `buckets`; counters provide `type: counter` and a
-numeric `value`, and their names end in `_total`. Collectors are loaded once at
-startup; duplicate or malformed metric names make a scrape fail rather than
-silently publishing misleading data.
+- Utterance dispatch contains preprocessing, selection, matched-intent dispatch and finalization.
+- Selection contains the pipeline build and one or more match attempts.
+- Matched-intent dispatch contains the handler scheduling.
+- A plugin can record more stages inside its own handler.
+
+An installed package can add histograms and counters through the `ovos.performance.metrics` entry-point group. A collector is a callable with no arguments that returns metric snapshots:
+
+- A histogram gives `count`, `sum_ms` and cumulative `buckets`.
+- A counter gives `type: counter` and a numeric `value`. Its name ends in `_total`.
+
+The service loads the collectors once, at startup. A duplicate or malformed metric name makes the scrape fail.
 
 ## Aggregating processes
 
-Histograms are process-local, so every OVOS process that exposes metrics has
-its own endpoint. Scrape each one, and give processes on the same host their
-own `OVOS_METRICS_PORT`. Aggregate buckets across all scraped processes before
-calculating a percentile:
+Each process has its own histograms and its own endpoint. Scrape each endpoint. Give each process on one host its own `OVOS_METRICS_PORT`. Add the buckets of all processes before you calculate a percentile:
 
 ```promql
 histogram_quantile(
@@ -76,8 +73,7 @@ histogram_quantile(
 )
 ```
 
-Use the same query shape for any histogram listed above. Keep the `instance`
-label for a per-process view:
+The same query works for each histogram in the table. To see each process, keep the `instance` label:
 
 ```promql
 histogram_quantile(
@@ -86,6 +82,7 @@ histogram_quantile(
 )
 ```
 
-These histograms are cumulative and reset when the process restarts. They use
-no session, client, utterance, or skill labels, avoiding unbounded cardinality
-and user-content leakage.
+The histograms are cumulative. They reset when the process restarts. They have no session, client, utterance or skill labels, so the number of series stays fixed and no user text goes into a metric.
+
+---
+[← Bus events](bus-events.md) · [Home](index.md) · [Next →](testing.md)

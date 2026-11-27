@@ -1,4 +1,11 @@
 # Prerelease quirks
+<!-- agent-hint
+covers: what changed since the last stable release
+source: CHANGELOG.md, git log origin/dev
+generated: no
+verify: test -s docs/prerelease-quirks.md
+see: index.md
+-->
 
 This file lists everything that changed or broke since the last stable
 release, `2.1.1`. It is version-stamped and newest first. If you install an
@@ -311,3 +318,6 @@ session.sync merge, and slot-fill.
 - `#750` — deferred skill loading is now opt-in via a config flag.
 - `#744` — duplicate skill loads during rescans are prevented.
 - `#742` — skill-dependency install fix.
+
+---
+[← Testing](testing.md) · [Home](index.md)

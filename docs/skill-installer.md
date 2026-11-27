@@ -1,5 +1,11 @@
-
 # Skill Installer (SkillsStore)
+<!-- agent-hint
+covers: how to install and uninstall skills over the bus
+source: ovos_core/skill_installer.py:SkillsStore
+generated: no
+verify: grep -q 'class SkillsStore' ovos_core/skill_installer.py
+see: bus-events.md
+-->
 
 **Module:** `ovos_core.skill_installer.SkillsStore`
 
@@ -106,22 +112,22 @@ After a successful install, `ovos-plugin-manager`'s entry point cache is reloade
 ## Cross-References
 
 ### Constraints file source
-Default constraints are served from **`ovos-releases`** — the workspace repo that manages stable/testing/alpha constraint channels. See [`ovos-releases`](../../ovos-releases) for the constraints file format. Custom constraints can point to any HTTP URL or local path (`skills.installer.constraints` in `mycroft.conf`).
+Default constraints are served from **`ovos-releases`** , the repository that holds the stable/testing/alpha constraint channels. See [`ovos-releases`](https://github.com/OpenVoiceOS/ovos-releases) for the constraints file format. Custom constraints can point to any HTTP URL or local path (`skills.installer.constraints` in `mycroft.conf`).
 
 ### Entry point cache reload
-After a successful install, `ovos_plugin_manager` is reloaded via `importlib.reload(ovos_plugin_manager)` to pick up new entry points. `SkillManager` runs a discovery pass on `ovos.skills.install.complete` / `ovos.pip.install.complete` (or on request via `skillmanager.rescan`), and its scan loop (every 30 s) is the backstop. See [`skill-manager.md`](skill-manager.md). See [`ovos-plugin-manager/docs/index.md`](../../ovos-plugin-manager/docs/index.md).
+After a successful install, `ovos_plugin_manager` is reloaded via `importlib.reload(ovos_plugin_manager)` to pick up new entry points. `SkillManager` runs a discovery pass on `ovos.skills.install.complete` / `ovos.pip.install.complete` (or on request via `skillmanager.rescan`), and its scan loop (every 30 s) is the backstop. See [`skill-manager.md`](skill-manager.md). See [`ovos-plugin-manager/docs/index.md`](https://github.com/OpenVoiceOS/ovos-plugin-manager/blob/dev/docs/index.md).
 
 ### `uv` acceleration
 `uv` is a fast pip-compatible installer. It is the default in **raspOVOS**. If `uv` is on `$PATH`, `SkillsStore.UV` is set and `uv pip install` is used instead of `pip`. See the [uv documentation](https://github.com/astral-sh/uv) for setup.
 
 ### Configuration
-Config is read from `mycroft.conf` via `ovos_config.config.Configuration` → [`ovos-config/docs/configuration.md`](../../ovos-config/docs/configuration.md).
+Config is read from `mycroft.conf` via `ovos_config.config.Configuration` → [`ovos-config/docs/configuration.md`](https://github.com/OpenVoiceOS/ovos-config).
 
 ### Security note
-`validate_skill()` currently only checks for the `https://github.com/` prefix. See [`SUGGESTIONS.md`](../SUGGESTIONS.md) entry S-003 for the proposed full validation (class compatibility, legacy Mycroft checks).
+`validate_skill()` accepts only a `https://github.com/` URL. It reads the repository through the GitHub API, with a 3 s timeout. It refuses a repository that does not exist, that has no `pyproject.toml`, `setup.cfg` or `setup.py`, or whose packaging file names `MycroftSkill` or `CommonPlaySkill`. When GitHub does not answer, it accepts the URL.
 
 ### Full bus events list
 See [`bus-events.md`](bus-events.md) for the complete SkillsStore event reference.
 
 ---
-[← Converse & Fallback](converse-fallback.md) · [Home](index.md) · [Next →](bus-events.md)
+[← Converse and fallback](converse-fallback.md) · [Home](index.md) · [Next →](bus-events.md)

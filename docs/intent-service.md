@@ -1,5 +1,11 @@
-
 # IntentService
+<!-- agent-hint
+covers: how IntentService takes an utterance and dispatches the match
+source: ovos_core/intent_services/service.py:IntentService
+generated: no
+verify: grep -q 'def handle_utterance' ovos_core/intent_services/service.py
+see: pipeline.md
+-->
 
 **Module:** `ovos_core.intent_services.service.IntentService`
 
@@ -105,31 +111,31 @@ If `open_data.intent_urls` is configured, intent match results (utterance, inten
 ## Cross-References
 
 ### Upstream: who produces `recognizer_loop:utterance`
-- **`ovos-dinkum-listener`**: the voice input daemon. Runs the wakeword → STT pipeline and emits `recognizer_loop:utterance`. See [`ovos-dinkum-listener/docs/voice-loop.md`](../../ovos-dinkum-listener/docs/voice-loop.md) for the FSM states and [`ovos-dinkum-listener/docs/transformers.md`](../../ovos-dinkum-listener/docs/transformers.md) for STT-level transformers (distinct from the intent-level transformers here).
+- **`ovos-dinkum-listener`**: the voice input daemon. Runs the wakeword → STT pipeline and emits `recognizer_loop:utterance`. See [`ovos-dinkum-listener/docs/voice-loop.md`](https://github.com/OpenVoiceOS/ovos-dinkum-listener/blob/dev/docs/voice-loop.md) for the FSM states and [`ovos-dinkum-listener/docs/transformers.md`](https://github.com/OpenVoiceOS/ovos-dinkum-listener/blob/dev/docs/transformers.md) for STT-level transformers (distinct from the intent-level transformers here).
 
 ### Sessions
-- **`Session`**: `ovos_bus_client.session.Session` → [`ovos-bus-client/docs/session.md`](../../ovos-bus-client/docs/session.md). Stores `active_skills`, `pipeline`, `context`, `lang`, `site_id`, `blacklisted_skills`, `blacklisted_intents`.
+- **`Session`**: `ovos_bus_client.session.Session` → [`ovos-bus-client/docs/session.md`](https://github.com/OpenVoiceOS/ovos-bus-client/blob/dev/docs/session.md). Stores `active_skills`, `pipeline`, `context`, `lang`, `site_id`, `blacklisted_skills`, `blacklisted_intents`.
 - **`SessionManager`**: `ovos_bus_client.session.SessionManager` → same file. Singleton registry; `SessionManager.get(message)` resolves the session from message context.
 - **`IntentContextManager`**: `ovos_bus_client.session.IntentContextManager` → used by the Adapt pipeline for entity context injection via `add_context` / `remove_context` events.
 
 ### Pipeline plugins
-- **`OVOSPipelineFactory`**: `ovos_plugin_manager.pipeline.OVOSPipelineFactory` → [`ovos-plugin-manager/docs/plugin-types.md`](../../ovos-plugin-manager/docs/plugin-types.md). Discovers and loads all `opm.pipeline` entry points.
+- **`OVOSPipelineFactory`**: `ovos_plugin_manager.pipeline.OVOSPipelineFactory` → [`ovos-plugin-manager/docs/plugin-types.md`](https://github.com/OpenVoiceOS/ovos-plugin-manager/blob/dev/docs/plugin-types.md). Discovers and loads all `opm.pipeline` entry points.
 - **`ConfidenceMatcherPipeline`** / **`PipelinePlugin`**: base classes in `ovos_plugin_manager.templates.pipeline`. Plugins extending `ConfidenceMatcherPipeline` must implement `match_high`, `match_medium`, `match_low`.
 - Pipeline configuration and stage names → [`pipeline.md`](pipeline.md).
 
 ### Transformer plugins
 - Three transformer stages run before pipeline matching → [`transformers.md`](transformers.md).
-- Entry point groups: `opm.utterance_transformer`, `opm.metadata_transformer`, `opm.intent_transformer` → [`ovos-plugin-manager/docs/plugin-types.md`](../../ovos-plugin-manager/docs/plugin-types.md).
+- Entry point groups: `opm.utterance_transformer`, `opm.metadata_transformer`, `opm.intent_transformer` → [`ovos-plugin-manager/docs/plugin-types.md`](https://github.com/OpenVoiceOS/ovos-plugin-manager/blob/dev/docs/plugin-types.md).
 
 ### Language handling
-- **`get_valid_languages()`**: `ovos_config.locale.get_valid_languages` → [`ovos-config/docs/configuration.md`](../../ovos-config/docs/configuration.md). Returns the list of enabled languages from `mycroft.conf`.
+- **`get_valid_languages()`**: `ovos_config.locale.get_valid_languages` → [`ovos-config/docs/configuration.md`](https://github.com/OpenVoiceOS/ovos-config). Returns the list of enabled languages from `mycroft.conf`.
 - **`langcodes.closest_match`**: third-party `langcodes` library; used in `disambiguate_lang()` to validate language tags against enabled languages.
 
 ### Metrics / Open Data
-- **`ovos-opendata-server`**: optional companion server for intent metrics collection. Configure `open_data.intent_urls` in `mycroft.conf` to enable upload. See [`ovos-opendata-server`](../../ovos-opendata-server) repo.
+- **`ovos-opendata-server`**: optional companion server for intent metrics collection. Configure `open_data.intent_urls` in `mycroft.conf` to enable upload. See [`ovos-opendata-server`](https://github.com/OpenVoiceOS/ovos-opendata-server) repo.
 
 ### Full bus events list
 See [`bus-events.md`](bus-events.md) for the complete IntentService event reference.
 
 ---
-[← Skill Manager](skill-manager.md) · [Home](index.md) · [Next →](pipeline.md)
+[← Skill manager](skill-manager.md) · [Home](index.md) · [Next →](pipeline.md)

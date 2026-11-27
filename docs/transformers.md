@@ -1,5 +1,11 @@
-
 # Transformer Plugins
+<!-- agent-hint
+covers: which transformer stages run on an utterance before matching
+source: ovos_core/transformers.py
+generated: no
+verify: grep -q 'class UtteranceTransformersService' ovos_core/transformers.py
+see: personas.md
+-->
 
 Transformers are loaded by `IntentService` and run on every utterance before pipeline matching begins. There are three transformer stages, each backed by a separate plugin type.
 
@@ -52,7 +58,7 @@ The runner services themselves are the canonical implementations from
 cancellation contract: a plugin returning `"canceled": true` +
 `"cancel_reason"` stops the chain, and `handle_utterance` terminates the
 lifecycle with `ovos.utterance.cancelled` → `ovos.utterance.handled`.
-Full contract → [`ovos-plugin-manager/docs/transformers.md`](../../ovos-plugin-manager/docs/transformers.md).
+Full contract → [`ovos-plugin-manager/docs/transformers.md`](https://github.com/OpenVoiceOS/ovos-plugin-manager/blob/dev/docs/transformers.md).
 
 ## Enabling / Disabling Plugins
 
@@ -87,20 +93,20 @@ All three transformer types are discovered via `ovos-plugin-manager`:
 | Metadata | `opm.metadata_transformer` | `find_metadata_transformer_plugins()` |
 | Intent | `opm.intent_transformer` | `find_intent_transformer_plugins()` |
 
-→ [`ovos-plugin-manager/docs/plugin-types.md`](../../ovos-plugin-manager/docs/plugin-types.md)
+→ [`ovos-plugin-manager/docs/plugin-types.md`](https://github.com/OpenVoiceOS/ovos-plugin-manager/blob/dev/docs/plugin-types.md)
 
 ### Writing transformer plugins
 - Template base classes live in `ovos_plugin_manager.templates` (utterance_transformers, metadata_transformers, intent_transformers).
-- Writing guide → [`ovos-plugin-manager/docs/writing-plugins.md`](../../ovos-plugin-manager/docs/writing-plugins.md).
+- Writing guide → [`ovos-plugin-manager/docs/writing-plugins.md`](https://github.com/OpenVoiceOS/ovos-plugin-manager/blob/dev/docs/writing-plugins.md).
 
 ### Listener-level transformers (distinct from these)
-`ovos-dinkum-listener` has its own STT-level transformer stage that runs **before** audio is converted to text. These run post-STT but before `recognizer_loop:utterance` is emitted: distinct from the three transformer stages here. See [`ovos-dinkum-listener/docs/transformers.md`](../../ovos-dinkum-listener/docs/transformers.md).
+`ovos-dinkum-listener` has its own STT-level transformer stage that runs **before** audio is converted to text. These run post-STT but before `recognizer_loop:utterance` is emitted: distinct from the three transformer stages here. See [`ovos-dinkum-listener/docs/transformers.md`](https://github.com/OpenVoiceOS/ovos-dinkum-listener/blob/dev/docs/transformers.md).
 
 ### Audio-level transformers
-`ovos-audio` has TTS and dialog transformer stages that run when TTS is synthesised. See [`ovos-audio/docs/transformers.md`](../../ovos-audio/docs/transformers.md).
+`ovos-audio` has TTS and dialog transformer stages that run when TTS is synthesised. See [`ovos-audio/docs/transformers.md`](https://github.com/OpenVoiceOS/ovos-audio/blob/dev/docs/transformers.md).
 
 ### IntentHandlerMatch
-- `IntentHandlerMatch`: `ovos_plugin_manager.templates.pipeline.IntentHandlerMatch`. Fields: `match_type`, `match_data`, `skill_id`, `utterance`, `updated_session`. Used by `IntentTransformersService`. See [`ovos-plugin-manager/docs/plugin-types.md`](../../ovos-plugin-manager/docs/plugin-types.md).
+- `IntentHandlerMatch`: `ovos_plugin_manager.templates.pipeline.IntentHandlerMatch`. Fields: `match_type`, `match_data`, `skill_id`, `utterance`, `updated_session`. Used by `IntentTransformersService`. See [`ovos-plugin-manager/docs/plugin-types.md`](https://github.com/OpenVoiceOS/ovos-plugin-manager/blob/dev/docs/plugin-types.md).
 
 ---
-[← Pipeline](pipeline.md) · [Home](index.md) · [Next →](converse-fallback.md)
+[← Pipeline](pipeline.md) · [Home](index.md) · [Next →](personas.md)
