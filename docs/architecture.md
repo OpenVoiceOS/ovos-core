@@ -1,5 +1,11 @@
-
 # Architecture
+<!-- agent-hint
+covers: which components run in the ovos-core process and how they start
+source: ovos_core/__main__.py, ovos_core/skill_manager.py
+generated: no
+verify: python3 docs/check_page.py docs/architecture.md recognizer_loop:utterance
+see: skill-manager.md
+-->
 
 ## Component Map
 
@@ -84,7 +90,7 @@ What the tests cover:
 
 These tests are the canonical reference for how ovoscope should be used in any OVOS repo.
 
-See [ovoscope/docs/usage-guide.md](../../ovoscope/docs/usage-guide.md) for the full tutorial.
+See [ovoscope/docs/usage-guide.md](https://github.com/TigreGotico/ovoscope/blob/dev/docs/usage-guide.md) for the full tutorial.
 
 ---
 
@@ -92,15 +98,15 @@ See [ovoscope/docs/usage-guide.md](../../ovoscope/docs/usage-guide.md) for the f
 
 | Component | Package | Documentation |
 |---|---|---|
-| **MessageBus server** | `ovos-messagebus` | [`ovos-messagebus/docs/server.md`](../../ovos-messagebus/docs/server.md): WebSocket Tornado broker, host/port/SSL config |
-| **`MessageBusClient`** | `ovos-bus-client` | [`ovos-bus-client/docs/client.md`](../../ovos-bus-client/docs/client.md): connect, emit, on, `wait_for_response` |
-| **`Message`** | `ovos-bus-client` | [`ovos-bus-client/docs/message.md`](../../ovos-bus-client/docs/message.md): structure, routing, context keys |
-| **`ProcessStatus`** | `ovos-utils` | [`ovos-utils/docs/process-utils.md`](../../ovos-utils/docs/process-utils.md): state machine, callbacks |
-| **`Configuration`** | `ovos-config` | [`ovos-config/docs/configuration.md`](../../ovos-config/docs/configuration.md): config stack, `mycroft.conf` location |
-| **`ovos-dinkum-listener`** | `ovos-dinkum-listener` | [`ovos-dinkum-listener/docs/index.md`](../../ovos-dinkum-listener/docs/index.md): produces `recognizer_loop:utterance` |
-| **`ovos-audio`** | `ovos-audio` | [`ovos-audio/docs/index.md`](../../ovos-audio/docs/index.md): TTS playback, `mycroft.audio.play_sound` |
-| **`ovos-gui`** | `ovos-gui` | [`ovos-gui/docs/architecture.md`](../../ovos-gui/docs/architecture.md): GUI adapter plugin system, site_id routing |
-| **`ovos-PHAL`** | `ovos-PHAL` | [`ovos-PHAL/docs/index.md`](../../ovos-PHAL/docs/index.md): connectivity events, `ovos.PHAL.internet_check` |
+| **MessageBus server** | `ovos-messagebus` | [`ovos-messagebus/docs/server.md`](https://github.com/OpenVoiceOS/ovos-messagebus/blob/dev/docs/server.md): WebSocket Tornado broker, host/port/SSL config |
+| **`MessageBusClient`** | `ovos-bus-client` | [`ovos-bus-client/docs/client.md`](https://github.com/OpenVoiceOS/ovos-bus-client/blob/dev/docs/client.md): connect, emit, on, `wait_for_response` |
+| **`Message`** | `ovos-bus-client` | [`ovos-bus-client/docs/message.md`](https://github.com/OpenVoiceOS/ovos-bus-client): structure, routing, context keys |
+| **`ProcessStatus`** | `ovos-utils` | [`ovos-utils/docs/process-utils.md`](https://github.com/OpenVoiceOS/ovos-utils/blob/dev/docs/process-utils.md): state machine, callbacks |
+| **`Configuration`** | `ovos-config` | [`ovos-config/docs/configuration.md`](https://github.com/OpenVoiceOS/ovos-config): config stack, `mycroft.conf` location |
+| **`ovos-dinkum-listener`** | `ovos-dinkum-listener` | [`ovos-dinkum-listener/docs/index.md`](https://github.com/OpenVoiceOS/ovos-dinkum-listener/blob/dev/docs/index.md): produces `recognizer_loop:utterance` |
+| **`ovos-audio`** | `ovos-audio` | [`ovos-audio/docs/index.md`](https://github.com/OpenVoiceOS/ovos-audio/blob/dev/docs/index.md): TTS playback, `mycroft.audio.play_sound` |
+| **`ovos-gui`** | `ovos-gui` | [`ovos-gui/docs/architecture.md`](https://github.com/OpenVoiceOS/ovos-gui): GUI adapter plugin system, site_id routing |
+| **`ovos-PHAL`** | `ovos-PHAL` | [`ovos-PHAL/docs/index.md`](https://github.com/OpenVoiceOS/ovos-PHAL): connectivity events, `ovos.PHAL.internet_check` |
 
 ---
-[Home](index.md) · [Next →](skill-manager.md)
+[← Install and run](install-and-run.md) · [Home](index.md) · [Next →](skill-manager.md)

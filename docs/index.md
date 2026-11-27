@@ -1,64 +1,63 @@
+# ovos-core documentation
+<!-- agent-hint
+covers: the reading order of the ovos-core docs and the packages it works with
+source: docs/*.md, pyproject.toml
+generated: no
+verify: python3 docs/check_page.py docs/index.md recognizer_loop:utterance && { for f in $(grep -o '([a-z-]*\.md)' docs/index.md | tr -d '()' | sort -u); do test -f docs/$f || exit 1; done; }
+see: install-and-run.md
+-->
 
-# ovos-core Documentation
+`ovos-core` loads the skills of an OpenVoiceOS assistant and sends each utterance to the skill that handles it.
 
-`ovos-core` is the central service of the OpenVoiceOS platform. It manages skill loading, intent parsing, and routes user utterances to the correct skill handler.
+```mermaid
+flowchart LR
+    L[listener] -- recognizer_loop:utterance --> T[transformers]
+    T --> P{pipeline: matchers in order}
+    P -- match --> S[skill handler]
+    P -- no match --> F[complete_intent_failure]
+    S -- speak --> A[audio]
+```
 
-## Contents
+## Quickstart
 
-| Document | Description |
-|---|---|
-| [architecture.md](architecture.md) | High-level component overview and startup flow |
-| [skill-manager.md](skill-manager.md) | `SkillManager`: skill loading, activation, connectivity gating |
-| [intent-service.md](intent-service.md) | `IntentService`: utterance handling and pipeline matching |
-| [pipeline.md](pipeline.md) | Pipeline configuration, plugin IDs, and ordering |
-| [transformers.md](transformers.md) | Utterance, metadata, and intent transformer plugins |
-| [converse-fallback.md](converse-fallback.md) | `ConverseService` and `FallbackService` |
-| [skill-installer.md](skill-installer.md) | `SkillsStore`: runtime pip install/uninstall via the bus |
-| [bus-events.md](bus-events.md) | MessageBus events reference |
-| [performance-metrics.md](performance-metrics.md) | Opt-in runtime stage histograms and multi-process aggregation |
+```bash
+uv pip install --prerelease=allow ovos-core ovos-messagebus
+ovos-messagebus &
+ovos-core
+```
+
+```text
+INFO - IntentService is ready.
+INFO - Skills Manager is ready.
+```
+
+## Pages
+
+| Page | What you get there |
+| :--- | :--- |
+| [install-and-run.md](install-and-run.md) | Install options, extras, the three commands and their flags |
+| [architecture.md](architecture.md) | The components in the process and the startup order |
+| [skill-manager.md](skill-manager.md) | How skills are found, loaded, gated by connectivity and unloaded |
+| [intent-service.md](intent-service.md) | How an utterance becomes a match and a dispatch |
+| [pipeline.md](pipeline.md) | How to set the order of the matchers, and the plugin IDs |
+| [transformers.md](transformers.md) | The utterance, metadata and intent transformer stages |
+| [personas.md](personas.md) | How to answer with an LLM persona |
+| [converse-fallback.md](converse-fallback.md) | How converse and fallback pick a skill |
+| [skill-installer.md](skill-installer.md) | How to install and uninstall skills over the bus |
+| [bus-events.md](bus-events.md) | Each bus message that the service sends or handles |
+| [performance-metrics.md](performance-metrics.md) | How to turn on the latency histograms |
+| [testing.md](testing.md) | How to run the unit and end-to-end tests |
 | [prerelease-quirks.md](prerelease-quirks.md) | What changed since the last stable release |
 
-## Quick Start
+## Related packages
 
-```bash
-pip install ovos-core
-ovos-core           # starts SkillManager + IntentService + installer + scheduler
-```
-
-Run only the intent service (no skills):
-```bash
-ovos-intent-service
-```
-
-## Entry Points
-
-| Command | Module |
-|---|---|
-| `ovos-core` | `ovos_core.__main__:main` |
-| `ovos-intent-service` | `ovos_core.intent_services.service:launch_standalone` |
-| `ovos-skill-installer` | `ovos_core.skill_installer:launch_standalone` |
-
----
-
-## Dependencies & Related Packages
-
-`ovos-core` depends on and integrates with the following packages in this workspace:
-
-| Package | Role | Docs |
-|---|---|---|
-| **ovos-messagebus** | WebSocket message broker that all services connect to | [`ovos-messagebus/docs/index.md`](../../ovos-messagebus/docs/index.md) |
-| **ovos-bus-client** | `MessageBusClient`, `Message`, `Session`: the bus API | [`ovos-bus-client/docs/index.md`](../../ovos-bus-client/docs/index.md) |
-| **ovos-workshop** | `OVOSSkill`, `FallbackSkill`, `PluginSkillLoader`: skill base classes | [`ovos-workshop/docs/index.md`](../../ovos-workshop/docs/index.md) |
-| **ovos-plugin-manager** | Entry point discovery (`find_skill_plugins`, `OVOSPipelineFactory`) | [`ovos-plugin-manager/docs/index.md`](../../ovos-plugin-manager/docs/index.md) |
-| **ovos-config** | `Configuration` singleton: reads `mycroft.conf` | [`ovos-config/docs/index.md`](../../ovos-config/docs/index.md) |
-| **ovos-utils** | `LOG`, `ProcessStatus`, `FileWatcher`, `is_connected_http` | [`ovos-utils/docs/index.md`](../../ovos-utils/docs/index.md) |
-| **ovos-dinkum-listener** | Produces `recognizer_loop:utterance` that `IntentService` consumes | [`ovos-dinkum-listener/docs/index.md`](../../ovos-dinkum-listener/docs/index.md) |
-| **ovos-audio** | Consumes `mycroft.audio.play_sound` emitted by `IntentService` | [`ovos-audio/docs/index.md`](../../ovos-audio/docs/index.md) |
-| **ovos-PHAL** | Emits connectivity events; responds to `ovos.PHAL.internet_check` | [`ovos-PHAL/docs/index.md`](../../ovos-PHAL/docs/index.md) |
-| **ovos-gui** | Consumes GUI template events emitted by skills via `GUIInterface` | [`ovos-gui/docs/index.md`](../../ovos-gui/docs/index.md) |
-
-### Skill-writing guide
-If you are **writing a skill**, start with [`ovos-workshop/docs/index.md`](../../ovos-workshop/docs/index.md). Skills register via the `opm.skills` entry point: see [`ovos-plugin-manager/docs/plugin-types.md`](../../ovos-plugin-manager/docs/plugin-types.md).
-
-### Pipeline plugin guide
-If you are **writing a pipeline plugin**, see [`ovos-plugin-manager/docs/writing-plugins.md`](../../ovos-plugin-manager/docs/writing-plugins.md) and [`pipeline.md`](pipeline.md).
+| Package | Role |
+| :--- | :--- |
+| [ovos-messagebus](https://github.com/OpenVoiceOS/ovos-messagebus) | The WebSocket broker that all services connect to |
+| [ovos-bus-client](https://github.com/OpenVoiceOS/ovos-bus-client) | `MessageBusClient`, `Message` and `Session` |
+| [ovos-workshop](https://github.com/OpenVoiceOS/ovos-workshop) | `OVOSSkill`, `FallbackSkill` and the skill loader. Start here to write a skill. |
+| [ovos-plugin-manager](https://github.com/OpenVoiceOS/ovos-plugin-manager) | Plugin discovery. Start here to write a pipeline plugin. |
+| [ovos-config](https://github.com/OpenVoiceOS/ovos-config) | The `Configuration` that reads `mycroft.conf` |
+| [ovos-utils](https://github.com/OpenVoiceOS/ovos-utils) | Logging, process status, file watching and the metrics endpoint |
+| [ovos-dinkum-listener](https://github.com/OpenVoiceOS/ovos-dinkum-listener) | Sends `recognizer_loop:utterance` |
+| [ovos-audio](https://github.com/OpenVoiceOS/ovos-audio) | Speaks the answers and plays `mycroft.audio.play_sound` |

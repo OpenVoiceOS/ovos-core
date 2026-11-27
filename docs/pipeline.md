@@ -1,5 +1,11 @@
-
 # Intent Pipeline
+<!-- agent-hint
+covers: how to configure the order of the intent matchers and which IDs exist
+source: ovos_core/intent_services/service.py:_PIPELINE_MIGRATION_MAP
+generated: no
+verify: python3 docs/check_page.py docs/pipeline.md ovos-adapt ovos-ocp ovos-padacioso ovos_commonqa ovos-persona-pipeline-plugin
+see: transformers.md
+-->
 
 The pipeline is an ordered list of matchers. Each utterance is passed to matchers in sequence until one returns a match.
 
@@ -79,11 +85,11 @@ All other pipeline plugins (`adapt`, `padatious`, `ocp`, etc.) come from separat
 ## Cross-References
 
 ### Plugin framework
-- **`OVOSPipelineFactory`**: `ovos_plugin_manager.pipeline.OVOSPipelineFactory` → [`ovos-plugin-manager/docs/plugin-types.md`](../../ovos-plugin-manager/docs/plugin-types.md). Scans the `opm.pipeline` entry point group and instantiates each plugin with a `bus` connection.
-- **`ConfidenceMatcherPipeline`** / **`PipelinePlugin`**: base templates in `ovos_plugin_manager.templates.pipeline`. Writing a new pipeline plugin: [`ovos-plugin-manager/docs/writing-plugins.md`](../../ovos-plugin-manager/docs/writing-plugins.md).
+- **`OVOSPipelineFactory`**: `ovos_plugin_manager.pipeline.OVOSPipelineFactory` → [`ovos-plugin-manager/docs/plugin-types.md`](https://github.com/OpenVoiceOS/ovos-plugin-manager/blob/dev/docs/plugin-types.md). Scans the `opm.pipeline` entry point group and instantiates each plugin with a `bus` connection.
+- **`ConfidenceMatcherPipeline`** / **`PipelinePlugin`**: base templates in `ovos_plugin_manager.templates.pipeline`. Writing a new pipeline plugin: [`ovos-plugin-manager/docs/writing-plugins.md`](https://github.com/OpenVoiceOS/ovos-plugin-manager/blob/dev/docs/writing-plugins.md).
 
 ### Per-session pipeline
-- The pipeline list is stored on the **`Session`** object: `ovos_bus_client.session.Session.pipeline`. Each HiveMind client or remote session can have an independent pipeline. See [`ovos-bus-client/docs/session.md`](../../ovos-bus-client/docs/session.md).
+- The pipeline list is stored on the **`Session`** object: `ovos_bus_client.session.Session.pipeline`. Each HiveMind client or remote session can have an independent pipeline. See [`ovos-bus-client/docs/session.md`](https://github.com/OpenVoiceOS/ovos-bus-client/blob/dev/docs/session.md).
 
 ### External pipeline plugins (separate packages)
 | Plugin | Package | Notes |
@@ -93,10 +99,10 @@ All other pipeline plugins (`adapt`, `padatious`, `ocp`, etc.) come from separat
 | `ovos-padacioso-pipeline-plugin` | `ovos-padacioso` | Regex+Padatious hybrid |
 | `ovos-ocp-pipeline-plugin` | `ovos-ocp` | OCP media player pipeline |
 | `ovos-common-query-pipeline-plugin` | `ovos-common-query-pipeline-plugin` | `@common_query()` handler routing; the import package is `ovos_commonqa` |
-| `ovos-persona-pipeline-plugin` | `ovos-persona` | LLM persona / chatbot routing; see [`ovos-persona`](../../ovos-persona) |
+| `ovos-persona-pipeline-plugin` | `ovos-persona` | LLM persona / chatbot routing; see [`ovos-persona`](https://github.com/OpenVoiceOS/ovos-persona) |
 
 ### Converse & Fallback detail
 → [`converse-fallback.md`](converse-fallback.md)
 
 ---
-[← Intent Service](intent-service.md) · [Home](index.md) · [Next →](transformers.md)
+[← Intent service](intent-service.md) · [Home](index.md) · [Next →](transformers.md)
