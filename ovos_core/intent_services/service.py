@@ -1170,7 +1170,6 @@ class IntentService:
         message.context["utterance_id"] = uid
         return uid
 
-    @UTTERANCE_DISPATCH.timed
     def _match_rejected(self, match, sess, lang: str) -> Optional[str]:
         """Return why the orchestrator refuses a plugin's match, or None to accept it."""
         if not match.match_type:
@@ -1210,6 +1209,7 @@ class IntentService:
             if future is not None and future.done():
                 self._match_inflight.pop(key, None)
 
+    @UTTERANCE_DISPATCH.timed
     def handle_utterance(self, message: Message):
         """Main entrypoint for handling user utterances, typically generated
         by a spoken interaction but potentially also from a CLI or other

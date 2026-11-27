@@ -261,3 +261,9 @@ def test_core_registers_its_stage_histograms_on_the_shared_endpoint(monkeypatch)
         stop_metrics_server(server)
         monkeypatch.delenv("OVOS_METRICS_ENABLED", raising=False)
         reset_metrics_recording_cache()
+
+
+def test_dispatch_histogram_times_handle_utterance():
+    from ovos_core.intent_services.service import IntentService
+    assert IntentService.handle_utterance.__wrapped__.__name__ == "handle_utterance"
+    assert not hasattr(IntentService._match_rejected, "__wrapped__")
