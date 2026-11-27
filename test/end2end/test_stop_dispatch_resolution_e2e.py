@@ -33,6 +33,9 @@ from ovos_utils.log import LOG
 
 from ovoscope import get_minicroft
 
+# The topic the skill speaks on depends on the bus translator settings.
+SPEAK_TOPICS = ("speak", "ovos.utterance.speak")
+
 SPEC_UTTERANCE = SpecMessage.UTTERANCE.value
 
 #: Generous next to the PIPELINE-1 §8.3 handler timeout the unresolved path
@@ -65,7 +68,13 @@ class TestTargetedStopResolves(TestCase):
         visible on the round's own messages, not on the snapshot emitted here.
         """
         activated = Event()
+        counting = Event()
         observed = {}
+
+        def on_speak(msg):
+            sess = (msg.context or {}).get("session") or {}
+            if sess.get("session_id") == session.session_id:
+                counting.set()
 
         def on_start(msg):
             if msg.data.get("skill_id") == self.skill_id:
@@ -73,13 +82,21 @@ class TestTargetedStopResolves(TestCase):
                 activated.set()
 
         self.minicroft.bus.on(SpecMessage.INTENT_HANDLER_START.value, on_start)
+        for topic in SPEAK_TOPICS:
+            self.minicroft.bus.on(topic, on_speak)
         create_daemon(lambda: self.minicroft.bus.emit(Message(
             SPEC_UTTERANCE,
             {"utterances": ["count to infinity"], "lang": session.lang},
             {"session": session.serialize()})))
         self.assertTrue(activated.wait(RESOLVE_WINDOW),
                         "the count skill never started")
+        # The skill can stop only after it speaks its first number. A stop
+        # that arrives before that finds nothing to stop.
+        self.assertTrue(counting.wait(RESOLVE_WINDOW),
+                        "the count skill never spoke a number")
         self.minicroft.bus.remove(SpecMessage.INTENT_HANDLER_START.value, on_start)
+        for topic in SPEAK_TOPICS:
+            self.minicroft.bus.remove(topic, on_speak)
         live = observed["session"]
         self.assertIn(self.skill_id,
                       [h["skill_id"] for h in live.active_handlers],

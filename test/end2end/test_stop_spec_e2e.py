@@ -32,6 +32,9 @@ from ovoscope import End2EndTest, get_minicroft
 
 from ovos_core.intent_services.stop_service import StopService
 
+# The topic the skill speaks on depends on the bus translator settings.
+SPEAK_TOPICS = ("speak", "ovos.utterance.speak")
+
 SPEC_UTTERANCE = SpecMessage.UTTERANCE.value
 STOP_BROADCAST = SpecMessage.STOP.value                     # ovos.stop (§5.3)
 PIPELINE_ID = StopService.pipeline_id
@@ -88,7 +91,13 @@ def _wait_for_active_skill(bus, session_id, skill_id, timeout=10):
     observable.
     """
     activated = threading.Event()
+    counting = threading.Event()
     observed = {}
+
+    def on_speak(message):
+        session = (message.context or {}).get("session") or {}
+        if session.get("session_id") == session_id:
+            counting.set()
 
     def on_handler_start(message):
         session = (message.context or {}).get("session") or {}
@@ -100,11 +109,19 @@ def _wait_for_active_skill(bus, session_id, skill_id, timeout=10):
             activated.set()
 
     bus.on(SpecMessage.INTENT_HANDLER_START.value, on_handler_start)
+    for topic in SPEAK_TOPICS:
+        bus.on(topic, on_speak)
     try:
         if not activated.wait(timeout):
             raise TimeoutError(f"Skill {skill_id} did not activate within {timeout}s")
+        # The skill can stop only after it speaks its first number. A stop
+        # that arrives before that finds nothing to stop.
+        if not counting.wait(timeout):
+            raise TimeoutError(f"Skill {skill_id} did not start counting within {timeout}s")
     finally:
         bus.remove(SpecMessage.INTENT_HANDLER_START.value, on_handler_start)
+        for topic in SPEAK_TOPICS:
+            bus.remove(topic, on_speak)
     return observed["session"]
 
 
