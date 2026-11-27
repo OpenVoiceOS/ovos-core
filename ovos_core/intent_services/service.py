@@ -902,6 +902,43 @@ class IntentService:
             return
         message.data["typed_slots"] = kept
 
+    def _adopt_updated_session(self, updated, sess, message: Message,
+                               pipeline_id: Optional[str]):
+        """Return the round's session after a plugin's ``Match.updated_session`` (SESSION-2 §5.1).
+
+        An updated_session for another session id is a plugin bug: it is
+        logged and ignored. Deployment-owned fields keep the values from
+        before the plugin ran (PIPELINE-1 §5.5).
+        """
+        if updated.resolved_session_id() != sess.resolved_session_id():
+            LOG.error(
+                f"pipeline '{pipeline_id}' returned an updated_session "
+                f"for '{updated.resolved_session_id()}' but the round is "
+                f"running on '{sess.resolved_session_id()}'; ignoring "
+                f"the updated_session and continuing on the round's own "
+                f"session")
+            return sess
+        for field in _DEPLOYMENT_OWNED_SESSION_FIELDS:
+            setattr(updated, field, getattr(sess, field))
+        # ``update`` returns the store for the default session.
+        sess = SessionManager.update(updated)
+        open_round(message, sess)
+        SessionManager.bind(message, sess)
+        return sess
+
+    def _activate_on_dispatch(self, match, sess, reply: Message,
+                              pipeline_id: Optional[str]):
+        """Stamp the skill id on the dispatch and push the skill as active (PIPELINE-1 §7.1)."""
+        reply.context["skill_id"] = match.skill_id
+        # PIPELINE-1 §7.1 push, suppressed per reserved intent_name (§7.3)
+        # and for producers that still emit pre-spec match_types.
+        dispatched_intent = match.match_type.split(":", 1)[-1]
+        if match.skill_id not in self._deactivations[sess.session_id] and \
+                dispatched_intent not in _ACTIVATION_PUSH_SUPPRESSED and \
+                not _produces_reserved_name(pipeline_id):
+            sess.activate_skill(match.skill_id)
+            self.bus.emit(reply.forward(f"{match.skill_id}.activate"))
+
     def _dispatch_match(self, match: IntentHandlerMatch, message: Message, lang: str,
                         pipeline_id: Optional[str] = None,
                         pre_match_entries: Optional[dict] = None) -> None:
@@ -936,58 +973,10 @@ class IntentService:
         # was folded onto at entry. No fold here (§2.6).
         sess = round_session(message)
         if match.updated_session is not None:
-            updated = match.updated_session
-            # OVOS-PIPELINE-1 §5.5: every deployment-owned per-component
-            # override field (SESSION-1 §3) is re-imposed onto a plugin's
-            # updated_session from the value the orchestrator held before
-            # the plugin ran, so a claiming plugin cannot relax or redirect
-            # policy for the stages after it: `pipeline`, the six
-            # OVOS-TRANSFORM-1 §5 transformer-chain lists, the three
-            # blacklist denylists, and `site_id`.
-            pre_plugin_overrides = {
-                field: getattr(sess, field)
-                for field in _DEPLOYMENT_OWNED_SESSION_FIELDS
-            }
-            if updated.resolved_session_id() != sess.resolved_session_id():
-                # §5.1/§4.2: updated_session is defined as the ROUND's session,
-                # updated — never a different session. A pipeline plugin
-                # returning one for a different id is a plugin bug, and a
-                # plugin bug must not kill the utterance: log it and keep
-                # dispatching on the round's own working session.
-                LOG.error(
-                    f"pipeline '{pipeline_id}' returned an updated_session "
-                    f"for '{updated.resolved_session_id()}' but the round is "
-                    f"running on '{sess.resolved_session_id()}'; ignoring "
-                    f"the updated_session and continuing on the round's own "
-                    f"session")
-            else:
-                # ``update`` returns the store for the default session, so the
-                # round carries on the one object every co-located view holds.
-                for field, value in pre_plugin_overrides.items():
-                    setattr(updated, field, value)
-                sess = SessionManager.update(updated)
-                open_round(message, sess)
-                SessionManager.bind(message, sess)
-        # OVOS-SESSION-1 §3.2.1 makes ``lang`` the participant's standing
-        # input-side preference — "stable across the session, not derived from
-        # any one utterance" — and §3.2.7 says intake resolution "reads the
-        # signals; it MUST NOT mutate them". Under ``multilingual_matching``
-        # the plugin is called once per candidate language, so ``lang`` here
-        # can be a member of ``secondary_langs``. Writing it back would make
-        # the match language the session's preference, and for the default
-        # session ``sess`` IS the §5.1 store, so the flip would outlive the
-        # round and reach every later utterance. It would also break §3.2.2,
-        # which forbids ``secondary_langs`` from containing ``lang``.
-        #
-        # OVOS-SESSION-2 §5.1 enumerates the writes that apply on top of a
-        # committed ``Match.updated_session`` — the PIPELINE-1 §7.1
-        # ``active_handlers`` push and the OVOS-CONTEXT-1 §5.3
-        # ``intent_context`` merge — and ``lang`` is not one of them.
-        #
-        # The match language reaches the handler where the specifications put
-        # it: ``reply.data["lang"]`` (§3.2.8, the payload content language,
-        # which ``get_message_lang`` reads before the session) and the §9.2
-        # ``ovos.intent.matched`` notification, both set below.
+            sess = self._adopt_updated_session(match.updated_session, sess, message, pipeline_id)
+        # The match language goes to reply.data["lang"] and ovos.intent.matched,
+        # never to sess.lang: SESSION-1 §3.2.1 makes lang the participant's
+        # standing preference, and SESSION-2 §5.1 lists no lang write.
 
         # Launch intent handler
         if match.match_type:
@@ -1011,36 +1000,9 @@ class IntentService:
             # update active skill list
             with INTENT_ACTIVATION.measure():
                 if match.skill_id:
-                    # ensure skill_id is present in message.context
-                    reply.context["skill_id"] = match.skill_id
-
-                    was_deactivated = match.skill_id in self._deactivations[sess.session_id]
-                    # OVOS-PIPELINE-1 §7.1 pushes the skill onto the session's
-                    # active-handler recency list; §7.3's registry suppresses that
-                    # push per reserved intent_name, keyed on the Match's
-                    # `intent_name` and never on the producing pipeline_id.
-                    # `_produces_reserved_name` is the transitional second gate for
-                    # producers still emitting pre-spec match_types.
-                    # `activate_skill` is a back-compat shim over
-                    # `add_active_handler` (§7.1) in current bus-client.
-                    dispatched_intent = match.match_type.split(":", 1)[-1]
-                    if not was_deactivated and \
-                            dispatched_intent not in _ACTIVATION_PUSH_SUPPRESSED and \
-                            not _produces_reserved_name(pipeline_id):
-                        sess.activate_skill(match.skill_id)
-                        # emit event for skills callback -> self.handle_activate
-                        self.bus.emit(reply.forward(f"{match.skill_id}.activate"))
-
-                # OVOS-CONVERSE-1 §3.1 automatic activation on dispatch: "The
-                # orchestrator MUST stamp session.converse_handlers whenever
-                # it dispatches to an owner via the OVOS-PIPELINE-1 §7
-                # dispatch topic <skill_id>:<intent_name>. This rule is
-                # uniform — it applies to every dispatch including reserved
-                # intent_names converse (§4.3) and response (§5.2)." Unlike
-                # the §7.1 active_handlers push above, this stamp is never
-                # suppressed for reserved names or for a suppressed
-                # activation: "the two lists have independent stamping
-                # rules."
+                    self._activate_on_dispatch(match, sess, reply, pipeline_id)
+                # CONVERSE-1 §3.1: every dispatch stamps converse_handlers, with
+                # no suppression; the two lists have independent rules.
                 sess.add_converse_handler(match.skill_id)
 
             # OVOS-CONTEXT-1 §5.1: matcher-captured entries reach the session
