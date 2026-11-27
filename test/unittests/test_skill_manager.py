@@ -13,6 +13,8 @@
 # limitations under the License.
 #
 import sys
+from types import SimpleNamespace
+from contextlib import nullcontext
 import tempfile
 import time as time_module
 from copy import deepcopy
@@ -27,6 +29,7 @@ from ovos_config import Configuration
 from ovos_config import LocalConf, DEFAULT_CONFIG
 from ovos_bus_client.session import SessionManager
 from ovos_core.skill_manager import (SkillManager, PLUGIN_SKILL_RETRY_BASE_SECONDS,
+                                     PROTECTED_RUNTIME_MODULES,
                                       PLUGIN_SKILL_RETRY_MAX_SECONDS)
 from ovos_workshop.skill_launcher import SkillLoader
 
@@ -1641,3 +1644,359 @@ class TestUpgradedPluginSkillReload(TestCase):
                 # case where a reload was the only work done
                 expected = 1 if (reloaded and not loaded) else 0
                 self.assertEqual(len(trained), expected)
+
+
+class TestUpgradedDependencyForget(TestCase):
+    """An upgraded DEPENDENCY must leave the import cache too.
+
+    Production, 2026-09-22: `thalovant-skillkit` went 0.16.0 -> 0.18.0 as a
+    dependency of a skill upgrade. The process kept the old library in
+    `sys.modules`, and the next three skills to reload each died on a name the
+    running copy did not have -- `ShuffleBagPool`, `combined_lines`,
+    `ThalovantConversationalCommonPlaySkill`. Every one of them was on disk.
+    The manager logged "not discoverable after its upgrade, leaving it
+    unloaded" and gave up, and only restarting the process brought them back.
+    """
+
+    def setUp(self):
+        """A manager with no baseline yet, as a freshly started process has."""
+        self.manager = SkillManager(Mock())
+
+    def _manager_seeing(self, before, after, modules):
+        """A manager that read `before` last time and reads `after` now.
+
+        Args:
+            before: Distribution name to version, the recorded baseline.
+            after: What the scan returns on this install.
+            modules: Distribution name to the modules it installs.
+
+        Returns:
+            The two patches to enter, in that order.
+        """
+        manager = self.manager
+        manager._distribution_versions = dict(before)
+        return patch.object(manager, "_installed_distributions", return_value=dict(after)), \
+            patch.object(manager, "_modules_of",
+                         side_effect=lambda names: {n: set(modules.get(n, ())) for n in names})
+
+    def test_the_baseline_is_taken_on_the_path_startup_really_uses(self):
+        """Normal startup loads through `_load_untracked_plugin_skills`.
+
+        `_load_new_skills` calls it directly and never goes through
+        `load_plugin_skills`, so seeding the baseline there left it empty on
+        every real boot. The first install then recorded the post-upgrade
+        state as the baseline and forgot nothing, for the life of the process.
+        """
+        manager = self.manager
+        self.assertIsNone(manager._distribution_versions)
+        with patch.object(manager, "_installed_distributions",
+                          return_value={"thalovant-skillkit": "0.16.0"}) as scan, \
+                patch("ovos_core.skill_manager.find_skill_plugins", return_value={}):
+            manager._load_untracked_plugin_skills(network=True, internet=True)
+        scan.assert_called_once()
+        self.assertEqual({"thalovant-skillkit": "0.16.0"}, manager._distribution_versions)
+
+    def test_a_name_is_keyed_the_way_the_installer_keys_it(self):
+        """PEP 503, the same canonical form `skill_installer` already uses.
+
+        A bare `_ -> -` swap leaves dots and repeated separators alone, so
+        `zope.interface` and `zope_interface` key differently and the same
+        distribution can be recorded twice, or read back under a spelling the
+        next scan does not produce.
+        """
+        manager = self.manager
+        spellings = [
+            SimpleNamespace(metadata={"Name": "Zope.Interface"}, version="5.0"),
+            SimpleNamespace(metadata={"Name": "ovos__utils"}, version="0.1"),
+        ]
+        with patch("ovos_core.skill_manager.distributions", return_value=spellings):
+            self.assertEqual({"zope-interface": "5.0", "ovos-utils": "0.1"},
+                             manager._installed_distributions())
+
+    def test_a_shadowed_second_copy_never_becomes_the_version(self):
+        """One name, installed twice, on the layout a hosted runtime uses.
+
+        Skills are installed into a writable venv layered over the image's, so
+        a shared library exists in both and `distributions()` returns both.
+        It walks sys.path in order, so the FIRST is the one an import gets.
+        Recording the later one pins the version to a copy nothing imports,
+        and an upgrade of the live copy then reads as no change: nothing is
+        forgotten and the stale modules stay, which is the whole defect.
+
+        Taken from a live hub: thalovant-skillkit 0.18.0 in /persist/venv
+        shadowing 0.2.0 baked into the image.
+        """
+        manager = self.manager
+        copies = [
+            SimpleNamespace(metadata={"Name": "thalovant-skillkit"}, version="0.18.0"),
+            SimpleNamespace(metadata={"Name": "thalovant-skillkit"}, version="0.2.0"),
+        ]
+        with patch("ovos_core.skill_manager.distributions", return_value=copies):
+            self.assertEqual({"thalovant-skillkit": "0.18.0"},
+                             manager._installed_distributions())
+
+    def test_a_scan_that_raises_reports_no_answer_at_all(self):
+        """The scan says None when it failed, and {} when nothing is there.
+
+        Collapsing the two is what makes a failed first scan permanent: the
+        next install reads the empty baseline as "first time", writes down
+        the post-upgrade versions and drops nothing.
+        """
+        manager = self.manager
+        with patch("ovos_core.skill_manager.distributions", return_value=[]):
+            self.assertEqual({}, manager._installed_distributions())
+        with patch("ovos_core.skill_manager.distributions",
+                   side_effect=OSError("metadata unreadable")):
+            self.assertIsNone(manager._installed_distributions())
+
+    def test_a_failed_scan_does_not_become_the_baseline(self):
+        """A scan that raised must not be read as "nothing is installed".
+
+        Recording an empty baseline would make the next install look like the
+        first one, and an upgrade seen then would be written down as done
+        without a single module being dropped.
+        """
+        manager = self.manager
+        manager._distribution_versions = {"thalovant-skillkit": "0.16.0"}
+        with patch.object(manager, "_installed_distributions", return_value=None):
+            self.assertEqual([], manager._forget_upgraded_dependencies())
+        self.assertEqual({"thalovant-skillkit": "0.16.0"}, manager._distribution_versions)
+
+    def test_an_unreadable_upgrade_is_retried_at_the_next_install(self):
+        """A version is only written down once its modules have been dropped.
+
+        `_modules_of` leaves out what it could not read. Advancing the version
+        anyway would make the upgrade invisible to every later install, and
+        the stale modules would sit in `sys.modules` until a restart.
+        """
+        installed, module_map = self._manager_seeing(
+            {"thalovant-skillkit": "0.16.0"}, {"thalovant-skillkit": "0.18.0"}, {},
+        )
+        manager = self.manager
+        with installed, patch.object(manager, "_modules_of", return_value={}):
+            self.assertEqual([], manager._forget_upgraded_dependencies())
+        self.assertEqual({"thalovant-skillkit": "0.16.0"}, manager._distribution_versions)
+
+    def test_an_upgraded_dependency_is_forgotten(self):
+        """The library a skill upgrade pulled in leaves `sys.modules` with it."""
+        installed, module_map = self._manager_seeing(
+            {"thalovant-skillkit": "0.16.0"},
+            {"thalovant-skillkit": "0.18.0"},
+            {"thalovant-skillkit": {"thalovant_skillkit"}},
+        )
+        stale = Mock()
+        with installed, module_map, patch.dict(
+            sys.modules,
+            {"thalovant_skillkit": stale, "thalovant_skillkit.skill": stale},
+            clear=False,
+        ):
+            forgotten = self.manager._forget_upgraded_dependencies()
+            self.assertEqual(forgotten, ["thalovant-skillkit"])
+            self.assertNotIn("thalovant_skillkit", sys.modules)
+            self.assertNotIn("thalovant_skillkit.skill", sys.modules)
+
+    def test_an_unchanged_dependency_is_left_alone(self):
+        """Forgetting on every install would rebuild the world each time."""
+        installed, module_map = self._manager_seeing(
+            {"thalovant-skillkit": "0.18.0"},
+            {"thalovant-skillkit": "0.18.0"},
+            {"thalovant-skillkit": {"thalovant_skillkit"}},
+        )
+        sentinel = Mock()
+        with installed, module_map, patch.dict(
+            sys.modules, {"thalovant_skillkit": sentinel}, clear=False
+        ):
+            self.assertEqual(self.manager._forget_upgraded_dependencies(), [])
+            self.assertIs(sys.modules["thalovant_skillkit"], sentinel)
+
+    def test_the_runtimes_own_machinery_is_never_forgotten(self):
+        """Re-importing these under a live process leaves running skills as
+        instances of classes their own module no longer defines -- a dead
+        skill traded for a corrupt one."""
+        installed, module_map = self._manager_seeing(
+            {"ovos-workshop": "9.8.0"},
+            {"ovos-workshop": "9.9.0"},
+            {"ovos-workshop": {"ovos_workshop"}},
+        )
+        sentinel = Mock()
+        with installed, module_map, patch.dict(
+            sys.modules, {"ovos_workshop": sentinel}, clear=False
+        ):
+            self.assertEqual(self.manager._forget_upgraded_dependencies(), [])
+            self.assertIs(sys.modules["ovos_workshop"], sentinel)
+
+    def test_a_shared_namespace_sibling_is_not_forgotten(self):
+        """Two distributions under one namespace: upgrading one must not evict
+        the other's code.
+
+        The child rule was ``n.startswith(f"{top_level}.")``, and both
+        distributions report the same top level, so upgrading dist-a forgot
+        ``shared.plugin_b`` -- code from a distribution that did not change.
+        The next skill to import it rebuilt it against nothing that moved.
+        """
+        installed, module_map = self._manager_seeing(
+            {"dist-a": "1.0"},
+            {"dist-a": "2.0"},
+            {"dist-a": {"shared"}},
+        )
+        # dist-a ships shared/ and shared/plugin_a; dist-b ships shared/plugin_b.
+        self.manager._distribution_owned = {
+            "dist-a": {"shared", "shared.plugin_a"},
+        }
+        self.manager._distribution_files = {
+            "dist-a": {"/site/shared/__init__.py", "/site/shared/plugin_a.py"},
+        }
+        parent = Mock(__file__="/site/shared/__init__.py")
+        mine = Mock(__file__="/site/shared/plugin_a.py")
+        theirs = Mock(__file__="/site/shared/plugin_b.py")
+        with installed, module_map, patch.dict(
+            sys.modules,
+            {"shared": parent, "shared.plugin_a": mine, "shared.plugin_b": theirs},
+            clear=False,
+        ):
+            self.assertEqual(
+                self.manager._forget_upgraded_dependencies(), ["dist-a"])
+            self.assertNotIn("shared.plugin_a", sys.modules)
+            self.assertIs(sys.modules.get("shared.plugin_b"), theirs,
+                          "another distribution's module was forgotten")
+            # Re-importing `shared` would drop its binding to the plugin_b
+            # that stayed cached, so the parent stays too.
+            self.assertIs(sys.modules.get("shared"), parent,
+                          "a parent with a retained child was forgotten")
+
+    def test_a_sibling_under_a_shared_subpackage_is_not_forgotten(self):
+        """Both distributions under `shared.plugins`, which dist-a ships.
+
+        Matching by prefix under an owned SUBpackage is still a guess: dist-a
+        owns `shared.plugins`, so `shared.plugins.b` from dist-b matched
+        `shared.plugins.` and went with it. Ownership is by file.
+        """
+        installed, module_map = self._manager_seeing(
+            {"dist-a": "1.0"}, {"dist-a": "2.0"}, {"dist-a": {"shared"}},
+        )
+        self.manager._distribution_owned = {
+            "dist-a": {"shared.plugins", "shared.plugins.a"},
+        }
+        self.manager._distribution_files = {
+            "dist-a": {"/site/shared/plugins/__init__.py",
+                       "/site/shared/plugins/a.py"},
+        }
+        plugins = Mock(__file__="/site/shared/plugins/__init__.py")
+        mine = Mock(__file__="/site/shared/plugins/a.py")
+        theirs = Mock(__file__="/site/shared/plugins/b.py")
+        with installed, module_map, patch.dict(
+            sys.modules,
+            {"shared.plugins": plugins, "shared.plugins.a": mine,
+             "shared.plugins.b": theirs},
+            clear=False,
+        ):
+            self.assertEqual(
+                self.manager._forget_upgraded_dependencies(), ["dist-a"])
+            self.assertNotIn("shared.plugins.a", sys.modules)
+            self.assertIs(sys.modules.get("shared.plugins.b"), theirs,
+                          "another distribution's module was forgotten")
+            self.assertIs(sys.modules.get("shared.plugins"), plugins)
+
+    def test_an_owned_package_goes_whole_when_nothing_else_lives_in_it(self):
+        """The file rule must not turn into forgetting too little: an owned
+        package, its files and a runtime-made child with no file all go."""
+        installed, module_map = self._manager_seeing(
+            {"dist-a": "1.0"}, {"dist-a": "2.0"}, {"dist-a": {"pkg"}},
+        )
+        self.manager._distribution_owned = {"dist-a": {"pkg", "pkg.core"}}
+        self.manager._distribution_files = {
+            "dist-a": {"/site/pkg/__init__.py", "/site/pkg/core.py"},
+        }
+        with installed, module_map, patch.dict(
+            sys.modules,
+            {"pkg": Mock(__file__="/site/pkg/__init__.py"),
+             "pkg.core": Mock(__file__="/site/pkg/core.py"),
+             "pkg.generated": Mock(__file__=None)},
+            clear=False,
+        ):
+            self.assertEqual(
+                self.manager._forget_upgraded_dependencies(), ["dist-a"])
+            for name in ("pkg", "pkg.core", "pkg.generated"):
+                self.assertNotIn(name, sys.modules)
+
+    def test_what_skill_discovery_imports_is_not_protected(self):
+        """The snapshot is taken before `find_skill_plugins()`.
+
+        Discovery loads every skill entry point, which imports the skills and
+        the libraries they use. Snapshotting after it protected exactly the
+        dependency this feature exists to refresh -- `thalovant_skillkit`
+        among them -- so its upgrade was never forgotten.
+        """
+        def discover():
+            sys.modules["imported_by_a_skill"] = Mock()
+            return {}
+
+        with patch("ovos_core.skill_manager.find_skill_plugins",
+                   side_effect=discover), \
+                patch.dict(sys.modules, {}, clear=False):
+            manager = SkillManager(Mock())
+            self.assertNotIn("imported_by_a_skill", manager._protected_modules)
+
+    def test_a_live_runtime_package_beyond_the_named_six_is_protected(self):
+        """The floor is not the whole runtime.
+
+        Importing ``ovos_core.skill_manager`` alone pulls in nine more
+        top-level packages -- ``padacioso``, ``quebra_frases`` and
+        ``ovos_spec_tools`` among them -- and a live manager holds live objects
+        from them. Forgetting one and re-importing it leaves
+        ``isinstance(running_thing, new_module.Thing)`` False.
+        """
+        self.assertNotIn("padacioso", PROTECTED_RUNTIME_MODULES,
+                         "the floor was widened; this test is about the rest")
+        installed, module_map = self._manager_seeing(
+            {"padacioso": "1.0"},
+            {"padacioso": "2.0"},
+            {"padacioso": {"padacioso"}},
+        )
+        sentinel = Mock()
+        with installed, module_map, patch.dict(
+            sys.modules, {"padacioso": sentinel}, clear=False
+        ):
+            self.assertEqual(self.manager._forget_upgraded_dependencies(), [])
+            self.assertIs(sys.modules["padacioso"], sentinel)
+
+    def test_a_package_imported_only_by_a_skill_is_still_forgettable(self):
+        """The snapshot is taken when the manager starts, so a module a SKILL
+        imports afterwards is not runtime and must stay evictable -- otherwise
+        the feature protects everything and forgets nothing."""
+        installed, module_map = self._manager_seeing(
+            {"late-skill-lib": "1.0"},
+            {"late-skill-lib": "2.0"},
+            {"late-skill-lib": {"late_skill_lib"}},
+        )
+        stale = Mock()
+        with installed, module_map, patch.dict(
+            sys.modules, {"late_skill_lib": stale}, clear=False
+        ):
+            self.assertEqual(
+                self.manager._forget_upgraded_dependencies(), ["late-skill-lib"])
+            self.assertNotIn("late_skill_lib", sys.modules)
+
+    def test_a_newly_installed_distribution_is_not_an_upgrade(self):
+        """Nothing was cached under it, so there is nothing to forget."""
+        installed, module_map = self._manager_seeing(
+            {"thalovant-skillkit": "0.18.0"},
+            {"thalovant-skillkit": "0.18.0", "thalovant-skill-news": "0.2.5"},
+            {"thalovant-skill-news": {"thalovant_skill_news"}},
+        )
+        with installed, module_map:
+            self.assertEqual(self.manager._forget_upgraded_dependencies(), [])
+
+    def test_dependencies_are_forgotten_before_any_skill_reloads(self):
+        """Order is the whole fix. A skill rebuilt while an upgraded library
+        is still cached is built against the old one."""
+        order = []
+        manager = SkillManager(Mock())
+        with patch.object(manager, "_forget_upgraded_dependencies",
+                          side_effect=lambda: order.append("forget") or []), \
+             patch.object(manager, "_reload_upgraded_plugin_skills",
+                          side_effect=lambda: order.append("reload") or []), \
+             patch.object(manager, "_rescan_plugin_skills",
+                          side_effect=lambda: order.append("rescan") or []):
+            manager.handle_install_complete(Message("ovos.pip.install.complete"))
+        self.assertEqual(order, ["forget", "reload", "rescan"])

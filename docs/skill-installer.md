@@ -82,6 +82,8 @@ ovos.pip.uninstall
   → ovos.pip.uninstall.failed  {"error": "...", "detail": "..."}
 ```
 
+Both uninstall requests take bare distribution names. pip and uv uninstall whatever distribution a requirement names, so an entry carrying a version, extras, a marker, a URL or path, an option or surrounding whitespace (`ovos-core>=0`, `ovos-core[extra]`, `-r file`) is refused before pip runs, along with the rest of the request. A name listed in the constraints file is refused the same way.
+
 ### Failure replies
 
 Every `.failed` reply carries two fields. `error` is the `InstallError` value naming the failure (see below); `detail` is the last `FAILURE_DETAIL_CHARS` (2000) characters of what pip or uv printed, so a caller can tell "this version is not published yet" from "this dependency conflicts" without reading the service log. `detail` is an empty string when pip never ran (disabled installer, bad URL, empty package list, protected package).
